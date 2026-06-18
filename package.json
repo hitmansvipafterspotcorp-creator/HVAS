@@ -1,0 +1,14 @@
+{
+  "name": "hitgear-os",
+  "version": "1.0.0",
+  "description": "HITGEAR OS — Hitmans VIP After Spot Quest PWA",
+  "scripts": {
+    "start": "node launcher/start_node_server.js",
+    "dev": "node launcher/start_node_server.js"
+  },
+  "keywords": ["game", "pwa", "tallahassee", "nightlife", "brawler", "rpg"],
+  "author": "HITMAN VIP",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": { "node": ">=16.0.0" }
+}

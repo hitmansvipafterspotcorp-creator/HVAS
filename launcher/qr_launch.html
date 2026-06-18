@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HITGEAR OS — QR Launch</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0010;
+    color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 24px;
+  }
+  h1 {
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    color: #ffd700;
+    text-shadow: 0 0 20px #ffd700, 0 0 40px #ff00aa;
+    text-align: center;
+    letter-spacing: 0.1em;
+  }
+  .subtitle { color: #ff00aa; font-size: 0.9rem; letter-spacing: 0.2em; text-transform: uppercase; }
+  .qr-box {
+    background: #fff;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 0 40px #ff00aa88;
+  }
+  #qr-canvas { display: block; }
+  .url-box {
+    background: #1a0030;
+    border: 1px solid #8b00ff;
+    border-radius: 8px;
+    padding: 14px 20px;
+    font-size: 1.1rem;
+    color: #ff00aa;
+    word-break: break-all;
+    text-align: center;
+    max-width: 500px;
+  }
+  .instructions {
+    color: #ccc;
+    font-size: 0.85rem;
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .instructions strong { color: #ffd700; }
+  .btn {
+    background: linear-gradient(135deg, #ff00aa, #8b00ff);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 28px;
+    font-size: 1rem;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<h1>HITGEAR OS</h1>
+<div class="subtitle">Hitmans VIP After Spot Quest</div>
+
+<div class="qr-box">
+  <canvas id="qr-canvas" width="200" height="200"></canvas>
+</div>
+
+<div class="url-box" id="game-url">Detecting local address...</div>
+
+<p class="instructions">
+  <strong>Scan the QR code</strong> with your phone's camera while on the same WiFi network to play on mobile, or click the button below to open in this browser.
+</p>
+
+<a class="btn" id="open-btn" href="#">Open Game</a>
+
+<p class="instructions">
+  Make sure the Node.js server is running first via <strong>start_windows.bat</strong> or <strong>npm start</strong>.
+</p>
+
+<script>
+  // Simple QR code via Google Charts API (or fallback text)
+  function getGameUrl() {
+    const port = 3000;
+    // Best guess at local IP — in practice this is the server machine's IP
+    return `http://${location.hostname}:${port}`;
+  }
+
+  function drawQR(url) {
+    const canvas = document.getElementById('qr-canvas');
+    const ctx = canvas.getContext('2d');
+    // Draw placeholder with URL text since we can't generate QR without a library
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 200, 200);
+    ctx.fillStyle = '#000';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR Code', 100, 20);
+    ctx.font = '8px monospace';
+    // Draw border squares (QR finder patterns)
+    const drawFinder = (x, y) => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(x, y, 42, 42);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x+6, y+6, 30, 30);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(x+12, y+12, 18, 18);
+    };
+    drawFinder(10, 10);
+    drawFinder(148, 10);
+    drawFinder(10, 148);
+    // Center text
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    const lines = url.replace('http://', '').split(':');
+    ctx.fillText(lines[0], 100, 105);
+    ctx.fillText(':' + (lines[1] || '3000'), 100, 118);
+    ctx.fillStyle = '#000';
+    ctx.font = '7px sans-serif';
+    ctx.fillText('Use Google Charts or', 100, 140);
+    ctx.fillText('a QR library for', 100, 151);
+    ctx.fillText('real QR generation', 100, 162);
+  }
+
+  const url = getGameUrl();
+  document.getElementById('game-url').textContent = url;
+  document.getElementById('open-btn').href = url;
+  drawQR(url);
+</script>
+</body>
+</html>

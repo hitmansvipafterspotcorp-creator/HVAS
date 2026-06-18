@@ -1,0 +1,84 @@
+[
+  {
+    "id": "hater", "name": "Hater", "emoji": "😤",
+    "color": "#cc2200", "size": { "w": 28, "h": 44 },
+    "hp": 80, "dmg": 12, "speed": 3.2, "behavior": "chase",
+    "blockChance": 0.1, "retreatHp": 0.1,
+    "reward": { "pts": 50, "coins": 10 },
+    "frameData": { "startup": 6, "active": 4, "recovery": 12 }
+  },
+  {
+    "id": "opp", "name": "Opp", "emoji": "🕵️",
+    "color": "#882200", "size": { "w": 30, "h": 46 },
+    "hp": 100, "dmg": 15, "speed": 3.8, "behavior": "patrol",
+    "blockChance": 0.25, "retreatHp": 0.2,
+    "reward": { "pts": 75, "coins": 15 },
+    "frameData": { "startup": 5, "active": 3, "recovery": 10 }
+  },
+  {
+    "id": "bad_npc", "name": "Bad-Energy NPC", "emoji": "🧟",
+    "color": "#444400", "size": { "w": 26, "h": 42 },
+    "hp": 60, "dmg": 8, "speed": 2.5, "behavior": "wander",
+    "blockChance": 0.05, "retreatHp": 0.05,
+    "reward": { "pts": 30, "coins": 5 },
+    "frameData": { "startup": 8, "active": 3, "recovery": 14 }
+  },
+  {
+    "id": "gate_crasher", "name": "Gate Crasher", "emoji": "🚨",
+    "color": "#ff4400", "size": { "w": 32, "h": 48 },
+    "hp": 120, "dmg": 18, "speed": 4.5, "behavior": "rush",
+    "blockChance": 0.15, "retreatHp": 0.1,
+    "reward": { "pts": 100, "coins": 20 },
+    "frameData": { "startup": 4, "active": 5, "recovery": 8 }
+  },
+  {
+    "id": "scammer", "name": "Scammer", "emoji": "🤥",
+    "color": "#886600", "size": { "w": 28, "h": 44 },
+    "hp": 70, "dmg": 10, "speed": 3.5, "behavior": "flee_then_attack",
+    "blockChance": 0.2, "retreatHp": 0.3,
+    "reward": { "pts": 60, "coins": 12 },
+    "frameData": { "startup": 7, "active": 3, "recovery": 11 }
+  },
+  {
+    "id": "disruptor", "name": "Disruptor", "emoji": "💥",
+    "color": "#cc0055", "size": { "w": 30, "h": 46 },
+    "hp": 90, "dmg": 14, "speed": 3.0, "behavior": "aggressive",
+    "blockChance": 0.1, "retreatHp": 0.15,
+    "reward": { "pts": 80, "coins": 16 },
+    "frameData": { "startup": 5, "active": 4, "recovery": 9 }
+  },
+  {
+    "id": "stalker", "name": "Stalker", "emoji": "👀",
+    "color": "#334400", "size": { "w": 26, "h": 44 },
+    "hp": 75, "dmg": 11, "speed": 2.8, "behavior": "follow",
+    "blockChance": 0.15, "retreatHp": 0.1,
+    "reward": { "pts": 65, "coins": 13 },
+    "frameData": { "startup": 6, "active": 3, "recovery": 12 }
+  },
+  {
+    "id": "corrupt_security", "name": "Corrupt Security", "emoji": "🚫",
+    "color": "#334466", "size": { "w": 36, "h": 52 },
+    "hp": 160, "dmg": 20, "speed": 2.5, "behavior": "block_and_attack",
+    "blockChance": 0.5, "retreatHp": 0.05,
+    "reward": { "pts": 150, "coins": 30 },
+    "frameData": { "startup": 8, "active": 5, "recovery": 14 }
+  },
+  {
+    "id": "boss_promoter_rival", "name": "Boss Promoter Rival", "emoji": "😈",
+    "color": "#660033", "size": { "w": 38, "h": 56 },
+    "hp": 300, "dmg": 25, "speed": 3.5, "behavior": "boss_phase",
+    "blockChance": 0.35, "retreatHp": 0.0,
+    "reward": { "pts": 500, "coins": 100 },
+    "phase2Hp": 0.5,
+    "frameData": { "startup": 6, "active": 5, "recovery": 10 }
+  },
+  {
+    "id": "venue_boss", "name": "Venue Boss", "emoji": "💀",
+    "color": "#440044", "size": { "w": 42, "h": 60 },
+    "hp": 600, "dmg": 30, "speed": 3.0, "behavior": "boss_phase",
+    "blockChance": 0.4, "retreatHp": 0.0,
+    "reward": { "pts": 1000, "coins": 200 },
+    "phase2Hp": 0.5,
+    "frameData": { "startup": 7, "active": 6, "recovery": 12 }
+  }
+]

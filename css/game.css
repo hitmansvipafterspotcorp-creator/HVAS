@@ -1,0 +1,156 @@
+/* ──── GAME ENGINE CANVAS STYLES ──── */
+#gameCanvas { display: block; image-rendering: pixelated; }
+
+/* Stage backgrounds rendered via JS canvas — these classes tag the active theme */
+.stage-theme-1  { --stage-sky: #0a0020; --stage-ground: #1a0030; }
+.stage-theme-2  { --stage-sky: #000510; --stage-ground: #051020; }
+.stage-theme-3  { --stage-sky: #0d001a; --stage-ground: #1a002a; }
+.stage-theme-4  { --stage-sky: #001020; --stage-ground: #002030; }
+.stage-theme-5  { --stage-sky: #100005; --stage-ground: #200010; }
+.stage-theme-6  { --stage-sky: #050010; --stage-ground: #0f001a; }
+.stage-theme-7  { --stage-sky: #000510; --stage-ground: #000a20; }
+.stage-theme-8  { --stage-sky: #100800; --stage-ground: #201500; }
+.stage-theme-9  { --stage-sky: #040010; --stage-ground: #0a0015; }
+.stage-theme-10 { --stage-sky: #080012; --stage-ground: #100020; }
+.stage-theme-11 { --stage-sky: #0a0010; --stage-ground: #150020; }
+.stage-theme-12 { --stage-sky: #050010; --stage-ground: #0a0015; }
+.stage-theme-13 { --stage-sky: #000a08; --stage-ground: #001510; }
+.stage-theme-14 { --stage-sky: #0a0008; --stage-ground: #150010; }
+.stage-theme-15 { --stage-sky: #050018; --stage-ground: #0a0020; }
+.stage-theme-16 { --stage-sky: #080020; --stage-ground: #100030; }
+
+/* Game over / win overlays */
+.game-overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: #00000099;
+  z-index: 100;
+  gap: 16px;
+}
+.game-overlay-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(32px, 6vw, 64px);
+  font-weight: 900;
+  letter-spacing: 6px;
+}
+.game-overlay-title.win  { color: #ffd700; text-shadow: 0 0 30px #ffd700, 0 0 60px #ffd70088; }
+.game-overlay-title.lose { color: #ff4444; text-shadow: 0 0 30px #ff4444, 0 0 60px #ff444488; }
+.game-overlay-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  color: #ffffff88;
+  letter-spacing: 3px;
+}
+.game-overlay-actions { display: flex; gap: 16px; margin-top: 16px; }
+.game-overlay-btn {
+  padding: 12px 28px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.game-overlay-btn.primary {
+  background: var(--pink);
+  border: 2px solid var(--pink);
+  color: #fff;
+  box-shadow: 0 0 20px #ff00aa88;
+}
+.game-overlay-btn.secondary {
+  background: transparent;
+  border: 2px solid #ffffff55;
+  color: #fff;
+}
+.game-overlay-btn:hover { transform: scale(1.05); }
+
+/* Enemy health bars */
+.enemy-hp-wrap {
+  position: absolute;
+  top: 60px; left: 50%; transform: translateX(-50%);
+  width: 200px;
+  text-align: center;
+}
+.enemy-name {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  color: #ff4444;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+}
+.enemy-hp-track {
+  height: 8px; background: #ffffff22;
+  border: 1px solid #ff444488; border-radius: 4px; overflow: hidden;
+}
+.enemy-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff2222, #ff6600);
+  transition: width 0.2s;
+}
+
+/* Floating damage numbers */
+.dmg-float {
+  position: absolute;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  pointer-events: none;
+  z-index: 200;
+  animation: floatUp 0.8s ease forwards;
+}
+@keyframes floatUp {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+}
+.dmg-float.hit  { color: #ffffff; font-size: 20px; text-shadow: 0 0 8px #fff; }
+.dmg-float.crit { color: var(--gold); font-size: 28px; text-shadow: 0 0 12px #ffd700; }
+.dmg-float.heal { color: #44ff88; font-size: 18px; text-shadow: 0 0 8px #44ff88; }
+
+/* Special move flash */
+.special-flash {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  animation: flashPulse 0.4s ease forwards;
+}
+@keyframes flashPulse {
+  0%   { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+/* Combo counter */
+.combo-display {
+  position: absolute;
+  top: 80px; right: 20px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--pink);
+  text-shadow: var(--neon-pink);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.combo-display.show { opacity: 1; }
+.combo-display span { font-size: 16px; display: block; color: var(--gold); }
+
+/* Pause screen */
+.pause-screen {
+  position: absolute; inset: 0;
+  background: #000000cc;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  gap: 16px;
+}
+.pause-screen.active { display: flex; }
+.pause-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 48px;
+  font-weight: 900;
+  color: var(--pink);
+  text-shadow: var(--neon-pink);
+  letter-spacing: 8px;
+}

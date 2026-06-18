@@ -1,0 +1,209 @@
+CharID,CharName,VenueID,VenueName,CameraType,WaveCount,BossName,UnlockPts_Char,UnlockPts_Venue,Status
+1,"Creator",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",0,0,CHAR_FREE
+1,"Creator",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",0,0,CHAR_FREE
+1,"Creator",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",0,500,CHAR_FREE
+1,"Creator",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",0,1300,CHAR_FREE
+1,"Creator",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",0,2200,CHAR_FREE
+1,"Creator",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",0,3200,CHAR_FREE
+1,"Creator",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",0,4300,CHAR_FREE
+1,"Creator",8,"The Den",topdown,3,"Underground Challenge Boss",0,5500,CHAR_FREE
+1,"Creator",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",0,6800,CHAR_FREE
+1,"Creator",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",0,8200,CHAR_FREE
+1,"Creator",11,"Public Hall",topdown,3,"Crowd Control Boss",0,9700,CHAR_FREE
+1,"Creator",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",0,11300,CHAR_FREE
+1,"Creator",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",0,13000,CHAR_FREE
+1,"Creator",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",0,14800,CHAR_FREE
+1,"Creator",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",0,16700,CHAR_FREE
+1,"Creator",16,"Evo Fest",sidescroll,4,"Festival Final Boss",0,18700,CHAR_FREE
+2,"DJ",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",0,0,CHAR_FREE
+2,"DJ",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",0,0,CHAR_FREE
+2,"DJ",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",0,500,CHAR_FREE
+2,"DJ",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",0,1300,CHAR_FREE
+2,"DJ",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",0,2200,CHAR_FREE
+2,"DJ",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",0,3200,CHAR_FREE
+2,"DJ",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",0,4300,CHAR_FREE
+2,"DJ",8,"The Den",topdown,3,"Underground Challenge Boss",0,5500,CHAR_FREE
+2,"DJ",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",0,6800,CHAR_FREE
+2,"DJ",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",0,8200,CHAR_FREE
+2,"DJ",11,"Public Hall",topdown,3,"Crowd Control Boss",0,9700,CHAR_FREE
+2,"DJ",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",0,11300,CHAR_FREE
+2,"DJ",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",0,13000,CHAR_FREE
+2,"DJ",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",0,14800,CHAR_FREE
+2,"DJ",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",0,16700,CHAR_FREE
+2,"DJ",16,"Evo Fest",sidescroll,4,"Festival Final Boss",0,18700,CHAR_FREE
+3,"FAMU Student A",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",300,0,LOCKED_CHAR
+3,"FAMU Student A",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",300,0,LOCKED_CHAR
+3,"FAMU Student A",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",300,500,LOCKED_CHAR
+3,"FAMU Student A",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",300,1300,LOCKED_CHAR
+3,"FAMU Student A",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",300,2200,LOCKED_CHAR
+3,"FAMU Student A",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",300,3200,LOCKED_CHAR
+3,"FAMU Student A",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",300,4300,LOCKED_CHAR
+3,"FAMU Student A",8,"The Den",topdown,3,"Underground Challenge Boss",300,5500,LOCKED_CHAR
+3,"FAMU Student A",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",300,6800,LOCKED_CHAR
+3,"FAMU Student A",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",300,8200,LOCKED_CHAR
+3,"FAMU Student A",11,"Public Hall",topdown,3,"Crowd Control Boss",300,9700,LOCKED_CHAR
+3,"FAMU Student A",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",300,11300,LOCKED_CHAR
+3,"FAMU Student A",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",300,13000,LOCKED_CHAR
+3,"FAMU Student A",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",300,14800,LOCKED_CHAR
+3,"FAMU Student A",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",300,16700,LOCKED_CHAR
+3,"FAMU Student A",16,"Evo Fest",sidescroll,4,"Festival Final Boss",300,18700,LOCKED_CHAR
+4,"FAMU Student B",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",600,0,LOCKED_CHAR
+4,"FAMU Student B",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",600,0,LOCKED_CHAR
+4,"FAMU Student B",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",600,500,LOCKED_CHAR
+4,"FAMU Student B",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",600,1300,LOCKED_CHAR
+4,"FAMU Student B",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",600,2200,LOCKED_CHAR
+4,"FAMU Student B",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",600,3200,LOCKED_CHAR
+4,"FAMU Student B",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",600,4300,LOCKED_CHAR
+4,"FAMU Student B",8,"The Den",topdown,3,"Underground Challenge Boss",600,5500,LOCKED_CHAR
+4,"FAMU Student B",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",600,6800,LOCKED_CHAR
+4,"FAMU Student B",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",600,8200,LOCKED_CHAR
+4,"FAMU Student B",11,"Public Hall",topdown,3,"Crowd Control Boss",600,9700,LOCKED_CHAR
+4,"FAMU Student B",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",600,11300,LOCKED_CHAR
+4,"FAMU Student B",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",600,13000,LOCKED_CHAR
+4,"FAMU Student B",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",600,14800,LOCKED_CHAR
+4,"FAMU Student B",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",600,16700,LOCKED_CHAR
+4,"FAMU Student B",16,"Evo Fest",sidescroll,4,"Festival Final Boss",600,18700,LOCKED_CHAR
+5,"Influencer",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",1000,0,LOCKED_CHAR
+5,"Influencer",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",1000,0,LOCKED_CHAR
+5,"Influencer",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",1000,500,LOCKED_CHAR
+5,"Influencer",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",1000,1300,LOCKED_CHAR
+5,"Influencer",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",1000,2200,LOCKED_CHAR
+5,"Influencer",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",1000,3200,LOCKED_CHAR
+5,"Influencer",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",1000,4300,LOCKED_CHAR
+5,"Influencer",8,"The Den",topdown,3,"Underground Challenge Boss",1000,5500,LOCKED_CHAR
+5,"Influencer",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",1000,6800,LOCKED_CHAR
+5,"Influencer",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",1000,8200,LOCKED_CHAR
+5,"Influencer",11,"Public Hall",topdown,3,"Crowd Control Boss",1000,9700,LOCKED_CHAR
+5,"Influencer",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",1000,11300,LOCKED_CHAR
+5,"Influencer",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",1000,13000,LOCKED_CHAR
+5,"Influencer",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",1000,14800,LOCKED_CHAR
+5,"Influencer",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",1000,16700,LOCKED_CHAR
+5,"Influencer",16,"Evo Fest",sidescroll,4,"Festival Final Boss",1000,18700,LOCKED_CHAR
+6,"Photographer",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",1500,0,LOCKED_CHAR
+6,"Photographer",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",1500,0,LOCKED_CHAR
+6,"Photographer",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",1500,500,LOCKED_CHAR
+6,"Photographer",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",1500,1300,LOCKED_CHAR
+6,"Photographer",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",1500,2200,LOCKED_CHAR
+6,"Photographer",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",1500,3200,LOCKED_CHAR
+6,"Photographer",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",1500,4300,LOCKED_CHAR
+6,"Photographer",8,"The Den",topdown,3,"Underground Challenge Boss",1500,5500,LOCKED_CHAR
+6,"Photographer",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",1500,6800,LOCKED_CHAR
+6,"Photographer",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",1500,8200,LOCKED_CHAR
+6,"Photographer",11,"Public Hall",topdown,3,"Crowd Control Boss",1500,9700,LOCKED_CHAR
+6,"Photographer",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",1500,11300,LOCKED_CHAR
+6,"Photographer",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",1500,13000,LOCKED_CHAR
+6,"Photographer",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",1500,14800,LOCKED_CHAR
+6,"Photographer",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",1500,16700,LOCKED_CHAR
+6,"Photographer",16,"Evo Fest",sidescroll,4,"Festival Final Boss",1500,18700,LOCKED_CHAR
+7,"Promoter",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",2000,0,LOCKED_CHAR
+7,"Promoter",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",2000,0,LOCKED_CHAR
+7,"Promoter",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",2000,500,LOCKED_CHAR
+7,"Promoter",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",2000,1300,LOCKED_CHAR
+7,"Promoter",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",2000,2200,LOCKED_CHAR
+7,"Promoter",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",2000,3200,LOCKED_CHAR
+7,"Promoter",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",2000,4300,LOCKED_CHAR
+7,"Promoter",8,"The Den",topdown,3,"Underground Challenge Boss",2000,5500,LOCKED_CHAR
+7,"Promoter",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",2000,6800,LOCKED_CHAR
+7,"Promoter",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",2000,8200,LOCKED_CHAR
+7,"Promoter",11,"Public Hall",topdown,3,"Crowd Control Boss",2000,9700,LOCKED_CHAR
+7,"Promoter",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",2000,11300,LOCKED_CHAR
+7,"Promoter",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",2000,13000,LOCKED_CHAR
+7,"Promoter",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",2000,14800,LOCKED_CHAR
+7,"Promoter",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",2000,16700,LOCKED_CHAR
+7,"Promoter",16,"Evo Fest",sidescroll,4,"Festival Final Boss",2000,18700,LOCKED_CHAR
+8,"Dancer",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",2800,0,LOCKED_CHAR
+8,"Dancer",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",2800,0,LOCKED_CHAR
+8,"Dancer",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",2800,500,LOCKED_CHAR
+8,"Dancer",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",2800,1300,LOCKED_CHAR
+8,"Dancer",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",2800,2200,LOCKED_CHAR
+8,"Dancer",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",2800,3200,LOCKED_CHAR
+8,"Dancer",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",2800,4300,LOCKED_CHAR
+8,"Dancer",8,"The Den",topdown,3,"Underground Challenge Boss",2800,5500,LOCKED_CHAR
+8,"Dancer",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",2800,6800,LOCKED_CHAR
+8,"Dancer",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",2800,8200,LOCKED_CHAR
+8,"Dancer",11,"Public Hall",topdown,3,"Crowd Control Boss",2800,9700,LOCKED_CHAR
+8,"Dancer",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",2800,11300,LOCKED_CHAR
+8,"Dancer",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",2800,13000,LOCKED_CHAR
+8,"Dancer",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",2800,14800,LOCKED_CHAR
+8,"Dancer",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",2800,16700,LOCKED_CHAR
+8,"Dancer",16,"Evo Fest",sidescroll,4,"Festival Final Boss",2800,18700,LOCKED_CHAR
+9,"Vendor",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",3800,0,LOCKED_CHAR
+9,"Vendor",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",3800,0,LOCKED_CHAR
+9,"Vendor",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",3800,500,LOCKED_CHAR
+9,"Vendor",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",3800,1300,LOCKED_CHAR
+9,"Vendor",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",3800,2200,LOCKED_CHAR
+9,"Vendor",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",3800,3200,LOCKED_CHAR
+9,"Vendor",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",3800,4300,LOCKED_CHAR
+9,"Vendor",8,"The Den",topdown,3,"Underground Challenge Boss",3800,5500,LOCKED_CHAR
+9,"Vendor",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",3800,6800,LOCKED_CHAR
+9,"Vendor",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",3800,8200,LOCKED_CHAR
+9,"Vendor",11,"Public Hall",topdown,3,"Crowd Control Boss",3800,9700,LOCKED_CHAR
+9,"Vendor",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",3800,11300,LOCKED_CHAR
+9,"Vendor",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",3800,13000,LOCKED_CHAR
+9,"Vendor",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",3800,14800,LOCKED_CHAR
+9,"Vendor",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",3800,16700,LOCKED_CHAR
+9,"Vendor",16,"Evo Fest",sidescroll,4,"Festival Final Boss",3800,18700,LOCKED_CHAR
+10,"Security",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",5000,0,LOCKED_CHAR
+10,"Security",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",5000,0,LOCKED_CHAR
+10,"Security",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",5000,500,LOCKED_CHAR
+10,"Security",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",5000,1300,LOCKED_CHAR
+10,"Security",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",5000,2200,LOCKED_CHAR
+10,"Security",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",5000,3200,LOCKED_CHAR
+10,"Security",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",5000,4300,LOCKED_CHAR
+10,"Security",8,"The Den",topdown,3,"Underground Challenge Boss",5000,5500,LOCKED_CHAR
+10,"Security",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",5000,6800,LOCKED_CHAR
+10,"Security",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",5000,8200,LOCKED_CHAR
+10,"Security",11,"Public Hall",topdown,3,"Crowd Control Boss",5000,9700,LOCKED_CHAR
+10,"Security",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",5000,11300,LOCKED_CHAR
+10,"Security",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",5000,13000,LOCKED_CHAR
+10,"Security",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",5000,14800,LOCKED_CHAR
+10,"Security",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",5000,16700,LOCKED_CHAR
+10,"Security",16,"Evo Fest",sidescroll,4,"Festival Final Boss",5000,18700,LOCKED_CHAR
+11,"Host",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",6500,0,LOCKED_CHAR
+11,"Host",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",6500,0,LOCKED_CHAR
+11,"Host",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",6500,500,LOCKED_CHAR
+11,"Host",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",6500,1300,LOCKED_CHAR
+11,"Host",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",6500,2200,LOCKED_CHAR
+11,"Host",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",6500,3200,LOCKED_CHAR
+11,"Host",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",6500,4300,LOCKED_CHAR
+11,"Host",8,"The Den",topdown,3,"Underground Challenge Boss",6500,5500,LOCKED_CHAR
+11,"Host",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",6500,6800,LOCKED_CHAR
+11,"Host",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",6500,8200,LOCKED_CHAR
+11,"Host",11,"Public Hall",topdown,3,"Crowd Control Boss",6500,9700,LOCKED_CHAR
+11,"Host",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",6500,11300,LOCKED_CHAR
+11,"Host",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",6500,13000,LOCKED_CHAR
+11,"Host",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",6500,14800,LOCKED_CHAR
+11,"Host",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",6500,16700,LOCKED_CHAR
+11,"Host",16,"Evo Fest",sidescroll,4,"Festival Final Boss",6500,18700,LOCKED_CHAR
+12,"FSU Student A",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",8000,0,LOCKED_CHAR
+12,"FSU Student A",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",8000,0,LOCKED_CHAR
+12,"FSU Student A",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",8000,500,LOCKED_CHAR
+12,"FSU Student A",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",8000,1300,LOCKED_CHAR
+12,"FSU Student A",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",8000,2200,LOCKED_CHAR
+12,"FSU Student A",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",8000,3200,LOCKED_CHAR
+12,"FSU Student A",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",8000,4300,LOCKED_CHAR
+12,"FSU Student A",8,"The Den",topdown,3,"Underground Challenge Boss",8000,5500,LOCKED_CHAR
+12,"FSU Student A",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",8000,6800,LOCKED_CHAR
+12,"FSU Student A",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",8000,8200,LOCKED_CHAR
+12,"FSU Student A",11,"Public Hall",topdown,3,"Crowd Control Boss",8000,9700,LOCKED_CHAR
+12,"FSU Student A",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",8000,11300,LOCKED_CHAR
+12,"FSU Student A",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",8000,13000,LOCKED_CHAR
+12,"FSU Student A",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",8000,14800,LOCKED_CHAR
+12,"FSU Student A",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",8000,16700,LOCKED_CHAR
+12,"FSU Student A",16,"Evo Fest",sidescroll,4,"Festival Final Boss",8000,18700,LOCKED_CHAR
+13,"FSU Student B",1,"Cafe8Fifty Exterior",sidescroll,3,"Entry Line Disruptor",10000,0,LOCKED_CHAR
+13,"FSU Student B",2,"Food Truck / Hibachi Street",sidescroll,3,"Street Heat Boss",10000,0,LOCKED_CHAR
+13,"FSU Student B",3,"HITMANS VIP After Spot Interior",topdown,2,"Status Check Boss",10000,500,LOCKED_CHAR
+13,"FSU Student B",4,"Kingdom Come Saloon",topdown,2,"Saloon Rival",10000,1300,LOCKED_CHAR
+13,"FSU Student B",5,"Social Gaines Bar",topdown,2,"Pool Table Shark",10000,2200,LOCKED_CHAR
+13,"FSU Student B",6,"Success Pool Bar",topdown,2,"Rooftop VIP Boss",10000,3200,LOCKED_CHAR
+13,"FSU Student B",7,"Tally Row Exterior",sidescroll,3,"Street Route Boss",10000,4300,LOCKED_CHAR
+13,"FSU Student B",8,"The Den",topdown,3,"Underground Challenge Boss",10000,5500,LOCKED_CHAR
+13,"FSU Student B",9,"The Itus Pizza",topdown,2,"Kitchen Rush Boss",10000,6800,LOCKED_CHAR
+13,"FSU Student B",10,"Sammys Stage",topdown,2,"Stage Showdown Boss",10000,8200,LOCKED_CHAR
+13,"FSU Student B",11,"Public Hall",topdown,3,"Crowd Control Boss",10000,9700,LOCKED_CHAR
+13,"FSU Student B",12,"13 Rave Club",topdown,3,"Laser/Rave Boss",10000,11300,LOCKED_CHAR
+13,"FSU Student B",13,"Dukes & Dimes",topdown,2,"Hustle Table Boss",10000,13000,LOCKED_CHAR
+13,"FSU Student B",14,"Quick Hit Fuel",sidescroll,3,"Late Night Stop Boss",10000,14800,LOCKED_CHAR
+13,"FSU Student B",15,"Rooftop / Parking Connector",sidescroll,3,"Parking Lot Boss",10000,16700,LOCKED_CHAR
+13,"FSU Student B",16,"Evo Fest",sidescroll,4,"Festival Final Boss",10000,18700,LOCKED_CHAR
