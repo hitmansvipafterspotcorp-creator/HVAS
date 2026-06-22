@@ -136,6 +136,8 @@ const HitgearOS = (() => {
     const grid = document.getElementById('os-icon-grid');
     if (!grid) return;
     const icons = [
+      { label: 'STORY\nMODE', emoji: '🥊', action: () => StoryMode.startStory() },
+      { label: 'ARCADE\nFIGHT', emoji: '🕹️', action: () => StoryMode.startArcade() },
       { label: 'HITMANS VIP\nQUEST', emoji: '👑', action: () => openGameMenu() },
       { label: 'VENUES\n& SPOTS', emoji: '🗺️', action: () => openVenueMap() },
       { label: 'VIP\nSTATUS', emoji: '⭐', action: () => openVIPStatus() },
@@ -167,10 +169,11 @@ const HitgearOS = (() => {
   function osKeyHandler(e) {
     if (currentScreen !== 'screen-os') return;
     const icons = document.querySelectorAll('.os-icon');
-    const actions = [openGameMenu, openVenueMap, openVIPStatus, openBingo];
-    if (e.key === 'ArrowRight' || e.key === 'd') { selectedOsIcon = Math.min(3, selectedOsIcon + 1); }
+    const actions = [() => StoryMode.startStory(), () => StoryMode.startArcade(), openGameMenu, openVenueMap, openVIPStatus, openBingo];
+    const maxIdx = actions.length - 1;
+    if (e.key === 'ArrowRight' || e.key === 'd') { selectedOsIcon = Math.min(maxIdx, selectedOsIcon + 1); }
     if (e.key === 'ArrowLeft'  || e.key === 'a') { selectedOsIcon = Math.max(0, selectedOsIcon - 1); }
-    if (e.key === 'ArrowDown'  || e.key === 's') { selectedOsIcon = Math.min(3, selectedOsIcon + 2); }
+    if (e.key === 'ArrowDown'  || e.key === 's') { selectedOsIcon = Math.min(maxIdx, selectedOsIcon + 2); }
     if (e.key === 'ArrowUp'    || e.key === 'w') { selectedOsIcon = Math.max(0, selectedOsIcon - 2); }
     if (e.key === 'Enter' || e.key === 'z' || e.key === 'Z') { actions[selectedOsIcon]?.(); return; }
     icons.forEach((ic, i) => ic.classList.toggle('selected', i === selectedOsIcon));
@@ -186,6 +189,8 @@ const HitgearOS = (() => {
 
   let gameMenuIdx = 0;
   const gameMenuItems = [
+    { label: 'STORY MODE (FIGHTER)', action: () => StoryMode.startStory() },
+    { label: 'ARCADE FIGHT',         action: () => StoryMode.startArcade() },
     { label: 'CONTINUE QUEST', action: () => continueQuest() },
     { label: 'NEW GAME',       action: () => newGame() },
     { label: 'VENUE MAP',      action: () => openVenueMap() },

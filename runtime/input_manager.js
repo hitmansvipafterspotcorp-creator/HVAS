@@ -45,7 +45,10 @@ const InputManager = (() => {
 
   function justPressed(action) { return state[action] && !prev[action]; }
 
+  let _inited = false;
   function init() {
+    if (_inited) return;
+    _inited = true;
     window.addEventListener('keydown', e => onKey(e, true));
     window.addEventListener('keyup', e => onKey(e, false));
     initGamepad();
