@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="HITGEAR OS">
@@ -31,6 +31,29 @@
 </style>
 </head>
 <body>
+<div id="portrait-blocker">
+  <div style="font-size:48px">↻</div>
+  ROTATE DEVICE TO PLAY
+</div>
+
+<div id="console-shell">
+  <div class="console-body">
+    <div id="shell-branding">HITGEAR OS</div>
+
+    <div id="shell-left">
+      <div id="shell-dpad">
+        <div class="shell-dpad-btn" id="sdpad-up">▲</div>
+        <div class="shell-dpad-mid">
+          <div class="shell-dpad-btn" id="sdpad-left">◀</div>
+          <div class="shell-dpad-center"></div>
+          <div class="shell-dpad-btn" id="sdpad-right">▶</div>
+        </div>
+        <div class="shell-dpad-btn" id="sdpad-down">▼</div>
+      </div>
+      <div id="shell-select-btn">SELECT</div>
+    </div>
+
+    <div id="screen-area">
 
 <!-- ══════════════════════════════════ BOOT SCREEN ══════════════════════════════════ -->
 <div id="screen-boot" class="screen active" style="display:flex">
@@ -247,6 +270,23 @@
   <div class="vip-header" style="margin-bottom:24px">OPTIONS</div>
   <div id="options-area"></div>
 </div>
+
+    </div><!-- /#screen-area -->
+
+    <div id="shell-right">
+      <div id="shell-face-btns">
+        <div class="shell-face-btn shell-btn-y" id="sfbtn-y">Y</div>
+        <div class="shell-face-row">
+          <div class="shell-face-btn shell-btn-x" id="sfbtn-x">X</div>
+          <div class="shell-face-btn shell-btn-b" id="sfbtn-b">B</div>
+        </div>
+        <div class="shell-face-btn shell-btn-a" id="sfbtn-a">A</div>
+      </div>
+      <div id="shell-start-btn">START</div>
+    </div>
+
+  </div><!-- /.console-body -->
+</div><!-- /#console-shell -->
 
 <!-- ══════════════════════════════════ DATA SCRIPTS ══════════════════════════════════ -->
 <script>
@@ -502,6 +542,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const tier = VIPStatus.getTier(save.statusPts || 0);
   const tierEl = document.getElementById('hud-tier');
   if (tierEl) { tierEl.textContent = tier.name; tierEl.style.color = tier.color; }
+
+  // Orientation lock
+  if (screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape').catch(()=>{});
+  }
+
+  // Wire console shell physical buttons to game touch controls
+  function wireShellButton(shellId, touchId) {
+    const shell = document.getElementById(shellId);
+    const touch = document.getElementById(touchId);
+    if (!shell || !touch) return;
+    const down = e => { e.preventDefault(); touch.dispatchEvent(new TouchEvent('touchstart', {bubbles:true, touches:[new Touch({identifier:Date.now(), target:touch})]})); shell.classList.add('pressed'); };
+    const up   = e => { e.preventDefault(); touch.dispatchEvent(new TouchEvent('touchend',   {bubbles:true, changedTouches:[new Touch({identifier:Date.now(), target:touch})]})); shell.classList.remove('pressed'); };
+    shell.addEventListener('touchstart', down, {passive:false});
+    shell.addEventListener('touchend',   up,   {passive:false});
+    shell.addEventListener('mousedown',  () => { touch.dispatchEvent(new MouseEvent('mousedown', {bubbles:true})); shell.classList.add('pressed'); });
+    shell.addEventListener('mouseup',    () => { touch.dispatchEvent(new MouseEvent('mouseup',   {bubbles:true})); shell.classList.remove('pressed'); });
+  }
+
+  wireShellButton('sdpad-up',    'touch-up');
+  wireShellButton('sdpad-down',  'touch-down');
+  wireShellButton('sdpad-left',  'touch-left');
+  wireShellButton('sdpad-right', 'touch-right');
+  wireShellButton('sfbtn-a',     'touch-a');
+  wireShellButton('sfbtn-b',     'touch-b');
+  wireShellButton('sfbtn-x',     'touch-x');
+  wireShellButton('sfbtn-y',     'touch-y');
+
+  document.getElementById('shell-select-btn')?.addEventListener('click', () => { if(typeof QuestEngine !== 'undefined') QuestEngine?.togglePause?.(); });
+  document.getElementById('shell-start-btn')?.addEventListener('click', () => {
+    document.getElementById('touch-a')?.click();
+  });
 });
 </script>
 </body>
