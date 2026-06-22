@@ -38,19 +38,32 @@
 
 <div id="console-shell">
   <div class="console-body">
-    <div id="shell-branding">HITGEAR OS</div>
 
+    <!-- ── LEFT GRIP ── -->
+    <div class="shell-grip shell-grip-left">
+      <div class="shell-grip-inner"></div>
+    </div>
+
+    <!-- ── LEFT PANEL ── -->
     <div id="shell-left">
+      <!-- HITGEAR OS label top-left -->
+      <div class="shell-label-tl">HITGEAR OS</div>
+      <!-- D-pad: proper + cross shape -->
       <div id="shell-dpad">
-        <div class="shell-dpad-btn" id="sdpad-up">▲</div>
-        <div class="shell-dpad-mid">
-          <div class="shell-dpad-btn" id="sdpad-left">◀</div>
-          <div class="shell-dpad-center"></div>
-          <div class="shell-dpad-btn" id="sdpad-right">▶</div>
+        <div class="dpad-row"><div class="dpad-arm dpad-arm-up"   id="sdpad-up">  <span>▲</span></div></div>
+        <div class="dpad-row dpad-row-mid">
+          <div class="dpad-arm dpad-arm-left"  id="sdpad-left"> <span>◀</span></div>
+          <div class="dpad-center"></div>
+          <div class="dpad-arm dpad-arm-right" id="sdpad-right"><span>▶</span></div>
         </div>
-        <div class="shell-dpad-btn" id="sdpad-down">▼</div>
+        <div class="dpad-row"><div class="dpad-arm dpad-arm-down" id="sdpad-down"><span>▼</span></div></div>
       </div>
-      <div id="shell-select-btn">SELECT</div>
+      <!-- Speaker grille left -->
+      <div class="shell-grille">
+        <div class="grille-line"></div><div class="grille-line"></div>
+        <div class="grille-line"></div><div class="grille-line"></div>
+        <div class="grille-line"></div>
+      </div>
     </div>
 
     <div id="screen-area">
@@ -273,17 +286,42 @@
 
     </div><!-- /#screen-area -->
 
+    <!-- ── RIGHT PANEL ── -->
     <div id="shell-right">
+      <!-- Crown badge top-right -->
+      <div class="shell-crown">👑</div>
+      <!-- Face buttons diamond: Y top, X left, B right, A bottom -->
       <div id="shell-face-btns">
-        <div class="shell-face-btn shell-btn-y" id="sfbtn-y">Y</div>
-        <div class="shell-face-row">
+        <div class="face-row"><div class="shell-face-btn shell-btn-y" id="sfbtn-y">Y</div></div>
+        <div class="face-row">
           <div class="shell-face-btn shell-btn-x" id="sfbtn-x">X</div>
+          <div class="face-spacer"></div>
           <div class="shell-face-btn shell-btn-b" id="sfbtn-b">B</div>
         </div>
-        <div class="shell-face-btn shell-btn-a" id="sfbtn-a">A</div>
+        <div class="face-row"><div class="shell-face-btn shell-btn-a" id="sfbtn-a">A</div></div>
       </div>
+      <!-- Speaker grille right -->
+      <div class="shell-grille">
+        <div class="grille-line"></div><div class="grille-line"></div>
+        <div class="grille-line"></div><div class="grille-line"></div>
+        <div class="grille-line"></div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT GRIP ── -->
+    <div class="shell-grip shell-grip-right">
+      <div class="shell-grip-inner"></div>
+    </div>
+
+    <!-- ── SELECT / START pills — centered bottom ── -->
+    <div id="shell-bottom-btns">
+      <div id="shell-select-btn">SELECT</div>
       <div id="shell-start-btn">START</div>
     </div>
+
+    <!-- Gold accent lines top + bottom across screen -->
+    <div class="shell-accent-top"></div>
+    <div class="shell-accent-bot"></div>
 
   </div><!-- /.console-body -->
 </div><!-- /#console-shell -->

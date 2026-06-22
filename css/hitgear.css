@@ -689,225 +689,316 @@ body {
   .venues-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
-/* ──────────────────── CONSOLE SHELL ──────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   CONSOLE SHELL — matches the HITGEAR handheld reference image
+   ═══════════════════════════════════════════════════════════ */
+
 @media (orientation: portrait) {
-  #console-shell { display: none; }
-  #portrait-blocker { display: flex; }
+  #console-shell { display: none !important; }
+  #portrait-blocker { display: flex !important; }
 }
 @media (orientation: landscape) {
-  #console-shell { display: flex; }
-  #portrait-blocker { display: none; }
+  #console-shell { display: flex !important; }
+  #portrait-blocker { display: none !important; }
 }
 
+/* ── Portrait blocker ── */
 #portrait-blocker {
   position: fixed; inset: 0; z-index: 9999;
   background: #0a0010;
   display: none;
   flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 20px;
+  gap: 16px;
   font-family: 'Orbitron', sans-serif;
   color: #ff00aa;
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 3px;
   text-align: center;
-  text-shadow: 0 0 12px #ff00aa;
+  text-shadow: 0 0 16px #ff00aa;
 }
+#portrait-blocker > div { font-size: 52px; animation: spin360 2s linear infinite; }
+@keyframes spin360 { to { transform: rotate(360deg); } }
 
+/* ── Outer shell container ── */
 #console-shell {
   position: fixed; inset: 0; z-index: 1;
   display: flex;
   align-items: center; justify-content: center;
-  background: radial-gradient(ellipse at 30% 20%, #1a0035 0%, #0d001a 40%, #0a0010 100%);
+  background: radial-gradient(ellipse at 35% 25%, #230040 0%, #100020 45%, #07000f 100%);
 }
 
+/* ── Console body ── */
 .console-body {
-  width: 96vw; height: 90vh;
-  max-height: 100vw;
+  /* Size: fills viewport in landscape, 16:7 ratio like the reference */
+  width: 98vw;
+  height: 94vh;
+  max-width: calc(94vh * 2.35);  /* maintain aspect */
   display: flex;
   align-items: stretch;
-  background: linear-gradient(160deg, #1a1a22 0%, #0d0d12 50%, #111118 100%);
-  border-radius: 24px;
-  border: 2px solid #ff00aa44;
-  box-shadow: 0 0 40px #ff00aa33, 0 0 80px #ff00aa11, inset 0 1px 0 #ffffff11;
-  overflow: hidden;
   position: relative;
+  /* Dark charcoal body with subtle top-highlight */
+  background: linear-gradient(175deg,
+    #2a2a35 0%,
+    #1a1a22 8%,
+    #111118 30%,
+    #0e0e14 60%,
+    #131318 100%);
+  /* Rounded grips on left+right, tighter radius top+bottom center */
+  border-radius: 28px;
+  /* Outer pink neon underglow like the reference */
+  box-shadow:
+    0 0 0 1px #ff00aa33,
+    0 0 30px #ff00aa44,
+    0 0 80px #ff00aa22,
+    0 8px 60px #00000088,
+    inset 0 1px 0 #ffffff18,
+    inset 0 -1px 0 #00000066;
+  overflow: visible;  /* allow grip protrusions */
 }
 
-.console-body::before, .console-body::after {
-  content: '';
+/* ── Gold accent lines spanning screen edges ── */
+.shell-accent-top, .shell-accent-bot {
   position: absolute;
-  left: 18vw; right: 18vw;
+  left: 19%; right: 19%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #ffd700aa, transparent);
-}
-.console-body::before { top: 0; }
-.console-body::after { bottom: 0; }
-
-#shell-branding {
-  position: absolute;
-  top: 6px; left: 50%; transform: translateX(-50%);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 8px; letter-spacing: 4px;
-  color: #ff00aa66;
-  z-index: 10;
+  z-index: 5;
   pointer-events: none;
+  background: linear-gradient(90deg, transparent 0%, #ffd700cc 30%, #ffd700 50%, #ffd700cc 70%, transparent 100%);
+}
+.shell-accent-top { top: 0; border-radius: 0 0 2px 2px; }
+.shell-accent-bot { bottom: 0; border-radius: 2px 2px 0 0; }
+
+/* ── Grip protrusions (bulging rounded ends) ── */
+.shell-grip {
+  position: absolute;
+  top: 10%; bottom: 10%;
+  width: 26px;
+  background: inherit;
+  z-index: 0;
+}
+.shell-grip-left  { left: -12px; border-radius: 50% 0 0 50%; box-shadow: -4px 0 20px #ff00aa22; }
+.shell-grip-right { right: -12px; border-radius: 0 50% 50% 0; box-shadow: 4px 0 20px #ff00aa22; }
+.shell-grip-inner {
+  position: absolute; inset: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #222230, #1a1a22);
 }
 
+/* ── LEFT PANEL ── */
 #shell-left {
-  width: 18vw;
+  width: 19%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 12px 8px;
-  background: #0d0d12;
-  border-right: 1px solid #ff00aa22;
+  gap: 10px;
+  padding: 10px 6px 28px;
   position: relative;
+  z-index: 2;
+  /* Very subtle inner separator toward screen */
+  border-right: 1px solid #ff00aa18;
 }
 
+.shell-label-tl {
+  position: absolute;
+  top: 10px; left: 0; right: 0;
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(5px, 1vw, 8px);
+  letter-spacing: 2px;
+  color: #ff00aa55;
+  pointer-events: none;
+}
+
+/* ── D-pad: proper + cross shape ── */
 #shell-dpad {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   user-select: none;
+  /* size the whole dpad relative to panel width */
+  --dp: clamp(28px, 5.5vw, 52px);
 }
 
-.shell-dpad-mid {
+.dpad-row {
+  display: flex;
+  justify-content: center;
+}
+
+.dpad-row-mid {
   display: flex;
   align-items: center;
-  gap: 2px;
 }
 
-.shell-dpad-center {
-  width: 28px; height: 28px;
-  background: #1a1a22;
-  border-radius: 4px;
-}
-
-.shell-dpad-btn {
-  width: 32px; height: 32px;
-  background: #1e1e2a;
-  border: 1px solid #ff00aa44;
-  border-radius: 6px;
+.dpad-arm {
+  width: var(--dp);
+  height: var(--dp);
+  background: linear-gradient(145deg, #2a2a38, #1a1a26);
+  border: 1px solid #cc88ff33;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
-  color: #cc88ff;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.08s, box-shadow 0.08s;
   touch-action: none;
+  transition: background 0.07s, box-shadow 0.07s;
 }
-.shell-dpad-btn:active, .shell-dpad-btn.pressed {
-  background: #3a0060;
-  box-shadow: 0 0 8px #ff00aa88;
+.dpad-arm span {
+  font-size: clamp(10px, 2vw, 16px);
+  color: #cc88ff;
+  pointer-events: none;
 }
-
-#shell-select-btn {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 7px;
-  letter-spacing: 1px;
-  color: #ff00aa99;
-  background: #1a1a22;
-  border: 1px solid #ff00aa33;
-  border-radius: 10px;
-  padding: 4px 8px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-#shell-select-btn:active { background: #2a0040; }
-
-#screen-area {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-  background: #000;
-  border-left: 2px solid #ff00aa22;
-  border-right: 2px solid #ff00aa22;
+.dpad-arm:active, .dpad-arm.pressed {
+  background: #3a0058;
+  box-shadow: inset 0 0 10px #ff00aa66;
 }
 
-#screen-area .screen {
-  position: absolute;
-  inset: 0;
+/* Arm shapes — top/bottom have rounded top/bottom edges, left/right have rounded left/right */
+.dpad-arm-up    { border-radius: 6px 6px 0 0; }
+.dpad-arm-down  { border-radius: 0 0 6px 6px; }
+.dpad-arm-left  { border-radius: 6px 0 0 6px; }
+.dpad-arm-right { border-radius: 0 6px 6px 0; }
+
+.dpad-center {
+  width: var(--dp);
+  height: var(--dp);
+  background: #111118;
+  border: 1px solid #cc88ff11;
+  pointer-events: none;
 }
 
+/* ── Speaker grille ── */
+.shell-grille {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 60%;
+}
+.grille-line {
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #ffffff14, transparent);
+}
+
+/* ── RIGHT PANEL ── */
 #shell-right {
-  width: 18vw;
+  width: 19%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 12px 8px;
-  background: #0d0d12;
-  border-left: 1px solid #ff00aa22;
+  gap: 10px;
+  padding: 10px 6px 28px;
   position: relative;
+  z-index: 2;
+  border-left: 1px solid #ff00aa18;
 }
 
+/* Crown badge */
+.shell-crown {
+  position: absolute;
+  top: 8px; right: 10px;
+  font-size: clamp(12px, 2.2vw, 20px);
+  filter: drop-shadow(0 0 6px #ffd700aa);
+  pointer-events: none;
+}
+
+/* ── Face buttons diamond ── */
 #shell-face-btns {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   user-select: none;
+  --fb: clamp(24px, 4.5vw, 44px);
 }
 
-.shell-face-row {
+.face-row {
   display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 3px;
 }
 
+.face-spacer {
+  width: var(--fb);
+  height: var(--fb);
+}
+
 .shell-face-btn {
-  width: 30px; height: 30px;
+  width: var(--fb);
+  height: var(--fb);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: clamp(9px, 1.8vw, 14px);
+  font-weight: 900;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   border: 2px solid;
-  background: #00000066;
-  transition: all 0.08s;
+  background: linear-gradient(145deg, #1e1e2a, #141420);
+  box-shadow: 0 2px 6px #00000066;
+  transition: all 0.07s;
   touch-action: none;
 }
-.shell-face-btn:active, .shell-face-btn.pressed { filter: brightness(1.6); transform: scale(0.9); }
+.shell-face-btn:active, .shell-face-btn.pressed {
+  filter: brightness(1.7);
+  transform: scale(0.88);
+  box-shadow: 0 0 12px currentColor;
+}
 
-.shell-btn-a { color: #ffd700; border-color: #ffd700; }
-.shell-btn-b { color: #ff4444; border-color: #ff4444; }
-.shell-btn-x { color: #ff00aa; border-color: #ff00aa; }
-.shell-btn-y { color: #44aaff; border-color: #44aaff; }
+.shell-btn-a { color: #ffd700; border-color: #ffd700; text-shadow: 0 0 8px #ffd70088; }
+.shell-btn-b { color: #ff4444; border-color: #ff4444; text-shadow: 0 0 8px #ff444488; }
+.shell-btn-x { color: #ff00aa; border-color: #ff00aa; text-shadow: 0 0 8px #ff00aa88; }
+.shell-btn-y { color: #44aaff; border-color: #44aaff; text-shadow: 0 0 8px #44aaff88; }
 
-#shell-start-btn {
+/* ── SELECT / START pill buttons — absolute bottom center ── */
+#shell-bottom-btns {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 6;
+}
+
+#shell-select-btn, #shell-start-btn {
   font-family: 'Orbitron', sans-serif;
-  font-size: 7px;
-  letter-spacing: 1px;
-  color: #ff00aa99;
-  background: #1a1a22;
-  border: 1px solid #ff00aa33;
-  border-radius: 10px;
-  padding: 4px 8px;
+  font-size: clamp(6px, 1vw, 9px);
+  letter-spacing: 2px;
+  color: #ff00aacc;
+  background: #1a1a28;
+  border: 1px solid #ff00aa44;
+  border-radius: 20px;
+  padding: clamp(3px,0.6vh,5px) clamp(8px,1.5vw,14px);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 0 8px #ff00aa22;
+  transition: background 0.1s, box-shadow 0.1s;
+  white-space: nowrap;
 }
-#shell-start-btn:active { background: #2a0040; }
+#shell-select-btn:active, #shell-start-btn:active {
+  background: #2e0048;
+  box-shadow: 0 0 14px #ff00aa66;
+}
 
-#shell-left::after, #shell-right::before {
-  content: '· · ·\A· · ·\A· · ·';
-  white-space: pre;
-  font-size: 8px;
-  color: #ffffff11;
-  letter-spacing: 4px;
-  line-height: 1.8;
-  text-align: center;
+/* ── SCREEN AREA ── */
+#screen-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  /* Screen bezel — thin dark frame, slight inset look */
+  border-left:  2px solid #ff00aa22;
+  border-right: 2px solid #ff00aa22;
+  box-shadow: inset 0 0 30px #00000088;
+  z-index: 2;
+}
+#screen-area .screen {
   position: absolute;
-  bottom: 20px;
+  inset: 0;
 }
-#shell-left::after { left: 8px; }
-#shell-right::before { right: 8px; }
 
-#console-shell .touch-controls {
-  display: none !important;
-}
+/* ── Hide in-canvas floating touch controls — shell buttons replace them ── */
+#console-shell .touch-controls { display: none !important; }
