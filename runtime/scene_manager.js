@@ -194,66 +194,76 @@ const SceneManager = (() => {
     const groundYPx = H * groundYFrac;
     const accentColor = (venue.colors && venue.colors.accent) || '#ff00aa';
 
-    // 1. Sky gradient
-    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-    skyGrad.addColorStop(0, '#080014');
-    skyGrad.addColorStop(1, '#1a0030');
-    ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, W, H);
+    // 0. Real backdrop art (if uploaded) — fills the frame; vector layers below
+    //    are skipped so the painted scene shows through.
+    const bgImg = (typeof AssetLoader !== 'undefined' && venue.bgImage)
+      ? AssetLoader.get(venue.bgImage) : null;
 
-    // 2. Stars (fixed positions — deterministic)
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    for (let i = 0; i < 20; i++) {
-      const sx = (i * 137.5) % W;
-      const sy = (i * 89.3) % (H * 0.6);
-      ctx.fillRect(sx, sy, 1, 1);
-    }
+    if (!bgImg) {
+      // 1. Sky gradient
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+      skyGrad.addColorStop(0, '#080014');
+      skyGrad.addColorStop(1, '#1a0030');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, W, H);
 
-    // 3. Background layer processing (for neonSigns and other layer types)
-    const layers = venue.bgLayers || [];
-    layers.forEach(layer => {
-      if (layer.type === 'cityBg') {
-        ctx.fillStyle = layer.color;
-        ctx.fillRect(0, H * (layer.y || 0.2), W, H * (layer.h || 0.6));
-      } else if (layer.type === 'buildings') {
-        drawBuildings(layer.color, cameraX, W, H, layer.y, layer.h);
-      } else if (layer.type === 'neonSigns') {
-        drawNeonSigns(neonSigns[(venue.id - 1)] || [], cameraX * 0.5, W, H, layer.y, layer.color);
+      // 2. Stars (fixed positions — deterministic)
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      for (let i = 0; i < 20; i++) {
+        const sx = (i * 137.5) % W;
+        const sy = (i * 89.3) % (H * 0.6);
+        ctx.fillRect(sx, sy, 1, 1);
       }
-      // sky and ground handled separately above/below
-    });
 
-    // If no buildings layer defined, still draw default buildings
-    const hasBuildingsLayer = layers.some(l => l.type === 'buildings');
-    if (!hasBuildingsLayer) {
-      drawBuildings('#1a0035', cameraX, W, H, groundYFrac - 0.3, 0.3);
+      // 3. Background layer processing (for neonSigns and other layer types)
+      const layers = venue.bgLayers || [];
+      layers.forEach(layer => {
+        if (layer.type === 'cityBg') {
+          ctx.fillStyle = layer.color;
+          ctx.fillRect(0, H * (layer.y || 0.2), W, H * (layer.h || 0.6));
+        } else if (layer.type === 'buildings') {
+          drawBuildings(layer.color, cameraX, W, H, layer.y, layer.h);
+        } else if (layer.type === 'neonSigns') {
+          drawNeonSigns(neonSigns[(venue.id - 1)] || [], cameraX * 0.5, W, H, layer.y, layer.color);
+        }
+        // sky and ground handled separately above/below
+      });
+
+      // If no buildings layer defined, still draw default buildings
+      const hasBuildingsLayer = layers.some(l => l.type === 'buildings');
+      if (!hasBuildingsLayer) {
+        drawBuildings('#1a0035', cameraX, W, H, groundYFrac - 0.3, 0.3);
+      }
+
+      // 4. Ground gradient
+      const groundGrad = ctx.createLinearGradient(0, groundYPx, 0, H);
+      const groundBaseColor = (venue.colors && venue.colors.floor) || '#1a0025';
+      groundGrad.addColorStop(0, groundBaseColor);
+      groundGrad.addColorStop(1, '#0a0010');
+      ctx.fillStyle = groundGrad;
+      ctx.fillRect(0, groundYPx, W, H - groundYPx);
+
+      // 5. Neon floor line
+      ctx.strokeStyle = accentColor;
+      ctx.shadowColor = accentColor;
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, groundYPx);
+      ctx.lineTo(W, groundYPx);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    } else {
+      // painted backdrop fills the whole frame
+      AssetLoader.drawCover(ctx, bgImg, 0, 0, W, H);
     }
-
-    // 4. Ground gradient
-    const groundGrad = ctx.createLinearGradient(0, groundYPx, 0, H);
-    const groundBaseColor = (venue.colors && venue.colors.floor) || '#1a0025';
-    groundGrad.addColorStop(0, groundBaseColor);
-    groundGrad.addColorStop(1, '#0a0010');
-    ctx.fillStyle = groundGrad;
-    ctx.fillRect(0, groundYPx, W, H - groundYPx);
-
-    // 5. Neon floor line
-    ctx.strokeStyle = accentColor;
-    ctx.shadowColor = accentColor;
-    ctx.shadowBlur = 8;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, groundYPx);
-    ctx.lineTo(W, groundYPx);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
 
     // World entities (with camera offset)
     ctx.save();
     ctx.translate(-cameraX, 0);
 
-    // Stage 1 specific tile rendering
-    if (venue.id === 1 && typeof Stage1Scene !== 'undefined') {
+    // Stage 1 specific tile rendering (skipped when painted backdrop is shown)
+    if (!bgImg && venue.id === 1 && typeof Stage1Scene !== 'undefined') {
       Stage1Scene.renderOutside(ctx, cameraX, W, H);
     }
 
@@ -520,28 +530,35 @@ const SceneManager = (() => {
     const wallColor = venue.colors ? venue.colors.wall : '#2a0040';
     const accentColor = venue.colors ? venue.colors.accent : '#ff00aa';
 
-    ctx.fillStyle = floorColor;
-    ctx.fillRect(0, 0, W, H);
+    const bgImg = (typeof AssetLoader !== 'undefined' && venue.bgImage)
+      ? AssetLoader.get(venue.bgImage) : null;
 
-    // Floor grid subtle
-    ctx.strokeStyle = accentColor + '15';
-    ctx.lineWidth = 1;
-    const tileSize = 50;
-    const offX = -(cameraX % tileSize);
-    const offY = -(cameraY % tileSize);
-    for (let x = offX; x < W; x += tileSize) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    }
-    for (let y = offY; y < H; y += tileSize) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    if (bgImg) {
+      AssetLoader.drawCover(ctx, bgImg, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = floorColor;
+      ctx.fillRect(0, 0, W, H);
+
+      // Floor grid subtle
+      ctx.strokeStyle = accentColor + '15';
+      ctx.lineWidth = 1;
+      const tileSize = 50;
+      const offX = -(cameraX % tileSize);
+      const offY = -(cameraY % tileSize);
+      for (let x = offX; x < W; x += tileSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = offY; y < H; y += tileSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
     }
 
     // Translate for camera
     ctx.save();
     ctx.translate(-cameraX, -cameraY);
 
-    // Stage 1 specific tile rendering
-    if (venue && venue.id === 1 && typeof Stage1Scene !== 'undefined') {
+    // Stage 1 specific tile rendering (skipped when painted backdrop is shown)
+    if (!bgImg && venue && venue.id === 1 && typeof Stage1Scene !== 'undefined') {
       Stage1Scene.renderInside(ctx, cameraX, cameraY, W, H);
     }
 

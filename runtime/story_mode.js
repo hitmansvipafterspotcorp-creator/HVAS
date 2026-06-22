@@ -12,7 +12,7 @@ const StoryMode = (() => {
   // ── HITMAN'S RISE — the arcade ladder ───────────────────────────────────────
   // Each rung: opponent charId, the venue/stage it happens at, and dialogue.
   const LADDER = [
-    { opp:30, venue:'CAFE 8FIFTY — THE LINE', stage:{sky:'#10001a',ground:'#08000f',accent:'#6600cc',name:'CAFE 8FIFTY'},
+    { opp:30, venue:'CAFE 8FIFTY — THE LINE', stage:{sky:'#10001a',ground:'#08000f',accent:'#6600cc',name:'CAFE 8FIFTY',bgImage:'assets/venues/cafe8fifty_exterior.png'},
       pre:['PREDATOR PETE: "Line\'s closed, champ. You\'re not on the list."',
            'YOU: "I don\'t wait in lines. I run the night."'],
       win:'PETE goes down. The line opens. Word travels fast.' },
@@ -32,12 +32,12 @@ const StoryMode = (() => {
            'YOU: "Then watch this one."'],
       win:'The counter game breaks. The rave crowd chants your name.' },
 
-    { opp:21, venue:'HVAS — THE ENTRY', stage:{sky:'#12000a',ground:'#08000f',accent:'#cc0022',name:'HITMANS VIP AFTER SPOT'}, boss:true,
+    { opp:21, venue:'HVAS — THE ENTRY', stage:{sky:'#12000a',ground:'#08000f',accent:'#cc0022',name:'HITMANS VIP AFTER SPOT',bgImage:'assets/venues/cafe8fifty_exterior.png'}, boss:true,
       pre:['BIG SOULJA: "Nobody passes me. Not for status. Not for nothing."',
            'YOU: "Then I\'ll earn the entry the hard way."'],
       win:'BIG SOULJA steps aside. The VIP room is yours to enter.' },
 
-    { opp:20, venue:'CAFE 8FIFTY — THE STAGE', stage:{sky:'#150000',ground:'#0a0000',accent:'#ff0000',name:'KT — FINAL BOSS'}, boss:true, final:true,
+    { opp:20, venue:'CAFE 8FIFTY — THE STAGE', stage:{sky:'#150000',ground:'#0a0000',accent:'#ff0000',name:'KT — FINAL BOSS',bgImage:'assets/venues/hvas_interior.png'}, boss:true, final:true,
       pre:['KT: "This is my house. The owner. The chef. The producer."',
            'KT: "Prove you belong — or get the shutdown."',
            'YOU: "I came to run the night. Let\'s go."'],

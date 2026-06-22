@@ -339,6 +339,7 @@ window.OPS = [
 window.VENUES = [
   { id:1,  name:'Cafe 8Fifty — Exterior', shortName:'CAFE 8FIFTY', emoji:'🌆', unlockPts:0,
     cameraType:'sidescroll',
+    bgImage:'assets/venues/cafe8fifty_exterior.png',
     colors:{sky:'#050015',ground:'#0a000f',accent:'#ff0000'},
     bossName:'Big Soulja', bossHp:480, bossEmoji:'👑', bossCharId:21,
     groundY:0.75, stageWidth:4000,
@@ -376,6 +377,7 @@ window.VENUES = [
 
   { id:3,  name:'HITMANS VIP After Spot — Interior', shortName:'HVAS INTERIOR', emoji:'👑', unlockPts:500,
     cameraType:'topdown',
+    bgImage:'assets/venues/hvas_interior.png',
     colors:{floor:'#12000a',wall:'#1e0012',accent:'#ff0000'},
     bossName:'KT', bossHp:620, bossEmoji:'🔥', bossCharId:20,
     props:['dj_booth','vip_rope','stage_light','bar_counter','lounge_booth','smoke_machine','pool_table','couch_section'],
@@ -493,6 +495,7 @@ window.VENUES = [
 </script>
 
 <!-- ══════════════════════════════════ RUNTIME SCRIPTS ══════════════════════════════════ -->
+<script src="runtime/asset_loader.js"></script>
 <script src="runtime/sprite_system.js"></script>
 <script src="runtime/fighter_engine.js"></script>
 <script src="runtime/stage1_scene.js"></script>

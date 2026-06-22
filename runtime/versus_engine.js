@@ -585,6 +585,21 @@ const VersusEngine = (() => {
   }
 
   function drawStage() {
+    // painted backdrop (if uploaded) — fills the frame; floor line still drawn for footing
+    const bgImg = (typeof AssetLoader !== 'undefined' && stage.bgImage)
+      ? AssetLoader.get(stage.bgImage) : null;
+    if (bgImg) {
+      AssetLoader.drawCover(ctx, bgImg, 0, 0, W, H);
+      // darken lower third so fighters read against the art
+      const sh = ctx.createLinearGradient(0, groundY-40, 0, H);
+      sh.addColorStop(0, 'rgba(0,0,0,0)');
+      sh.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = sh; ctx.fillRect(0, groundY-40, W, H-groundY+40);
+      ctx.strokeStyle = (stage.accent||'#ff00aa'); ctx.globalAlpha = 0.5; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
     const g = ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0, stage.sky || '#0a0020');
     g.addColorStop(0.7, shade(stage.sky||'#0a0020', -10));
