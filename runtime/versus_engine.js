@@ -113,8 +113,20 @@ const VersusEngine = (() => {
     projectiles = []; sparks = []; popups = [];
   }
 
+  // swap the shell face-button captions to fighter roles (and restore on exit)
+  const _btnDefaults = { 'touch-a':'A', 'touch-b':'B', 'touch-x':'X', 'touch-y':'Y' };
+  const _btnFighter  = { 'touch-a':'L', 'touch-b':'H', 'touch-x':'BLK', 'touch-y':'SP' };
+  function setButtonLabels(map) {
+    if (typeof document === 'undefined') return;
+    Object.keys(map).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.textContent = map[id]; el.classList.toggle('fight-label', map === _btnFighter); }
+    });
+  }
+
   // ── public start / stop ─────────────────────────────────────────────────────
   function start(cv, opts) {
+    setButtonLabels(_btnFighter);
     startOpts = opts;
     canvas = cv;
     ctx = canvas.getContext('2d');
@@ -196,6 +208,7 @@ const VersusEngine = (() => {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
     window.removeEventListener('resize', resize);
+    setButtonLabels(_btnDefaults);
   }
 
   function resize() {
