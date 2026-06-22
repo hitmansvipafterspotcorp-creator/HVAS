@@ -6,7 +6,7 @@
  * walk / jump / crouch / block, light + heavy normals, EX special (meter),
  * and a cinematic SUPER (full meter). Player vs CPU.
  *
- * Renders vector fighters (char color + emoji) so it needs no sprite assets.
+ * Renders real sprite sheets via SpriteSystem when available; falls back to vector.
  * Controls (mapped from the HITGEAR shell / InputManager.state):
  *   D-pad L/R  walk (hold AWAY from rival = BLOCK)
  *   D-pad Up   jump      D-pad Down  crouch
@@ -650,21 +650,38 @@ const VersusEngine = (() => {
     return { bw: 1.0, bh: 1.0, hd: 1.0 };
   }
 
+  // Build or retrieve sprite entity adapter for SpriteSystem
+  function _toSpriteEnt(f) {
+    if (!f._se) f._se = { spriteState: {}, vel: { x: 0, y: 0 }, speed: 5 };
+    const e = f._se;
+    e.vel.x = f.vx || 0;
+    e.hp     = f.hp;
+    e.knocked    = (f.state === 'knockdown' || (f.hp <= 0 && f.state !== 'idle'));
+    e.crouching  = f.crouching;
+    e.blocking   = f.blocking && f.state === 'block';
+    e.attacking  = false; e.comboStep = 0; e.specialAnim = false; e.superAnim = null; e.finishering = false;
+    if (f.attack === 'light')   { e.attacking = true;  e.comboStep = 1; }
+    else if (f.attack === 'heavy')   { e.comboStep = 2; }
+    else if (f.attack === 'crouch')  { e.comboStep = 3; }
+    else if (f.attack === 'special') { e.specialAnim = true; }
+    else if (f.attack === 'super') {
+      e.superAnim = 1; e.finishering = (f.char && f.char.isBoss);
+    }
+    return e;
+  }
+
   function drawFighter(f) {
     const x = f.x, baseY = f.y;
     const crouch = f.crouching ? 0.62 : 1;
     const h = f.h * crouch;
-    const topY = baseY - h;
     const b = buildOf(f);
     const ww = f.w * b.bw;
-    // shadow
-    ctx.save();
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(x, groundY, ww*0.6, 10, 0,0,Math.PI*2); ctx.fill();
-    ctx.restore();
 
-    // meter-charged aura ring (super ready) — makes a primed fighter read instantly
+    // ground shadow
+    ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(x, groundY, ww*0.6, 10, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+
+    // super-charged aura ring
     if (f.meter >= 100) {
       ctx.save();
       const pulse = 0.5 + 0.5*Math.sin(performance.now()/120);
@@ -674,22 +691,40 @@ const VersusEngine = (() => {
       ctx.restore();
     }
 
+    // ── Try real sprite sheet ──────────────────────────────────────────────
+    const SS = window.SpriteSystem;
+    if (SS && f.char && SS.hasSprites(f.char.id)) {
+      const se = _toSpriteEnt(f);
+      SS.update(f.char.id, se, 1/60, false, null);
+      ctx.save();
+      if (f.flashHit > 0) { ctx.globalAlpha = 0.7; ctx.filter = 'brightness(4)'; }
+      const didDraw = SS.draw(ctx, f.char.id, se, x - ww*0.5, baseY - h, ww, h, f.facing < 0);
+      ctx.restore();
+      if (didDraw) {
+        // boss crown overlay
+        if (f.char.isBoss) {
+          ctx.font = `${Math.round(ww*0.28)}px serif`;
+          ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText('👑', x, baseY - h - ww*0.18);
+        }
+        return;
+      }
+    }
+
+    // ── Vector fallback ────────────────────────────────────────────────────
+    const topY = baseY - h;
     ctx.save();
     if (f.flashHit > 0) { ctx.globalAlpha = 0.9; }
-    // body
     const bodyColor = f.flashHit>0 ? '#ffffff' : f.color;
     roundRect(x - ww*0.32, topY + h*0.28, ww*0.64, h*0.5, 12);
     ctx.fillStyle = bodyColor; ctx.shadowColor = f.color; ctx.shadowBlur = 16; ctx.fill();
     ctx.shadowBlur = 0;
-    // chest accent stripe (school/op color pop)
     ctx.fillStyle = shade(f.color, 45);
     roundRect(x - ww*0.10, topY + h*0.30, ww*0.20, h*0.42, 5); ctx.fill();
-    // legs
     ctx.fillStyle = shade(f.color,-40);
     const legSplit = f.state==='walk' ? Math.sin(performance.now()/80)*8 : 4;
     roundRect(x - ww*0.28 - (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
     roundRect(x + ww*0.06 + (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
-    // arm / attack
     if (f.attack && f.atkPhase==='active' && !MOVES[f.attack].projectile) {
       ctx.fillStyle = f.color; ctx.shadowColor='#fff'; ctx.shadowBlur=14;
       const ar = MOVES[f.attack].reach;
@@ -697,17 +732,13 @@ const VersusEngine = (() => {
       if (f.facing>0) roundRect(x, ay, ar, 18, 8); else roundRect(x-ar, ay, ar, 18, 8);
       ctx.fill(); ctx.shadowBlur=0;
     }
-    // head
     const hr = f.w*0.34*b.hd;
-    ctx.beginPath();
-    ctx.arc(x, topY + h*0.16, hr, 0, Math.PI*2);
+    ctx.beginPath(); ctx.arc(x, topY + h*0.16, hr, 0, Math.PI*2);
     ctx.fillStyle = shade(f.color, 30); ctx.shadowColor=f.color; ctx.shadowBlur=14; ctx.fill();
     ctx.shadowBlur=0;
-    // emoji face
     ctx.font = `${Math.round(hr*1.3)}px serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(f.emoji, x, topY + h*0.16);
-    // boss crown marker
     if (f.char && f.char.isBoss) {
       ctx.font = `${Math.round(hr*0.9)}px serif`;
       ctx.fillText('👑', x, topY - hr*0.4);

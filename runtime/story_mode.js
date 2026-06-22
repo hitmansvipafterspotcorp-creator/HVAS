@@ -11,37 +11,74 @@ const StoryMode = (() => {
 
   // ── HITMAN'S RISE — the arcade ladder ───────────────────────────────────────
   // Each rung: opponent charId, the venue/stage it happens at, and dialogue.
+  // HITMAN'S RISE — climb the whole strip, venue by venue, from the late-night
+  // fuel stop all the way to KT's stage. Every rung is a real venue backdrop and
+  // a canonical character. Difficulty scales with the rung index.
   const LADDER = [
-    { opp:30, venue:'CAFE 8FIFTY — THE LINE', stage:{sky:'#10001a',ground:'#08000f',accent:'#6600cc',name:'CAFE 8FIFTY',bgImage:'assets/venues/cafe8fifty_exterior.png'},
-      pre:['PREDATOR PETE: "Line\'s closed, champ. You\'re not on the list."',
-           'YOU: "I don\'t wait in lines. I run the night."'],
-      win:'PETE goes down. The line opens. Word travels fast.' },
-
-    { opp:31, venue:'QUICK HIT FUEL — LATE STOP', stage:{sky:'#040014',ground:'#060005',accent:'#ffee00',name:'QUICK HIT FUEL'},
-      pre:['AGENT SNOW: "I\'m shutting the whole scene down. Starting with you."',
+    // ── ACT I — THE STREET ──────────────────────────────────────────────────
+    { opp:31, venue:'QUICK HIT FUEL — LATE STOP', stage:{sky:'#040014',ground:'#060005',accent:'#ffee00',name:'QUICK HIT FUEL',bgImage:'assets/venues/qhf_exterior.png'},
+      pre:['AGENT SNOW: "Scene\'s shutting down tonight. Starting with you."',
            'YOU: "Cold night for the wrong move, agent."'],
-      win:'SNOW\'s case goes cold. The block stays open.' },
+      win:'SNOW\'s case goes cold. The block stays open. Word starts to travel.' },
 
-    { opp:12, venue:'KINGDOM COME SALOON — FSU TERRITORY', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#cc4400',name:'KINGDOM COME SALOON'},
-      pre:['FSU MALE: "Rattlers don\'t run this block. Seminoles do."',
-           'YOU: "Block\'s open season. Let\'s see who\'s still standing."'],
-      win:'Garnet and Gold hits the floor. The saloon belongs to the night.' },
+    { opp:4, venue:'TALLY ROW — THE STRIP', stage:{sky:'#060018',ground:'#0c0010',accent:'#ffdd00',name:'TALLY ROW EXTERIOR',bgImage:'assets/venues/tally_exterior.png'},
+      pre:['FAMU MALE: "Rattler pride runs this strip. You sure you wanna walk it?"',
+           'YOU: "I don\'t walk it. I own it."'],
+      win:'FAMU Male tips his head. Respect. The strip opens up.' },
 
-    { opp:13, venue:'13 RAVE CLUB — GOLD STANDARD', stage:{sky:'#080030',ground:'#0a000f',accent:'#bb8800',name:'13 RAVE CLUB'},
-      pre:['FSU FEMALE: "I counter everything. You have no moves I haven\'t seen."',
-           'YOU: "Then watch this one."'],
-      win:'The counter game breaks. The rave crowd chants your name.' },
+    { opp:3, venue:'THE ITUS PIZZA — KITCHEN RUSH', stage:{sky:'#1a0800',ground:'#0a0400',accent:'#ff4400',name:'THE ITUS PIZZA',bgImage:'assets/venues/tally_itus.png'},
+      pre:['FAMU FEMALE: "Rattler rush — you can\'t keep up with me."',
+           'YOU: "Watch the counter, then. This one\'s on the house."'],
+      win:'FAMU Female salutes. Pizza • People • Party — and you ran it.' },
+
+    // ── ACT II — THE VENUES ──────────────────────────────────────────────────
+    { opp:13, venue:'SAMMYS STAGE — THE SHOWDOWN', stage:{sky:'#100020',ground:'#0a0010',accent:'#ffdd00',name:'SAMMYS STAGE',bgImage:'assets/venues/tally_sammys.png'},
+      pre:['FSU FEMALE: "I counter everything. No move you\'ve got is new to me."',
+           'YOU: "Then watch this one, gold standard."'],
+      win:'The counter game breaks. Sammys crowd chants your name.' },
+
+    { opp:12, venue:'PUBLIC HALL — CROWD CONTROL', stage:{sky:'#080018',ground:'#0a0014',accent:'#aaaaff',name:'PUBLIC HALL',bgImage:'assets/venues/tally_public_hall.png'},
+      pre:['FSU MALE: "Garnet and gold runs this hall. Seminoles don\'t fold."',
+           'YOU: "Open season. Let\'s see who\'s still standing."'],
+      win:'Garnet and Gold hits the floor. Public Hall belongs to the night.' },
+
+    { opp:30, venue:'13 RAVE CLUB — THE BASS DROP', stage:{sky:'#080030',ground:'#0a000f',accent:'#00ffcc',name:'13 RAVE CLUB',bgImage:'assets/venues/tally_13rave.png'},
+      pre:['PREDATOR PETE: "Smooth operator works the floor. You\'re cramping it."',
+           'YOU: "Your act\'s played out, Pete. Lights up."'],
+      win:'PETE slithers off mid-bass-drop. 13 Rave is yours.' },
+
+    { opp:31, venue:'THE DEN — UNDERGROUND', stage:{sky:'#0a0015',ground:'#0a0010',accent:'#8800ff',name:'THE DEN',bgImage:'assets/venues/tally_den.png'},
+      pre:['AGENT SNOW: "You shouldn\'t have made it this far. Rematch. Final answer."',
+           'YOU: "Cold case. Closed twice."'],
+      win:'SNOW taps out for good. The Den answers to you now.' },
+
+    { opp:12, venue:'DUKES & DIMES — HIGH STAKES', stage:{sky:'#0a0a00',ground:'#181800',accent:'#ffd700',name:'DUKES & DIMES',bgImage:'assets/venues/dukes_interior.png'},
+      pre:['FSU MALE: "Double or nothing. House always wins."',
+           'YOU: "Not tonight. I am the house."'],
+      win:'The table flips. Dukes & Dimes folds. The hustle is yours.' },
+
+    { opp:13, venue:'KINGDOM COME SALOON — LAST CALL', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#ffaa00',name:'KINGDOM COME SALOON',bgImage:'assets/venues/kingdom_come_exterior.png'},
+      pre:['FSU FEMALE: "Last call, hotshot. Country brawlers don\'t miss."',
+           'YOU: "Then it\'s a good thing I never do."'],
+      win:'Last call rings out. Kingdom Come Saloon bows to the night.' },
+
+    // ── ACT III — THE GAUNTLET (HOME TURF — CAFE 8FIFTY / HVAS) ──────────────
+    { opp:22, venue:'CAFE 8FIFTY — THE DOOR', stage:{sky:'#10001a',ground:'#08000f',accent:'#7700cc',name:'CAFE 8FIFTY ENTRY',bgImage:'assets/venues/cafe8fifty_exterior.png'}, boss:true,
+      pre:['ENTRY LINE DISRUPTOR: "You\'re not on the list. This door is mine."',
+           'ENTRY LINE DISRUPTOR: "VIP Locked. Walk away — or get locked out."',
+           'YOU: "I built the list. Now move."'],
+      win:'The velvet rope drops. The door swings open. VIP status — earned in blood.' },
 
     { opp:21, venue:'HVAS — THE ENTRY', stage:{sky:'#12000a',ground:'#08000f',accent:'#cc0022',name:'HITMANS VIP AFTER SPOT',bgImage:'assets/venues/cafe8fifty_exterior.png'}, boss:true,
       pre:['BIG SOULJA: "Nobody passes me. Not for status. Not for nothing."',
-           'YOU: "Then I\'ll earn the entry the hard way."'],
-      win:'BIG SOULJA steps aside. The VIP room is yours to enter.' },
+           'YOU: "Then I earn the entry the hard way."'],
+      win:'BIG SOULJA steps aside. The VIP room opens. One door left.' },
 
     { opp:20, venue:'CAFE 8FIFTY — THE STAGE', stage:{sky:'#150000',ground:'#0a0000',accent:'#ff0000',name:'KT — FINAL BOSS',bgImage:'assets/venues/hvas_interior.png'}, boss:true, final:true,
       pre:['KT: "This is my house. The owner. The chef. The producer."',
            'KT: "Prove you belong — or get the shutdown."',
            'YOU: "I came to run the night. Let\'s go."'],
-      win:'KT nods. Respect earned. You are a certified HITMANS VIP.' },
+      win:'KT nods. Respect earned. You are a certified HITMANS VIP LEGEND.' },
   ];
 
   let run = null; // { playerCharId, idx, mode }
@@ -161,9 +198,12 @@ const StoryMode = (() => {
   }
 
   function shuffledLadder() {
-    const a = LADDER.slice();
-    for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-    return a;
+    // shuffle the regular rungs, but keep the boss gauntlet (ELD → Big Soulja → KT)
+    // locked in order at the end so the climax always lands right.
+    const regular = LADDER.filter(r => !r.boss);
+    const bosses  = LADDER.filter(r => r.boss);
+    for (let i=regular.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [regular[i],regular[j]]=[regular[j],regular[i]]; }
+    return regular.concat(bosses);
   }
 
   function ladder() { return (run && run.ladder) || LADDER; }

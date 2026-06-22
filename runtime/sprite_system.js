@@ -395,6 +395,56 @@ const SpriteSystem = (() => {
         vfx_trail:{sheet:'vfx',row:7,frames:8,fps:14,loop:false},
       }
     },
+
+    // ── ENTRY LINE DISRUPTOR — CAFE8FIFTY VIP BOSS (id:22) ──────────────────
+    22: {
+      sheetRows: { loco:6, combat:5, damage:6, supers:4, topdown:8, vfx:6 },
+      sheets: {
+        loco:   'assets/characters/eld_sheet01_loco.png',
+        combat: 'assets/characters/eld_sheet02_combat.png',
+        damage: 'assets/characters/eld_sheet03_damage.png',
+        supers: 'assets/characters/eld_sheet04_supers.png',
+        topdown:'assets/characters/eld_sheet05_topdown.png',
+        vfx:    'assets/characters/eld_sheet06_vfx.png',
+      },
+      anims: {
+        idle:{sheet:'loco',row:0,frames:8,fps:6,loop:true},
+        walk:{sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:{sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:{sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:{sheet:'loco',row:4,frames:8,fps:8,loop:true},
+        interact:{sheet:'loco',row:5,frames:8,fps:8,loop:false},
+        combo1:{sheet:'combat',row:0,frames:8,fps:18,loop:false,startup:3,active:4,recovery:1},
+        combo2:{sheet:'combat',row:1,frames:8,fps:16,loop:false,startup:4,active:4,recovery:0},
+        combo3:{sheet:'combat',row:2,frames:8,fps:14,loop:false,startup:5,active:4,recovery:-1},
+        special:{sheet:'combat',row:3,frames:8,fps:14,loop:false,startup:5,active:5,recovery:-2},
+        finisher_c:{sheet:'combat',row:4,frames:8,fps:10,loop:false,startup:7,active:5,recovery:-5},
+        hurt:{sheet:'damage',row:0,frames:8,fps:16,loop:false},
+        hurt_heavy:{sheet:'damage',row:1,frames:8,fps:14,loop:false},
+        launch_hit:{sheet:'damage',row:2,frames:8,fps:12,loop:false},
+        knockdown:{sheet:'damage',row:3,frames:8,fps:10,loop:false},
+        stun:{sheet:'damage',row:4,frames:8,fps:8,loop:true},
+        recover:{sheet:'damage',row:5,frames:8,fps:10,loop:false},
+        super1:{sheet:'supers',row:0,frames:8,fps:14,loop:false,superFlash:true},
+        super2:{sheet:'supers',row:1,frames:8,fps:13,loop:false,superFlash:true},
+        super3:{sheet:'supers',row:2,frames:8,fps:12,loop:false,superFlash:true},
+        finisher:{sheet:'supers',row:3,frames:8,fps:9,loop:false,superFlash:true},
+        td_idle_s:{sheet:'topdown',row:0,frames:8,fps:6,loop:true},
+        td_idle_n:{sheet:'topdown',row:1,frames:8,fps:6,loop:true},
+        td_idle_w:{sheet:'topdown',row:2,frames:8,fps:6,loop:true},
+        td_idle_e:{sheet:'topdown',row:3,frames:8,fps:6,loop:true},
+        td_walk_s:{sheet:'topdown',row:4,frames:8,fps:10,loop:true},
+        td_walk_n:{sheet:'topdown',row:5,frames:8,fps:10,loop:true},
+        td_walk_w:{sheet:'topdown',row:6,frames:8,fps:10,loop:true},
+        td_walk_e:{sheet:'topdown',row:7,frames:8,fps:10,loop:true},
+        vfx_jab:{sheet:'vfx',row:0,frames:8,fps:22,loop:false},
+        vfx_counter:{sheet:'vfx',row:1,frames:8,fps:18,loop:false},
+        vfx_barrier:{sheet:'vfx',row:2,frames:8,fps:16,loop:false},
+        vfx_rope:{sheet:'vfx',row:3,frames:8,fps:16,loop:false},
+        vfx_super_ring:{sheet:'vfx',row:4,frames:8,fps:14,loop:false},
+        vfx_finisher_shockwave:{sheet:'vfx',row:5,frames:8,fps:12,loop:false},
+      }
+    },
   };
 
   // ── VFX queue ────────────────────────────────────────────────────────────
