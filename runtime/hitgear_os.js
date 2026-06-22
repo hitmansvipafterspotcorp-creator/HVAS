@@ -598,9 +598,10 @@ const HitgearOS = (() => {
 
   // ──── QUEST FLOW ────
   function newGame() {
-    const name = prompt('Enter your member name (or leave blank):') || 'CREATOR';
-    SaveSystem.newGame(name);
-    SaveSystem.patch({ characterId: 1, currentVenueId: 1 });
+    // No blocking prompt() on the handheld — use a default member name.
+    // (A proper in-game name-entry screen can be added later.)
+    SaveSystem.newGame('CREATOR');
+    SaveSystem.patch({ characterId: 3, currentVenueId: 1 });
     openCharSelect(charId => {
       selectedCharId = charId;
       openVenueSelectForChar();
