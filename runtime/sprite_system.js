@@ -10,6 +10,9 @@ const SpriteSystem = (() => {
   const FRAMES_PER_ROW = 8;
   const SHEET_ROWS = { loco:6, combat:5, damage:5, supers:4, topdown:8, vfx:8 };
 
+  // Per-character row overrides (takes precedence over SHEET_ROWS defaults)
+  // Used when a char's sheet has different row counts than the defaults
+
   // ── Image cache ──────────────────────────────────────────────────────────
   const _cache = {};
   function _img(src) {
@@ -23,10 +26,11 @@ const SpriteSystem = (() => {
     return img;
   }
 
-  // Compute frame size from loaded image + sheet type
-  function _dims(img, sheetKey) {
+  // Compute frame size from loaded image + sheet type + optional char override
+  function _dims(img, sheetKey, charId) {
     if (!img._ready) return { w:128, h:160 };
-    const rows = SHEET_ROWS[sheetKey] || 4;
+    const def = charId != null ? CHAR_DEFS[charId] : null;
+    const rows = (def && def.sheetRows && def.sheetRows[sheetKey]) || SHEET_ROWS[sheetKey] || 4;
     return { w: Math.floor(img.naturalWidth / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
   }
 
@@ -160,6 +164,189 @@ const SpriteSystem = (() => {
         vfx_trail:{sheet:'vfx',row:7,frames:8,fps:14,loop:false},
       }
     },
+    // ── KT — CAFE 8FIFTY OWNER BOSS (id:20) ─────────────────────────────────
+    20: {
+      sheetRows: { loco:6, combat:5, damage:6, supers:4, topdown:8, vfx:6 },
+      sheets: {
+        loco:   'assets/characters/kt_sheet01_loco.png',
+        combat: 'assets/characters/kt_sheet02_combat.png',
+        damage: 'assets/characters/kt_sheet03_damage.png',
+        supers: 'assets/characters/kt_sheet04_supers.png',
+        topdown:'assets/characters/kt_sheet05_topdown.png',
+        vfx:    'assets/characters/kt_sheet06_vfx.png',
+      },
+      anims: {
+        idle:{sheet:'loco',row:0,frames:8,fps:6,loop:true},
+        walk:{sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:{sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:{sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:{sheet:'loco',row:4,frames:8,fps:8,loop:true},
+        interact:{sheet:'loco',row:5,frames:8,fps:8,loop:false},
+        combo1:{sheet:'combat',row:0,frames:8,fps:18,loop:false,startup:4,active:3,recovery:1},
+        combo2:{sheet:'combat',row:1,frames:8,fps:16,loop:false,startup:5,active:3,recovery:0},
+        combo3:{sheet:'combat',row:2,frames:8,fps:14,loop:false,startup:6,active:3,recovery:-1},
+        special:{sheet:'combat',row:3,frames:8,fps:14,loop:false,startup:6,active:4,recovery:-2},
+        finisher_c:{sheet:'combat',row:4,frames:8,fps:10,loop:false,startup:8,active:5,recovery:-5},
+        hurt:{sheet:'damage',row:0,frames:8,fps:16,loop:false},
+        hurt_heavy:{sheet:'damage',row:1,frames:8,fps:14,loop:false},
+        launch_hit:{sheet:'damage',row:2,frames:8,fps:12,loop:false},
+        knockdown:{sheet:'damage',row:3,frames:8,fps:10,loop:false},
+        stun:{sheet:'damage',row:4,frames:8,fps:8,loop:true},
+        recover:{sheet:'damage',row:5,frames:8,fps:10,loop:false},
+        super1:{sheet:'supers',row:0,frames:8,fps:14,loop:false,superFlash:true},
+        super2:{sheet:'supers',row:1,frames:8,fps:14,loop:false,superFlash:true},
+        super3:{sheet:'supers',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        finisher:{sheet:'supers',row:3,frames:8,fps:10,loop:false,superFlash:true},
+        td_idle_s:{sheet:'topdown',row:0,frames:8,fps:6,loop:true},
+        td_idle_n:{sheet:'topdown',row:1,frames:8,fps:6,loop:true},
+        td_idle_w:{sheet:'topdown',row:2,frames:8,fps:6,loop:true},
+        td_idle_e:{sheet:'topdown',row:3,frames:8,fps:6,loop:true},
+        td_walk_s:{sheet:'topdown',row:4,frames:8,fps:10,loop:true},
+        td_walk_n:{sheet:'topdown',row:5,frames:8,fps:10,loop:true},
+        td_walk_w:{sheet:'topdown',row:6,frames:8,fps:10,loop:true},
+        td_walk_e:{sheet:'topdown',row:7,frames:8,fps:10,loop:true},
+        vfx_jab:{sheet:'vfx',row:0,frames:8,fps:22,loop:false},
+        vfx_fire:{sheet:'vfx',row:1,frames:8,fps:18,loop:false},
+        vfx_sound:{sheet:'vfx',row:2,frames:8,fps:16,loop:false},
+        vfx_dash:{sheet:'vfx',row:3,frames:8,fps:18,loop:false},
+        vfx_boss_ring:{sheet:'vfx',row:4,frames:8,fps:14,loop:false},
+        vfx_finisher_col:{sheet:'vfx',row:5,frames:8,fps:12,loop:false},
+      }
+    },
+
+    // ── BIG SOULJA — HITMANS VIP DOOR BOSS (id:21) ──────────────────────────
+    21: {
+      sheetRows: { loco:6, combat:5, damage:6, supers:4, topdown:8, vfx:6 },
+      sheets: {
+        loco:   'assets/characters/bigsoulja_sheet01_loco.png',
+        combat: 'assets/characters/bigsoulja_sheet02_combat.png',
+        damage: 'assets/characters/bigsoulja_sheet03_damage.png',
+        supers: 'assets/characters/bigsoulja_sheet04_supers.png',
+        topdown:'assets/characters/bigsoulja_sheet05_topdown.png',
+        vfx:    'assets/characters/bigsoulja_sheet06_vfx.png',
+      },
+      anims: {
+        idle:{sheet:'loco',row:0,frames:8,fps:5,loop:true},
+        walk:{sheet:'loco',row:1,frames:8,fps:9,loop:true},
+        run:{sheet:'loco',row:2,frames:8,fps:13,loop:true},
+        dodge:{sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:{sheet:'loco',row:4,frames:8,fps:8,loop:true},
+        interact:{sheet:'loco',row:5,frames:8,fps:8,loop:false},
+        combo1:{sheet:'combat',row:0,frames:8,fps:16,loop:false,startup:5,active:4,recovery:1},
+        combo2:{sheet:'combat',row:1,frames:8,fps:14,loop:false,startup:6,active:4,recovery:0},
+        combo3:{sheet:'combat',row:2,frames:8,fps:12,loop:false,startup:7,active:4,recovery:-1},
+        special:{sheet:'combat',row:3,frames:8,fps:13,loop:false,startup:7,active:5,recovery:-2},
+        finisher_c:{sheet:'combat',row:4,frames:8,fps:9,loop:false,startup:10,active:6,recovery:-6},
+        hurt:{sheet:'damage',row:0,frames:8,fps:14,loop:false},
+        hurt_heavy:{sheet:'damage',row:1,frames:8,fps:12,loop:false},
+        launch_hit:{sheet:'damage',row:2,frames:8,fps:10,loop:false},
+        knockdown:{sheet:'damage',row:3,frames:8,fps:9,loop:false},
+        stun:{sheet:'damage',row:4,frames:8,fps:7,loop:true},
+        recover:{sheet:'damage',row:5,frames:8,fps:9,loop:false},
+        super1:{sheet:'supers',row:0,frames:8,fps:14,loop:false,superFlash:true},
+        super2:{sheet:'supers',row:1,frames:8,fps:13,loop:false,superFlash:true},
+        super3:{sheet:'supers',row:2,frames:8,fps:13,loop:false,superFlash:true},
+        finisher:{sheet:'supers',row:3,frames:8,fps:9,loop:false,superFlash:true},
+        td_idle_s:{sheet:'topdown',row:0,frames:8,fps:5,loop:true},
+        td_idle_n:{sheet:'topdown',row:1,frames:8,fps:5,loop:true},
+        td_idle_w:{sheet:'topdown',row:2,frames:8,fps:5,loop:true},
+        td_idle_e:{sheet:'topdown',row:3,frames:8,fps:5,loop:true},
+        td_walk_s:{sheet:'topdown',row:4,frames:8,fps:9,loop:true},
+        td_walk_n:{sheet:'topdown',row:5,frames:8,fps:9,loop:true},
+        td_walk_w:{sheet:'topdown',row:6,frames:8,fps:9,loop:true},
+        td_walk_e:{sheet:'topdown',row:7,frames:8,fps:9,loop:true},
+        vfx_jab:{sheet:'vfx',row:0,frames:8,fps:22,loop:false},
+        vfx_impact:{sheet:'vfx',row:1,frames:8,fps:18,loop:false},
+        vfx_rope_arc:{sheet:'vfx',row:2,frames:8,fps:16,loop:false},
+        vfx_dash:{sheet:'vfx',row:3,frames:8,fps:18,loop:false},
+        vfx_super_ring:{sheet:'vfx',row:4,frames:8,fps:14,loop:false},
+        vfx_finisher_col:{sheet:'vfx',row:5,frames:8,fps:12,loop:false},
+      }
+    },
+
+    // ── PREDATOR PETE — OUTSIDE OP / BAD GUY (id:30) ────────────────────────
+    30: {
+      sheetRows: { loco:6, combat:5, damage:6, supers:4, vfx:6 },
+      sheets: {
+        loco:   'assets/characters/pete_sheet01_loco.png',
+        combat: 'assets/characters/pete_sheet02_combat.png',
+        damage: 'assets/characters/pete_sheet03_damage.png',
+        supers: 'assets/characters/pete_sheet04_supers.png',
+        vfx:    'assets/characters/pete_sheet05_vfx.png',
+      },
+      anims: {
+        idle:{sheet:'loco',row:0,frames:8,fps:6,loop:true},
+        walk:{sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:{sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:{sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:{sheet:'loco',row:4,frames:8,fps:8,loop:true},
+        interact:{sheet:'loco',row:5,frames:8,fps:8,loop:false},
+        combo1:{sheet:'combat',row:0,frames:8,fps:18,loop:false,startup:3,active:3,recovery:2},
+        combo2:{sheet:'combat',row:1,frames:8,fps:16,loop:false,startup:4,active:3,recovery:1},
+        combo3:{sheet:'combat',row:2,frames:8,fps:14,loop:false,startup:5,active:3,recovery:0},
+        special:{sheet:'combat',row:3,frames:8,fps:13,loop:false,startup:5,active:4,recovery:-1},
+        finisher_c:{sheet:'combat',row:4,frames:8,fps:9,loop:false,startup:7,active:4,recovery:-4},
+        hurt:{sheet:'damage',row:0,frames:8,fps:16,loop:false},
+        hurt_heavy:{sheet:'damage',row:1,frames:8,fps:14,loop:false},
+        launch_hit:{sheet:'damage',row:2,frames:8,fps:12,loop:false},
+        knockdown:{sheet:'damage',row:3,frames:8,fps:10,loop:false},
+        stun:{sheet:'damage',row:4,frames:8,fps:8,loop:true},
+        recover:{sheet:'damage',row:5,frames:8,fps:10,loop:false},
+        super1:{sheet:'supers',row:0,frames:8,fps:14,loop:false,superFlash:true},
+        super2:{sheet:'supers',row:1,frames:8,fps:13,loop:false,superFlash:true},
+        super3:{sheet:'supers',row:2,frames:8,fps:12,loop:false,superFlash:true},
+        finisher:{sheet:'supers',row:3,frames:8,fps:9,loop:false,superFlash:true},
+        vfx_slap:{sheet:'vfx',row:0,frames:8,fps:22,loop:false},
+        vfx_purple_dash:{sheet:'vfx',row:1,frames:8,fps:18,loop:false},
+        vfx_chain_arc:{sheet:'vfx',row:2,frames:8,fps:16,loop:false},
+        vfx_heart_bait:{sheet:'vfx',row:3,frames:8,fps:14,loop:false},
+        vfx_stun_stars:{sheet:'vfx',row:4,frames:8,fps:12,loop:true},
+        vfx_banned:{sheet:'vfx',row:5,frames:8,fps:10,loop:false},
+      }
+    },
+
+    // ── AGENT SNOW — OUTSIDE OP / SNOW AGENT (id:31) ────────────────────────
+    31: {
+      sheetRows: { loco:6, combat:5, damage:6, supers:4, vfx:6 },
+      sheets: {
+        loco:   'assets/characters/snow_sheet01_loco.png',
+        combat: 'assets/characters/snow_sheet02_combat.png',
+        damage: 'assets/characters/snow_sheet03_damage.png',
+        supers: 'assets/characters/snow_sheet04_supers.png',
+        vfx:    'assets/characters/snow_sheet05_vfx.png',
+      },
+      anims: {
+        idle:{sheet:'loco',row:0,frames:8,fps:6,loop:true},
+        walk:{sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:{sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:{sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:{sheet:'loco',row:4,frames:8,fps:8,loop:true},
+        interact:{sheet:'loco',row:5,frames:8,fps:8,loop:false},
+        combo1:{sheet:'combat',row:0,frames:8,fps:17,loop:false,startup:4,active:3,recovery:1},
+        combo2:{sheet:'combat',row:1,frames:8,fps:15,loop:false,startup:5,active:3,recovery:0},
+        combo3:{sheet:'combat',row:2,frames:8,fps:14,loop:false,startup:5,active:4,recovery:-1},
+        special:{sheet:'combat',row:3,frames:8,fps:12,loop:false,startup:6,active:4,recovery:-2},
+        finisher_c:{sheet:'combat',row:4,frames:8,fps:9,loop:false,startup:8,active:5,recovery:-5},
+        hurt:{sheet:'damage',row:0,frames:8,fps:16,loop:false},
+        hurt_heavy:{sheet:'damage',row:1,frames:8,fps:14,loop:false},
+        launch_hit:{sheet:'damage',row:2,frames:8,fps:12,loop:false},
+        knockdown:{sheet:'damage',row:3,frames:8,fps:10,loop:false},
+        stun:{sheet:'damage',row:4,frames:8,fps:8,loop:true},
+        recover:{sheet:'damage',row:5,frames:8,fps:10,loop:false},
+        super1:{sheet:'supers',row:0,frames:8,fps:14,loop:false,superFlash:true},
+        super2:{sheet:'supers',row:1,frames:8,fps:13,loop:false,superFlash:true},
+        super3:{sheet:'supers',row:2,frames:8,fps:12,loop:false,superFlash:true},
+        finisher:{sheet:'supers',row:3,frames:8,fps:9,loop:false,superFlash:true},
+        vfx_punch:{sheet:'vfx',row:0,frames:8,fps:22,loop:false},
+        vfx_ice_burst:{sheet:'vfx',row:1,frames:8,fps:18,loop:false},
+        vfx_radio:{sheet:'vfx',row:2,frames:8,fps:14,loop:false},
+        vfx_ice_dash:{sheet:'vfx',row:3,frames:8,fps:18,loop:false},
+        vfx_shield_hex:{sheet:'vfx',row:4,frames:8,fps:14,loop:true},
+        vfx_case_closed:{sheet:'vfx',row:5,frames:8,fps:10,loop:false},
+      }
+    },
+
+    // ── FAMU MALE (id:4) ─────────────────────────────────────────────────────
     4: {
       sheets: {
         loco:'assets/characters/famu_male_sheet01_loco.png',
@@ -293,7 +480,7 @@ const SpriteSystem = (() => {
     const img = _img(def.sheets[animDef.sheet]);
     if (!img || !img._ready || img._failed) return false;
 
-    const d = _dims(img, animDef.sheet);
+    const d = _dims(img, animDef.sheet, charId);
     const sx = ss.frame * d.w;
     const sy = animDef.row * d.h;
 
@@ -339,7 +526,7 @@ const SpriteSystem = (() => {
       if (!a) return;
       const img = _img(def.sheets[a.sheet]);
       if (!img || !img._ready || img._failed) return;
-      const d = _dims(img, a.sheet);
+      const d = _dims(img, a.sheet, v.charId);
       ctx.drawImage(img, v.frame*d.w, a.row*d.h, d.w, d.h,
         v.x-(cameraX||0)-v.size/2, v.y-(cameraY||0)-v.size/2, v.size, v.size);
     });

@@ -1,7 +1,61 @@
 'use strict';
+
+// ── MUSIC ENGINE ─────────────────────────────────────────────────────────────
+const MusicEngine = (() => {
+  const TRACKS = [
+    'assets/audio/track01.mp3','assets/audio/track02.mp3','assets/audio/track03.mp3',
+    'assets/audio/track04.mp3','assets/audio/track05.mp3','assets/audio/track06.mp3',
+  ];
+  let audio = null, trackIdx = 0, muted = false, started = false;
+
+  function _load(idx) {
+    if (!audio) {
+      audio = new Audio();
+      audio.volume = 0.55;
+      audio.addEventListener('ended', () => next());
+      audio.addEventListener('error', () => next());
+    }
+    const track = TRACKS[idx % TRACKS.length];
+    audio.src = track;
+    audio.load();
+  }
+
+  function start() {
+    if (started) return;
+    started = true;
+    const save = (typeof SaveSystem !== 'undefined' && SaveSystem.load()) || {};
+    muted = save.settings && save.settings.music === false;
+    _load(trackIdx);
+    if (!muted) audio.play().catch(() => {});
+  }
+
+  function next() {
+    trackIdx = (trackIdx + 1) % TRACKS.length;
+    _load(trackIdx);
+    if (!muted) audio.play().catch(() => {});
+  }
+
+  function setMuted(val) {
+    muted = val;
+    if (!audio) return;
+    if (muted) { audio.pause(); }
+    else { if (!started) start(); else audio.play().catch(() => {}); }
+  }
+
+  function resumeOnInteraction() {
+    if (!started) return;
+    if (!muted && audio && audio.paused) audio.play().catch(() => {});
+  }
+
+  document.addEventListener('click',     resumeOnInteraction, { once: false });
+  document.addEventListener('touchstart', resumeOnInteraction, { once: false });
+
+  return { start, next, setMuted, get muted() { return muted; } };
+})();
+
 const HitgearOS = (() => {
   let currentScreen = 'screen-boot';
-  let selectedCharId = 1;
+  let selectedCharId = 3;
   let selectedVenueId = 1;
   let selectedOsIcon = 0;
   let clockInterval = null;
@@ -46,6 +100,7 @@ const HitgearOS = (() => {
       }
       if (pct >= 100) {
         clearInterval(tick);
+        MusicEngine.start();
         setTimeout(() => openOSMenu(), 600);
       }
     }, 40);
@@ -208,30 +263,40 @@ const HitgearOS = (() => {
   function renderCharSelect(onSelect) {
     const grid = document.getElementById('char-grid');
     if (!grid || !window.CHARACTERS) return;
-    const save = SaveSystem.load() || SaveSystem.defaults();
     grid.innerHTML = '';
+
+    // Default selection to first char if current is invalid
+    if (!window.CHARACTERS.find(c => c.id === selectedCharId)) {
+      selectedCharId = window.CHARACTERS[0]?.id || 3;
+    }
+
     window.CHARACTERS.forEach(ch => {
-      const unlocked = save.statusPts >= (ch.unlockPts || 0);
       const card = document.createElement('div');
       card.className = 'char-card' + (ch.id === selectedCharId ? ' active' : '');
       card.innerHTML = `
         <div class="char-avatar">${ch.emoji}</div>
-        <div class="char-name">${ch.name}</div>
+        <div class="char-name" style="font-size:10px">${ch.shortName || ch.name}</div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:9px;color:#ff00aa;margin:2px 0 4px">${ch.style || ''}</div>
         <div class="char-stat-bars">
-          <div class="char-stat"><span class="char-stat-name">SPD</span><div class="char-stat-bar"><div class="char-stat-fill spd" style="width:${ch.spd}%"></div></div></div>
-          <div class="char-stat"><span class="char-stat-name">STR</span><div class="char-stat-bar"><div class="char-stat-fill str" style="width:${ch.str}%"></div></div></div>
-          <div class="char-stat"><span class="char-stat-name">DEF</span><div class="char-stat-bar"><div class="char-stat-fill def" style="width:${ch.def}%"></div></div></div>
+          <div class="char-stat"><span class="char-stat-name">SPD</span><div class="char-stat-bar"><div class="char-stat-fill spd" style="width:${ch.spd||50}%"></div></div></div>
+          <div class="char-stat"><span class="char-stat-name">STR</span><div class="char-stat-bar"><div class="char-stat-fill str" style="width:${ch.str||50}%"></div></div></div>
+          <div class="char-stat"><span class="char-stat-name">DEF</span><div class="char-stat-bar"><div class="char-stat-fill def" style="width:${ch.def||50}%"></div></div></div>
         </div>
-        ${!unlocked ? `<div class="char-locked">🔒<div style="font-size:9px;font-family:'Orbitron',sans-serif;margin-top:4px">${ch.unlockPts} PTS</div></div>` : ''}`;
-      if (unlocked) {
-        card.addEventListener('click', () => {
-          selectedCharId = ch.id;
-          renderCharSelect(onSelect);
-          setTimeout(() => onSelect && onSelect(ch.id), 300);
-        });
-      }
+        <div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:#ccbbee;margin-top:4px;line-height:1.2">${ch.special || ''}</div>`;
+      card.addEventListener('click', () => {
+        selectedCharId = ch.id;
+        renderCharSelect(onSelect);
+        setTimeout(() => onSelect && onSelect(ch.id), 300);
+      });
       grid.appendChild(card);
     });
+
+    // Show selected char description
+    const selected = window.CHARACTERS.find(c => c.id === selectedCharId);
+    const descEl = document.getElementById('char-desc');
+    if (descEl && selected) {
+      descEl.innerHTML = `<span style="color:${selected.color||'#ff00aa'};font-weight:900">${selected.shortName||selected.name}</span> — ${selected.desc||''}`;
+    }
   }
 
   // ──── VENUE MAP ────
@@ -498,6 +563,7 @@ const HitgearOS = (() => {
     if (!save.settings) save.settings = {};
     save.settings[key] = !save.settings[key];
     SaveSystem.save(save);
+    if (key === 'music') MusicEngine.setMuted(!save.settings.music);
     renderOptions();
   }
 

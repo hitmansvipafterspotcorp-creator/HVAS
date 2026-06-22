@@ -251,32 +251,105 @@
 <!-- ══════════════════════════════════ DATA SCRIPTS ══════════════════════════════════ -->
 <script>
 // Inline character data (matches data/characters.json)
+// ── PLAYABLE FIGHTERS (4 available, others COMING SOON) ────────────────────
 window.CHARACTERS = [
-  { id:1,  name:'Creator',       emoji:'🎤', unlockPts:0,     desc:'The main all-around hero.',       style:'Balanced',        special:'Beat Drop',     spd:78,str:78,def:72, color:'#ff00aa', baseHp:120,baseDmg:18,moveSpeed:4.5,weight:'medium',    frameData:{startup:4,active:3,recovery:8},  meterGain:15,meterCost:40,iFrames:8  },
-  { id:2,  name:'DJ',            emoji:'🎧', unlockPts:0,     desc:'Rhythm-based fighter.',           style:'Soundwave zone',  special:'Bass Cannon',   spd:68,str:72,def:68, color:'#aa44ff', baseHp:115,baseDmg:17,moveSpeed:4.0,weight:'medium',    frameData:{startup:6,active:4,recovery:10}, meterGain:18,meterCost:45,iFrames:7  },
-  { id:3,  name:'FAMU Student A',emoji:'🔥', unlockPts:300,   desc:'Fast confident striker.',         style:'Rushdown',        special:'Rattler Rush',  spd:94,str:68,def:50, color:'#ff8800', baseHp:100,baseDmg:15,moveSpeed:6.0,weight:'light',     frameData:{startup:3,active:2,recovery:5},  meterGain:20,meterCost:35,iFrames:10 },
-  { id:4,  name:'FAMU Student B',emoji:'⚡', unlockPts:600,   desc:'Balanced but flashy.',            style:'Momentum dash',   special:'Thunder Dash',  spd:82,str:76,def:62, color:'#ffdd00', baseHp:108,baseDmg:16,moveSpeed:5.2,weight:'medium-light',frameData:{startup:4,active:3,recovery:7}, meterGain:17,meterCost:38,iFrames:9  },
-  { id:5,  name:'Influencer',    emoji:'📸', unlockPts:1000,  desc:'Evasive flash fighter.',          style:'Dodge & stun',    special:'Flash Mob',     spd:92,str:60,def:52, color:'#ff44cc', baseHp:95, baseDmg:13,moveSpeed:5.8,weight:'light',     frameData:{startup:3,active:2,recovery:6},  meterGain:22,meterCost:35,iFrames:14 },
-  { id:6,  name:'Photographer',  emoji:'📷', unlockPts:1500,  desc:'Precision range fighter.',        style:'Zone control',    special:'Shutter Strike',spd:70,str:74,def:64, color:'#44aaff', baseHp:105,baseDmg:16,moveSpeed:4.2,weight:'medium',    frameData:{startup:5,active:3,recovery:9},  meterGain:16,meterCost:40,iFrames:8  },
-  { id:7,  name:'Promoter',      emoji:'🎉', unlockPts:2000,  desc:'Crowd-control utility.',          style:'Push/pull',       special:'Hype Up',       spd:65,str:70,def:70, color:'#ff6600', baseHp:115,baseDmg:15,moveSpeed:3.8,weight:'medium',    frameData:{startup:6,active:4,recovery:11}, meterGain:14,meterCost:42,iFrames:7  },
-  { id:8,  name:'Dancer',        emoji:'💃', unlockPts:2800,  desc:'Fastest close-range spin fighter.',style:'Dodge combos',   special:'Spin Cycle',    spd:96,str:65,def:55, color:'#ff00ff', baseHp:98, baseDmg:14,moveSpeed:6.2,weight:'light',     frameData:{startup:2,active:2,recovery:4},  meterGain:25,meterCost:38,iFrames:16 },
-  { id:9,  name:'Vendor',        emoji:'🛒', unlockPts:3800,  desc:'Heavy item-toss utility.',        style:'Toss & ram',      special:'Tray Slam',     spd:50,str:85,def:82, color:'#88aa44', baseHp:145,baseDmg:22,moveSpeed:3.2,weight:'heavy',     frameData:{startup:8,active:5,recovery:14}, meterGain:12,meterCost:45,iFrames:5  },
-  { id:10, name:'Security',      emoji:'🛡️', unlockPts:5000,  desc:'Heavy grappler tank.',            style:'Block & throw',   special:'Crowd Removal', spd:38,str:95,def:98, color:'#444466', baseHp:190,baseDmg:28,moveSpeed:2.5,weight:'heavy',     frameData:{startup:10,active:6,recovery:16},meterGain:10,meterCost:50,iFrames:4  },
-  { id:11, name:'Host',          emoji:'🎙️', unlockPts:6500,  desc:'Mic-command support fighter.',    style:'Buff & debuff',   special:'Mic Drop',      spd:72,str:72,def:74, color:'#ffaa44', baseHp:118,baseDmg:17,moveSpeed:4.3,weight:'medium',    frameData:{startup:5,active:3,recovery:9},  meterGain:16,meterCost:40,iFrames:8  },
-  { id:12, name:'FSU Student A', emoji:'🏈', unlockPts:8000,  desc:'Aggressive rushdown pressure.',   style:'Momentum rush',   special:'Garnet Blitz',  spd:88,str:82,def:58, color:'#cc4400', baseHp:112,baseDmg:20,moveSpeed:5.5,weight:'medium-heavy',frameData:{startup:4,active:3,recovery:7}, meterGain:18,meterCost:38,iFrames:9  },
-  { id:13, name:'FSU Student B', emoji:'🎓', unlockPts:10000, desc:'Technical counter fighter.',      style:'Parry & counter', special:'Gold Counter',  spd:76,str:78,def:80, color:'#bb8800', baseHp:122,baseDmg:19,moveSpeed:4.6,weight:'medium',    frameData:{startup:4,active:3,recovery:8},  meterGain:15,meterCost:42,iFrames:10 }
+  // === AVAILABLE NOW ===
+  { id:3,  playable:true, name:'FAMU STUDENT — FEMALE', shortName:'FAMU FEMALE', emoji:'🔥', unlockPts:0,
+    desc:'Rattler born and bred. Fast hands, faster mind. Rushdown pressure that never stops.',
+    style:'Rushdown',  special:'Rattler Rush', color:'#ff8800',
+    spd:94,str:68,def:50, baseHp:100,baseDmg:15,moveSpeed:6.0,weight:'light',
+    frameData:{startup:3,active:2,recovery:5}, meterGain:20,meterCost:35,iFrames:10 },
+
+  { id:4,  playable:true, name:'FAMU STUDENT — MALE', shortName:'FAMU MALE', emoji:'⚡', unlockPts:0,
+    desc:'Momentum machine. Flash dash combos that break shields and build crowd status.',
+    style:'Momentum Dash', special:'Thunder Dash', color:'#ffdd00',
+    spd:82,str:76,def:62, baseHp:108,baseDmg:16,moveSpeed:5.2,weight:'medium-light',
+    frameData:{startup:4,active:3,recovery:7}, meterGain:17,meterCost:38,iFrames:9 },
+
+  { id:12, playable:true, name:'FSU STUDENT — MALE', shortName:'FSU MALE', emoji:'🏈', unlockPts:0,
+    desc:'Garnet & Gold aggression. Built like a linebacker, hits like a hitter.',
+    style:'Momentum Rush', special:'Garnet Blitz', color:'#cc4400',
+    spd:88,str:82,def:58, baseHp:112,baseDmg:20,moveSpeed:5.5,weight:'medium-heavy',
+    frameData:{startup:4,active:3,recovery:7}, meterGain:18,meterCost:38,iFrames:9 },
+
+  { id:13, playable:true, name:'FSU STUDENT — FEMALE', shortName:'FSU FEMALE', emoji:'🎓', unlockPts:0,
+    desc:'Technical counter specialist. Reads every move and answers with gold precision.',
+    style:'Parry & Counter', special:'Gold Counter', color:'#bb8800',
+    spd:76,str:78,def:80, baseHp:122,baseDmg:19,moveSpeed:4.6,weight:'medium',
+    frameData:{startup:4,active:3,recovery:8}, meterGain:15,meterCost:42,iFrames:10 },
+
+  // === UNLOCKABLE / FULL ROSTER ===
+  { id:1,  playable:true, name:'THE CREATOR',    shortName:'THE CREATOR',    emoji:'🎤', unlockPts:0, desc:'Original visionary. Bars and beats hit harder than any punch.',         style:'Hype Master',   special:'Creator Wave',  color:'#ff00aa', spd:78,str:78,def:72, baseHp:120,baseDmg:18,moveSpeed:4.5, weight:'medium', frameData:{startup:4,active:3,recovery:8},  meterGain:15,meterCost:40,iFrames:8  },
+  { id:2,  playable:true, name:'THE DJ',         shortName:'THE DJ',         emoji:'🎧', unlockPts:0, desc:'Soundwave zone controller. Controls tempo of every fight.',            style:'Zone Control',  special:'Bass Drop',     color:'#aa44ff', spd:68,str:72,def:68, baseHp:115,baseDmg:17,moveSpeed:4.0, weight:'medium', frameData:{startup:6,active:4,recovery:10}, meterGain:18,meterCost:45,iFrames:7  },
+  { id:5,  playable:true, name:'THE INFLUENCER', shortName:'INFLUENCER',     emoji:'📸', unlockPts:0, desc:'Flash mob evasion master. Slippery and unpredictable.',               style:'Evasion Flash', special:'Flash Mob',     color:'#ff44cc', spd:92,str:60,def:52, baseHp:95, baseDmg:13,moveSpeed:5.8, weight:'light',  frameData:{startup:3,active:2,recovery:6},  meterGain:22,meterCost:35,iFrames:14 },
+  { id:6,  playable:true, name:'THE PHOTOGRAPHER',shortName:'PHOTOGRAPHER',  emoji:'📷', unlockPts:0, desc:'Precision zone fighter. Every shot calculated and framed.',            style:'Precision',     special:'Shutter Burst', color:'#44aaff', spd:70,str:74,def:64, baseHp:105,baseDmg:16,moveSpeed:4.2, weight:'medium', frameData:{startup:5,active:3,recovery:9},  meterGain:16,meterCost:40,iFrames:8  },
+  { id:7,  playable:true, name:'THE PROMOTER',   shortName:'THE PROMOTER',   emoji:'🎉', unlockPts:0, desc:'Crowd control and hype personified. Works the crowd against you.',    style:'Crowd Control', special:'Hype Train',    color:'#ff6600', spd:65,str:70,def:70, baseHp:115,baseDmg:15,moveSpeed:3.8, weight:'medium', frameData:{startup:6,active:4,recovery:11}, meterGain:14,meterCost:42,iFrames:7  },
+  { id:8,  playable:true, name:'THE DANCER',     shortName:'THE DANCER',     emoji:'💃', unlockPts:0, desc:'Fastest spin combos alive. Rhythm is a weapon in her hands.',         style:'Spin Combos',   special:'Vibe Break',    color:'#ff00ff', spd:96,str:65,def:55, baseHp:98, baseDmg:14,moveSpeed:6.2, weight:'light',  frameData:{startup:2,active:2,recovery:4},  meterGain:25,meterCost:38,iFrames:16 },
+  { id:9,  playable:true, name:'THE VENDOR',     shortName:'THE VENDOR',     emoji:'🛒', unlockPts:0, desc:'Heavy item-toss utility. Nothing hits harder than a crate.',          style:'Item Toss',     special:'Cart Slam',     color:'#88aa44', spd:50,str:85,def:82, baseHp:145,baseDmg:22,moveSpeed:3.2, weight:'heavy',  frameData:{startup:8,active:5,recovery:14}, meterGain:12,meterCost:45,iFrames:5  },
+  { id:10, playable:true, name:'SECURITY',       shortName:'SECURITY',       emoji:'🛡️', unlockPts:0, desc:'Tank grappler. Once he grabs you, it is over.',                     style:'Grappler Tank', special:'Slam Down',     color:'#444466', spd:38,str:95,def:98, baseHp:190,baseDmg:28,moveSpeed:2.5, weight:'heavy',  frameData:{startup:10,active:6,recovery:16},meterGain:10,meterCost:50,iFrames:4  },
+  { id:11, playable:true, name:'THE HOST',       shortName:'THE HOST',       emoji:'🎙️', unlockPts:0, desc:'Buff and debuff support. Sets the vibe and breaks yours.',           style:'Support Aura',  special:'Set The Tone',  color:'#ffaa44', spd:72,str:72,def:74, baseHp:118,baseDmg:17,moveSpeed:4.3, weight:'medium', frameData:{startup:5,active:3,recovery:9},  meterGain:16,meterCost:40,iFrames:8  },
+  // === BOSSES — also playable ===
+  { id:20, playable:true, name:'KT',             shortName:'KT',             emoji:'🔥', unlockPts:0, desc:'The owner. The chef. The producer. KT runs Cafe 8Fifty — final boss energy.',    style:'Boss Rush',     special:'8Fifty Finale', color:'#ff0000', spd:80,str:95,def:90, baseHp:620,baseDmg:32,moveSpeed:3.5, weight:'heavy',  frameData:{startup:4,active:5,recovery:9},  meterGain:20,meterCost:40,iFrames:6, isBoss:true  },
+  { id:21, playable:true, name:'BIG SOULJA',     shortName:'BIG SOULJA',     emoji:'👑', unlockPts:0, desc:'He holds the door. Built like a wall and twice as mean. Door boss unlocked.',   style:'Power Grapple', special:'Rope-A-Dope',   color:'#cc0022', spd:60,str:92,def:88, baseHp:480,baseDmg:26,moveSpeed:3.0, weight:'heavy',  frameData:{startup:5,active:4,recovery:11}, meterGain:14,meterCost:45,iFrames:5, isBoss:true  },
+  // === OPS — also playable ===
+  { id:30, playable:true, name:'PREDATOR PETE',  shortName:'PRED. PETE',     emoji:'🔮', unlockPts:0, desc:'Smooth but sleazy. Works the outside. Plays dirty and disappears.',            style:'Dirty Op',      special:'Purple Haze',   color:'#6600cc', spd:85,str:72,def:55, baseHp:160,baseDmg:18,moveSpeed:5.0, weight:'medium', frameData:{startup:3,active:3,recovery:7},  meterGain:20,meterCost:38,iFrames:10 },
+  { id:31, playable:true, name:'AGENT SNOW',     shortName:'AGENT SNOW',     emoji:'❄️', unlockPts:0, desc:'Cold-blooded intelligence op. Ice moves, precise timing, no mercy.',           style:'Ice Agent',     special:'Case Closed',   color:'#0088ff', spd:78,str:74,def:70, baseHp:180,baseDmg:20,moveSpeed:4.8, weight:'medium', frameData:{startup:4,active:3,recovery:8},  meterGain:18,meterCost:40,iFrames:9  },
+];
+
+// ── BOSSES & OPS refs for venue wave logic ──────────────────────────────────
+window.BOSSES = [
+  { id:21, name:'BIG SOULJA',  role:'VIP Door Boss',           color:'#cc0022', emoji:'👑', isBoss:true,
+    baseHp:480, baseDmg:26, moveSpeed:3.0, weight:'heavy',
+    frameData:{startup:5,active:4,recovery:1}, charId:21,
+    desc:'He holds the door. Built like a wall and twice as mean. Get past him or go home.' },
+  { id:20, name:'KT',          role:'Cafe 8Fifty Owner / Final Boss', color:'#ff0000', emoji:'🔥', isBoss:true,
+    baseHp:620, baseDmg:32, moveSpeed:3.5, weight:'heavy',
+    frameData:{startup:4,active:5,recovery:-1}, charId:20,
+    desc:'The owner. The chef. The producer. KT runs Cafe 8Fifty and he WILL shut you down.' },
+];
+
+window.OPS = [
+  { id:30, name:'PREDATOR PETE', role:'Outside Op / Bad Guy',  color:'#6600cc', emoji:'🔮', charId:30,
+    baseHp:160, baseDmg:18, moveSpeed:5.0, weight:'medium',
+    frameData:{startup:3,active:3,recovery:2},
+    desc:'Smooth but sleazy. Works the outside blocking good people from getting in.' },
+  { id:31, name:'AGENT SNOW',    role:'Outside Op / Snow Agent', color:'#0088ff', emoji:'❄️', charId:31,
+    baseHp:180, baseDmg:20, moveSpeed:4.5, weight:'medium-heavy',
+    frameData:{startup:4,active:3,recovery:1},
+    desc:'Fed agent trying to shut the whole nightlife scene down. Cold shoulder guaranteed.' },
 ];
 </script>
 
 <script>
 // Inline venue data (abbreviated for boot speed — full data in venues.json)
 window.VENUES = [
-  { id:1,  name:'Cafe8Fifty Exterior',           shortName:'CAFE8FIFTY',    emoji:'🌆', unlockPts:0,     cameraType:'sidescroll', colors:{sky:'#050015',ground:'#0a000f',accent:'#ff00aa'}, bossName:'Entry Line Disruptor',   bossHp:300,  bossEmoji:'👊', groundY:0.75, stageWidth:4000,
-    bgLayers:[{type:'sky',color:'#050015',y:0,h:0.5},{type:'cityBg',color:'#0d002a',y:0.2,h:0.6},{type:'buildings',color:'#1a0035',y:0.15,h:0.7},{type:'neonSigns',color:'#ff00aa',y:0.3,h:0.3},{type:'ground',color:'#08000e',y:0.75,h:0.25}],
-    props:['velvet_rope','neon_sign','entry_door','security_post','street_light','sidewalk_barricade'],
-    npcs:['Door Security','VIP Host','Member in line','Street Vendor'],
-    missionSteps:['Arrive outside Cafe8Fifty.','Talk to the door security.','Clear the entry-line disruption — wave 1.','Interact with the VIP sign.','Defeat the Entry Line Disruptor.','Unlock HITMANS VIP Interior.'],
-    waves:[{wave:1,enemies:['Hater','Hater','Gate Crasher'],spawnX:750},{wave:2,enemies:['Opp','Disruptor'],spawnX:750},{wave:'boss',enemies:['Entry Line Disruptor'],spawnX:700}],
+  { id:1,  name:'Cafe 8Fifty — Exterior', shortName:'CAFE 8FIFTY', emoji:'🌆', unlockPts:0,
+    cameraType:'sidescroll',
+    colors:{sky:'#050015',ground:'#0a000f',accent:'#ff0000'},
+    bossName:'Big Soulja', bossHp:480, bossEmoji:'👑', bossCharId:21,
+    groundY:0.75, stageWidth:4000,
+    bgLayers:[
+      {type:'sky',color:'#050015',y:0,h:0.5},
+      {type:'cityBg',color:'#0d0000',y:0.2,h:0.6},
+      {type:'buildings',color:'#1a0008',y:0.15,h:0.7},
+      {type:'neonSigns',color:'#ff0000',y:0.3,h:0.3},
+      {type:'ground',color:'#08000e',y:0.75,h:0.25}
+    ],
+    props:['velvet_rope','neon_sign','entry_door','security_post','street_light','sidewalk_barricade','trash_can','parked_car'],
+    npcs:['VIP Host','Member in line','Street Vendor'],
+    missionSteps:[
+      'You\'re outside Cafe 8Fifty. Tallahassee\'s most exclusive after-spot.',
+      'Predator Pete and Agent Snow are running ops — blocking the line and harassing members.',
+      'Clear Wave 1 — handle Pete\'s crew in the street.',
+      'Agent Snow calls backup — clear Wave 2 before they lock the block.',
+      'BIG SOULJA holds the door. He doesn\'t move for anyone. Earn your entry.',
+      'Defeat Big Soulja to unlock the inside: HITMANS VIP AFTER SPOT.'
+    ],
+    waves:[
+      {wave:1, enemies:['Predator Pete','Street Goon','Street Goon'], enemyCharIds:[30,null,null], spawnX:700},
+      {wave:2, enemies:['Agent Snow','Agent Snow Backup','Hater'],    enemyCharIds:[31,31,null],   spawnX:750},
+      {wave:'boss', enemies:['Big Soulja'], enemyCharIds:[21], spawnX:680}
+    ],
     reward:{pts:500,coins:100,unlocks:2} },
 
   { id:2,  name:'Food Truck / Hibachi Street',   shortName:'HIBACHI STREET', emoji:'🍜', unlockPts:0,     cameraType:'sidescroll', colors:{sky:'#080010',ground:'#0f0008',accent:'#ff6600'}, bossName:'Street Heat Boss',       bossHp:350,  bossEmoji:'🔥', groundY:0.75, stageWidth:3800,
@@ -287,11 +360,25 @@ window.VENUES = [
     waves:[{wave:1,enemies:['Gate Crasher','Scammer'],spawnX:750},{wave:2,enemies:['Opp','Bad-energy NPC'],spawnX:750},{wave:'boss',enemies:['Street Heat Boss'],spawnX:700}],
     reward:{pts:600,coins:120,unlocks:3} },
 
-  { id:3,  name:'HITMANS VIP After Spot Interior',shortName:'HVAS INTERIOR', emoji:'👑', unlockPts:500,   cameraType:'topdown',    colors:{floor:'#1a0025',wall:'#2a0040',accent:'#ffd700'}, bossName:'Status Check Boss',      bossHp:400,  bossEmoji:'🏆',
-    props:['dj_booth','vip_rope','stage_light','bar_counter','lounge_booth','smoke_machine'],
-    npcs:['VIP Host','DJ','Member','Promoter'],
-    missionSteps:['Enter HITMANS VIP After Spot.','Talk to the host and DJ.','Pass the member challenge.','Clear the boss confrontation.','Unlock Kingdom Come Saloon.'],
-    waves:[{wave:1,enemies:['Bad-energy NPC','Disruptor'],zone:'center'},{wave:'boss',enemies:['Status Check Boss'],zone:'stage'}],
+  { id:3,  name:'HITMANS VIP After Spot — Interior', shortName:'HVAS INTERIOR', emoji:'👑', unlockPts:500,
+    cameraType:'topdown',
+    colors:{floor:'#12000a',wall:'#1e0012',accent:'#ff0000'},
+    bossName:'KT', bossHp:620, bossEmoji:'🔥', bossCharId:20,
+    props:['dj_booth','vip_rope','stage_light','bar_counter','lounge_booth','smoke_machine','pool_table','couch_section'],
+    npcs:['Big Soulja','VIP Host','DJ Host','Bartender','Hostess','Security Guard','VIP Member Male','VIP Member Female','Server Runner','Promoter'],
+    missionSteps:[
+      'You\'re inside HITMANS VIP AFTER SPOT. The most exclusive room in Tallahassee.',
+      'Network with the DJ, Bartender, and Hostess — build your status.',
+      'Security is on edge. Someone\'s running a play inside — clear the disruption.',
+      'KT himself comes out. The Owner. The Chef. The Producer.',
+      'This is his house. Prove you belong here or get the Cafe 8Fifty Shutdown.',
+      'Defeat KT to become a certified HITMANS VIP member.'
+    ],
+    waves:[
+      {wave:1, enemies:['Disruptor','Bad Energy','Hater'], enemyCharIds:[null,null,null], zone:'main_floor'},
+      {wave:2, enemies:['Bodyguard','Bodyguard'],           enemyCharIds:[null,null],     zone:'vip_section'},
+      {wave:'boss', enemies:['KT'], enemyCharIds:[20], zone:'stage'}
+    ],
     reward:{pts:800,coins:200,unlocks:4} },
 
   { id:4,  name:'Kingdom Come Saloon',           shortName:'KINGDOM COME',  emoji:'🍺', unlockPts:1300,  cameraType:'topdown',    colors:{floor:'#1a1000',wall:'#2a1800',accent:'#ffaa00'}, bossName:'Saloon Rival',           bossHp:450,  bossEmoji:'🤠',
