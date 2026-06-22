@@ -76,7 +76,14 @@ const QuestEngine = (() => {
     gameState.bossDefeated = false;
     gameState.missionComplete = false;
 
-    CombatEngine.resetForStage();
+    FighterEngine.resetForStage();
+    if (typeof SpriteSystem !== 'undefined' && SpriteSystem.hasSprites(ch.id)) {
+      SpriteSystem.preload(ch.id);
+    }
+    if (venue.id === 1 && typeof Stage1Scene !== 'undefined') {
+      Stage1Scene.preloadOutside();
+      Stage1Scene.preloadInside();
+    }
     SceneManager.resetCamera();
 
     // Build player entity
@@ -140,122 +147,84 @@ const QuestEngine = (() => {
   }
 
   function update(dt) {
-    const frozen = CombatEngine.update(dt);
-    if (frozen) return;
-
     InputManager.update();
     const inp = InputManager.state;
-    const p = entities.player;
+    const p   = entities.player;
     const venue = gameState.venue;
     const isTopdown = venue.cameraType === 'topdown';
+    const stageW = venue.stageWidth || (isTopdown ? canvas.width : canvas.width * 5);
+    const stageGroundY = canvas.height * (venue.groundY || 0.75);
 
-    // Player movement
-    if (p.hitstunFrames > 0) {
-      p.hitstunFrames--;
-    } else if (!p.attacking || attackTimer <= 0) {
-      if (!p.dodging) {
-        if (!isTopdown) {
-          // Side-scroll movement
-          if (inp.left)  { p.x -= p.speed * dt * 60; p.facing = -1; }
-          if (inp.right) { p.x += p.speed * dt * 60; p.facing =  1; }
-          if (inp.up && p.onGround) { p.vel.y = -14; p.onGround = false; }
-        } else {
-          // Top-down 4-dir
-          if (inp.left)  { p.x -= p.speed * dt * 60; p.facing = -1; }
-          if (inp.right) { p.x += p.speed * dt * 60; p.facing =  1; }
-          if (inp.up)    p.y -= p.speed * dt * 60;
-          if (inp.down)  p.y += p.speed * dt * 60;
-        }
-      }
-      p.blocking = inp.block || (inp.dodge && !inp.left && !inp.right && !inp.up && !inp.down);
-    }
-
-    // Gravity (sidescroll only)
-    if (!isTopdown) {
-      p.vel.y += 0.6;
-      p.y += p.vel.y;
-      const groundY = canvas.height * (venue.groundY || 0.75) - p.h;
-      if (p.y >= groundY) { p.y = groundY; p.vel.y = 0; p.onGround = true; }
-    }
-
-    // Bounds
-    const stageW = venue.stageWidth || canvas.width * 5;
-    p.x = Math.max(0, Math.min(p.x, isTopdown ? canvas.width - p.w : stageW - p.w));
-    if (isTopdown) p.y = Math.max(50, Math.min(p.y, canvas.height - p.h - 10));
-
-    // Attack timer
-    if (attackTimer > 0) { attackTimer--; if (attackTimer === 0) p.attacking = false; }
-    if (attackCooldown > 0) attackCooldown--;
-    if (dodgeTimer > 0) { dodgeTimer--; if (dodgeTimer === 0) { p.dodging = false; iFrames = 0; } }
-    if (iFrames > 0) { iFrames--; p.invincible = iFrames > 0; }
-    if (comboWindowTimer > 0) { comboWindowTimer--; if (comboWindowTimer === 0) attackComboStep = 0; }
-
-    // Collision with walls (topdown)
-    if (isTopdown) resolveWallCollision(p, entities.walls);
-
-    // Check attack hits
-    if (p.attacking && attackTimer > 0 && attackTimer <= gameState.character.frameData.active) {
-      const atkBox = CombatEngine.getAttackBox(p, p.facing);
+    if (isTopdown) {
+      // ── Topdown physics via FighterEngine ──
+      const layout = (venue.id === 1 && typeof Stage1Scene !== 'undefined')
+        ? Stage1Scene.INSIDE : null;
+      const inter = FighterEngine.updatePlayerTopdown(p, inp, dt, layout);
+      if (inter) handleStage1Interaction(inter);
+    } else {
+      // ── Sidescroll physics via FighterEngine ──
+      FighterEngine.updatePlayerSidescroll(p, inp, dt, stageGroundY, stageW);
+      // Enemy AI + ground physics
       entities.enemies.forEach(e => {
-        if (e.hp <= 0 || e.hitThisAttack) return;
-        const hurtBox = CombatEngine.getHurtBox(e);
-        if (CombatEngine.aabb(atkBox, hurtBox)) {
-          if (!e.blocking) {
-            const dmg = CombatEngine.applyHit(p, e, gameState.character.baseDmg, p.facing);
-            e.hitThisAttack = true;
-            onEnemyHit(e, dmg);
-          } else {
-            CombatEngine.applyBlockstun(e, 15);
-            CombatEngine.triggerHitstop(3);
+        if (e.hp <= 0) return;
+        FighterEngine.tickEnemy(e, p, dt);
+        if (e.vel) {
+          e.x += e.vel.x * dt;
+          e.y += e.vel.y * dt;
+          e.vel.x *= 0.82;
+          e.vel.y += 1800 * dt;
+          const gy = stageGroundY - e.h;
+          if (e.y >= gy) { e.y = gy; e.vel.y = 0; e.onGround = true; e.launched = false; }
+        }
+        // Enemy hits player
+        if (e.attacking && !p.invincible) {
+          const eBox  = FighterEngine.getHitbox(e);
+          const pHurt = FighterEngine.getHurtbox(p);
+          if (FighterEngine.aabb(eBox, pHurt)) {
+            if (p.blocking) {
+              p.hp = Math.max(0, p.hp - Math.ceil(e.dmg * 0.15));
+              FighterEngine.applyBlockstun(p, 12);
+              FighterEngine.triggerHitstop(0.05);
+            } else {
+              p.hp = Math.max(0, p.hp - e.dmg);
+              FighterEngine.applyKnockback(p, -e.facing, 200);
+              FighterEngine.applyHitstun(p, 20);
+              FighterEngine.shakeScreen(4, 10);
+              if (navigator.vibrate) navigator.vibrate(80);
+              gameState.hp = p.hp;
+            }
+            e.attacking = false;
+            if (p.hp <= 0) { onGameOver(); return; }
           }
+        }
+      });
+      // Player attack hits enemies
+      FighterEngine.resolveHits(p, entities.enemies, stageGroundY);
+      entities.enemies.forEach(e => {
+        if (e.hp <= 0 && !e._defeatedHandled) {
+          e._defeatedHandled = true;
+          onEnemyDefeated(e);
         }
       });
     }
 
-    // Enemy attacks vs player
+    // SpriteSystem animation update
+    if (typeof SpriteSystem !== 'undefined' && SpriteSystem.hasSprites(p.charId)) {
+      SpriteSystem.update(p.charId, p, dt, isTopdown, p.lastDir || 's');
+    }
     entities.enemies.forEach(e => {
-      if (e.hp <= 0) return;
-      CombatEngine.updateEnemyAI(e, p, dt, venue.stageWidth || canvas.width * 5);
-
-      // Apply enemy velocity
-      if (e.vel) {
-        e.x += e.vel.x;
-        e.y += e.vel.y;
-        e.vel.x *= 0.85;
-        if (!isTopdown) {
-          e.vel.y += 0.4;
-          const gy = canvas.height * (venue.groundY || 0.75) - e.h;
-          if (e.y >= gy) { e.y = gy; e.vel.y = 0; }
-        }
+      if (typeof SpriteSystem !== 'undefined' && SpriteSystem.hasSprites(e.charId)) {
+        SpriteSystem.update(e.charId, e, dt, isTopdown, 's');
       }
-
-      // Enemy attack hits player
-      if (e.attacking && !p.invincible) {
-        const eBox = CombatEngine.getAttackBox(e, e.facing);
-        const pHurt = CombatEngine.getHurtBox(p);
-        if (CombatEngine.aabb(eBox, pHurt)) {
-          if (p.blocking) {
-            p.hp = Math.max(0, p.hp - Math.ceil(e.dmg * 0.15));
-            CombatEngine.applyBlockstun(p, 12);
-            CombatEngine.triggerHitstop(4);
-          } else {
-            p.hp = Math.max(0, p.hp - e.dmg);
-            CombatEngine.applyKnockback(p, -e.facing, 5);
-            CombatEngine.applyHitstun(p, 18);
-            CombatEngine.shakeScreen(3, 8);
-            if (navigator.vibrate) navigator.vibrate(80);
-            gameState.hp = p.hp;
-          }
-          e.attacking = false;
-          if (p.hp <= 0) { onGameOver(); return; }
-        }
-      }
-      if (e.attacking) e.attacking = false;
-      delete e.hitThisAttack;
     });
 
-    // Apply player knockback
-    if (p.vel.x) { p.x += p.vel.x; p.vel.x *= 0.8; if (Math.abs(p.vel.x) < 0.5) p.vel.x = 0; }
+    // Collision with walls (topdown legacy)
+    if (isTopdown) resolveWallCollision(p, entities.walls);
+
+    // NPC / prop / door proximity
+    NPCEngine.updateNPCProximity(entities.npcs, p, 65);
+    NPCEngine.updatePropProximity(entities.props, p, 65);
+    if (isTopdown) NPCEngine.updateDoorProximity(entities.doors, p, 55);
 
     // NPC / prop / door proximity
     NPCEngine.updateNPCProximity(entities.npcs, p, 65);
@@ -306,42 +275,30 @@ const QuestEngine = (() => {
 
     switch (action) {
       case 'attack':
-        if (attackCooldown > 0) return;
-        p.attacking = true;
-        attackTimer = (ch.frameData.startup + ch.frameData.active + ch.frameData.recovery);
-        attackCooldown = Math.max(8, ch.frameData.recovery);
-        comboWindowTimer = 30;
-        attackComboStep++;
-        CombatEngine.pushInput('attack');
+        FighterEngine.pushInput('attack');
+        FighterEngine.executeAttack(p, 'normal');
         break;
 
       case 'special':
-        if (!CombatEngine.spendMeter(ch.meterCost || 40)) return;
-        p.attacking = true;
-        attackTimer = 20;
-        attackCooldown = 25;
-        CombatEngine.pushInput('special');
-        CombatEngine.shakeScreen(5, 10);
-        // Special deals 2x damage to all nearby enemies
-        entities.enemies.forEach(e => {
-          if (e.hp > 0) {
-            const dx = Math.abs(e.x - p.x);
-            if (dx < 200) {
-              CombatEngine.applyHit(p, e, ch.baseDmg * 2.5, p.facing);
-              onEnemyHit(e, ch.baseDmg * 2.5);
-            }
-          }
-        });
+        FighterEngine.pushInput('special');
+        FighterEngine.executeAttack(p, 'special');
+        break;
+
+      case 'super':
+        FighterEngine.pushInput('super');
+        p.superAnim = 1;
+        FighterEngine.executeAttack(p, 'super');
         break;
 
       case 'dodge':
-        if (dodgeTimer > 0) return;
-        p.dodging = true;
-        dodgeTimer = ch.iFrames || 10;
-        iFrames = ch.iFrames || 10;
-        p.invincible = true;
-        p.vel.x = p.facing * 8;
-        CombatEngine.pushInput('dodge');
+        FighterEngine.pushInput('dodge');
+        FighterEngine.executeAttack(p, 'dodge');
+        break;
+
+      case 'finisher':
+        FighterEngine.pushInput('finisher');
+        p.finisherTarget = entities.enemies.find(e => e.hp > 0 && e.finisherAvailable);
+        FighterEngine.executeAttack(p, 'finisher');
         break;
 
       case 'interact':
@@ -439,7 +396,38 @@ const QuestEngine = (() => {
     gameState.objective = MissionEngine.getObjectiveText();
     gameState.coins += 15;
     gameState.statusPts += 25;
-    CombatEngine.gainMeter(20);
+    FighterEngine.gainMeter(null, 20);
+  }
+
+  function handleStage1Interaction(inter) {
+    if (!inter) return;
+    switch (inter.action) {
+      case 'dialog_npc': {
+        const npc = entities.npcs.find(n => n.id === inter.npcId);
+        if (npc) startNPCDialog(npc);
+        break;
+      }
+      case 'check_vip': {
+        const save = SaveSystem.load() || SaveSystem.defaults();
+        if ((save.statusPts || 0) >= 500) {
+          showNotification('VIP ACCESS GRANTED ✓');
+        } else {
+          showNotification('VIP MEMBERS ONLY — Earn 500 Status Points');
+        }
+        break;
+      }
+      case 'dance_minigame':
+        showNotification('DANCE FLOOR — HIT THE FLOOR! [coming soon]');
+        break;
+      case 'exit_back':
+        showNotification('BACK EXIT — Returning outside...');
+        break;
+      case 'enter_venue':
+        // Switch camera to topdown
+        gameState.venue.cameraType = 'topdown';
+        showNotification('ENTERING CAFE 8 FIFTY...');
+        break;
+    }
   }
 
   function onEnemyHit(enemy, dmg) {
@@ -578,11 +566,30 @@ const QuestEngine = (() => {
   function render() {
     const venue = gameState.venue;
     if (!venue) return;
+    const cameraX = SceneManager.getCameraX ? SceneManager.getCameraX() : 0;
+    const cameraY = SceneManager.getCameraY ? SceneManager.getCameraY() : 0;
+
     if (venue.cameraType === 'topdown') {
       SceneManager.renderTopdown(gameState, entities, venue);
     } else {
       SceneManager.renderSidescroll(gameState, entities, venue);
     }
+
+    // VFX overlay (sprite-based hit sparks, trails)
+    if (typeof SpriteSystem !== 'undefined') {
+      SpriteSystem.renderVFX(ctx, cameraX, cameraY);
+    }
+
+    // Super flash overlay
+    FighterEngine.renderSuperFlash(ctx, canvas.width, canvas.height);
+
+    // Combo counter HUD
+    if (FighterEngine.getCombo() >= 2) {
+      FighterEngine.renderComboHUD(ctx, 16, canvas.height - 80);
+    }
+
+    // FighterEngine damage numbers
+    FighterEngine.renderDmgNumbers(ctx, cameraX, 0);
   }
 
   function updateHUD() {
@@ -593,7 +600,7 @@ const QuestEngine = (() => {
     const starsEl = document.getElementById('hud-stars');
 
     if (hpFill) hpFill.style.width = (gameState.hp / gameState.maxHp * 100) + '%';
-    if (spFill) spFill.style.width = (CombatEngine.getMeterPct() * 100) + '%';
+    if (spFill) spFill.style.width = (FighterEngine.getMeterPct() * 100) + '%';
     if (ptsEl) ptsEl.textContent = gameState.statusPts;
     if (coinsEl) coinsEl.textContent = gameState.coins;
     if (starsEl) starsEl.textContent = gameState.stars;
