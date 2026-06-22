@@ -533,22 +533,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Shell image overlay positioning ──────────────────────────────────────
-  // Shell image: 1448×1086px  Screen area: x 21.5%-77.5%, y 13.4%-86.5%
-  // Button centers as fraction of image (cx%, cy%, half-size%)
-  const SHELL_NAT_W = 1448, SHELL_NAT_H = 1086;
-  const SCREEN_X1 = 0.215, SCREEN_Y1 = 0.134;
-  const SCREEN_X2 = 0.775, SCREEN_Y2 = 0.865;
+  // Shell image: 1448×958px (cropped, device fills frame).
+  // Rendered with object-fit:cover / object-position 50% 42% — MUST match CSS.
+  // All coordinates are fractions of the image, measured against the artwork.
+  const SHELL_NAT_W = 1448, SHELL_NAT_H = 958;
+  const OBJ_POS_X = 0.50, OBJ_POS_Y = 0.10;  // keep in sync with #shell-img object-position
+  const SCREEN_X1 = 0.200, SCREEN_Y1 = 0.135;
+  const SCREEN_X2 = 0.790, SCREEN_Y2 = 0.800;
   const SHELL_BTNS = [
-    { id:'sdpad-up',    cx:0.097, cy:0.375, r:0.040 },
-    { id:'sdpad-down',  cx:0.097, cy:0.615, r:0.040 },
-    { id:'sdpad-left',  cx:0.055, cy:0.497, r:0.040 },
-    { id:'sdpad-right', cx:0.140, cy:0.497, r:0.040 },
-    { id:'sfbtn-y',     cx:0.877, cy:0.340, r:0.044 },
-    { id:'sfbtn-x',     cx:0.834, cy:0.490, r:0.044 },
-    { id:'sfbtn-b',     cx:0.920, cy:0.490, r:0.044 },
-    { id:'sfbtn-a',     cx:0.877, cy:0.635, r:0.044 },
-    { id:'sfbtn-start',  cx:0.895, cy:0.865, r:0.030 },
-    { id:'sfbtn-select', cx:0.848, cy:0.865, r:0.030 },
+    { id:'sdpad-up',     cx:0.100, cy:0.300, r:0.050 },
+    { id:'sdpad-down',   cx:0.100, cy:0.450, r:0.050 },
+    { id:'sdpad-left',   cx:0.055, cy:0.375, r:0.050 },
+    { id:'sdpad-right',  cx:0.145, cy:0.375, r:0.050 },
+    { id:'sfbtn-y',      cx:0.880, cy:0.300, r:0.052 },
+    { id:'sfbtn-x',      cx:0.832, cy:0.400, r:0.052 },
+    { id:'sfbtn-b',      cx:0.925, cy:0.400, r:0.052 },
+    { id:'sfbtn-a',      cx:0.880, cy:0.500, r:0.052 },
+    { id:'sfbtn-start',  cx:0.850, cy:0.720, r:0.040 },
+    { id:'sfbtn-select', cx:0.915, cy:0.720, r:0.040 },
   ];
 
   function positionShellOverlay() {
@@ -556,20 +558,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const screenArea = document.getElementById('screen-area');
     if (!shellEl || !screenArea) return;
     const cw = shellEl.clientWidth, ch = shellEl.clientHeight;
-    // Compute displayed image rect (object-fit: contain)
-    const scale = Math.min(cw / SHELL_NAT_W, ch / SHELL_NAT_H);
+    // object-fit: cover → image scaled to COVER the box (max scale)
+    const scale = Math.max(cw / SHELL_NAT_W, ch / SHELL_NAT_H);
     const dw = SHELL_NAT_W * scale, dh = SHELL_NAT_H * scale;
-    const ox = (cw - dw) / 2, oy = (ch - dh) / 2;
-    // Position screen area
-    const sx = ox + dw * SCREEN_X1, sy = oy + dh * SCREEN_Y1;
-    const sw = dw * (SCREEN_X2 - SCREEN_X1), sh = dh * (SCREEN_Y2 - SCREEN_Y1);
-    screenArea.style.cssText = `left:${sx}px;top:${sy}px;width:${sw}px;height:${sh}px`;
-    // Position each button hit area
+    // object-position determines where the overflow is cropped
+    const ox = (cw - dw) * OBJ_POS_X;
+    const oy = (ch - dh) * OBJ_POS_Y;
+    // Map image fractions → viewport pixels
+    const px = f => ox + dw * f;
+    const py = f => oy + dh * f;
+    // Position screen area over the screen cutout
+    screenArea.style.cssText =
+      `left:${px(SCREEN_X1)}px;top:${py(SCREEN_Y1)}px;` +
+      `width:${dw*(SCREEN_X2-SCREEN_X1)}px;height:${dh*(SCREEN_Y2-SCREEN_Y1)}px`;
+    // Position each button hit area (square, sized off the smaller image dimension)
     SHELL_BTNS.forEach(b => {
       const el = document.getElementById(b.id);
       if (!el) return;
-      const bw = b.r * 2 * dw, bh = b.r * 2 * dh;
-      el.style.cssText = `left:${ox+b.cx*dw-bw/2}px;top:${oy+b.cy*dh-bh/2}px;width:${bw}px;height:${bh}px`;
+      const size = b.r * 2 * Math.min(dw, dh);
+      el.style.cssText =
+        `left:${px(b.cx)-size/2}px;top:${py(b.cy)-size/2}px;width:${size}px;height:${size}px`;
     });
   }
 
