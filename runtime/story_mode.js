@@ -22,15 +22,15 @@ const StoryMode = (() => {
            'YOU: "Cold night for the wrong move, agent."'],
       win:'SNOW\'s case goes cold. The block stays open.' },
 
-    { opp:7,  venue:'KINGDOM COME SALOON', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#ffaa00',name:'KINGDOM COME SALOON'},
-      pre:['THE PROMOTER: "This is MY crowd. They move when I say move."',
-           'YOU: "Watch them move for me."'],
-      win:'The crowd switches sides. Your status climbs.' },
+    { opp:12, venue:'KINGDOM COME SALOON — FSU TERRITORY', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#cc4400',name:'KINGDOM COME SALOON'},
+      pre:['FSU MALE: "Rattlers don\'t run this block. Seminoles do."',
+           'YOU: "Block\'s open season. Let\'s see who\'s still standing."'],
+      win:'Garnet and Gold hits the floor. The saloon belongs to the night.' },
 
-    { opp:8,  venue:'13 RAVE CLUB', stage:{sky:'#080030',ground:'#0a000f',accent:'#00ffcc',name:'13 RAVE CLUB'},
-      pre:['THE DANCER: "Can you keep the rhythm, or do you break?"',
-           'YOU: "I AM the rhythm tonight."'],
-      win:'You out-danced the floor. The DJ drops your name.' },
+    { opp:13, venue:'13 RAVE CLUB — GOLD STANDARD', stage:{sky:'#080030',ground:'#0a000f',accent:'#bb8800',name:'13 RAVE CLUB'},
+      pre:['FSU FEMALE: "I counter everything. You have no moves I haven\'t seen."',
+           'YOU: "Then watch this one."'],
+      win:'The counter game breaks. The rave crowd chants your name.' },
 
     { opp:21, venue:'HVAS — THE ENTRY', stage:{sky:'#12000a',ground:'#08000f',accent:'#cc0022',name:'HITMANS VIP AFTER SPOT'}, boss:true,
       pre:['BIG SOULJA: "Nobody passes me. Not for status. Not for nothing."',
