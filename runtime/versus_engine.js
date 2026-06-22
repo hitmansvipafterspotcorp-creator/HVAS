@@ -37,7 +37,7 @@ const VersusEngine = (() => {
   // ── module state ────────────────────────────────────────────────────────────
   let canvas, ctx, W, H, groundY, rafId = null, running = false;
   let last = 0;
-  let p1, p2, stage, onMatchEnd, difficulty = 1;
+  let p1, p2, stage, onMatchEnd, onQuit, difficulty = 1;
   let projectiles = [];
   let sparks = [];
   let popups = [];      // floating damage / combo text
@@ -50,6 +50,12 @@ const VersusEngine = (() => {
   let roundNum = 1;
   let timer = ROUND_TIME;
   let aiThink = 0;
+  let startOpts = null;  // remember opts for rematch
+
+  // ── pause menu ──────────────────────────────────────────────────────────────
+  let paused = false, pauseSel = 0;
+  const PAUSE_ITEMS = ['RESUME', 'REMATCH', 'QUIT TO MENU'];
+  let _prevPause = false, _prevUp = false, _prevDown = false, _prevConfirm = false, _prevBack = false;
 
   // ── helpers ───────────────────────────────────────────────────────────────
   function makeFighter(charId, isPlayer, side) {
@@ -93,14 +99,18 @@ const VersusEngine = (() => {
 
   // ── public start / stop ─────────────────────────────────────────────────────
   function start(cv, opts) {
+    startOpts = opts;
     canvas = cv;
     ctx = canvas.getContext('2d');
     resize();
     stage = opts.stage || { sky:'#0a0020', ground:'#08000f', accent:'#ff00aa', name:'AFTER SPOT' };
     difficulty = opts.difficulty || 1;
     onMatchEnd = opts.onMatchEnd || function(){};
+    onQuit = opts.onQuit || function(){};
+    paused = false; pauseSel = 0;
     p1 = makeFighter(opts.p1CharId, true,  -1);
     p2 = makeFighter(opts.p2CharId, false,  1);
+    if (opts.playerName) p1.name = String(opts.playerName).toUpperCase().slice(0, 12);
     p2.maxHp = Math.round(p2.maxHp * (0.85 + difficulty * 0.12));
     p2.hp = p2.maxHp;
     p1.rounds = 0; p2.rounds = 0;
@@ -111,6 +121,43 @@ const VersusEngine = (() => {
     last = performance.now();
     rafId = requestAnimationFrame(loop);
     window.addEventListener('resize', resize);
+  }
+
+  // ── pause controls ────────────────────────────────────────────────────────────
+  function togglePause() {
+    if (phase === 'matchover') return;
+    paused = !paused;
+    pauseSel = 0;
+  }
+
+  function rematch() {
+    paused = false;
+    p1.rounds = 0; p2.rounds = 0;
+    roundNum = 1;
+    p1.hp = p1.maxHp; p2.hp = p2.maxHp;
+    p1.meter = 0; p2.meter = 0;
+    phase = 'intro';
+    beginRound();
+  }
+
+  function quitMatch() {
+    paused = false;
+    stop();
+    onQuit();
+  }
+
+  function handlePauseNav() {
+    const s = (typeof InputManager !== 'undefined') ? InputManager.state : {};
+    const up = !!s.up, down = !!s.down, confirm = !!(s.confirm || s.attack), back = !!s.back;
+    if (up && !_prevUp)     pauseSel = (pauseSel + PAUSE_ITEMS.length - 1) % PAUSE_ITEMS.length;
+    if (down && !_prevDown) pauseSel = (pauseSel + 1) % PAUSE_ITEMS.length;
+    if (back && !_prevBack) { _prevBack = back; paused = false; }
+    if (confirm && !_prevConfirm) {
+      if (pauseSel === 0) paused = false;
+      else if (pauseSel === 1) rematch();
+      else if (pauseSel === 2) quitMatch();
+    }
+    _prevUp = up; _prevDown = down; _prevConfirm = confirm; _prevBack = back;
   }
 
   function stop() {
@@ -335,37 +382,45 @@ const VersusEngine = (() => {
     if (me.hitstun > 0 || me.knockdown > 0) return out;
     const dist = Math.abs(foe.x - me.x);
     const dir = foe.x > me.x ? 1 : -1;
-    const aggro = 0.4 + difficulty * 0.18;
+    // difficulty 1 (easy) → 3 (final boss). Clamp the influence so rung 1 feels fair.
+    const d = Math.max(0, Math.min(1, (difficulty - 1) / 2));   // 0..1 normalized
+    const aggro = 0.30 + d * 0.45;     // how often it presses forward / attacks
+    const blockSkill = 0.25 + d * 0.50; // how reliably it blocks real threats
 
     aiThink -= dt;
     if (aiThink <= 0) {
-      aiThink = 0.12 + Math.random() * 0.25;
+      // lower difficulty = slower reactions (longer think gaps = more whiff windows)
+      aiThink = (0.34 - d * 0.20) + Math.random() * (0.34 - d * 0.18);
       me._plan = Math.random();
+      // easy AI sometimes just idles, giving the player openings
+      me._idle = Math.random() > (0.55 + d * 0.40);
     }
     const plan = me._plan || 0;
+    if (me._idle) { return out; }
 
     // block when foe is attacking & close
-    const foeThreat = foe.attack && foe.atkPhase !== 'recovery' && dist < 180;
-    if (foeThreat && plan < 0.35 + difficulty*0.12) {
+    const foeThreat = foe.attack && foe.atkPhase !== 'recovery' && dist < 190;
+    if (foeThreat && plan < blockSkill) {
       if (dir > 0) out.left = true; else out.right = true; // hold back to block
+      if (foe.crouching && plan < blockSkill * 0.5) out.down = true; // low block
       return out;
     }
 
     if (dist > 360) {
       // approach or zone with special
-      if (me.meter >= 25 && plan < 0.25) out.special = true;
+      if (me.meter >= 25 && plan < 0.18 + d*0.12) out.special = true;
       else { if (dir>0) out.right=true; else out.left=true; }
     } else if (dist > 150) {
-      if (me.meter >= 100 && plan < 0.4) out.super = true;
-      else if (me.meter >= 25 && plan < 0.35) out.special = true;
+      if (me.meter >= 100 && plan < 0.25 + d*0.25) out.super = true;
+      else if (me.meter >= 25 && plan < 0.25 + d*0.15) out.special = true;
       else if (plan < aggro) { if (dir>0) out.right=true; else out.left=true; }
-      else if (plan > 0.9) out.up = true;
+      else if (plan > 0.92) out.up = true;
     } else {
-      // in range — attack
-      if (me.meter >= 100 && plan < 0.25) out.super = true;
-      else if (plan < 0.45) out.light = true;
-      else if (plan < 0.7) out.heavy = true;
-      else if (plan < 0.82 && me.meter >= 25) out.special = true;
+      // in range — attack mix scales with difficulty
+      if (me.meter >= 100 && plan < 0.18 + d*0.20) out.super = true;
+      else if (plan < 0.30 + aggro*0.25) out.light = true;
+      else if (plan < 0.55 + d*0.15) out.heavy = true;
+      else if (plan < 0.78 && me.meter >= 25) out.special = true;
       else { if (dir>0) out.left=true; else out.right=true; } // back off / block
     }
     return out;
@@ -382,6 +437,12 @@ const VersusEngine = (() => {
   }
 
   function update(dt) {
+    // pause toggle (edge-detected) — START / Esc / P
+    const ps = (typeof InputManager !== 'undefined') ? !!InputManager.state.pause : false;
+    if (ps && !_prevPause) togglePause();
+    _prevPause = ps;
+    if (paused) { handlePauseNav(); return; }
+
     if (bigT > 0) bigT -= dt;
     if (flash > 0) flash = Math.max(0, flash - dt * 1.8);
     if (shake > 0) shake = Math.max(0, shake - dt * 60);
@@ -492,6 +553,35 @@ const VersusEngine = (() => {
       ctx.fillRect(0,0,W,H);
       ctx.restore();
     }
+
+    if (paused) drawPause();
+  }
+
+  function drawPause() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(4,0,12,0.82)';
+    ctx.fillRect(0,0,W,H);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 22;
+    ctx.font = `900 ${Math.max(34,H*0.10)}px Orbitron, monospace`;
+    ctx.fillText('PAUSED', W/2, H*0.30);
+    ctx.shadowBlur = 0;
+    const itemH = Math.max(40, H*0.085);
+    const y0 = H*0.44;
+    PAUSE_ITEMS.forEach((label, i) => {
+      const sel = i === pauseSel;
+      const y = y0 + i*itemH;
+      ctx.font = `${sel?'900':'700'} ${Math.max(20,H*0.05)}px Orbitron, monospace`;
+      ctx.fillStyle = sel ? '#fff' : '#ffffff66';
+      ctx.shadowColor = sel ? (stage.accent||'#ff00aa') : 'transparent';
+      ctx.shadowBlur = sel ? 18 : 0;
+      ctx.fillText((sel?'▶  ':'')+label, W/2, y);
+    });
+    ctx.shadowBlur = 0;
+    ctx.font = `600 ${Math.max(11,H*0.022)}px Orbitron, monospace`;
+    ctx.fillStyle = '#ffffff55';
+    ctx.fillText('D-PAD to move • A/ENTER to select • START to resume', W/2, H*0.86);
+    ctx.restore();
   }
 
   function drawStage() {
@@ -535,30 +625,55 @@ const VersusEngine = (() => {
     ctx.globalAlpha = 1;
   }
 
+  // build factor per weight class so each character reads with a distinct silhouette
+  function buildOf(f) {
+    const w = (f.char && f.char.weight) || 'medium';
+    if (w === 'heavy')        return { bw: 1.34, bh: 1.04, hd: 1.18 };
+    if (w === 'medium-heavy') return { bw: 1.16, bh: 1.02, hd: 1.08 };
+    if (w === 'medium-light') return { bw: 0.92, bh: 1.00, hd: 0.98 };
+    if (w === 'light')        return { bw: 0.80, bh: 0.98, hd: 0.92 };
+    return { bw: 1.0, bh: 1.0, hd: 1.0 };
+  }
+
   function drawFighter(f) {
     const x = f.x, baseY = f.y;
     const crouch = f.crouching ? 0.62 : 1;
     const h = f.h * crouch;
     const topY = baseY - h;
+    const b = buildOf(f);
+    const ww = f.w * b.bw;
     // shadow
     ctx.save();
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(x, groundY, f.w*0.6, 10, 0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, groundY, ww*0.6, 10, 0,0,Math.PI*2); ctx.fill();
     ctx.restore();
+
+    // meter-charged aura ring (super ready) — makes a primed fighter read instantly
+    if (f.meter >= 100) {
+      ctx.save();
+      const pulse = 0.5 + 0.5*Math.sin(performance.now()/120);
+      ctx.globalAlpha = 0.25 + pulse*0.35;
+      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3; ctx.shadowColor='#ffd700'; ctx.shadowBlur=24;
+      ctx.beginPath(); ctx.ellipse(x, baseY - h*0.5, ww*0.7, h*0.62, 0,0,Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.save();
     if (f.flashHit > 0) { ctx.globalAlpha = 0.9; }
     // body
     const bodyColor = f.flashHit>0 ? '#ffffff' : f.color;
-    roundRect(x - f.w*0.32, topY + h*0.28, f.w*0.64, h*0.5, 12);
+    roundRect(x - ww*0.32, topY + h*0.28, ww*0.64, h*0.5, 12);
     ctx.fillStyle = bodyColor; ctx.shadowColor = f.color; ctx.shadowBlur = 16; ctx.fill();
     ctx.shadowBlur = 0;
+    // chest accent stripe (school/op color pop)
+    ctx.fillStyle = shade(f.color, 45);
+    roundRect(x - ww*0.10, topY + h*0.30, ww*0.20, h*0.42, 5); ctx.fill();
     // legs
     ctx.fillStyle = shade(f.color,-40);
     const legSplit = f.state==='walk' ? Math.sin(performance.now()/80)*8 : 4;
-    roundRect(x - f.w*0.28, topY+h*0.7, f.w*0.22, h*0.32, 6); ctx.fill();
-    roundRect(x + f.w*0.06, topY+h*0.7, f.w*0.22, h*0.32, 6); ctx.fill();
+    roundRect(x - ww*0.28 - (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
+    roundRect(x + ww*0.06 + (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
     // arm / attack
     if (f.attack && f.atkPhase==='active' && !MOVES[f.attack].projectile) {
       ctx.fillStyle = f.color; ctx.shadowColor='#fff'; ctx.shadowBlur=14;
@@ -568,14 +683,20 @@ const VersusEngine = (() => {
       ctx.fill(); ctx.shadowBlur=0;
     }
     // head
+    const hr = f.w*0.34*b.hd;
     ctx.beginPath();
-    ctx.arc(x, topY + h*0.16, f.w*0.34, 0, Math.PI*2);
+    ctx.arc(x, topY + h*0.16, hr, 0, Math.PI*2);
     ctx.fillStyle = shade(f.color, 30); ctx.shadowColor=f.color; ctx.shadowBlur=14; ctx.fill();
     ctx.shadowBlur=0;
     // emoji face
-    ctx.font = `${Math.round(f.w*0.5)}px serif`;
+    ctx.font = `${Math.round(hr*1.3)}px serif`;
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(f.emoji, x, topY + h*0.16);
+    // boss crown marker
+    if (f.char && f.char.isBoss) {
+      ctx.font = `${Math.round(hr*0.9)}px serif`;
+      ctx.fillText('👑', x, topY - hr*0.4);
+    }
     ctx.restore();
   }
 
@@ -706,5 +827,5 @@ const VersusEngine = (() => {
     return `rgb(${r},${g},${b})`;
   }
 
-  return { start, stop, resize };
+  return { start, stop, resize, togglePause, rematch, isPaused: () => paused };
 })();

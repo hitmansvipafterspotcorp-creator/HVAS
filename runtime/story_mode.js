@@ -45,6 +45,17 @@ const StoryMode = (() => {
   ];
 
   let run = null; // { playerCharId, idx, mode }
+  let playerName = '';
+
+  function loadName() {
+    if (playerName) return playerName;
+    try { playerName = localStorage.getItem('hvas_player_name') || ''; } catch(_){}
+    return playerName;
+  }
+  function saveName(n) {
+    playerName = (n||'').toUpperCase().slice(0,12);
+    try { localStorage.setItem('hvas_player_name', playerName); } catch(_){}
+  }
 
   // ── DOM screen scaffolding ──────────────────────────────────────────────────
   function ensureScreens() {
@@ -80,6 +91,48 @@ const StoryMode = (() => {
       r.innerHTML = `<div class="result-box" id="result-box"></div>`;
       host.appendChild(r);
     }
+    if (!document.getElementById('screen-name')) {
+      const n = document.createElement('div');
+      n.id = 'screen-name'; n.className = 'screen'; n.style.display = 'none';
+      n.innerHTML = `
+        <div class="name-box">
+          <div class="name-title">ENTER YOUR NAME</div>
+          <div class="name-sub">THIS IS HOW THE NIGHT WILL KNOW YOU</div>
+          <input id="name-input" class="name-input" maxlength="12" autocomplete="off"
+                 spellcheck="false" placeholder="HITMAN" />
+          <div class="name-row">
+            <button class="vs-fight-btn" id="name-go">▶ ENTER THE NIGHT</button>
+            <button class="back-btn" id="name-back">BACK</button>
+          </div>
+        </div>`;
+      host.appendChild(n);
+    }
+  }
+
+  // ── name entry ────────────────────────────────────────────────────────────────
+  function promptName(cb) {
+    ensureScreens();
+    show('screen-name');
+    const input = document.getElementById('name-input');
+    const go = document.getElementById('name-go');
+    const back = document.getElementById('name-back');
+    if (input) { input.value = loadName(); setTimeout(()=>{ try{input.focus();}catch(_){} }, 60); }
+    const finish = () => {
+      const v = (input && input.value.trim()) || 'HITMAN';
+      saveName(v);
+      cleanup();
+      cb();
+    };
+    const onKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(); } };
+    function cleanup() {
+      go && go.removeEventListener('click', finish);
+      back && back.removeEventListener('click', toMenu);
+      input && input.removeEventListener('keydown', onKey);
+    }
+    function toMenu() { cleanup(); try { HitgearOS.openGameMenu(); } catch(_){} }
+    if (go) go.addEventListener('click', finish);
+    if (back) back.addEventListener('click', toMenu);
+    if (input) input.addEventListener('keydown', onKey);
   }
 
   function show(id) { HitgearOS.showScreen(id); }
@@ -88,18 +141,22 @@ const StoryMode = (() => {
   // ── entry points ────────────────────────────────────────────────────────────
   function startStory() {
     ensureScreens();
-    HitgearOS.openCharSelect(charId => {
-      run = { playerCharId: charId, idx: 0, mode: 'story' };
-      nextRung();
+    promptName(() => {
+      HitgearOS.openCharSelect(charId => {
+        run = { playerCharId: charId, idx: 0, mode: 'story' };
+        nextRung();
+      });
     });
   }
 
   function startArcade() {
     ensureScreens();
-    HitgearOS.openCharSelect(charId => {
-      run = { playerCharId: charId, idx: 0, mode: 'arcade',
-        ladder: shuffledLadder() };
-      nextRung();
+    promptName(() => {
+      HitgearOS.openCharSelect(charId => {
+        run = { playerCharId: charId, idx: 0, mode: 'arcade',
+          ladder: shuffledLadder() };
+        nextRung();
+      });
     });
   }
 
@@ -156,6 +213,13 @@ const StoryMode = (() => {
       btn.addEventListener('mousedown', ()=>InputManager.setTouch(action,true));
       btn.addEventListener('mouseup',   ()=>InputManager.setTouch(action,false));
     });
+    // START button (shell + on-screen) pauses the fight
+    ['sfbtn-start','touch-start'].forEach(id=>{
+      const b=document.getElementById(id);
+      if (!b || b.dataset.vspause) return;
+      b.dataset.vspause='1';
+      b.addEventListener('click', ()=>{ if (typeof VersusEngine!=='undefined') VersusEngine.togglePause(); });
+    });
   }
 
   function launchFight(rung) {
@@ -177,7 +241,9 @@ const StoryMode = (() => {
       p2CharId: rung.opp,
       stage: rung.stage,
       difficulty: diff,
+      playerName: loadName(),
       onMatchEnd: (playerWon) => onFightEnd(rung, playerWon),
+      onQuit: () => { try { HitgearOS.openGameMenu(); } catch(_){} },
     });
   }
 
@@ -229,15 +295,16 @@ const StoryMode = (() => {
     const p = charById(run.playerCharId);
     const box = document.getElementById('result-box');
     if (!box) return;
+    const who = loadName() || (p.shortName||p.name);
     box.innerHTML = `
       <div class="result-win" style="color:#ffd700">YOU RUN THE NIGHT</div>
       <div class="ending-portrait" style="color:${p.color||'#ffd700'};border-color:${p.color||'#ffd700'};box-shadow:0 0 30px ${p.color||'#ffd700'}88">${p.emoji||'👑'}</div>
       <div class="result-flavor" style="max-width:520px">
-        From the line outside CAFE 8FIFTY to KT's own stage — ${p.shortName||p.name} cleared
+        From the line outside CAFE 8FIFTY to KT's own stage — ${who} cleared
         every rival in the city. Predator Pete, Agent Snow, the whole strip.
         Tonight you're not waiting on the list. You ARE the list.
       </div>
-      <div class="ending-title">★ HITMANS VIP — LEGEND STATUS ★</div>
+      <div class="ending-title">★ ${who} — HITMANS VIP LEGEND STATUS ★</div>
       <button class="vs-fight-btn" id="ending-done">RETURN TO HITGEAR OS</button>`;
     document.getElementById('ending-done').onclick = () => { VersusEngine.stop(); HitgearOS.openOSMenu(); };
     try { SaveSystem.addPts(2000); } catch(_){}

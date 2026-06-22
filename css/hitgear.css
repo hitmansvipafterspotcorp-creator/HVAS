@@ -855,3 +855,21 @@ body {
 .result-flavor { font-family: 'Rajdhani', sans-serif; font-size: clamp(13px, 2.2vw, 17px); color: #ccbbee; line-height: 1.55; max-width: 560px; }
 .ending-portrait { width: clamp(90px,18vw,150px); height: clamp(90px,18vw,150px); border: 3px solid #ffd700; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(48px,10vw,84px); background: #0a0014; }
 .ending-title { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(16px, 3vw, 26px); color: #ffd700; letter-spacing: 3px; text-shadow: 0 0 18px #ffd70088; }
+
+/* ── Name entry screen ───────────────────────────────────────────────────── */
+#screen-name { display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 35%, #1a0030 0%, #06000f 70%); }
+.name-box { display: flex; flex-direction: column; align-items: center; gap: 18px;
+  padding: 28px; max-width: 92%; }
+.name-title { font-family: 'Orbitron', sans-serif; font-weight: 900;
+  font-size: clamp(22px, 6vw, 44px); color: #ffd700; letter-spacing: 3px;
+  text-shadow: 0 0 22px #ffd70088; }
+.name-sub { font-family: 'Rajdhani', sans-serif; font-size: clamp(11px, 2.4vw, 15px);
+  color: #b59cff; letter-spacing: 2px; }
+.name-input { font-family: 'Orbitron', sans-serif; font-weight: 700;
+  font-size: clamp(20px, 5vw, 34px); text-align: center; text-transform: uppercase;
+  letter-spacing: 4px; color: #fff; background: #0a0018;
+  border: 2px solid #ff00aa; border-radius: 10px; padding: 14px 18px; width: min(86vw, 380px);
+  box-shadow: 0 0 22px #ff00aa55, inset 0 0 14px #ff00aa33; outline: none; }
+.name-input::placeholder { color: #ffffff33; }
+.name-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
