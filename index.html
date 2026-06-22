@@ -37,51 +37,22 @@
 </div>
 
 <div id="console-shell">
-  <div class="console-body">
+  <!-- The actual HITGEAR hardware shell image fills the viewport -->
+  <img id="shell-img" src="assets/ui/hitgear_shell.png" alt="HITGEAR OS" draggable="false">
 
-    <!-- ── LEFT GRIP ── -->
-    <div class="shell-grip shell-grip-left">
-      <div class="shell-grip-inner"></div>
-    </div>
-
-    <!-- ── LEFT PANEL ── -->
-    <div id="shell-left">
-      <!-- HITGEAR OS label top-left -->
-      <div class="shell-label-tl">HITGEAR OS</div>
-      <!-- D-pad: proper + cross shape -->
-      <div id="shell-dpad">
-        <div class="dpad-row"><div class="dpad-arm dpad-arm-up"   id="sdpad-up">  <span>▲</span></div></div>
-        <div class="dpad-row dpad-row-mid">
-          <div class="dpad-arm dpad-arm-left"  id="sdpad-left"> <span>◀</span></div>
-          <div class="dpad-center"></div>
-          <div class="dpad-arm dpad-arm-right" id="sdpad-right"><span>▶</span></div>
-        </div>
-        <div class="dpad-row"><div class="dpad-arm dpad-arm-down" id="sdpad-down"><span>▼</span></div></div>
-      </div>
-      <!-- Speaker grille left -->
-      <div class="shell-grille">
-        <div class="grille-line"></div><div class="grille-line"></div>
-        <div class="grille-line"></div><div class="grille-line"></div>
-        <div class="grille-line"></div>
-      </div>
-    </div>
-
-    <div id="screen-area">
+  <!-- Game canvas renders here — JS positions this over the screen cutout -->
+  <div id="screen-area">
 
 <!-- ══════════════════════════════════ BOOT SCREEN ══════════════════════════════════ -->
 <div id="screen-boot" class="screen active" style="display:flex">
-  <div class="boot-logo">
-    <div class="logo-hitgear">HITGEAR</div>
-    <div class="logo-os">OS</div>
-    <div class="boot-subtitle">HITMANS VIP AFTER SPOT</div>
-  </div>
+  <img src="assets/ui/hvas_logo.png" alt="HITMANS VIP AFTER SPOT" class="boot-logo-img">
   <div class="boot-bar-wrap">
     <div class="boot-bar" id="boot-bar"></div>
   </div>
   <div class="boot-loading-text" id="boot-loading-text">INITIALIZING HITGEAR OS...</div>
-  <div style="position:absolute;bottom:20px;right:20px">
-    <button id="pwa-install-btn" onclick="HitgearOS.installPWA()" style="display:none;font-family:'Orbitron',sans-serif;font-size:11px;padding:8px 16px;background:transparent;border:1px solid #ff00aa;color:#ff00aa;cursor:pointer;border-radius:4px;letter-spacing:2px">
-      + ADD TO HOME SCREEN
+  <div style="position:absolute;bottom:16px;right:16px">
+    <button id="pwa-install-btn" onclick="HitgearOS.installPWA()" style="display:none;font-family:'Orbitron',sans-serif;font-size:9px;padding:6px 12px;background:transparent;border:1px solid #ff00aa;color:#ff00aa;cursor:pointer;border-radius:4px;letter-spacing:2px">
+      + ADD TO HOME
     </button>
   </div>
 </div>
@@ -284,46 +255,21 @@
   <div id="options-area"></div>
 </div>
 
-    </div><!-- /#screen-area -->
+  </div><!-- /#screen-area -->
 
-    <!-- ── RIGHT PANEL ── -->
-    <div id="shell-right">
-      <!-- Crown badge top-right -->
-      <div class="shell-crown">👑</div>
-      <!-- Face buttons diamond: Y top, X left, B right, A bottom -->
-      <div id="shell-face-btns">
-        <div class="face-row"><div class="shell-face-btn shell-btn-y" id="sfbtn-y">Y</div></div>
-        <div class="face-row">
-          <div class="shell-face-btn shell-btn-x" id="sfbtn-x">X</div>
-          <div class="face-spacer"></div>
-          <div class="shell-face-btn shell-btn-b" id="sfbtn-b">B</div>
-        </div>
-        <div class="face-row"><div class="shell-face-btn shell-btn-a" id="sfbtn-a">A</div></div>
-      </div>
-      <!-- Speaker grille right -->
-      <div class="shell-grille">
-        <div class="grille-line"></div><div class="grille-line"></div>
-        <div class="grille-line"></div><div class="grille-line"></div>
-        <div class="grille-line"></div>
-      </div>
-    </div>
+  <!-- Invisible touch hit-areas over each physical button on the shell image -->
+  <!-- Positions are set by positionShellOverlay() in JS after img loads      -->
+  <div class="shell-hit" id="sdpad-up"    data-touches="touch-up"></div>
+  <div class="shell-hit" id="sdpad-down"  data-touches="touch-down"></div>
+  <div class="shell-hit" id="sdpad-left"  data-touches="touch-left"></div>
+  <div class="shell-hit" id="sdpad-right" data-touches="touch-right"></div>
+  <div class="shell-hit" id="sfbtn-y"     data-touches="touch-y"></div>
+  <div class="shell-hit" id="sfbtn-x"     data-touches="touch-x"></div>
+  <div class="shell-hit" id="sfbtn-b"     data-touches="touch-b"></div>
+  <div class="shell-hit" id="sfbtn-a"     data-touches="touch-a"></div>
+  <div class="shell-hit" id="sfbtn-start"  data-action="start"></div>
+  <div class="shell-hit" id="sfbtn-select" data-action="select"></div>
 
-    <!-- ── RIGHT GRIP ── -->
-    <div class="shell-grip shell-grip-right">
-      <div class="shell-grip-inner"></div>
-    </div>
-
-    <!-- ── SELECT / START pills — centered bottom ── -->
-    <div id="shell-bottom-btns">
-      <div id="shell-select-btn">SELECT</div>
-      <div id="shell-start-btn">START</div>
-    </div>
-
-    <!-- Gold accent lines top + bottom across screen -->
-    <div class="shell-accent-top"></div>
-    <div class="shell-accent-bot"></div>
-
-  </div><!-- /.console-body -->
 </div><!-- /#console-shell -->
 
 <!-- ══════════════════════════════════ DATA SCRIPTS ══════════════════════════════════ -->
@@ -586,32 +532,87 @@ document.addEventListener('DOMContentLoaded', () => {
     screen.orientation.lock('landscape').catch(()=>{});
   }
 
-  // Wire console shell physical buttons to game touch controls
-  function wireShellButton(shellId, touchId) {
-    const shell = document.getElementById(shellId);
-    const touch = document.getElementById(touchId);
-    if (!shell || !touch) return;
-    const down = e => { e.preventDefault(); touch.dispatchEvent(new TouchEvent('touchstart', {bubbles:true, touches:[new Touch({identifier:Date.now(), target:touch})]})); shell.classList.add('pressed'); };
-    const up   = e => { e.preventDefault(); touch.dispatchEvent(new TouchEvent('touchend',   {bubbles:true, changedTouches:[new Touch({identifier:Date.now(), target:touch})]})); shell.classList.remove('pressed'); };
-    shell.addEventListener('touchstart', down, {passive:false});
-    shell.addEventListener('touchend',   up,   {passive:false});
-    shell.addEventListener('mousedown',  () => { touch.dispatchEvent(new MouseEvent('mousedown', {bubbles:true})); shell.classList.add('pressed'); });
-    shell.addEventListener('mouseup',    () => { touch.dispatchEvent(new MouseEvent('mouseup',   {bubbles:true})); shell.classList.remove('pressed'); });
+  // ── Shell image overlay positioning ──────────────────────────────────────
+  // Shell image: 1448×1086px  Screen area: x 21.5%-77.5%, y 13.4%-86.5%
+  // Button centers as fraction of image (cx%, cy%, half-size%)
+  const SHELL_NAT_W = 1448, SHELL_NAT_H = 1086;
+  const SCREEN_X1 = 0.215, SCREEN_Y1 = 0.134;
+  const SCREEN_X2 = 0.775, SCREEN_Y2 = 0.865;
+  const SHELL_BTNS = [
+    { id:'sdpad-up',    cx:0.097, cy:0.375, r:0.040 },
+    { id:'sdpad-down',  cx:0.097, cy:0.615, r:0.040 },
+    { id:'sdpad-left',  cx:0.055, cy:0.497, r:0.040 },
+    { id:'sdpad-right', cx:0.140, cy:0.497, r:0.040 },
+    { id:'sfbtn-y',     cx:0.877, cy:0.340, r:0.044 },
+    { id:'sfbtn-x',     cx:0.834, cy:0.490, r:0.044 },
+    { id:'sfbtn-b',     cx:0.920, cy:0.490, r:0.044 },
+    { id:'sfbtn-a',     cx:0.877, cy:0.635, r:0.044 },
+    { id:'sfbtn-start',  cx:0.895, cy:0.865, r:0.030 },
+    { id:'sfbtn-select', cx:0.848, cy:0.865, r:0.030 },
+  ];
+
+  function positionShellOverlay() {
+    const shellEl = document.getElementById('console-shell');
+    const screenArea = document.getElementById('screen-area');
+    if (!shellEl || !screenArea) return;
+    const cw = shellEl.clientWidth, ch = shellEl.clientHeight;
+    // Compute displayed image rect (object-fit: contain)
+    const scale = Math.min(cw / SHELL_NAT_W, ch / SHELL_NAT_H);
+    const dw = SHELL_NAT_W * scale, dh = SHELL_NAT_H * scale;
+    const ox = (cw - dw) / 2, oy = (ch - dh) / 2;
+    // Position screen area
+    const sx = ox + dw * SCREEN_X1, sy = oy + dh * SCREEN_Y1;
+    const sw = dw * (SCREEN_X2 - SCREEN_X1), sh = dh * (SCREEN_Y2 - SCREEN_Y1);
+    screenArea.style.cssText = `left:${sx}px;top:${sy}px;width:${sw}px;height:${sh}px`;
+    // Position each button hit area
+    SHELL_BTNS.forEach(b => {
+      const el = document.getElementById(b.id);
+      if (!el) return;
+      const bw = b.r * 2 * dw, bh = b.r * 2 * dh;
+      el.style.cssText = `left:${ox+b.cx*dw-bw/2}px;top:${oy+b.cy*dh-bh/2}px;width:${bw}px;height:${bh}px`;
+    });
   }
 
-  wireShellButton('sdpad-up',    'touch-up');
-  wireShellButton('sdpad-down',  'touch-down');
-  wireShellButton('sdpad-left',  'touch-left');
-  wireShellButton('sdpad-right', 'touch-right');
-  wireShellButton('sfbtn-a',     'touch-a');
-  wireShellButton('sfbtn-b',     'touch-b');
-  wireShellButton('sfbtn-x',     'touch-x');
-  wireShellButton('sfbtn-y',     'touch-y');
+  const shellImg = document.getElementById('shell-img');
+  if (shellImg) {
+    shellImg.addEventListener('load', positionShellOverlay);
+    if (shellImg.complete) positionShellOverlay();
+  }
+  window.addEventListener('resize', positionShellOverlay);
+  setTimeout(positionShellOverlay, 200);
 
-  document.getElementById('shell-select-btn')?.addEventListener('click', () => { if(typeof QuestEngine !== 'undefined') QuestEngine?.togglePause?.(); });
-  document.getElementById('shell-start-btn')?.addEventListener('click', () => {
-    document.getElementById('touch-a')?.click();
-  });
+  // ── Wire hit areas to touch controls ──────────────────────────────────────
+  function wireHitArea(hitId, touchId) {
+    const hit = document.getElementById(hitId);
+    const touch = document.getElementById(touchId);
+    if (!hit || !touch) return;
+    const fireDown = e => {
+      e.preventDefault();
+      try { touch.dispatchEvent(new TouchEvent('touchstart', {bubbles:true, cancelable:true, touches:[new Touch({identifier:Date.now(), target:touch, clientX:0, clientY:0, pageX:0, pageY:0, screenX:0, screenY:0})]})); } catch(_) {}
+      touch.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+    };
+    const fireUp = e => {
+      e.preventDefault();
+      try { touch.dispatchEvent(new TouchEvent('touchend', {bubbles:true, cancelable:true, changedTouches:[new Touch({identifier:Date.now(), target:touch, clientX:0, clientY:0, pageX:0, pageY:0, screenX:0, screenY:0})]})); } catch(_) {}
+      touch.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
+    };
+    hit.addEventListener('touchstart', fireDown, {passive:false});
+    hit.addEventListener('touchend',   fireUp,   {passive:false});
+    hit.addEventListener('mousedown',  fireDown);
+    hit.addEventListener('mouseup',    fireUp);
+  }
+
+  wireHitArea('sdpad-up',    'touch-up');
+  wireHitArea('sdpad-down',  'touch-down');
+  wireHitArea('sdpad-left',  'touch-left');
+  wireHitArea('sdpad-right', 'touch-right');
+  wireHitArea('sfbtn-a',     'touch-a');
+  wireHitArea('sfbtn-b',     'touch-b');
+  wireHitArea('sfbtn-x',     'touch-x');
+  wireHitArea('sfbtn-y',     'touch-y');
+
+  document.getElementById('sfbtn-select')?.addEventListener('click', () => { if(typeof QuestEngine !== 'undefined') QuestEngine?.togglePause?.(); });
+  document.getElementById('sfbtn-start')?.addEventListener('click', () => { document.getElementById('touch-a')?.click(); });
 });
 </script>
 </body>

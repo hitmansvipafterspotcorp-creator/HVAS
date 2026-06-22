@@ -690,9 +690,10 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CONSOLE SHELL — matches the HITGEAR handheld reference image
+   CONSOLE SHELL — image-based, game canvas overlaid on screen
    ═══════════════════════════════════════════════════════════ */
 
+/* Portrait blocker */
 @media (orientation: portrait) {
   #console-shell { display: none !important; }
   #portrait-blocker { display: flex !important; }
@@ -702,297 +703,55 @@ body {
   #portrait-blocker { display: none !important; }
 }
 
-/* ── Portrait blocker ── */
 #portrait-blocker {
   position: fixed; inset: 0; z-index: 9999;
-  background: #0a0010;
+  background: #07000f;
   display: none;
   flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 16px;
+  gap: 20px;
   font-family: 'Orbitron', sans-serif;
   color: #ff00aa;
-  font-size: 16px;
+  font-size: 18px;
   letter-spacing: 3px;
   text-align: center;
-  text-shadow: 0 0 16px #ff00aa;
+  text-shadow: 0 0 20px #ff00aa;
 }
-#portrait-blocker > div { font-size: 52px; animation: spin360 2s linear infinite; }
+#portrait-blocker > div { font-size: 56px; animation: spin360 2s linear infinite; }
 @keyframes spin360 { to { transform: rotate(360deg); } }
 
-/* ── Outer shell container ── */
+/* ── Shell container ── */
 #console-shell {
   position: fixed; inset: 0; z-index: 1;
   display: flex;
   align-items: center; justify-content: center;
-  background: radial-gradient(ellipse at 35% 25%, #230040 0%, #100020 45%, #07000f 100%);
+  background: radial-gradient(ellipse at 40% 30%, #1a0035 0%, #08000f 50%, #020008 100%);
+  overflow: hidden;
 }
 
-/* ── Console body ── */
-.console-body {
-  /* Size: fills viewport in landscape, 16:7 ratio like the reference */
-  width: 98vw;
-  height: 94vh;
-  max-width: calc(94vh * 2.35);  /* maintain aspect */
-  display: flex;
-  align-items: stretch;
-  position: relative;
-  /* Dark charcoal body with subtle top-highlight */
-  background: linear-gradient(175deg,
-    #2a2a35 0%,
-    #1a1a22 8%,
-    #111118 30%,
-    #0e0e14 60%,
-    #131318 100%);
-  /* Rounded grips on left+right, tighter radius top+bottom center */
-  border-radius: 28px;
-  /* Outer pink neon underglow like the reference */
-  box-shadow:
-    0 0 0 1px #ff00aa33,
-    0 0 30px #ff00aa44,
-    0 0 80px #ff00aa22,
-    0 8px 60px #00000088,
-    inset 0 1px 0 #ffffff18,
-    inset 0 -1px 0 #00000066;
-  overflow: visible;  /* allow grip protrusions */
-}
-
-/* ── Gold accent lines spanning screen edges ── */
-.shell-accent-top, .shell-accent-bot {
+/* ── The shell hardware image ── */
+#shell-img {
   position: absolute;
-  left: 19%; right: 19%;
-  height: 2px;
-  z-index: 5;
+  /* Fit entirely within viewport, maintain aspect ratio */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent 0%, #ffd700cc 30%, #ffd700 50%, #ffd700cc 70%, transparent 100%);
-}
-.shell-accent-top { top: 0; border-radius: 0 0 2px 2px; }
-.shell-accent-bot { bottom: 0; border-radius: 2px 2px 0 0; }
-
-/* ── Grip protrusions (bulging rounded ends) ── */
-.shell-grip {
-  position: absolute;
-  top: 10%; bottom: 10%;
-  width: 26px;
-  background: inherit;
-  z-index: 0;
-}
-.shell-grip-left  { left: -12px; border-radius: 50% 0 0 50%; box-shadow: -4px 0 20px #ff00aa22; }
-.shell-grip-right { right: -12px; border-radius: 0 50% 50% 0; box-shadow: 4px 0 20px #ff00aa22; }
-.shell-grip-inner {
-  position: absolute; inset: 4px;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #222230, #1a1a22);
-}
-
-/* ── LEFT PANEL ── */
-#shell-left {
-  width: 19%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 6px 28px;
-  position: relative;
-  z-index: 2;
-  /* Very subtle inner separator toward screen */
-  border-right: 1px solid #ff00aa18;
-}
-
-.shell-label-tl {
-  position: absolute;
-  top: 10px; left: 0; right: 0;
-  text-align: center;
-  font-family: 'Orbitron', sans-serif;
-  font-size: clamp(5px, 1vw, 8px);
-  letter-spacing: 2px;
-  color: #ff00aa55;
-  pointer-events: none;
-}
-
-/* ── D-pad: proper + cross shape ── */
-#shell-dpad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
   user-select: none;
-  /* size the whole dpad relative to panel width */
-  --dp: clamp(28px, 5.5vw, 52px);
+  -webkit-user-select: none;
+  display: block;
 }
 
-.dpad-row {
-  display: flex;
-  justify-content: center;
-}
-
-.dpad-row-mid {
-  display: flex;
-  align-items: center;
-}
-
-.dpad-arm {
-  width: var(--dp);
-  height: var(--dp);
-  background: linear-gradient(145deg, #2a2a38, #1a1a26);
-  border: 1px solid #cc88ff33;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: none;
-  transition: background 0.07s, box-shadow 0.07s;
-}
-.dpad-arm span {
-  font-size: clamp(10px, 2vw, 16px);
-  color: #cc88ff;
-  pointer-events: none;
-}
-.dpad-arm:active, .dpad-arm.pressed {
-  background: #3a0058;
-  box-shadow: inset 0 0 10px #ff00aa66;
-}
-
-/* Arm shapes — top/bottom have rounded top/bottom edges, left/right have rounded left/right */
-.dpad-arm-up    { border-radius: 6px 6px 0 0; }
-.dpad-arm-down  { border-radius: 0 0 6px 6px; }
-.dpad-arm-left  { border-radius: 6px 0 0 6px; }
-.dpad-arm-right { border-radius: 0 6px 6px 0; }
-
-.dpad-center {
-  width: var(--dp);
-  height: var(--dp);
-  background: #111118;
-  border: 1px solid #cc88ff11;
-  pointer-events: none;
-}
-
-/* ── Speaker grille ── */
-.shell-grille {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 60%;
-}
-.grille-line {
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, #ffffff14, transparent);
-}
-
-/* ── RIGHT PANEL ── */
-#shell-right {
-  width: 19%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 6px 28px;
-  position: relative;
-  z-index: 2;
-  border-left: 1px solid #ff00aa18;
-}
-
-/* Crown badge */
-.shell-crown {
-  position: absolute;
-  top: 8px; right: 10px;
-  font-size: clamp(12px, 2.2vw, 20px);
-  filter: drop-shadow(0 0 6px #ffd700aa);
-  pointer-events: none;
-}
-
-/* ── Face buttons diamond ── */
-#shell-face-btns {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  user-select: none;
-  --fb: clamp(24px, 4.5vw, 44px);
-}
-
-.face-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-
-.face-spacer {
-  width: var(--fb);
-  height: var(--fb);
-}
-
-.shell-face-btn {
-  width: var(--fb);
-  height: var(--fb);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Orbitron', sans-serif;
-  font-size: clamp(9px, 1.8vw, 14px);
-  font-weight: 900;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  border: 2px solid;
-  background: linear-gradient(145deg, #1e1e2a, #141420);
-  box-shadow: 0 2px 6px #00000066;
-  transition: all 0.07s;
-  touch-action: none;
-}
-.shell-face-btn:active, .shell-face-btn.pressed {
-  filter: brightness(1.7);
-  transform: scale(0.88);
-  box-shadow: 0 0 12px currentColor;
-}
-
-.shell-btn-a { color: #ffd700; border-color: #ffd700; text-shadow: 0 0 8px #ffd70088; }
-.shell-btn-b { color: #ff4444; border-color: #ff4444; text-shadow: 0 0 8px #ff444488; }
-.shell-btn-x { color: #ff00aa; border-color: #ff00aa; text-shadow: 0 0 8px #ff00aa88; }
-.shell-btn-y { color: #44aaff; border-color: #44aaff; text-shadow: 0 0 8px #44aaff88; }
-
-/* ── SELECT / START pill buttons — absolute bottom center ── */
-#shell-bottom-btns {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 10px;
-  z-index: 6;
-}
-
-#shell-select-btn, #shell-start-btn {
-  font-family: 'Orbitron', sans-serif;
-  font-size: clamp(6px, 1vw, 9px);
-  letter-spacing: 2px;
-  color: #ff00aacc;
-  background: #1a1a28;
-  border: 1px solid #ff00aa44;
-  border-radius: 20px;
-  padding: clamp(3px,0.6vh,5px) clamp(8px,1.5vw,14px);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 0 8px #ff00aa22;
-  transition: background 0.1s, box-shadow 0.1s;
-  white-space: nowrap;
-}
-#shell-select-btn:active, #shell-start-btn:active {
-  background: #2e0048;
-  box-shadow: 0 0 14px #ff00aa66;
-}
-
-/* ── SCREEN AREA ── */
+/* ── Screen area — JS positions this precisely over the screen cutout ── */
 #screen-area {
-  flex: 1;
-  position: relative;
+  position: absolute;
+  /* Default fallback: centered 56% wide 72% tall — JS overrides with precise pixels */
   overflow: hidden;
   background: #000;
-  /* Screen bezel — thin dark frame, slight inset look */
-  border-left:  2px solid #ff00aa22;
-  border-right: 2px solid #ff00aa22;
-  box-shadow: inset 0 0 30px #00000088;
+  /* subtle inner glow to blend with bezel */
+  box-shadow: inset 0 0 20px #00000099;
   z-index: 2;
 }
 #screen-area .screen {
@@ -1000,5 +759,33 @@ body {
   inset: 0;
 }
 
-/* ── Hide in-canvas floating touch controls — shell buttons replace them ── */
+/* ── Invisible hit areas over physical buttons ── */
+.shell-hit {
+  position: absolute;
+  z-index: 10;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  border-radius: 50%;
+  /* Uncomment to debug positions: */
+  /* background: rgba(255,0,255,0.3); */
+}
+
+/* ── Boot screen logo ── */
+.boot-logo-img {
+  width: 60%;
+  max-width: 180px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px #ff00aa88) drop-shadow(0 0 40px #8800ff44);
+  animation: logoPulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes logoPulse {
+  0%,100% { filter: drop-shadow(0 0 20px #ff00aa88) drop-shadow(0 0 40px #8800ff44); }
+  50% { filter: drop-shadow(0 0 35px #ff00aacc) drop-shadow(0 0 60px #8800ff88); }
+}
+
+/* ── In-canvas touch controls hidden — shell hit areas replace them ── */
 #console-shell .touch-controls { display: none !important; }
