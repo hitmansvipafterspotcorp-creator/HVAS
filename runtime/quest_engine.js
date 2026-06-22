@@ -83,7 +83,7 @@ const QuestEngine = (() => {
     const isTopdown = venue.cameraType === 'topdown';
     const groundY = isTopdown
       ? canvas.height * 0.5
-      : canvas.height * (venue.groundY || 0.75) - ch.baseHp * 0.35;
+      : canvas.height * (venue.groundY || 0.75);
     const playerH = isTopdown ? 30 : 44;
     const playerW = isTopdown ? 30 : 28;
 

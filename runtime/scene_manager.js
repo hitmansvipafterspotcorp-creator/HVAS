@@ -4,6 +4,30 @@ const SceneManager = (() => {
   let cameraX = 0, cameraY = 0;
   let devMode = false;
 
+  // Pre-computed building data (deterministic, no Math.random in render)
+  let _buildingCache = null;
+  const BUILDING_COUNT = 12;
+
+  function _getBuildings() {
+    if (_buildingCache) return _buildingCache;
+    _buildingCache = [];
+    for (let i = 0; i < BUILDING_COUNT; i++) {
+      const bw = 60 + ((i * 37) % 80);
+      const bh = 80 + ((i * 53) % 160);
+      // Pre-compute per-window lit state deterministically
+      const windows = [];
+      for (let wy = 0; wy < 5; wy++) {
+        for (let wx = 0; wx < 3; wx++) {
+          const lit = (i * 7 + wy * 3 + wx * 11) % 5 < 3;
+          const gold = (i * 13 + wy * 7 + wx * 5) % 3 === 0;
+          windows.push({ wy, wx, lit, gold });
+        }
+      }
+      _buildingCache.push({ bw, bh, windows });
+    }
+    return _buildingCache;
+  }
+
   // Neon sign templates per venue
   const neonSigns = [
     ['VIP ENTRY', 'AFTER SPOT', 'MEMBERS ONLY'],
@@ -49,6 +73,114 @@ const SceneManager = (() => {
 
   function setDevMode(v) { devMode = v; }
 
+  // ──── HELPERS ────
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  /**
+   * Draw a stylized humanoid character.
+   * options: { glow, alpha, attacking, blocking, isBoss, name, atkBox }
+   */
+  function drawHumanoid(x, y, w, h, color, emoji, options) {
+    options = options || {};
+    const cx = x + w / 2;
+
+    // Shadow ellipse on ground
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(cx, y + h + 3, w * 0.45, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Glow effect when attacking
+    if (options.glow || options.attacking) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = options.attacking ? 24 : 12;
+    }
+
+    // Body (rounded rectangle)
+    const bodyH = h * 0.55;
+    const bodyY = y + h * 0.28;
+    ctx.fillStyle = color;
+    roundRect(ctx, x + w * 0.1, bodyY, w * 0.8, bodyH, 4);
+    ctx.fill();
+
+    // Head (circle)
+    const headR = w * 0.28;
+    const headY = y + headR + 2;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx, headY, headR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Emoji in center of body
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = options.alpha !== undefined ? options.alpha : 1;
+    ctx.font = `${w * 0.45}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, cx, bodyY + bodyH * 0.5);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    // Name tag
+    if (options.name) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(cx - 32, y - 18, 64, 14);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 8px Orbitron, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(options.name.substring(0, 10), cx, y - 7);
+      ctx.textAlign = 'left';
+    }
+
+    // Boss crown
+    if (options.isBoss) {
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 10;
+      ctx.strokeRect(x - 4, y - 4, w + 8, h + 8);
+      ctx.shadowBlur = 0;
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('👑', cx, y - 6);
+      ctx.textAlign = 'left';
+    }
+
+    // Block shield
+    if (options.blocking) {
+      ctx.strokeStyle = '#44aaff';
+      ctx.shadowColor = '#44aaff';
+      ctx.shadowBlur = 14;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
+      ctx.shadowBlur = 0;
+    }
+
+    // Attack hitbox flash
+    if (options.atkBox) {
+      ctx.fillStyle = 'rgba(255,255,80,0.3)';
+      ctx.strokeStyle = '#ffff44';
+      ctx.lineWidth = 1;
+      ctx.fillRect(options.atkBox.x, options.atkBox.y, options.atkBox.w, options.atkBox.h);
+      ctx.strokeRect(options.atkBox.x, options.atkBox.y, options.atkBox.w, options.atkBox.h);
+    }
+  }
+
   // ──── SIDE-SCROLL RENDER ────
   function renderSidescroll(gameState, entities, venue) {
     if (!ctx) return;
@@ -57,52 +189,82 @@ const SceneManager = (() => {
     ctx.save();
     ctx.translate(shake.x, shake.y);
 
-    // Background layers
+    // Rich background
+    const groundYFrac = venue.groundY || 0.75;
+    const groundYPx = H * groundYFrac;
+    const accentColor = (venue.colors && venue.colors.accent) || '#ff00aa';
+
+    // 1. Sky gradient
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0, '#080014');
+    skyGrad.addColorStop(1, '#1a0030');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. Stars (fixed positions — deterministic)
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < 20; i++) {
+      const sx = (i * 137.5) % W;
+      const sy = (i * 89.3) % (H * 0.6);
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+
+    // 3. Background layer processing (for neonSigns and other layer types)
     const layers = venue.bgLayers || [];
     layers.forEach(layer => {
-      if (layer.type === 'sky') {
-        ctx.fillStyle = layer.color;
-        ctx.fillRect(0, 0, W, H);
-      } else if (layer.type === 'cityBg') {
+      if (layer.type === 'cityBg') {
         ctx.fillStyle = layer.color;
         ctx.fillRect(0, H * (layer.y || 0.2), W, H * (layer.h || 0.6));
       } else if (layer.type === 'buildings') {
-        drawBuildings(layer.color, cameraX * 0.3, W, H, layer.y, layer.h);
+        drawBuildings(layer.color, cameraX, W, H, layer.y, layer.h);
       } else if (layer.type === 'neonSigns') {
         drawNeonSigns(neonSigns[(venue.id - 1)] || [], cameraX * 0.5, W, H, layer.y, layer.color);
-      } else if (layer.type === 'ground') {
-        ctx.fillStyle = layer.color;
-        ctx.fillRect(0, H * (layer.y || 0.75), W, H);
-        // Ground line glow
-        ctx.strokeStyle = venue.colors.accent || '#ff00aa';
-        ctx.shadowColor = venue.colors.accent || '#ff00aa';
-        ctx.shadowBlur = 6;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, H * (layer.y || 0.75));
-        ctx.lineTo(W, H * (layer.y || 0.75));
-        ctx.stroke();
-        ctx.shadowBlur = 0;
       }
+      // sky and ground handled separately above/below
     });
 
-    // World entities
+    // If no buildings layer defined, still draw default buildings
+    const hasBuildingsLayer = layers.some(l => l.type === 'buildings');
+    if (!hasBuildingsLayer) {
+      drawBuildings('#1a0035', cameraX, W, H, groundYFrac - 0.3, 0.3);
+    }
+
+    // 4. Ground gradient
+    const groundGrad = ctx.createLinearGradient(0, groundYPx, 0, H);
+    const groundBaseColor = (venue.colors && venue.colors.floor) || '#1a0025';
+    groundGrad.addColorStop(0, groundBaseColor);
+    groundGrad.addColorStop(1, '#0a0010');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, groundYPx, W, H - groundYPx);
+
+    // 5. Neon floor line
+    ctx.strokeStyle = accentColor;
+    ctx.shadowColor = accentColor;
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, groundYPx);
+    ctx.lineTo(W, groundYPx);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // World entities (with camera offset)
     ctx.save();
     ctx.translate(-cameraX, 0);
 
     // Props
-    if (entities.props) entities.props.forEach(p => drawProp(p, H, venue.groundY || 0.75));
+    if (entities.props) entities.props.forEach(p => drawProp(p, H, groundYFrac));
 
     // NPCs
-    if (entities.npcs) entities.npcs.forEach(n => drawNPC(n, H, venue.groundY || 0.75));
+    if (entities.npcs) entities.npcs.forEach(n => drawNPC(n, H, groundYFrac));
 
     // Enemies
     if (entities.enemies) entities.enemies.forEach(e => {
-      if (e.hp > 0) drawEnemy(e, H, venue.groundY || 0.75);
+      if (e.hp > 0) drawEnemy(e, H, groundYFrac);
     });
 
     // Player
-    if (entities.player) drawPlayer(entities.player, H, venue.groundY || 0.75, gameState);
+    if (entities.player) drawPlayer(entities.player, H, groundYFrac, gameState);
 
     // Damage numbers
     CombatEngine.renderDamageNumbers(ctx, cameraX, 0);
@@ -117,24 +279,26 @@ const SceneManager = (() => {
   }
 
   function drawBuildings(color, camOff, W, H, yFrac, hFrac) {
-    const seed = 42;
-    ctx.fillStyle = color;
-    const count = 12;
-    for (let i = 0; i < count; i++) {
-      const bw = 60 + ((i * 37) % 80);
-      const bh = 80 + ((i * 53) % 160);
-      const bx = ((i * 140) - (camOff % (count * 140))) % (W + 200) - 100;
-      const by = H * yFrac - bh;
-      ctx.fillRect(bx, by, bw, bh);
-      // Windows
-      ctx.fillStyle = Math.random() < 0.4 ? '#ffd70044' : '#ff00aa22';
-      for (let wy = 0; wy < 5; wy++) {
-        for (let wx = 0; wx < 3; wx++) {
-          if (Math.random() < 0.6) ctx.fillRect(bx + 6 + wx * 18, by + 10 + wy * 20, 12, 14);
-        }
-      }
+    const buildings = _getBuildings();
+    const totalW = BUILDING_COUNT * 150;
+    const scrolled = (camOff * 0.3) % totalW;
+
+    buildings.forEach((b, i) => {
+      const bx = (i * 150 - scrolled + totalW) % totalW - 100;
+      const by = H * yFrac - b.bh;
+
+      // Building body
       ctx.fillStyle = color;
-    }
+      ctx.fillRect(bx, by, b.bw, b.bh);
+
+      // Windows (deterministic lit state)
+      b.windows.forEach(win => {
+        if (!win.lit) return;
+        const wCol = win.gold ? '#ffd70044' : '#ff00aa22';
+        ctx.fillStyle = wCol;
+        ctx.fillRect(bx + 6 + win.wx * 18, by + 10 + win.wy * 20, 12, 14);
+      });
+    });
   }
 
   function drawNeonSigns(signs, camOff, W, H, yFrac, accentColor) {
@@ -152,110 +316,63 @@ const SceneManager = (() => {
 
   function drawPlayer(p, H, groundYFrac, gameState) {
     const ch = gameState.character || window.CHARACTERS[0];
-    const groundY = H * groundYFrac;
-    const py = p.y;
+    const color = ch.color || '#ff00aa';
+    const emoji = ch.emoji || '🎤';
 
     ctx.save();
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.beginPath();
-    ctx.ellipse(p.x + p.w / 2, groundY + 2, p.w / 2, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
+    const atkBox = (p.attacking && p.attackTimer > 0)
+      ? CombatEngine.getAttackBox(p, p.facing || 1)
+      : null;
 
-    // Body glow
-    if (p.attacking) {
-      ctx.shadowColor = ch.color || '#ff00aa';
-      ctx.shadowBlur = 20;
-    }
-    if (p.invincible) {
-      ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 60) * 0.5;
-    }
-
-    // Body rect
-    ctx.fillStyle = ch.color || '#ff00aa';
-    ctx.fillRect(p.x, py, p.w, p.h);
-
-    // Emoji
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    ctx.font = `${Math.min(p.w, p.h) * 0.65}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch.emoji || '🎤', p.x + p.w / 2, py + p.h / 2);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    // Attack hitbox flash
-    if (p.attacking && p.attackTimer > 0) {
-      const atkBox = CombatEngine.getAttackBox(p, p.facing || 1);
-      ctx.fillStyle = 'rgba(255,255,100,0.35)';
-      ctx.strokeStyle = '#ffff00';
-      ctx.lineWidth = 1;
-      ctx.fillRect(atkBox.x, atkBox.y, atkBox.w, atkBox.h);
-      ctx.strokeRect(atkBox.x, atkBox.y, atkBox.w, atkBox.h);
-    }
-
-    // Block shield
-    if (p.blocking) {
-      ctx.strokeStyle = '#44aaff';
-      ctx.shadowColor = '#44aaff';
-      ctx.shadowBlur = 10;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(p.x - 2, py - 2, p.w + 4, p.h + 4);
-      ctx.shadowBlur = 0;
-    }
+    drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
+      glow: p.attacking,
+      attacking: p.attacking,
+      blocking: p.blocking,
+      alpha: alpha,
+      atkBox: atkBox,
+      name: gameState.character ? gameState.character.name : null
+    });
     ctx.restore();
   }
 
   function drawEnemy(e, H, groundYFrac) {
-    const ey = e.y;
-    ctx.save();
-    if (e.attacking) { ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 14; }
-    ctx.fillStyle = e.color || '#cc2200';
-    ctx.fillRect(e.x, ey, e.w, e.h);
+    const color = e.color || '#cc2200';
+    const emoji = e.emoji || '👊';
 
-    // Emoji
-    ctx.font = `${Math.min(e.w, e.h) * 0.6}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(e.emoji || '👊', e.x + e.w / 2, ey + e.h / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.shadowBlur = 0;
+    ctx.save();
+    drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
+      attacking: e.attacking,
+      isBoss: e.isBoss,
+      name: e.name || null
+    });
 
     // HP bar above enemy
     const barW = e.w + 10;
-    const bx = e.x - 5, by = ey - 12;
+    const bx = e.x - 5, by = e.y - 12;
     ctx.fillStyle = '#330000';
     ctx.fillRect(bx, by, barW, 5);
     ctx.fillStyle = '#ff2222';
     ctx.fillRect(bx, by, barW * (e.hp / e.maxHp), 5);
 
-    // Boss indicator
-    if (e.isBoss) {
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 2;
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur = 8;
-      ctx.strokeRect(e.x - 3, ey - 3, e.w + 6, e.h + 6);
-      ctx.shadowBlur = 0;
-    }
     ctx.restore();
   }
 
   function drawNPC(npc, H, groundYFrac) {
+    const color = npc.color || '#4444aa';
+    const emoji = npc.emoji || '🧑';
+    const nw = npc.w || 28;
+    const nh = npc.h || 44;
+
     ctx.save();
-    ctx.fillStyle = npc.color || '#4444aa';
-    ctx.fillRect(npc.x, npc.y, npc.w || 28, npc.h || 44);
-    ctx.font = `${Math.min(28, 44) * 0.55}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(npc.emoji || '🧑', npc.x + (npc.w || 28) / 2, npc.y + (npc.h || 44) / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+
     // Interact prompt
     if (npc.showPrompt) {
       ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 10px Orbitron, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('[Y] TALK', npc.x + (npc.w || 28) / 2, npc.y - 8);
+      ctx.fillText('[Y] TALK', npc.x + nw / 2, npc.y - 22);
       ctx.textAlign = 'left';
     }
     ctx.restore();
@@ -451,54 +568,54 @@ const SceneManager = (() => {
 
   function drawTopdownPlayer(p, gameState) {
     const ch = gameState.character || window.CHARACTERS[0];
+    const color = ch.color || '#ff00aa';
+    const emoji = ch.emoji || '🎤';
+
     ctx.save();
-    ctx.fillStyle = ch.color || '#ff00aa';
-    if (p.attacking) { ctx.shadowColor = ch.color || '#ff00aa'; ctx.shadowBlur = 16; }
-    if (p.invincible) ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 60) * 0.5;
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-    ctx.font = `${p.w * 0.7}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(ch.emoji || '🎤', p.x + p.w / 2, p.y + p.h / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
+    drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
+      glow: p.attacking,
+      attacking: p.attacking,
+      blocking: p.blocking,
+      alpha: alpha,
+      name: gameState.character ? gameState.character.name : null
+    });
     ctx.restore();
   }
 
   function drawTopdownEnemy(e) {
+    const color = e.color || '#cc2200';
+    const emoji = e.emoji || '👊';
+
     ctx.save();
-    ctx.fillStyle = e.color || '#cc2200';
-    if (e.attacking) { ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 12; }
-    ctx.fillRect(e.x, e.y, e.w, e.h);
-    ctx.shadowBlur = 0;
-    ctx.font = `${e.w * 0.65}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(e.emoji || '👊', e.x + e.w / 2, e.y + e.h / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
+      attacking: e.attacking,
+      isBoss: e.isBoss,
+      name: e.name || null
+    });
+
     // HP bar
     const bx = e.x, by = e.y - 10, bw = e.w;
     ctx.fillStyle = '#330000'; ctx.fillRect(bx, by, bw, 5);
     ctx.fillStyle = '#ff2222'; ctx.fillRect(bx, by, bw * (e.hp / e.maxHp), 5);
-    if (e.isBoss) {
-      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2;
-      ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 8;
-      ctx.strokeRect(e.x - 3, e.y - 3, e.w + 6, e.h + 6);
-      ctx.shadowBlur = 0;
-    }
+
     ctx.restore();
   }
 
   function drawTopdownNPC(npc) {
+    const color = npc.color || '#4444aa';
+    const emoji = npc.emoji || '🧑';
+    const nw = npc.w || 28;
+    const nh = npc.h || 28;
+
     ctx.save();
-    ctx.fillStyle = npc.color || '#4444aa';
-    ctx.fillRect(npc.x, npc.y, npc.w || 28, npc.h || 28);
-    ctx.font = `${(npc.w || 28) * 0.7}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(npc.emoji || '🧑', npc.x + (npc.w || 28) / 2, npc.y + (npc.h || 28) / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+
     if (npc.showPrompt) {
-      ctx.fillStyle = '#ffd700'; ctx.font = 'bold 10px Orbitron, monospace';
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 10px Orbitron, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('[Y] TALK', npc.x + (npc.w || 28) / 2, npc.y - 8);
+      ctx.fillText('[Y] TALK', npc.x + nw / 2, npc.y - 22);
       ctx.textAlign = 'left';
     }
     ctx.restore();
