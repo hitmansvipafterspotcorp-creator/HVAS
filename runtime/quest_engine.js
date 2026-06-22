@@ -106,7 +106,10 @@ const QuestEngine = (() => {
       vel: { x: 0, y: 0 },
       onGround: true,
       meterGain: ch.meterGain || 15,
-      frameData: ch.frameData || { startup: 4, active: 3, recovery: 8 }
+      frameData: ch.frameData || { startup: 4, active: 3, recovery: 8 },
+      charId: ch.id,
+      lastDir: { x: 0, y: 1 },
+      animState: 'idle'
     };
 
     // Build scene
@@ -254,7 +257,7 @@ const QuestEngine = (() => {
 
   function resolveWallCollision(entity, walls) {
     walls.forEach(w => {
-      if (CombatEngine.aabb(entity, w)) {
+      if (FighterEngine.aabb(entity, w)) {
         const overlapX = Math.min(entity.x + entity.w, w.x + w.w) - Math.max(entity.x, w.x);
         const overlapY = Math.min(entity.y + entity.h, w.y + w.h) - Math.max(entity.y, w.y);
         if (overlapX < overlapY) {
@@ -343,7 +346,8 @@ const QuestEngine = (() => {
     if (gameState.finisherAvailable) {
       const bossEnemy = entities.enemies.find(e => e.hp > 0 && e.hp < e.maxHp * 0.25);
       if (bossEnemy) {
-        CombatEngine.triggerFinisher(p, bossEnemy, gameState.venue);
+        FighterEngine.executeAttack(p, 'super');
+        FighterEngine.applyHit(p, bossEnemy, { damage: bossEnemy.maxHp, hitstop: 0.22, launch: true, meterGain: 0 });
         onEnemyHit(bossEnemy, 9999);
         gameState.finisherAvailable = false;
       }
@@ -486,7 +490,7 @@ const QuestEngine = (() => {
     gameState.objective = MissionEngine.getObjectiveText();
     gameState.statusPts += 100;
     gameState.coins += 20;
-    CombatEngine.gainMeter(25);
+    FighterEngine.gainMeter(null, 25);
 
     // Check if all normal waves done — spawn boss
     const venue = gameState.venue;

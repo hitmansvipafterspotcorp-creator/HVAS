@@ -719,7 +719,7 @@ const FighterEngine = (() => {
     // Collision
     aabb, getHitbox, getHurtbox,
     // Misc
-    resetForStage,
+    resetForStage, shakeScreen,
     FINISHER_HP_PCT,
   };
 })();

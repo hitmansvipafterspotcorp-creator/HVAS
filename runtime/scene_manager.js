@@ -272,7 +272,8 @@ const SceneManager = (() => {
     if (entities.player) drawPlayer(entities.player, H, groundYFrac, gameState);
 
     // Damage numbers
-    CombatEngine.renderDamageNumbers(ctx, cameraX, 0);
+    if (typeof FighterEngine !== 'undefined') FighterEngine.renderDmgNumbers(ctx, cameraX, 0);
+    else if (typeof CombatEngine !== 'undefined') CombatEngine.renderDamageNumbers(ctx, cameraX, 0);
 
     ctx.restore();
 
@@ -323,34 +324,38 @@ const SceneManager = (() => {
     const ch = gameState.character || window.CHARACTERS[0];
     const color = ch.color || '#ff00aa';
     const emoji = ch.emoji || '🎤';
+    const charId = ch.id || 12;
 
     ctx.save();
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
-    const atkBox = (p.attacking && p.attackTimer > 0)
-      ? CombatEngine.getAttackBox(p, p.facing || 1)
-      : null;
-
-    drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
-      glow: p.attacking,
-      attacking: p.attacking,
-      blocking: p.blocking,
-      alpha: alpha,
-      atkBox: atkBox,
-      name: gameState.character ? gameState.character.name : null
-    });
+    ctx.globalAlpha = alpha;
+    const flipX = (p.facing || 1) < 0;
+    const drawn = typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+    if (!drawn) {
+      const atkBox = (p.attacking && p.attackTimer > 0 && typeof CombatEngine !== 'undefined')
+        ? CombatEngine.getAttackBox(p, p.facing || 1)
+        : null;
+      drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
+        glow: p.attacking, attacking: p.attacking, blocking: p.blocking,
+        alpha: 1, atkBox: atkBox, name: ch.name || null
+      });
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
   function drawEnemy(e, H, groundYFrac) {
     const color = e.color || '#cc2200';
     const emoji = e.emoji || '👊';
+    const charId = e.charId || null;
 
     ctx.save();
-    drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
-      attacking: e.attacking,
-      isBoss: e.isBoss,
-      name: e.name || null
-    });
+    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
+    if (!drawn) {
+      drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
+        attacking: e.attacking, isBoss: e.isBoss, name: e.name || null
+      });
+    }
 
     // HP bar above enemy
     const barW = e.w + 10;
@@ -368,9 +373,11 @@ const SceneManager = (() => {
     const emoji = npc.emoji || '🧑';
     const nw = npc.w || 28;
     const nh = npc.h || 44;
+    const charId = npc.charId || null;
 
     ctx.save();
-    drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+    if (!drawn) drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
 
     // Interact prompt
     if (npc.showPrompt) {
@@ -565,7 +572,8 @@ const SceneManager = (() => {
     if (entities.player) drawTopdownPlayer(entities.player, gameState);
 
     // Damage numbers
-    CombatEngine.renderDamageNumbers(ctx, cameraX, cameraY);
+    if (typeof FighterEngine !== 'undefined') FighterEngine.renderDmgNumbers(ctx, cameraX, cameraY);
+    else if (typeof CombatEngine !== 'undefined') CombatEngine.renderDamageNumbers(ctx, cameraX, cameraY);
 
     ctx.restore();
 
@@ -580,29 +588,34 @@ const SceneManager = (() => {
     const ch = gameState.character || window.CHARACTERS[0];
     const color = ch.color || '#ff00aa';
     const emoji = ch.emoji || '🎤';
+    const charId = ch.id || 12;
 
     ctx.save();
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
-    drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
-      glow: p.attacking,
-      attacking: p.attacking,
-      blocking: p.blocking,
-      alpha: alpha,
-      name: gameState.character ? gameState.character.name : null
-    });
+    ctx.globalAlpha = alpha;
+    const flipX = (p.lastDir && p.lastDir.x < 0);
+    const drawn = typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+    if (!drawn) {
+      drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
+        glow: p.attacking, attacking: p.attacking, blocking: p.blocking, alpha: 1, name: ch.name || null
+      });
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
   function drawTopdownEnemy(e) {
     const color = e.color || '#cc2200';
     const emoji = e.emoji || '👊';
+    const charId = e.charId || null;
 
     ctx.save();
-    drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
-      attacking: e.attacking,
-      isBoss: e.isBoss,
-      name: e.name || null
-    });
+    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
+    if (!drawn) {
+      drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
+        attacking: e.attacking, isBoss: e.isBoss, name: e.name || null
+      });
+    }
 
     // HP bar
     const bx = e.x, by = e.y - 10, bw = e.w;
@@ -617,9 +630,11 @@ const SceneManager = (() => {
     const emoji = npc.emoji || '🧑';
     const nw = npc.w || 28;
     const nh = npc.h || 28;
+    const charId = npc.charId || null;
 
     ctx.save();
-    drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+    if (!drawn) drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
 
     if (npc.showPrompt) {
       ctx.fillStyle = '#ffd700';
