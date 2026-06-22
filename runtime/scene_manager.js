@@ -252,6 +252,11 @@ const SceneManager = (() => {
     ctx.save();
     ctx.translate(-cameraX, 0);
 
+    // Stage 1 specific tile rendering
+    if (venue.id === 1 && typeof Stage1Scene !== 'undefined') {
+      Stage1Scene.renderOutside(ctx, cameraX, W, H);
+    }
+
     // Props
     if (entities.props) entities.props.forEach(p => drawProp(p, H, groundYFrac));
 
@@ -527,6 +532,11 @@ const SceneManager = (() => {
     // Translate for camera
     ctx.save();
     ctx.translate(-cameraX, -cameraY);
+
+    // Stage 1 specific tile rendering
+    if (venue && venue.id === 1 && typeof Stage1Scene !== 'undefined') {
+      Stage1Scene.renderInside(ctx, cameraX, cameraY, W, H);
+    }
 
     // Walls
     if (entities.walls) entities.walls.forEach(w => {
