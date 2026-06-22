@@ -199,73 +199,16 @@ const SceneManager = (() => {
     const bgImg = (typeof AssetLoader !== 'undefined' && venue.bgImage)
       ? AssetLoader.get(venue.bgImage) : null;
 
-    if (!bgImg) {
-      // 1. Sky gradient
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-      skyGrad.addColorStop(0, '#080014');
-      skyGrad.addColorStop(1, '#1a0030');
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, W, H);
-
-      // 2. Stars (fixed positions — deterministic)
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      for (let i = 0; i < 20; i++) {
-        const sx = (i * 137.5) % W;
-        const sy = (i * 89.3) % (H * 0.6);
-        ctx.fillRect(sx, sy, 1, 1);
-      }
-
-      // 3. Background layer processing (for neonSigns and other layer types)
-      const layers = venue.bgLayers || [];
-      layers.forEach(layer => {
-        if (layer.type === 'cityBg') {
-          ctx.fillStyle = layer.color;
-          ctx.fillRect(0, H * (layer.y || 0.2), W, H * (layer.h || 0.6));
-        } else if (layer.type === 'buildings') {
-          drawBuildings(layer.color, cameraX, W, H, layer.y, layer.h);
-        } else if (layer.type === 'neonSigns') {
-          drawNeonSigns(neonSigns[(venue.id - 1)] || [], cameraX * 0.5, W, H, layer.y, layer.color);
-        }
-        // sky and ground handled separately above/below
-      });
-
-      // If no buildings layer defined, still draw default buildings
-      const hasBuildingsLayer = layers.some(l => l.type === 'buildings');
-      if (!hasBuildingsLayer) {
-        drawBuildings('#1a0035', cameraX, W, H, groundYFrac - 0.3, 0.3);
-      }
-
-      // 4. Ground gradient
-      const groundGrad = ctx.createLinearGradient(0, groundYPx, 0, H);
-      const groundBaseColor = (venue.colors && venue.colors.floor) || '#1a0025';
-      groundGrad.addColorStop(0, groundBaseColor);
-      groundGrad.addColorStop(1, '#0a0010');
-      ctx.fillStyle = groundGrad;
-      ctx.fillRect(0, groundYPx, W, H - groundYPx);
-
-      // 5. Neon floor line
-      ctx.strokeStyle = accentColor;
-      ctx.shadowColor = accentColor;
-      ctx.shadowBlur = 8;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, groundYPx);
-      ctx.lineTo(W, groundYPx);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    } else {
-      // painted backdrop fills the whole frame
+    if (bgImg) {
       AssetLoader.drawCover(ctx, bgImg, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#050008';
+      ctx.fillRect(0, 0, W, H);
     }
 
     // World entities (with camera offset)
     ctx.save();
     ctx.translate(-cameraX, 0);
-
-    // Stage 1 specific tile rendering (skipped when painted backdrop is shown)
-    if (!bgImg && venue.id === 1 && typeof Stage1Scene !== 'undefined') {
-      Stage1Scene.renderOutside(ctx, cameraX, W, H);
-    }
 
     // Props
     if (entities.props) entities.props.forEach(p => drawProp(p, H, groundYFrac));
@@ -341,15 +284,6 @@ const SceneManager = (() => {
     ctx.globalAlpha = alpha;
     const flipX = (p.facing || 1) < 0;
     const drawn = typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
-    if (!drawn) {
-      const atkBox = (p.attacking && p.attackTimer > 0 && typeof CombatEngine !== 'undefined')
-        ? CombatEngine.getAttackBox(p, p.facing || 1)
-        : null;
-      drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
-        glow: p.attacking, attacking: p.attacking, blocking: p.blocking,
-        alpha: 1, atkBox: atkBox, name: ch.name || null
-      });
-    }
     ctx.globalAlpha = 1;
     ctx.restore();
   }
@@ -360,12 +294,7 @@ const SceneManager = (() => {
     const charId = e.charId || null;
 
     ctx.save();
-    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
-    if (!drawn) {
-      drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
-        attacking: e.attacking, isBoss: e.isBoss, name: e.name || null
-      });
-    }
+    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
 
     // HP bar above enemy
     const barW = e.w + 10;
@@ -386,8 +315,7 @@ const SceneManager = (() => {
     const charId = npc.charId || null;
 
     ctx.save();
-    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
-    if (!drawn) drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
 
     // Interact prompt
     if (npc.showPrompt) {
@@ -611,12 +539,7 @@ const SceneManager = (() => {
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
     ctx.globalAlpha = alpha;
     const flipX = (p.lastDir && p.lastDir.x < 0);
-    const drawn = typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
-    if (!drawn) {
-      drawHumanoid(p.x, p.y, p.w, p.h, color, emoji, {
-        glow: p.attacking, attacking: p.attacking, blocking: p.blocking, alpha: 1, name: ch.name || null
-      });
-    }
+    typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
     ctx.globalAlpha = 1;
     ctx.restore();
   }
@@ -627,12 +550,7 @@ const SceneManager = (() => {
     const charId = e.charId || null;
 
     ctx.save();
-    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
-    if (!drawn) {
-      drawHumanoid(e.x, e.y, e.w, e.h, color, emoji, {
-        attacking: e.attacking, isBoss: e.isBoss, name: e.name || null
-      });
-    }
+    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
 
     // HP bar
     const bx = e.x, by = e.y - 10, bw = e.w;
@@ -650,8 +568,7 @@ const SceneManager = (() => {
     const charId = npc.charId || null;
 
     ctx.save();
-    const drawn = charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
-    if (!drawn) drawHumanoid(npc.x, npc.y, nw, nh, color, emoji, {});
+    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
 
     if (npc.showPrompt) {
       ctx.fillStyle = '#ffd700';

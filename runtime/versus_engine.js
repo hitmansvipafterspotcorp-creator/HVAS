@@ -600,44 +600,9 @@ const VersusEngine = (() => {
       ctx.globalAlpha = 1;
       return;
     }
-    const g = ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0, stage.sky || '#0a0020');
-    g.addColorStop(0.7, shade(stage.sky||'#0a0020', -10));
-    g.addColorStop(1, stage.ground || '#08000f');
-    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-
-    // distant neon skyline
-    ctx.save();
-    ctx.globalAlpha = 0.5;
-    const ac = stage.accent || '#ff00aa';
-    for (let i=0;i<14;i++){
-      const bw = W/14, bx = i*bw, bh = (Math.sin(i*12.9)*0.5+0.5)*H*0.34 + 40;
-      ctx.fillStyle = shade(ac, -60);
-      ctx.fillRect(bx+4, groundY-bh, bw-8, bh);
-      ctx.fillStyle = ac;
-      ctx.globalAlpha = 0.18;
-      ctx.fillRect(bx+4, groundY-bh, bw-8, 4);
-      ctx.globalAlpha = 0.5;
-    }
-    ctx.restore();
-
-    // floor
-    ctx.fillStyle = stage.ground || '#08000f';
-    ctx.fillRect(0, groundY, W, H-groundY);
-    ctx.strokeStyle = (stage.accent||'#ff00aa');
-    ctx.globalAlpha = 0.6; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(W, groundY); ctx.stroke();
-    ctx.globalAlpha = 1;
-    // floor grid
-    ctx.strokeStyle = shade(stage.accent||'#ff00aa', -50);
-    ctx.globalAlpha = 0.25; ctx.lineWidth = 1;
-    for (let i=-10;i<=10;i++){
-      ctx.beginPath();
-      ctx.moveTo(W/2 + i*60, groundY);
-      ctx.lineTo(W/2 + i*220, H);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
+    // No bgImage loaded yet — dark cinematic fill
+    ctx.fillStyle = '#050008';
+    ctx.fillRect(0, 0, W, H);
   }
 
   // build factor per weight class so each character reads with a distinct silhouette
@@ -711,39 +676,6 @@ const VersusEngine = (() => {
       }
     }
 
-    // ── Vector fallback ────────────────────────────────────────────────────
-    const topY = baseY - h;
-    ctx.save();
-    if (f.flashHit > 0) { ctx.globalAlpha = 0.9; }
-    const bodyColor = f.flashHit>0 ? '#ffffff' : f.color;
-    roundRect(x - ww*0.32, topY + h*0.28, ww*0.64, h*0.5, 12);
-    ctx.fillStyle = bodyColor; ctx.shadowColor = f.color; ctx.shadowBlur = 16; ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = shade(f.color, 45);
-    roundRect(x - ww*0.10, topY + h*0.30, ww*0.20, h*0.42, 5); ctx.fill();
-    ctx.fillStyle = shade(f.color,-40);
-    const legSplit = f.state==='walk' ? Math.sin(performance.now()/80)*8 : 4;
-    roundRect(x - ww*0.28 - (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
-    roundRect(x + ww*0.06 + (f.state==='walk'?legSplit:0), topY+h*0.7, ww*0.22, h*0.32, 6); ctx.fill();
-    if (f.attack && f.atkPhase==='active' && !MOVES[f.attack].projectile) {
-      ctx.fillStyle = f.color; ctx.shadowColor='#fff'; ctx.shadowBlur=14;
-      const ar = MOVES[f.attack].reach;
-      const ay = topY + h*0.38;
-      if (f.facing>0) roundRect(x, ay, ar, 18, 8); else roundRect(x-ar, ay, ar, 18, 8);
-      ctx.fill(); ctx.shadowBlur=0;
-    }
-    const hr = f.w*0.34*b.hd;
-    ctx.beginPath(); ctx.arc(x, topY + h*0.16, hr, 0, Math.PI*2);
-    ctx.fillStyle = shade(f.color, 30); ctx.shadowColor=f.color; ctx.shadowBlur=14; ctx.fill();
-    ctx.shadowBlur=0;
-    ctx.font = `${Math.round(hr*1.3)}px serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(f.emoji, x, topY + h*0.16);
-    if (f.char && f.char.isBoss) {
-      ctx.font = `${Math.round(hr*0.9)}px serif`;
-      ctx.fillText('👑', x, topY - hr*0.4);
-    }
-    ctx.restore();
   }
 
   function drawProjectile(p) {
