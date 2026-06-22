@@ -1,18 +1,28 @@
 {
+  "id": "hvas-hitgear-os",
   "name": "HITGEAR OS — Hitmans VIP After Spot Quest",
   "short_name": "HITGEAR OS",
-  "description": "Tallahassee nightlife RPG/brawler. 13 characters, 16 venues, Lip Sync Bingo.",
-  "start_url": "/index.html",
+  "description": "Retro-futuristic Tallahassee nightlife brawler & RPG. Real venues, real crew, easy 4-button arcade fighter, story ladder, and Lip Sync Bingo.",
+  "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
-  "background_color": "#0a0010",
   "theme_color": "#ff00aa",
+  "background_color": "#0a0010",
+  "lang": "en-US",
+  "dir": "ltr",
   "categories": ["games", "entertainment"],
   "icons": [
-    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
   ],
-  "screenshots": [],
+  "screenshots": [
+    { "src": "screenshots/shot1.jpg", "sizes": "1280x720", "type": "image/jpeg", "form_factor": "wide", "label": "Kingdom Come Saloon" },
+    { "src": "screenshots/shot2.jpg", "sizes": "1280x720", "type": "image/jpeg", "form_factor": "wide", "label": "Outta Pocket interior" },
+    { "src": "screenshots/shot3.jpg", "sizes": "1280x720", "type": "image/jpeg", "form_factor": "wide", "label": "Sammys Stage" }
+  ],
   "prefer_related_applications": false
 }
