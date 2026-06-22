@@ -30,9 +30,19 @@ const VersusEngine = (() => {
     heavy:   { startup:.12, active:.08, recovery:.30, reach:112, hh:150, dmgK:1.05, hitstun:.42, block:.26, kb:380, meter:12, knockdown:true,  hi:'mid'  },
     crouch:  { startup:.06, active:.07, recovery:.18, reach:104, hh:70,  dmgK:0.6,  hitstun:.30, block:.18, kb:140, meter:8,  knockdown:false, hi:'low'  },
     air:     { startup:.05, active:.10, recovery:.12, reach:90,  hh:120, dmgK:0.7,  hitstun:.32, block:.18, kb:200, meter:9,  knockdown:false, hi:'over' },
-    special: { startup:.10, active:.12, recovery:.30, reach:140, hh:140, dmgK:1.3,  hitstun:.50, block:.30, kb:420, meter:0,  cost:25, knockdown:true, projectile:true },
-    super:   { startup:.16, active:.30, recovery:.40, reach:520, hh:300, dmgK:3.2,  hitstun:.70, block:.40, kb:560, meter:0,  cost:100, knockdown:true, projectile:true, cinematic:true },
+    // ── directional specials (Y + direction) — same easy button, 3 distinct tools ──
+    // FORWARD + Y → Special 1: ranged projectile pressure
+    special:  { startup:.10, active:.12, recovery:.30, reach:140, hh:140, dmgK:1.3,  hitstun:.50, block:.30, kb:420, meter:0,  cost:25, knockdown:true,  projectile:true, name:'PROJECTILE' },
+    // DOWN + Y → Special 2: rising anti-air uppercut (melee, tall hitbox, launches)
+    special2: { startup:.06, active:.14, recovery:.34, reach:104, hh:230, dmgK:1.2,  hitstun:.55, block:.28, kb:280, meter:0,  cost:25, knockdown:true,  launch:true,    name:'RISING' },
+    // BACK + Y → Special 3: lunging advancing strike (melee, covers ground)
+    special3: { startup:.12, active:.10, recovery:.26, reach:180, hh:130, dmgK:1.25, hitstun:.50, block:.30, kb:480, meter:0,  cost:25, knockdown:true,  dash:true,      name:'LUNGE' },
+    // UP + Y → FINISHER: cinematic super (full meter)
+    super:    { startup:.16, active:.30, recovery:.40, reach:520, hh:300, dmgK:3.2,  hitstun:.70, block:.40, kb:560, meter:0,  cost:100, knockdown:true, projectile:true, cinematic:true, name:'FINISHER' },
   };
+
+  // magic-series tiers — higher tier cancels lower on hit (auto-combo glue)
+  const TIER = { light:1, crouch:1, air:1, heavy:2, special:3, special2:3, special3:3, super:4 };
 
   // ── module state ────────────────────────────────────────────────────────────
   let canvas, ctx, W, H, groundY, rafId = null, running = false;
@@ -51,10 +61,16 @@ const VersusEngine = (() => {
   let timer = ROUND_TIME;
   let aiThink = 0;
   let startOpts = null;  // remember opts for rematch
+  let training = false;  // training mode — passive dummy, infinite meter, no KO
 
   // ── pause menu ──────────────────────────────────────────────────────────────
   let paused = false, pauseSel = 0;
-  const PAUSE_ITEMS = ['RESUME', 'REMATCH', 'QUIT TO MENU'];
+  let overlay = null;    // null | 'moves' | 'controls'
+  function pauseItems() {
+    return ['RESUME', 'MOVE LIST', 'CONTROLS',
+            'TRAINING: ' + (training ? 'ON' : 'OFF'),
+            'REMATCH', 'QUIT TO MENU'];
+  }
   let _prevPause = false, _prevUp = false, _prevDown = false, _prevConfirm = false, _prevBack = false;
 
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -105,9 +121,10 @@ const VersusEngine = (() => {
     resize();
     stage = opts.stage || { sky:'#0a0020', ground:'#08000f', accent:'#ff00aa', name:'AFTER SPOT' };
     difficulty = opts.difficulty || 1;
+    training = !!opts.training;
     onMatchEnd = opts.onMatchEnd || function(){};
     onQuit = opts.onQuit || function(){};
-    paused = false; pauseSel = 0;
+    paused = false; pauseSel = 0; overlay = null;
     p1 = makeFighter(opts.p1CharId, true,  -1);
     p2 = makeFighter(opts.p2CharId, false,  1);
     if (opts.playerName) p1.name = String(opts.playerName).toUpperCase().slice(0, 12);
@@ -128,6 +145,7 @@ const VersusEngine = (() => {
     if (phase === 'matchover') return;
     paused = !paused;
     pauseSel = 0;
+    overlay = null;
   }
 
   function rematch() {
@@ -149,13 +167,26 @@ const VersusEngine = (() => {
   function handlePauseNav() {
     const s = (typeof InputManager !== 'undefined') ? InputManager.state : {};
     const up = !!s.up, down = !!s.down, confirm = !!(s.confirm || s.attack), back = !!s.back;
-    if (up && !_prevUp)     pauseSel = (pauseSel + PAUSE_ITEMS.length - 1) % PAUSE_ITEMS.length;
-    if (down && !_prevDown) pauseSel = (pauseSel + 1) % PAUSE_ITEMS.length;
+
+    // an overlay (move list / controls) is open — any back/confirm closes it
+    if (overlay) {
+      if ((back && !_prevBack) || (confirm && !_prevConfirm)) overlay = null;
+      _prevUp = up; _prevDown = down; _prevConfirm = confirm; _prevBack = back;
+      return;
+    }
+
+    const items = pauseItems();
+    if (up && !_prevUp)     pauseSel = (pauseSel + items.length - 1) % items.length;
+    if (down && !_prevDown) pauseSel = (pauseSel + 1) % items.length;
     if (back && !_prevBack) { _prevBack = back; paused = false; }
     if (confirm && !_prevConfirm) {
-      if (pauseSel === 0) paused = false;
-      else if (pauseSel === 1) rematch();
-      else if (pauseSel === 2) quitMatch();
+      const sel = items[pauseSel];
+      if (sel === 'RESUME') paused = false;
+      else if (sel === 'MOVE LIST') overlay = 'moves';
+      else if (sel === 'CONTROLS') overlay = 'controls';
+      else if (sel.indexOf('TRAINING') === 0) { training = !training; if (training) { rematch(); paused = true; } }
+      else if (sel === 'REMATCH') rematch();
+      else if (sel === 'QUIT TO MENU') quitMatch();
     }
     _prevUp = up; _prevDown = down; _prevConfirm = confirm; _prevBack = back;
   }
@@ -187,21 +218,36 @@ const VersusEngine = (() => {
   // ── input read ──────────────────────────────────────────────────────────────
   function readPlayerInputs() {
     const s = (typeof InputManager !== 'undefined') ? InputManager.state : {};
+    // 4-BUTTON LAYOUT — A:LIGHT  B:HEAVY  X:BLOCK  Y:SPECIAL(+direction)
     return {
       left: !!s.left, right: !!s.right, up: !!s.up, down: !!s.down,
-      light: !!s.attack, heavy: !!s.special, special: !!s.dodge, super: !!s.interact,
+      light: !!s.attack,             // A — light auto-combo
+      heavy: !!s.special,            // B — heavy auto-combo
+      block: !!s.dodge || !!s.block, // X — guard
+      sp:    !!s.interact,           // Y — directional special / finisher
     };
   }
 
   // ── attack start ────────────────────────────────────────────────────────────
+  // EASY 4-BUTTON ENGINE: mashing chains automatically (magic series). Any move
+  // can be cancelled into a SAME-OR-HIGHER tier move once it has CONNECTED, so
+  // light→light→heavy→special→FINISHER all flow from simple taps for every char.
   function tryAttack(f, kind) {
     if (f.hitstun > 0 || f.blockstun > 0 || f.knockdown > 0) return;
-    if (f.attack) return; // already mid-move
     let moveKey = kind;
     if (kind === 'light' && f.crouching) moveKey = 'crouch';
     if (kind === 'light' && !f.onGround) moveKey = 'air';
     const m = MOVES[moveKey];
     if (!m) return;
+
+    // mid-move? only allow a gatling cancel: must have hit, past startup, higher-or-equal tier
+    if (f.attack) {
+      const cur = TIER[f.attack] || 0, nxt = TIER[moveKey] || 0;
+      const canCancel = f.atkHit && f.atkPhase !== 'startup' && nxt >= cur && moveKey !== f.attack
+                        || (f.atkHit && f.atkPhase === 'recovery' && nxt >= cur);
+      if (!canCancel) return;
+    }
+
     if (m.cost) {
       if (f.meter < m.cost) return;
       f.meter -= m.cost;
@@ -212,7 +258,10 @@ const VersusEngine = (() => {
     f.atkT = m.startup;
     f.atkHit = false;
     f.state = m.cinematic ? 'super' : (m.projectile ? 'special' : kind);
-    f.vx = (!f.onGround) ? f.vx : 0;
+    // special movement flavor: rising launcher hops up, lunge dashes forward
+    if (m.launch && f.onGround) { f.vy = -560; f.onGround = false; f.knockdown = 0; }
+    if (m.dash) f.vx = f.facing * f.speed * 2.2;
+    else f.vx = (!f.onGround) ? f.vx : 0;
   }
 
   function spawnProjectile(f, m) {
@@ -229,11 +278,11 @@ const VersusEngine = (() => {
   // ── damage application ──────────────────────────────────────────────────────
   function hitFighter(att, def, m, srcX) {
     if (def.knockdown > 0 || def.hp <= 0) return;
-    // block check: grounded, holding away, not airborne overhead, low must crouch-block
-    const away = def.facing > 0 ? def._inLeft : def._inRight; // holding back
-    let blocking = away && def.onGround && def.hitstun <= 0 && !def.attack;
-    if (m.hi === 'over' && def.crouching) blocking = false;   // overhead beats crouch block
-    if (m.hi === 'low' && !def.crouching && blocking) blocking = true;
+    // block check: BLOCK BUTTON held, grounded, not mid-attack.
+    // Overheads beat crouch-guard; lows beat standing-guard. (easy, readable rules)
+    let blocking = def.blocking && def.onGround && def.hitstun <= 0 && !def.attack;
+    if (m.hi === 'over' && def.crouching) blocking = false;
+    if (m.hi === 'low' && !def.crouching) blocking = false;
 
     const scale = Math.pow(0.86, Math.max(0, att.combo - 1));
     let dmg = Math.max(1, Math.round(att.baseDmg * m.dmgK * scale * (blocking ? CHIP_MULT : 1)));
@@ -279,7 +328,6 @@ const VersusEngine = (() => {
     if (f.onGround && !f.attack && f.hitstun <= 0)
       f.facing = (opp.x >= f.x) ? 1 : -1;
 
-    f._inLeft = inputs.left; f._inRight = inputs.right;
 
     // timers
     if (f.comboT > 0) { f.comboT -= dt; if (f.comboT <= 0) f.combo = 0; }
@@ -294,24 +342,46 @@ const VersusEngine = (() => {
     f.crouching = false;
     f.blocking = false;
 
+    // edge-detect the SPECIAL trigger so Y fires one directional special per press
+    const spEdge = inputs.sp && !f._pSp;
+    f._pSp = inputs.sp;
+
     if (free) {
       const back = f.facing > 0 ? inputs.left : inputs.right;
       const fwd  = f.facing > 0 ? inputs.right : inputs.left;
-      if (inputs.down) { f.crouching = true; f.vx = 0; }
-      else if (back) { f.blocking = true; f.vx = -f.facing * f.speed * 0.7; }
+
+      // ── BLOCK BUTTON (X) — dedicated, hold to guard (crouch-guard with Down) ──
+      if (inputs.block) { f.blocking = true; f.crouching = !!inputs.down; f.vx = 0; }
+      else if (inputs.down) { f.crouching = true; f.vx = 0; }
       else if (fwd)  { f.vx = f.facing * f.speed; }
+      else if (back) { f.vx = -f.facing * f.speed * 0.7; }
       else f.vx = 0;
 
-      if (inputs.up && f.onGround) { f.vy = JUMP_VEL; f.onGround = false; f.vx = (fwd?f.facing:back?-f.facing:0) * f.speed * 0.9; }
+      // jump (Up) — but not while guarding or queuing a special
+      if (inputs.up && f.onGround && !inputs.block && !inputs.sp) {
+        f.vy = JUMP_VEL; f.onGround = false;
+        f.vx = (fwd?f.facing:back?-f.facing:0) * f.speed * 0.9;
+      }
 
-      // attack buttons (edge-ish: rely on natural hold; cooldown via f.attack)
-      if (inputs.super) tryAttack(f, 'super');
-      else if (inputs.special) tryAttack(f, 'special');
+      // ── SPECIAL (Y) + direction — one easy button, four tools ──
+      if (spEdge) {
+        if (inputs.up)        tryAttack(f, 'super');     // UP   = FINISHER
+        else if (inputs.down) tryAttack(f, 'special2');  // DOWN = rising
+        else if (back)        tryAttack(f, 'special3');  // BACK = lunge
+        else                  tryAttack(f, 'special');   // FWD/neutral = projectile
+      }
+      // ── LIGHT (A) / HEAVY (B) — held mashing auto-chains via gatling cancels ──
       else if (inputs.heavy) tryAttack(f, 'heavy');
       else if (inputs.light) tryAttack(f, 'light');
-    } else if (!f.onGround && !f.attack && !stunned) {
-      // air actions
-      if (inputs.light || inputs.heavy) tryAttack(f, 'light'); // air normal
+    } else if (!f.onGround && !stunned) {
+      // air actions: light/heavy = air normal, Y = air special
+      if (spEdge) tryAttack(f, 'special');
+      else if (inputs.light || inputs.heavy) tryAttack(f, 'light');
+    }
+
+    // keep guarding through blockstun so multi-hit strings stay blockable
+    if (f.blockstun > 0 && inputs.block && f.onGround && f.hitstun <= 0) {
+      f.blocking = true; f.crouching = !!inputs.down;
     }
 
     // attack state machine
@@ -354,7 +424,7 @@ const VersusEngine = (() => {
 
     // state label for rendering
     if (stunned) f.state = f.hitstun>0 ? 'hurt' : 'block';
-    else if (f.attack) f.state = (f.attack==='super')?'super':(f.attack==='special')?'special':(f.attack);
+    else if (f.attack) f.state = (f.attack==='super')?'super':(f.attack.indexOf('special')===0)?'special':(f.attack);
     else if (!f.onGround) f.state = 'air';
     else if (f.crouching) f.state = 'crouch';
     else if (f.blocking) f.state = 'block';
@@ -378,7 +448,7 @@ const VersusEngine = (() => {
   // ── CPU AI ───────────────────────────────────────────────────────────────────
   function cpuInputs(dt) {
     const me = p2, foe = p1;
-    const out = { left:false, right:false, up:false, down:false, light:false, heavy:false, special:false, super:false };
+    const out = { left:false, right:false, up:false, down:false, light:false, heavy:false, block:false, sp:false, special:false, super:false };
     if (me.hitstun > 0 || me.knockdown > 0) return out;
     const dist = Math.abs(foe.x - me.x);
     const dir = foe.x > me.x ? 1 : -1;
@@ -401,8 +471,8 @@ const VersusEngine = (() => {
     // block when foe is attacking & close
     const foeThreat = foe.attack && foe.atkPhase !== 'recovery' && dist < 190;
     if (foeThreat && plan < blockSkill) {
-      if (dir > 0) out.left = true; else out.right = true; // hold back to block
-      if (foe.crouching && plan < blockSkill * 0.5) out.down = true; // low block
+      out.block = true;                                          // press BLOCK button
+      if (foe.crouching && plan < blockSkill * 0.5) out.down = true; // low guard
       return out;
     }
 
@@ -423,7 +493,15 @@ const VersusEngine = (() => {
       else if (plan < 0.78 && me.meter >= 25) out.special = true;
       else { if (dir>0) out.left=true; else out.right=true; } // back off / block
     }
+    // translate intent → 4-button shape: Y(+Up for finisher)
+    if (out.super) { out.sp = true; out.up = true; }
+    else if (out.special) { out.sp = true; }   // neutral/forward special (projectile)
     return out;
+  }
+
+  // training dummy — stands still, no offense (pure practice target)
+  function trainingDummy() {
+    return { left:false, right:false, up:false, down:false, light:false, heavy:false, block:false, sp:false };
   }
 
   // ── main loop ────────────────────────────────────────────────────────────────
@@ -460,15 +538,21 @@ const VersusEngine = (() => {
     }
 
     if (phase === 'fight') {
-      timer -= dt;
+      if (!training) timer -= dt;
       const pin = readPlayerInputs();
-      const cin = cpuInputs(dt);
+      // TRAINING: opponent is a passive dummy that only guards occasionally
+      const cin = training ? trainingDummy() : cpuInputs(dt);
       updateFighter(p1, p2, pin, dt);
       updateFighter(p2, p1, cin, dt);
       updateProjectiles(dt);
 
-      // win conditions
-      if (p1.hp <= 0 || p2.hp <= 0 || timer <= 0) endRound();
+      if (training) {
+        // infinite meter to practice specials/finisher; dummy never dies; reset on KO
+        p1.meter = 100;
+        if (p2.hp <= 0) { p2.hp = p2.maxHp; popup(p2.x, p2.y - p2.h, 'RESET', '#66ff99', 16); }
+        if (p1.hp <= 0) p1.hp = p1.maxHp;
+        p2.hp = Math.min(p2.maxHp, p2.hp + p2.maxHp * 0.25 * dt); // slow regen so combos read
+      } else if (p1.hp <= 0 || p2.hp <= 0 || timer <= 0) endRound();
     }
 
     if (phase === 'roundover') {
@@ -545,6 +629,7 @@ const VersusEngine = (() => {
     ctx.restore();
 
     drawHUD();
+    drawControlsLegend();
     drawBigText();
 
     if (flash > 0) {
@@ -559,19 +644,29 @@ const VersusEngine = (() => {
 
   function drawPause() {
     ctx.save();
-    ctx.fillStyle = 'rgba(4,0,12,0.82)';
+    ctx.fillStyle = 'rgba(4,0,12,0.88)';
     ctx.fillRect(0,0,W,H);
+
+    if (overlay === 'moves')    { drawMoveList(); ctx.restore(); return; }
+    if (overlay === 'controls') { drawControlsPage(); ctx.restore(); return; }
+
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 22;
-    ctx.font = `900 ${Math.max(34,H*0.10)}px Orbitron, monospace`;
-    ctx.fillText('PAUSED', W/2, H*0.30);
+    ctx.font = `900 ${Math.max(30,H*0.09)}px Orbitron, monospace`;
+    ctx.fillText('PAUSED', W/2, H*0.20);
     ctx.shadowBlur = 0;
-    const itemH = Math.max(40, H*0.085);
-    const y0 = H*0.44;
-    PAUSE_ITEMS.forEach((label, i) => {
+    if (training) {
+      ctx.font = `700 ${Math.max(12,H*0.026)}px Orbitron, monospace`;
+      ctx.fillStyle = '#66ff99';
+      ctx.fillText('● TRAINING MODE', W/2, H*0.27);
+    }
+    const items = pauseItems();
+    const itemH = Math.max(34, H*0.072);
+    const y0 = H*0.36;
+    items.forEach((label, i) => {
       const sel = i === pauseSel;
       const y = y0 + i*itemH;
-      ctx.font = `${sel?'900':'700'} ${Math.max(20,H*0.05)}px Orbitron, monospace`;
+      ctx.font = `${sel?'900':'700'} ${Math.max(17,H*0.042)}px Orbitron, monospace`;
       ctx.fillStyle = sel ? '#fff' : '#ffffff66';
       ctx.shadowColor = sel ? (stage.accent||'#ff00aa') : 'transparent';
       ctx.shadowBlur = sel ? 18 : 0;
@@ -580,8 +675,70 @@ const VersusEngine = (() => {
     ctx.shadowBlur = 0;
     ctx.font = `600 ${Math.max(11,H*0.022)}px Orbitron, monospace`;
     ctx.fillStyle = '#ffffff55';
-    ctx.fillText('D-PAD to move • A/ENTER to select • START to resume', W/2, H*0.86);
+    ctx.fillText('D-PAD move • A/ENTER select • START resume', W/2, H*0.92);
     ctx.restore();
+  }
+
+  function _pauseHeader(title) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 18;
+    ctx.font = `900 ${Math.max(22,H*0.06)}px Orbitron, monospace`;
+    ctx.fillText(title, W/2, H*0.12);
+    ctx.shadowBlur = 0;
+    ctx.font = `600 ${Math.max(11,H*0.022)}px Orbitron, monospace`;
+    ctx.fillStyle = '#ffffff55';
+    ctx.fillText('B / BACK to return', W/2, H*0.93);
+  }
+
+  function drawControlsPage() {
+    _pauseHeader('CONTROLS');
+    const rows = [
+      ['D-PAD / ◀ ▶', 'Walk forward & back'],
+      ['UP', 'Jump'],
+      ['DOWN', 'Crouch'],
+      ['Ⓐ  LIGHT', 'Fast hit — tap to auto-combo'],
+      ['Ⓑ  HEAVY', 'Strong hit — tap to auto-combo'],
+      ['Ⓧ  BLOCK', 'Hold to guard (＋DOWN = low guard)'],
+      ['Ⓨ  SPECIAL', 'Press with a direction (see MOVE LIST)'],
+      ['START', 'Pause / menu'],
+    ];
+    const fs = Math.max(13, H*0.030), lh = fs*1.9, y0 = H*0.26;
+    ctx.textBaseline = 'middle';
+    rows.forEach((r,i) => {
+      const y = y0 + i*lh;
+      ctx.textAlign = 'right'; ctx.font = `900 ${fs}px Orbitron, monospace`;
+      ctx.fillStyle = stage.accent || '#ff55cc'; ctx.fillText(r[0], W*0.46, y);
+      ctx.textAlign = 'left'; ctx.font = `600 ${fs}px Orbitron, monospace`;
+      ctx.fillStyle = '#fff'; ctx.fillText(r[1], W*0.50, y);
+    });
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawMoveList() {
+    const cName = (p1.char && (p1.char.name || p1.char.shortName)) || p1.name;
+    _pauseHeader('MOVE LIST — ' + cName);
+    const rows = [
+      ['Ⓐ … Ⓐ … Ⓐ', 'AUTO COMBO', 'Tap Light repeatedly'],
+      ['Ⓐ → Ⓑ → Ⓨ', 'MAGIC SERIES', 'Light into Heavy into Special'],
+      ['→ ＋ Ⓨ', 'SPECIAL 1 — ' + MOVES.special.name,  'Ranged projectile'],
+      ['↓ ＋ Ⓨ', 'SPECIAL 2 — ' + MOVES.special2.name, 'Rising anti-air (launches)'],
+      ['← ＋ Ⓨ', 'SPECIAL 3 — ' + MOVES.special3.name, 'Advancing lunge'],
+      ['↑ ＋ Ⓨ', MOVES.super.name, 'Cinematic super (full meter)'],
+      ['Ⓧ (hold)', 'GUARD', 'Block; ＋DOWN guards low'],
+    ];
+    const fs = Math.max(12, H*0.026), lh = fs*2.0, y0 = H*0.25;
+    ctx.textBaseline = 'middle';
+    rows.forEach((r,i) => {
+      const y = y0 + i*lh;
+      ctx.textAlign = 'right'; ctx.font = `900 ${fs*1.05}px Orbitron, monospace`;
+      ctx.fillStyle = '#33ddff'; ctx.shadowColor='#33ddff'; ctx.shadowBlur=6;
+      ctx.fillText(r[0], W*0.34, y); ctx.shadowBlur=0;
+      ctx.textAlign = 'left'; ctx.font = `900 ${fs}px Orbitron, monospace`;
+      ctx.fillStyle = '#ffd700'; ctx.fillText(r[1], W*0.37, y);
+      ctx.font = `600 ${fs*0.85}px Orbitron, monospace`;
+      ctx.fillStyle = '#ffffffaa'; ctx.fillText(r[2], W*0.37, y + lh*0.42);
+    });
+    ctx.textBaseline = 'alphabetic';
   }
 
   function drawStage() {
@@ -628,7 +785,7 @@ const VersusEngine = (() => {
     if (f.attack === 'light')   { e.attacking = true;  e.comboStep = 1; }
     else if (f.attack === 'heavy')   { e.comboStep = 2; }
     else if (f.attack === 'crouch')  { e.comboStep = 3; }
-    else if (f.attack === 'special') { e.specialAnim = true; }
+    else if (f.attack === 'special' || f.attack === 'special2' || f.attack === 'special3') { e.specialAnim = true; }
     else if (f.attack === 'super') {
       e.superAnim = 1; e.finishering = (f.char && f.char.isBoss);
     }
@@ -769,6 +926,34 @@ const VersusEngine = (() => {
     ctx.save(); ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2);
     ctx.fillStyle=on?color:'#ffffff22'; ctx.shadowColor=color; ctx.shadowBlur=on?8:0;
     ctx.fill(); ctx.restore();
+  }
+
+  // EASY 4-BUTTON LEGEND — shown during the round intro so any character is learnable
+  function drawControlsLegend() {
+    if (phase !== 'intro') return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0, 1.4 - phaseT));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const fs = Math.max(11, H * 0.026);
+    const rows = [
+      ['Ⓐ', 'LIGHT — tap to auto-combo', '#33ddff'],
+      ['Ⓑ', 'HEAVY — tap to auto-combo', '#ff9933'],
+      ['Ⓧ', 'BLOCK — hold to guard',      '#66ff99'],
+      ['Ⓨ', 'SPECIAL  →1  ↓2  ←3  ↑FINISHER', '#ff55cc'],
+    ];
+    const lh = fs * 1.7, y0 = H * 0.66;
+    ctx.font = `700 ${fs}px Orbitron, monospace`;
+    const boxW = W * 0.6, boxX = W/2 - boxW/2;
+    ctx.fillStyle = 'rgba(2,0,8,0.55)';
+    ctx.fillRect(boxX, y0 - lh*0.8, boxW, lh*rows.length + lh*0.4);
+    rows.forEach((r, i) => {
+      const y = y0 + i*lh;
+      ctx.fillStyle = r[2]; ctx.shadowColor = r[2]; ctx.shadowBlur = 10;
+      ctx.fillText(r[0], boxX + boxW*0.12, y);
+      ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
+      ctx.fillText(r[1], boxX + boxW*0.58, y);
+    });
+    ctx.restore();
   }
 
   function drawBigText() {
