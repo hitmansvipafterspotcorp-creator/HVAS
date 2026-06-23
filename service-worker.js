@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v7';
+const CACHE_NAME = 'hitgear-os-v8';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -53,14 +53,6 @@ const CORE_ASSETS = [
   './assets/venues/dukes_pack_08_interior_bg.png',
   './assets/venues/tally_pack_02_exterior_stage.png',
   './assets/venues/kcs_pack_08_interior_bg.png',
-  './assets/venues/clean/kcs_interior_clean.png',
-  './assets/venues/clean/dukes_interior_clean.png',
-  './assets/venues/clean/publichall_interior_clean.png',
-  './assets/venues/clean/itus_interior_clean.png',
-  './assets/venues/clean/den_interior_clean.png',
-  './assets/venues/clean/sammys_interior_clean.png',
-  './assets/venues/clean/rave_interior_clean.png',
-  './assets/venues/clean/tallyrow_exterior_clean.png',
   './assets/characters/creator_sheet01_loco.png',
   './assets/characters/creator_sheet02_combat.png',
   './assets/characters/creator_sheet03_damage.png',
