@@ -92,6 +92,7 @@ const HitgearOS = (() => {
       pct += 1 + Math.random() * 3;
       if (pct > 100) pct = 100;
       if (bar) bar.style.width = pct + '%';
+      if (typeof LoadingScreen !== 'undefined') LoadingScreen.setProgress(pct / 100);
 
       const newMsgIdx = Math.floor((pct / 100) * messages.length);
       if (newMsgIdx !== msgIdx && newMsgIdx < messages.length) {
@@ -632,6 +633,28 @@ const HitgearOS = (() => {
   }
 
   function launchGameplay(charId, venueId) {
+    const ch = window.CHARACTERS.find(c => c.id === charId);
+    const venue = window.VENUES.find(v => v.id === venueId);
+    if (!ch || !venue) { alert('Invalid character or venue.'); return; }
+
+    // Show dynamic loading screen in the venue's color
+    const accentColor = venue.colors && (venue.colors.accent || venue.colors.neon);
+    LoadingScreen.setProgress(0);
+    LoadingScreen.show(accentColor, () => {
+      // Callback: actually launch the game after the screen fades out
+      _doLaunchGameplay(charId, venueId, ch, venue);
+    }, 1500);
+
+    // Simulate progress while show() holds
+    let p = 0;
+    const ticker = setInterval(() => {
+      p += 0.04 + Math.random() * 0.06;
+      if (p >= 1) { p = 1; clearInterval(ticker); }
+      LoadingScreen.setProgress(p);
+    }, 60);
+  }
+
+  function _doLaunchGameplay(charId, venueId, ch, venue) {
     showScreen('screen-gameplay');
     const canvas = document.getElementById('gameCanvas');
     if (!canvas) return;
@@ -652,10 +675,6 @@ const HitgearOS = (() => {
     window.addEventListener('resize', fitCanvas);
 
     QuestEngine.init(canvas);
-
-    const ch = window.CHARACTERS.find(c => c.id === charId);
-    const venue = window.VENUES.find(v => v.id === venueId);
-    if (!ch || !venue) { alert('Invalid character or venue.'); return; }
 
     SaveSystem.patch({ characterId: charId, currentVenueId: venueId });
     QuestEngine.startQuest(charId, venueId);
@@ -681,10 +700,12 @@ const HitgearOS = (() => {
 
   function returnToMenu() {
     QuestEngine.stopQuest();
-    openGameMenu();
+    // Brief neutral transition back to menu
+    LoadingScreen.show(null, () => openGameMenu(), 500);
   }
 
   function retryVenue() {
+    // Fade to loading screen before relaunching
     launchGameplay(selectedCharId, selectedVenueId);
   }
 
