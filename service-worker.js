@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v5';
+const CACHE_NAME = 'hitgear-os-v6';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -47,7 +47,29 @@ const CORE_ASSETS = [
   './assets/venues/tally_13rave.png',
   './assets/venues/dukes_interior.png',
   './assets/venues/dukes_exterior.png',
-  './assets/venues/qhf_exterior.png'
+  './assets/venues/qhf_exterior.png',
+  './assets/characters/creator_sheet01_loco.png',
+  './assets/characters/creator_sheet02_combat.png',
+  './assets/characters/creator_sheet03_damage.png',
+  './assets/characters/creator_sheet04_supers.png',
+  './assets/characters/creator_sheet05_topdown.png',
+  './assets/characters/creator_sheet06_vfx.png',
+  './assets/characters/dj_sheet01_loco.png',
+  './assets/characters/dj_sheet02_combat.png',
+  './assets/characters/dj_sheet03_damage.png',
+  './assets/characters/dj_sheet04_supers.png',
+  './assets/characters/dj_sheet05_topdown.png',
+  './assets/characters/dj_sheet06_vfx.png',
+  './assets/characters/vendor_sheet02_combat.png',
+  './assets/characters/vendor_sheet03_damage.png',
+  './assets/characters/vendor_sheet04_supers.png',
+  './assets/characters/vendor_sheet05_topdown.png',
+  './assets/characters/vendor_sheet06_vfx.png',
+  './assets/characters/security_sheet02_combat.png',
+  './assets/characters/security_sheet03_damage.png',
+  './assets/characters/security_sheet04_supers.png',
+  './assets/characters/security_sheet05_topdown.png',
+  './assets/characters/security_sheet06_vfx.png'
 ];
 
 self.addEventListener('install', e => {

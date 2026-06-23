@@ -1,5 +1,19 @@
 'use strict';
 const NPCEngine = (() => {
+  // charId maps enemy types to sprite sheet characters for rendering
+  const ENEMY_CHAR_IDS = {
+    'Hater':            7,   // Promoter build
+    'Opp':              30,  // Predator Pete
+    'Bad-energy NPC':   9,   // Vendor build
+    'Gate Crasher':     12,  // FSU Student A (aggressive rushdown)
+    'Scammer':          5,   // Influencer build
+    'Disruptor':        22,  // Entry Line Disruptor boss sprite
+    'Stalker':          31,  // Agent Snow
+    'Corrupt Security': 10,  // Security
+    'Street Heat Boss': 21,  // Big Soulja
+    'Entry Line Disruptor': 22,
+  };
+
   const ENEMY_DEFS = {
     'Hater':            { emoji:'😤', color:'#cc2200', w:28, h:44, hp:80,  maxHp:80,  dmg:12, speed:3.2, behavior:'chase',           blockChance:0.10, retreatHp:0.10, reward:{pts:50,  coins:10} },
     'Opp':              { emoji:'🕵️', color:'#882200', w:30, h:46, hp:100, maxHp:100, dmg:15, speed:3.8, behavior:'patrol',          blockChance:0.25, retreatHp:0.20, reward:{pts:75,  coins:15} },
@@ -89,6 +103,7 @@ const NPCEngine = (() => {
       hitstunFrames: 0, blockstunFrames: 0,
       attackCooldown: 0, attacking: false, blocking: false,
       facing: -1, vel: { x: 0, y: 0 },
+      charId: ENEMY_CHAR_IDS[typeName] || 10,
       phase2Hp: 0.5, patrolDir: 1
     };
   }
