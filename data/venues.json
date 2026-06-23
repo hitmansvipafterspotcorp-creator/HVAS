@@ -372,7 +372,7 @@
         "zone": "bar"
       }
     ],
-    "bgImage": "assets/venues/kingdom_come_saloon.png"
+    "bgImage": "assets/venues/kcs_pack_07_exterior_bg.png"
   },
   {
     "id": 5,
@@ -1155,7 +1155,7 @@
         "zone": "main_table"
       }
     ],
-    "bgImage": "assets/venues/dukes_interior.png"
+    "bgImage": "assets/venues/dukes_pack_02_exterior_stage.png"
   },
   {
     "id": 14,
@@ -1259,7 +1259,7 @@
     ],
     "stageWidth": 3600,
     "groundY": 0.75,
-    "bgImage": "assets/venues/qhf_exterior.png"
+    "bgImage": "assets/venues/qhf_pack_02_exterior_stage.png"
   },
   {
     "id": 15,
