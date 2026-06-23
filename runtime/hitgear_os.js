@@ -271,38 +271,131 @@ const HitgearOS = (() => {
     if (!grid || !window.CHARACTERS) return;
     grid.innerHTML = '';
 
-    // Default selection to first char if current is invalid
+    const save = SaveSystem.load() || SaveSystem.defaults();
+    const pts  = save.statusPoints || 0;
+
+    // Points label
+    const ptsEl = document.getElementById('cs-pts-label');
+    if (ptsEl) ptsEl.textContent = '⭐ ' + pts + ' STATUS PTS';
+
+    // Back button
+    const backBtn = document.getElementById('cs-back-btn');
+    if (backBtn) {
+      backBtn.onclick = () => HitgearOS.openGameMenu();
+    }
+
+    // Default selection
     if (!window.CHARACTERS.find(c => c.id === selectedCharId)) {
-      selectedCharId = window.CHARACTERS[0]?.id || 3;
+      selectedCharId = window.CHARACTERS[0]?.id || 1;
     }
 
     window.CHARACTERS.forEach(ch => {
+      const locked = (ch.unlockPts || 0) > pts;
       const card = document.createElement('div');
-      card.className = 'char-card' + (ch.id === selectedCharId ? ' active' : '');
+      card.className = 'char-card' + (ch.id === selectedCharId ? ' active' : '') + (locked ? ' locked-char' : '');
       card.innerHTML = `
         <div class="char-avatar">${ch.emoji}</div>
-        <div class="char-name" style="font-size:10px">${ch.shortName || ch.name}</div>
-        <div style="font-family:'Rajdhani',sans-serif;font-size:9px;color:#ff00aa;margin:2px 0 4px">${ch.style || ''}</div>
-        <div class="char-stat-bars">
-          <div class="char-stat"><span class="char-stat-name">SPD</span><div class="char-stat-bar"><div class="char-stat-fill spd" style="width:${ch.spd||50}%"></div></div></div>
-          <div class="char-stat"><span class="char-stat-name">STR</span><div class="char-stat-bar"><div class="char-stat-fill str" style="width:${ch.str||50}%"></div></div></div>
-          <div class="char-stat"><span class="char-stat-name">DEF</span><div class="char-stat-bar"><div class="char-stat-fill def" style="width:${ch.def||50}%"></div></div></div>
-        </div>
-        <div style="font-family:'Rajdhani',sans-serif;font-size:10px;color:#ccbbee;margin-top:4px;line-height:1.2">${ch.special || ''}</div>`;
+        <div class="char-name">${ch.shortName || ch.name}</div>
+        ${locked ? `<div class="char-locked">🔒</div>` : ''}`;
+
       card.addEventListener('click', () => {
+        if (locked) return;
         selectedCharId = ch.id;
-        renderCharSelect(onSelect);
-        setTimeout(() => onSelect && onSelect(ch.id), 300);
+        _updateCharPreview(ch, onSelect);
+        document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+      });
+      card.addEventListener('dblclick', () => {
+        if (locked) return;
+        selectedCharId = ch.id;
+        _doFight(ch, onSelect);
       });
       grid.appendChild(card);
     });
 
-    // Show selected char description
+    // Show preview for current selection
     const selected = window.CHARACTERS.find(c => c.id === selectedCharId);
-    const descEl = document.getElementById('char-desc');
-    if (descEl && selected) {
-      descEl.innerHTML = `<span style="color:${selected.color||'#ff00aa'};font-weight:900">${selected.shortName||selected.name}</span> — ${selected.desc||''}`;
+    if (selected) _updateCharPreview(selected, onSelect);
+  }
+
+  function _updateCharPreview(ch, onSelect) {
+    const el = id => document.getElementById(id);
+    if (el('cs-preview-emoji')) el('cs-preview-emoji').textContent = ch.emoji || '🎤';
+    if (el('cs-preview-name'))  el('cs-preview-name').textContent  = ch.shortName || ch.name || '';
+    if (el('cs-preview-style')) el('cs-preview-style').textContent = ch.style || ch.desc || '';
+
+    // Stats
+    const statsEl = el('cs-preview-stats');
+    if (statsEl) {
+      statsEl.innerHTML = [
+        { key:'SPD', val: ch.spd || 70, cls:'spd' },
+        { key:'STR', val: ch.str || 70, cls:'str' },
+        { key:'DEF', val: ch.def || 70, cls:'def' },
+      ].map(s => `<div class="cs-stat-row">
+        <span class="cs-stat-label">${s.key}</span>
+        <div class="cs-stat-track"><div class="cs-stat-fill ${s.cls}" style="width:${s.val}%"></div></div>
+        <span class="cs-stat-val">${s.val}</span>
+      </div>`).join('');
     }
+
+    // Move list
+    const movesEl = el('cs-preview-moves');
+    if (movesEl) {
+      const moves = [
+        { key: 'L',          name: ch.comboString ? ch.comboString + ' combo' : 'Light combo' },
+        { key: 'H',          name: 'Heavy strike' },
+        { key: 'BLK',        name: 'Guard / Block' },
+        { key: '→ + SP',     name: ch.special || 'Projectile' },
+        { key: '↓ + SP',     name: 'Rising attack' },
+        { key: '← + SP',     name: 'Lunge dash' },
+        { key: '↑ + SP',     name: (ch.super1 || 'FINISHER') + ' (full meter)' },
+      ];
+      movesEl.innerHTML = `<div class="cs-move-title">MOVE LIST</div>` +
+        moves.map(m => `<div class="cs-move-row"><span class="cs-move-key">${m.key}</span><span>${m.name}</span></div>`).join('');
+    }
+
+    // Fight button
+    const fightBtn = el('cs-fight-btn');
+    if (fightBtn) {
+      fightBtn.style.display = 'block';
+      fightBtn.style.background = `linear-gradient(135deg, ${ch.color || '#ffd700'}, #ff8800)`;
+      fightBtn.onclick = () => _doFight(ch, onSelect);
+    }
+  }
+
+  function _doFight(ch, onSelect) {
+    if (!onSelect) return;
+    // VS Flash then callback
+    _showVSFlash(ch, () => {
+      onSelect(ch.id);
+    });
+  }
+
+  function _showVSFlash(p1Char, callback) {
+    // Pick a CPU character for display in VS flash (random playable)
+    const cpuList = (window.CHARACTERS || []).filter(c => c.id !== p1Char.id).slice(0, 8);
+    const cpuChar = cpuList[Math.floor(Math.random() * cpuList.length)] || p1Char;
+
+    const flash = document.getElementById('vs-flash');
+    if (!flash) { callback(); return; }
+
+    const p1El = document.getElementById('vs-p1-panel');
+    const p2El = document.getElementById('vs-p2-panel');
+
+    if (p1El) p1El.innerHTML = `
+      <div class="vs-p-emoji">${p1Char.emoji}</div>
+      <div class="vs-p-name" style="color:${p1Char.color||'#ff00aa'}">${p1Char.shortName || p1Char.name}</div>
+      <div style="font-size:13px;color:#aaa;letter-spacing:2px;font-family:'Orbitron',sans-serif">PLAYER 1</div>`;
+    if (p2El) p2El.innerHTML = `
+      <div class="vs-p-emoji">${cpuChar.emoji}</div>
+      <div class="vs-p-name" style="color:${cpuChar.color||'#44aaff'}">${cpuChar.shortName || cpuChar.name}</div>
+      <div style="font-size:13px;color:#aaa;letter-spacing:2px;font-family:'Orbitron',sans-serif">CPU</div>`;
+
+    flash.style.display = 'flex';
+    setTimeout(() => {
+      flash.style.display = 'none';
+      callback();
+    }, 1800);
   }
 
   // ──── VENUE MAP ────

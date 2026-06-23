@@ -111,14 +111,38 @@
 </div>
 
 <!-- ══════════════════════════════════ CHARACTER SELECT ══════════════════════════════════ -->
-<div id="screen-char-select" class="screen" style="display:none">
-  <div class="select-header">SELECT YOUR CHARACTER</div>
-  <div style="font-family:'Rajdhani',sans-serif;font-size:13px;color:#ccbbee;text-align:center;margin-bottom:16px;flex-shrink:0">
-    Locked characters unlock as your STATUS POINTS grow.
+<div id="screen-char-select" class="screen cs-screen" style="display:none">
+  <!-- Header bar -->
+  <div class="cs-header">
+    <button class="back-btn cs-back" id="cs-back-btn">← BACK</button>
+    <div class="cs-title">SELECT YOUR FIGHTER</div>
+    <div class="cs-pts-label" id="cs-pts-label"></div>
   </div>
-  <div class="char-grid" id="char-grid"></div>
-  <div style="margin-top:12px;flex-shrink:0">
-    <button class="back-btn" onclick="HitgearOS.openGameMenu()">← BACK</button>
+  <!-- Body: preview left, grid right -->
+  <div class="cs-body">
+    <!-- LEFT: character preview -->
+    <div class="cs-preview" id="cs-preview">
+      <div class="cs-preview-emoji" id="cs-preview-emoji">?</div>
+      <div class="cs-preview-name" id="cs-preview-name">—</div>
+      <div class="cs-preview-style" id="cs-preview-style"></div>
+      <div class="cs-preview-stats" id="cs-preview-stats"></div>
+      <div class="cs-preview-moves" id="cs-preview-moves"></div>
+      <button class="cs-fight-btn" id="cs-fight-btn" style="display:none">⚔ FIGHT</button>
+    </div>
+    <!-- RIGHT: character grid -->
+    <div class="cs-right">
+      <div class="cs-unlock-hint">Locked fighters unlock as STATUS POINTS grow.</div>
+      <div class="char-grid cs-grid" id="char-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ VS FLASH OVERLAY ══════════════════ -->
+<div id="vs-flash" style="display:none;position:fixed;inset:0;z-index:8888;align-items:center;justify-content:center;background:#000;flex-direction:column">
+  <div class="vs-split" id="vs-split">
+    <div class="vs-p1" id="vs-p1-panel"></div>
+    <div class="vs-center"><div class="vs-word" id="vs-word">VS</div></div>
+    <div class="vs-p2" id="vs-p2-panel"></div>
   </div>
 </div>
 
@@ -511,6 +535,7 @@ window.VENUES = [
 <script src="runtime/quest_engine.js"></script>
 <script src="runtime/versus_engine.js"></script>
 <script src="runtime/story_mode.js"></script>
+<script src="runtime/char_renderer.js"></script>
 <script src="runtime/loading_screen.js"></script>
 <script src="runtime/hitgear_os.js"></script>
 

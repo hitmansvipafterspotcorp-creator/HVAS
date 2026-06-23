@@ -332,6 +332,11 @@ const VersusEngine = (() => {
       const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 260;
       sparks.push({ x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 60, life: .35, color });
     }
+    // CharRenderer VFX overlay
+    if (typeof CharRenderer !== 'undefined') {
+      const level = n >= 16 ? 4 : n >= 10 ? 3 : n >= 8 ? 2 : 1;
+      CharRenderer.spawnHitSpark(x, y, level, color);
+    }
   }
   function popup(x, y, text, color, size) { popups.push({ x, y, text, color, size, life: .9, vy: -70 }); }
 
@@ -622,6 +627,7 @@ const VersusEngine = (() => {
       const p = popups[i]; p.y+=p.vy*dt; p.vy*=0.92; p.life-=dt;
       if (p.life<=0) popups.splice(i,1);
     }
+    if (typeof CharRenderer !== 'undefined') CharRenderer.updateVFX(dt);
   }
 
   // ── render ───────────────────────────────────────────────────────────────────
@@ -637,6 +643,10 @@ const VersusEngine = (() => {
     const order = [p1, p2].sort((a,b)=>a.y-b.y);
     order.forEach(drawFighter);
     projectiles.forEach(drawProjectile);
+    // CharRenderer VFX layer (over fighters, under HUD)
+    if (typeof CharRenderer !== 'undefined') {
+      CharRenderer.drawVFX(ctx, W, H);
+    }
     drawSparks();
     drawPopups();
     ctx.restore();
@@ -805,47 +815,70 @@ const VersusEngine = (() => {
     return e;
   }
 
+  // Map fighter state/attack to CharRenderer animation state
+  function _vsAnimState(f) {
+    if (f.hp <= 0 || f.state === 'knockdown') return 'ko';
+    if (f.attack === 'light' || f.attack === 'crouch') return 'light';
+    if (f.attack === 'heavy')   return 'heavy';
+    if (f.attack === 'special') return 'special1';
+    if (f.attack === 'special2') return 'special2';
+    if (f.attack === 'special3') return 'special3';
+    if (f.attack === 'super')   return 'super';
+    if (f.hitstun > 0)          return 'hurt';
+    if (f.blocking)             return 'block';
+    if (f.crouching)            return 'crouch';
+    if (!f.onGround)            return 'jump';
+    if (Math.abs(f.vx) > 30)   return 'walk';
+    return 'idle';
+  }
+
+  function _vsAnimT(f, state) {
+    const now = performance.now() / 1000;
+    if (state === 'idle') return (now * 2.0) % 1;
+    if (state === 'walk') return (now * 4.0) % 1;
+    if (state === 'block') return (now * 3.0) % 1;
+    // Attack / special: use stateT (counts up from 0)
+    const dur = { light:0.35, heavy:0.5, special1:0.55, special2:0.5, special3:0.4, super:0.9, hurt:0.3, ko:1.0, crouch:1.0, jump:1.0 };
+    return Math.min(1, (f.stateT || 0) / (dur[state] || 0.5));
+  }
+
   function drawFighter(f) {
-    const x = f.x, baseY = f.y;
-    const crouch = f.crouching ? 0.62 : 1;
-    const h = f.h * crouch;
-    const b = buildOf(f);
-    const ww = f.w * b.bw;
+    if (typeof CharRenderer === 'undefined') return;
+    const CR = CharRenderer;
 
-    // ground shadow
-    ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(x, groundY, ww*0.6, 10, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
+    // Fighter display height — large and screen-proportional
+    const charH = Math.min(H * 0.56, 300);
 
-    // super-charged aura ring
-    if (f.meter >= 100) {
-      ctx.save();
-      const pulse = 0.5 + 0.5*Math.sin(performance.now()/120);
-      ctx.globalAlpha = 0.25 + pulse*0.35;
-      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 3; ctx.shadowColor='#ffd700'; ctx.shadowBlur=24;
-      ctx.beginPath(); ctx.ellipse(x, baseY - h*0.5, ww*0.7, h*0.62, 0,0,Math.PI*2); ctx.stroke();
-      ctx.restore();
-    }
+    const charId = (f.char && f.char.id) || 1;
+    const state  = _vsAnimState(f);
+    const animT  = _vsAnimT(f, state);
 
-    // ── Try real sprite sheet ──────────────────────────────────────────────
+    // ── Try real sprite sheet first ────────────────────────────────────────
     const SS = window.SpriteSystem;
     if (SS && f.char && SS.hasSprites(f.char.id)) {
-      const se = _toSpriteEnt(f);
+      const b   = buildOf(f);
+      const ww  = charH * 0.55 * b.bw;
+      const se  = _toSpriteEnt(f);
       SS.update(f.char.id, se, 1/60, false, null);
       ctx.save();
       if (f.flashHit > 0) { ctx.globalAlpha = 0.7; ctx.filter = 'brightness(4)'; }
-      const didDraw = SS.draw(ctx, f.char.id, se, x - ww*0.5, baseY - h, ww, h, f.facing < 0);
+      const didDraw = SS.draw(ctx, f.char.id, se, f.x - ww*0.5, groundY - charH, ww, charH, f.facing < 0);
       ctx.restore();
-      if (didDraw) {
-        // boss crown overlay
-        if (f.char.isBoss) {
-          ctx.font = `${Math.round(ww*0.28)}px serif`;
-          ctx.textAlign='center'; ctx.textBaseline='middle';
-          ctx.fillText('👑', x, baseY - h - ww*0.18);
-        }
-        return;
-      }
+      if (didDraw) return;
     }
 
+    // ── Canvas CharRenderer fallback (always available) ────────────────────
+    CR.draw(ctx, charId, state, animT, f.x, groundY, charH, f.facing, {
+      flashHit: f.flashHit || 0,
+      charged: f.meter >= 100,
+    });
+
+    // Boss crown above head
+    if (f.char && f.char.isBoss) {
+      ctx.font = `${Math.round(charH * 0.12)}px serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('👑', f.x, groundY - charH - charH * 0.08);
+    }
   }
 
   function drawProjectile(p) {

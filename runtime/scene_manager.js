@@ -273,57 +273,101 @@ const SceneManager = (() => {
     ctx.shadowBlur = 0;
   }
 
+  function _smAnimState(ent) {
+    if (ent.hp <= 0) return 'ko';
+    if (ent.attacking) return 'light';
+    if (ent.knocked)   return 'hurt';
+    if (ent.blocking)  return 'block';
+    if (ent.vel && Math.abs(ent.vel.x || ent.vx || 0) > 20) return 'walk';
+    return 'idle';
+  }
+
+  function _smAnimT(state) {
+    const now = performance.now() / 1000;
+    if (state === 'idle') return (now * 2.0) % 1;
+    if (state === 'walk') return (now * 4.0) % 1;
+    return (now * 3.0) % 1;
+  }
+
   function drawPlayer(p, H, groundYFrac, gameState) {
-    const ch = gameState.character || window.CHARACTERS[0];
-    const color = ch.color || '#ff00aa';
-    const emoji = ch.emoji || '🎤';
-    const charId = ch.id || 12;
+    const ch = gameState.character || (window.CHARACTERS && window.CHARACTERS[0]) || {};
+    const charId = ch.id || 1;
+    const groundY = H * groundYFrac;
+    const charH   = Math.min(H * 0.52, 260);
 
     ctx.save();
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
     ctx.globalAlpha = alpha;
+
     const flipX = (p.facing || 1) < 0;
-    const drawn = typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+
+    // Try sprite first
+    const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
+      SS.draw(ctx, charId, p, p.x - charH*0.28, groundY - charH, charH*0.56, charH, flipX);
+
+    if (!drawn && typeof CharRenderer !== 'undefined') {
+      const state = _smAnimState(p);
+      CharRenderer.draw(ctx, charId, state, _smAnimT(state),
+        p.x + charH * 0.28 * (flipX ? 1 : 0), groundY, charH, (p.facing || 1), { alpha });
+    }
+
     ctx.globalAlpha = 1;
     ctx.restore();
   }
 
   function drawEnemy(e, H, groundYFrac) {
-    const color = e.color || '#cc2200';
-    const emoji = e.emoji || '👊';
-    const charId = e.charId || null;
+    const charId  = e.charId || 10;
+    const groundY = H * groundYFrac;
+    const charH   = Math.min(H * 0.42, 200);
+    const facing  = e.facing || 1;
 
     ctx.save();
-    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
+    const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
+      SS.draw(ctx, charId, e, e.x, e.y, e.w, e.h, facing < 0);
+
+    if (!drawn && typeof CharRenderer !== 'undefined') {
+      const state = _smAnimState(e);
+      CharRenderer.draw(ctx, charId, state, _smAnimT(state),
+        e.x + e.w * 0.5, groundY, charH, facing, {});
+    }
 
     // HP bar above enemy
-    const barW = e.w + 10;
-    const bx = e.x - 5, by = e.y - 12;
-    ctx.fillStyle = '#330000';
-    ctx.fillRect(bx, by, barW, 5);
-    ctx.fillStyle = '#ff2222';
-    ctx.fillRect(bx, by, barW * (e.hp / e.maxHp), 5);
+    const barW = Math.max(e.w, 50);
+    const bx = e.x + e.w*0.5 - barW*0.5, by = groundY - charH - 14;
+    ctx.fillStyle = '#330000'; ctx.fillRect(bx, by, barW, 5);
+    ctx.fillStyle = '#ff2222'; ctx.fillRect(bx, by, barW * Math.max(0, e.hp / e.maxHp), 5);
 
     ctx.restore();
   }
 
   function drawNPC(npc, H, groundYFrac) {
-    const color = npc.color || '#4444aa';
-    const emoji = npc.emoji || '🧑';
-    const nw = npc.w || 28;
-    const nh = npc.h || 44;
-    const charId = npc.charId || null;
+    const nw = npc.w || 32;
+    const nh = npc.h || 56;
+    const charId  = npc.charId || 11;
+    const groundY = H * groundYFrac;
+    const charH   = Math.min(H * 0.38, 180);
 
     ctx.save();
-    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+    const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
+      SS.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+
+    if (!drawn && typeof CharRenderer !== 'undefined') {
+      CharRenderer.draw(ctx, charId, 'idle', _smAnimT('idle'),
+        npc.x + nw*0.5, groundY, charH, 1, {});
+    }
 
     // Interact prompt
     if (npc.showPrompt) {
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 10px Orbitron, monospace';
+      ctx.font = 'bold 11px Orbitron, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('[Y] TALK', npc.x + nw / 2, npc.y - 22);
-      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.shadowColor = '#000'; ctx.shadowBlur = 6;
+      ctx.fillText('[Y] TALK', npc.x + nw * 0.5, groundY - charH - 8);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
     }
     ctx.restore();
   }
