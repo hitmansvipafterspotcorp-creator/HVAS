@@ -208,7 +208,8 @@
       }
     ],
     "stageWidth": 3800,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/outta_exterior.png"
   },
   {
     "id": 3,
@@ -372,7 +373,7 @@
         "zone": "bar"
       }
     ],
-    "bgImage": "assets/venues/kcs_pack_07_exterior_bg.png"
+    "bgImage": "assets/venues/clean/kcs_interior_clean.png"
   },
   {
     "id": 5,
@@ -641,7 +642,7 @@
     ],
     "stageWidth": 4500,
     "groundY": 0.75,
-    "bgImage": "assets/venues/tally_exterior.png"
+    "bgImage": "assets/venues/clean/tallyrow_exterior_clean.png"
   },
   {
     "id": 8,
@@ -731,7 +732,7 @@
         "zone": "stage"
       }
     ],
-    "bgImage": "assets/venues/tally_den.png"
+    "bgImage": "assets/venues/clean/den_interior_clean.png"
   },
   {
     "id": 9,
@@ -811,7 +812,7 @@
         "zone": "kitchen"
       }
     ],
-    "bgImage": "assets/venues/tally_itus.png"
+    "bgImage": "assets/venues/clean/itus_interior_clean.png"
   },
   {
     "id": 10,
@@ -893,7 +894,7 @@
         "zone": "main_stage"
       }
     ],
-    "bgImage": "assets/venues/tally_sammys.png"
+    "bgImage": "assets/venues/clean/sammys_interior_clean.png"
   },
   {
     "id": 11,
@@ -983,7 +984,7 @@
         "zone": "center"
       }
     ],
-    "bgImage": "assets/venues/tally_public_hall.png"
+    "bgImage": "assets/venues/clean/publichall_interior_clean.png"
   },
   {
     "id": 12,
@@ -1073,7 +1074,7 @@
         "zone": "dj_platform"
       }
     ],
-    "bgImage": "assets/venues/tally_13rave.png"
+    "bgImage": "assets/venues/clean/rave_interior_clean.png"
   },
   {
     "id": 13,
@@ -1155,7 +1156,7 @@
         "zone": "main_table"
       }
     ],
-    "bgImage": "assets/venues/dukes_pack_02_exterior_stage.png"
+    "bgImage": "assets/venues/clean/dukes_interior_clean.png"
   },
   {
     "id": 14,
@@ -1259,7 +1260,7 @@
     ],
     "stageWidth": 3600,
     "groundY": 0.75,
-    "bgImage": "assets/venues/qhf_pack_02_exterior_stage.png"
+    "bgImage": "assets/venues/qhf_pack_07_exterior_bg.png"
   },
   {
     "id": 15,
@@ -1364,7 +1365,8 @@
       }
     ],
     "stageWidth": 4000,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/dukes_pack_07_exterior_bg.png"
   },
   {
     "id": 16,
@@ -1483,6 +1485,7 @@
       }
     ],
     "stageWidth": 5000,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/tally_pack_02_exterior_stage.png"
   }
 ]
