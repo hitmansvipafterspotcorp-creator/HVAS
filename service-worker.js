@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v4';
+const CACHE_NAME = 'hitgear-os-v5';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -32,7 +32,22 @@ const CORE_ASSETS = [
   './runtime/char_renderer.js',
   './runtime/loading_screen.js',
   './runtime/versus_engine.js',
-  './runtime/hitgear_os.js'
+  './runtime/hitgear_os.js',
+  './assets/venues/cafe8fifty_exterior.png',
+  './assets/venues/hvas_interior.png',
+  './assets/venues/kingdom_come_saloon.png',
+  './assets/venues/kingdom_come_exterior.png',
+  './assets/venues/outta_interior.png',
+  './assets/venues/outta_exterior.png',
+  './assets/venues/tally_exterior.png',
+  './assets/venues/tally_den.png',
+  './assets/venues/tally_itus.png',
+  './assets/venues/tally_sammys.png',
+  './assets/venues/tally_public_hall.png',
+  './assets/venues/tally_13rave.png',
+  './assets/venues/dukes_interior.png',
+  './assets/venues/dukes_exterior.png',
+  './assets/venues/qhf_exterior.png'
 ];
 
 self.addEventListener('install', e => {

@@ -106,6 +106,17 @@ const HitgearOS = (() => {
       }
     }, 40);
 
+    // Preload all venue backgrounds and character sprites in the background
+    setTimeout(() => {
+      if (typeof AssetLoader !== 'undefined' && window.VENUES) {
+        window.VENUES.forEach(v => { if (v.bgImage) AssetLoader.get(v.bgImage); });
+      }
+      if (typeof SpriteSystem !== 'undefined' && window.CHARACTERS) {
+        window.CHARACTERS.forEach(c => SpriteSystem.preload(c.id));
+        if (SpriteSystem.preloadNPCs) SpriteSystem.preloadNPCs();
+      }
+    }, 200);
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js')
         .catch(() => {});

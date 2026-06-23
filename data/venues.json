@@ -1,195 +1,572 @@
 [
   {
-    "id": 1, "name": "Cafe8Fifty Exterior", "shortName": "CAFE8FIFTY",
-    "emoji": "🌆", "unlockPts": 0, "cameraType": "sidescroll",
+    "id": 1,
+    "name": "Cafe8Fifty Exterior",
+    "shortName": "CAFE8FIFTY",
+    "emoji": "\ud83c\udf06",
+    "unlockPts": 0,
+    "cameraType": "sidescroll",
     "desc": "The main outside approach. Neon-lit street front of Cafe8Fifty. Entry line crowds, velvet ropes, and city energy. Your journey starts here.",
-    "colors": { "sky": "#050015", "ground": "#0a000f", "accent": "#ff00aa" },
-    "bossName": "Entry Line Disruptor", "bossHp": 300, "bossEmoji": "👊",
+    "colors": {
+      "sky": "#050015",
+      "ground": "#0a000f",
+      "accent": "#ff00aa"
+    },
+    "bossName": "Entry Line Disruptor",
+    "bossHp": 300,
+    "bossEmoji": "\ud83d\udc4a",
     "stageFinisher": "Neon sign slam / velvet rope launch",
-    "props": ["velvet_rope", "neon_sign", "entry_door", "security_post", "street_light", "sidewalk_barricade"],
-    "npcs": ["Door Security", "VIP Host", "Member in line", "Street Vendor"],
+    "props": [
+      "velvet_rope",
+      "neon_sign",
+      "entry_door",
+      "security_post",
+      "street_light",
+      "sidewalk_barricade"
+    ],
+    "npcs": [
+      "Door Security",
+      "VIP Host",
+      "Member in line",
+      "Street Vendor"
+    ],
     "missionSteps": [
       "Arrive outside Cafe8Fifty.",
       "Talk to the door security.",
-      "Clear the entry-line disruption — wave 1.",
+      "Clear the entry-line disruption \u2014 wave 1.",
       "Interact with the VIP sign at the entrance.",
       "Defeat the Entry Line Disruptor boss.",
       "Unlock HITMANS VIP After Spot Interior."
     ],
-    "reward": { "pts": 500, "coins": 100, "unlocks": 2 },
+    "reward": {
+      "pts": 500,
+      "coins": 100,
+      "unlocks": 2
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#050015", "y": 0, "h": 0.5 },
-      { "type": "cityBg", "color": "#0d002a", "y": 0.2, "h": 0.6 },
-      { "type": "buildings", "color": "#1a0035", "y": 0.15, "h": 0.7 },
-      { "type": "neonSigns", "color": "#ff00aa", "y": 0.3, "h": 0.3 },
-      { "type": "ground", "color": "#08000e", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#050015",
+        "y": 0,
+        "h": 0.5
+      },
+      {
+        "type": "cityBg",
+        "color": "#0d002a",
+        "y": 0.2,
+        "h": 0.6
+      },
+      {
+        "type": "buildings",
+        "color": "#1a0035",
+        "y": 0.15,
+        "h": 0.7
+      },
+      {
+        "type": "neonSigns",
+        "color": "#ff00aa",
+        "y": 0.3,
+        "h": 0.3
+      },
+      {
+        "type": "ground",
+        "color": "#08000e",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Hater", "Hater", "Gate Crasher"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Opp", "Disruptor", "Hater"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Entry Line Disruptor"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Hater",
+          "Hater",
+          "Gate Crasher"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Opp",
+          "Disruptor",
+          "Hater"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Entry Line Disruptor"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 4000,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/cafe8fifty_exterior.png"
   },
   {
-    "id": 2, "name": "Food Truck / Hibachi Street", "shortName": "HIBACHI STREET",
-    "emoji": "🍜", "unlockPts": 0, "cameraType": "sidescroll",
+    "id": 2,
+    "name": "Food Truck / Hibachi Street",
+    "shortName": "HIBACHI STREET",
+    "emoji": "\ud83c\udf5c",
+    "unlockPts": 0,
+    "cameraType": "sidescroll",
     "desc": "The street connector between Cafe8Fifty and the surrounding Tallahassee nightlife. Hibachi fire, food trucks, and late-night energy.",
-    "colors": { "sky": "#080010", "ground": "#0f0008", "accent": "#ff6600" },
-    "bossName": "Street Heat Boss", "bossHp": 350, "bossEmoji": "🔥",
+    "colors": {
+      "sky": "#080010",
+      "ground": "#0f0008",
+      "accent": "#ff6600"
+    },
+    "bossName": "Street Heat Boss",
+    "bossHp": 350,
+    "bossEmoji": "\ud83d\udd25",
     "stageFinisher": "Hibachi flame burst / food truck counter slam",
-    "props": ["food_truck", "hibachi_grill", "street_lamp", "trash_can", "vendor_table", "parked_car"],
-    "npcs": ["Hibachi Vendor", "Street Performer", "Night Owl Regular"],
+    "props": [
+      "food_truck",
+      "hibachi_grill",
+      "street_lamp",
+      "trash_can",
+      "vendor_table",
+      "parked_car"
+    ],
+    "npcs": [
+      "Hibachi Vendor",
+      "Street Performer",
+      "Night Owl Regular"
+    ],
     "missionSteps": [
       "Navigate to the food truck connector street.",
       "Talk to the hibachi vendor.",
-      "Clear the street wave — hostile gate crashers.",
+      "Clear the street wave \u2014 hostile gate crashers.",
       "Use the hibachi stage finisher (Y near grill).",
       "Defeat the Street Heat Boss.",
       "Unlock routes to/from Cafe8Fifty and other street zones."
     ],
-    "reward": { "pts": 600, "coins": 120, "unlocks": 3 },
+    "reward": {
+      "pts": 600,
+      "coins": 120,
+      "unlocks": 3
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#080010", "y": 0, "h": 0.5 },
-      { "type": "cityBg", "color": "#120020", "y": 0.15, "h": 0.65 },
-      { "type": "buildings", "color": "#1e0030", "y": 0.1, "h": 0.72 },
-      { "type": "neonSigns", "color": "#ff6600", "y": 0.25, "h": 0.35 },
-      { "type": "ground", "color": "#0a0005", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#080010",
+        "y": 0,
+        "h": 0.5
+      },
+      {
+        "type": "cityBg",
+        "color": "#120020",
+        "y": 0.15,
+        "h": 0.65
+      },
+      {
+        "type": "buildings",
+        "color": "#1e0030",
+        "y": 0.1,
+        "h": 0.72
+      },
+      {
+        "type": "neonSigns",
+        "color": "#ff6600",
+        "y": 0.25,
+        "h": 0.35
+      },
+      {
+        "type": "ground",
+        "color": "#0a0005",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Gate Crasher", "Scammer"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Opp", "Opp", "Bad-energy NPC"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Street Heat Boss"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Gate Crasher",
+          "Scammer"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Opp",
+          "Opp",
+          "Bad-energy NPC"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Street Heat Boss"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 3800,
     "groundY": 0.75
   },
   {
-    "id": 3, "name": "HITMANS VIP After Spot Interior", "shortName": "HVAS INTERIOR",
-    "emoji": "👑", "unlockPts": 500, "cameraType": "topdown",
+    "id": 3,
+    "name": "HITMANS VIP After Spot Interior",
+    "shortName": "HVAS INTERIOR",
+    "emoji": "\ud83d\udc51",
+    "unlockPts": 500,
+    "cameraType": "topdown",
     "desc": "Inside the legendary HITMANS VIP After Spot. Connected directly from Cafe8Fifty. The heart of the nightlife universe.",
-    "colors": { "floor": "#1a0025", "wall": "#2a0040", "accent": "#ffd700" },
-    "bossName": "Status Check Boss", "bossHp": 400, "bossEmoji": "🏆",
+    "colors": {
+      "floor": "#1a0025",
+      "wall": "#2a0040",
+      "accent": "#ffd700"
+    },
+    "bossName": "Status Check Boss",
+    "bossHp": 400,
+    "bossEmoji": "\ud83c\udfc6",
     "stageFinisher": "Stage light drop / VIP rope bounce",
-    "props": ["dj_booth", "vip_rope", "stage_light", "bar_counter", "lounge_booth", "smoke_machine", "speaker_stack"],
-    "npcs": ["VIP Host", "DJ", "Member", "Promoter", "Dancer"],
+    "props": [
+      "dj_booth",
+      "vip_rope",
+      "stage_light",
+      "bar_counter",
+      "lounge_booth",
+      "smoke_machine",
+      "speaker_stack"
+    ],
+    "npcs": [
+      "VIP Host",
+      "DJ",
+      "Member",
+      "Promoter",
+      "Dancer"
+    ],
     "missionSteps": [
       "Enter the HITMANS VIP After Spot.",
       "Talk to the host and DJ at the main floor.",
-      "Start a member challenge — pass the status test.",
-      "Clear the boss — Status Check confrontation.",
+      "Start a member challenge \u2014 pass the status test.",
+      "Clear the boss \u2014 Status Check confrontation.",
       "Receive VIP Member status.",
       "Unlock Kingdom Come Saloon and the full venue map."
     ],
-    "reward": { "pts": 800, "coins": 200, "unlocks": 4 },
-    "tileGrid": { "w": 30, "h": 20 },
+    "reward": {
+      "pts": 800,
+      "coins": 200,
+      "unlocks": 4
+    },
+    "tileGrid": {
+      "w": 30,
+      "h": 20
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#1a0025" },
-      { "type": "walls", "color": "#2a0040" },
-      { "type": "accent", "color": "#ffd700" }
+      {
+        "type": "floor",
+        "color": "#1a0025"
+      },
+      {
+        "type": "walls",
+        "color": "#2a0040"
+      },
+      {
+        "type": "accent",
+        "color": "#ffd700"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Bad-energy NPC", "Disruptor"], "zone": "center" },
-      { "wave": "boss", "enemies": ["Status Check Boss"], "zone": "stage" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Bad-energy NPC",
+          "Disruptor"
+        ],
+        "zone": "center"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Status Check Boss"
+        ],
+        "zone": "stage"
+      }
+    ],
+    "bgImage": "assets/venues/hvas_interior.png"
   },
   {
-    "id": 4, "name": "Kingdom Come Saloon", "shortName": "KINGDOM COME",
-    "emoji": "🍺", "unlockPts": 1300, "cameraType": "topdown",
+    "id": 4,
+    "name": "Kingdom Come Saloon",
+    "shortName": "KINGDOM COME",
+    "emoji": "\ud83c\udf7a",
+    "unlockPts": 1300,
+    "cameraType": "topdown",
     "desc": "A legendary Tallahassee saloon with its own nightlife energy. Long bar, pool tables, and vintage neon ambience.",
-    "colors": { "floor": "#1a1000", "wall": "#2a1800", "accent": "#ffaa00" },
-    "bossName": "Saloon Rival", "bossHp": 450, "bossEmoji": "🤠",
+    "colors": {
+      "floor": "#1a1000",
+      "wall": "#2a1800",
+      "accent": "#ffaa00"
+    },
+    "bossName": "Saloon Rival",
+    "bossHp": 450,
+    "bossEmoji": "\ud83e\udd20",
     "stageFinisher": "Saloon door throw / bar counter finisher",
-    "props": ["bar_counter", "pool_table", "saloon_door", "jukebox", "bar_stool", "neon_beer_sign"],
-    "npcs": ["Bartender", "Pool Shark", "Regular", "Security"],
+    "props": [
+      "bar_counter",
+      "pool_table",
+      "saloon_door",
+      "jukebox",
+      "bar_stool",
+      "neon_beer_sign"
+    ],
+    "npcs": [
+      "Bartender",
+      "Pool Shark",
+      "Regular",
+      "Security"
+    ],
     "missionSteps": [
       "Enter Kingdom Come Saloon.",
       "Talk to the bartender.",
-      "Beat the house in pool — complete the challenge.",
+      "Beat the house in pool \u2014 complete the challenge.",
       "Clear rival wave from the bar floor.",
       "Defeat the Saloon Rival boss.",
       "Unlock Social Gaines Bar."
     ],
-    "reward": { "pts": 900, "coins": 220, "unlocks": 5 },
-    "tileGrid": { "w": 28, "h": 18 },
+    "reward": {
+      "pts": 900,
+      "coins": 220,
+      "unlocks": 5
+    },
+    "tileGrid": {
+      "w": 28,
+      "h": 18
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#1a1000" },
-      { "type": "walls", "color": "#2a1800" },
-      { "type": "accent", "color": "#ffaa00" }
+      {
+        "type": "floor",
+        "color": "#1a1000"
+      },
+      {
+        "type": "walls",
+        "color": "#2a1800"
+      },
+      {
+        "type": "accent",
+        "color": "#ffaa00"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Hater", "Opp"], "zone": "pool_area" },
-      { "wave": "boss", "enemies": ["Saloon Rival"], "zone": "bar" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Hater",
+          "Opp"
+        ],
+        "zone": "pool_area"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Saloon Rival"
+        ],
+        "zone": "bar"
+      }
+    ],
+    "bgImage": "assets/venues/kingdom_come_saloon.png"
   },
   {
-    "id": 5, "name": "Social Gaines Bar", "shortName": "SOCIAL GAINES",
-    "emoji": "🎱", "unlockPts": 2200, "cameraType": "topdown",
+    "id": 5,
+    "name": "Social Gaines Bar",
+    "shortName": "SOCIAL GAINES",
+    "emoji": "\ud83c\udfb1",
+    "unlockPts": 2200,
+    "cameraType": "topdown",
     "desc": "Sports bar meets social scene. Pool tables, big screens, and competitive energy. Tallahassee locals know this spot.",
-    "colors": { "floor": "#001520", "wall": "#002030", "accent": "#44aaff" },
-    "bossName": "Pool Table Shark", "bossHp": 500, "bossEmoji": "🎱",
+    "colors": {
+      "floor": "#001520",
+      "wall": "#002030",
+      "accent": "#44aaff"
+    },
+    "bossName": "Pool Table Shark",
+    "bossHp": 500,
+    "bossEmoji": "\ud83c\udfb1",
     "stageFinisher": "Pool table combo / cue stick finisher",
-    "props": ["pool_table", "cue_stick", "tv_screen", "bar_counter", "high_top_table", "neon_sports_sign"],
-    "npcs": ["Bar Host", "Pool Shark", "Sports Fan", "Waitstaff"],
+    "props": [
+      "pool_table",
+      "cue_stick",
+      "tv_screen",
+      "bar_counter",
+      "high_top_table",
+      "neon_sports_sign"
+    ],
+    "npcs": [
+      "Bar Host",
+      "Pool Shark",
+      "Sports Fan",
+      "Waitstaff"
+    ],
     "missionSteps": [
       "Enter Social Gaines Bar.",
-      "Challenge the pool shark — social game.",
+      "Challenge the pool shark \u2014 social game.",
       "Clear the competitive wave on the main floor.",
       "Use the cue stick finisher (Y near pool table).",
       "Defeat the Pool Table Shark boss.",
       "Unlock Success Pool Bar upstairs."
     ],
-    "reward": { "pts": 1000, "coins": 250, "unlocks": 6 },
-    "tileGrid": { "w": 26, "h": 18 },
+    "reward": {
+      "pts": 1000,
+      "coins": 250,
+      "unlocks": 6
+    },
+    "tileGrid": {
+      "w": 26,
+      "h": 18
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#001520" },
-      { "type": "walls", "color": "#002030" },
-      { "type": "accent", "color": "#44aaff" }
+      {
+        "type": "floor",
+        "color": "#001520"
+      },
+      {
+        "type": "walls",
+        "color": "#002030"
+      },
+      {
+        "type": "accent",
+        "color": "#44aaff"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Scammer", "Bad-energy NPC"], "zone": "main_floor" },
-      { "wave": "boss", "enemies": ["Pool Table Shark"], "zone": "pool_room" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Scammer",
+          "Bad-energy NPC"
+        ],
+        "zone": "main_floor"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Pool Table Shark"
+        ],
+        "zone": "pool_room"
+      }
+    ],
+    "bgImage": "assets/venues/outta_interior.png"
   },
   {
-    "id": 6, "name": "Success Pool Bar", "shortName": "SUCCESS POOL",
-    "emoji": "🏊", "unlockPts": 3200, "cameraType": "topdown",
+    "id": 6,
+    "name": "Success Pool Bar",
+    "shortName": "SUCCESS POOL",
+    "emoji": "\ud83c\udfca",
+    "unlockPts": 3200,
+    "cameraType": "topdown",
     "desc": "Rooftop pool bar above Social Gaines. Open air, city views, palm trees, cabanas, and pure VIP energy.",
-    "colors": { "floor": "#001a30", "wall": "#002a45", "accent": "#00ccff" },
-    "bossName": "Rooftop VIP Boss", "bossHp": 550, "bossEmoji": "🌊",
+    "colors": {
+      "floor": "#001a30",
+      "wall": "#002a45",
+      "accent": "#00ccff"
+    },
+    "bossName": "Rooftop VIP Boss",
+    "bossHp": 550,
+    "bossEmoji": "\ud83c\udf0a",
     "stageFinisher": "Pool splash / rooftop rail finisher",
-    "props": ["pool", "cabana", "tiki_bar", "palm_tree", "rooftop_rail", "pool_chair", "outdoor_speaker"],
-    "npcs": ["Pool Host", "VIP Member", "Cabana Attendant", "Bartender"],
+    "props": [
+      "pool",
+      "cabana",
+      "tiki_bar",
+      "palm_tree",
+      "rooftop_rail",
+      "pool_chair",
+      "outdoor_speaker"
+    ],
+    "npcs": [
+      "Pool Host",
+      "VIP Member",
+      "Cabana Attendant",
+      "Bartender"
+    ],
     "missionSteps": [
-      "Access rooftop — take the stairs from Social Gaines.",
+      "Access rooftop \u2014 take the stairs from Social Gaines.",
       "Interact with the pool bar host.",
       "Defend the VIP section from crashers.",
       "Use the rail finisher (Y near railing).",
       "Defeat the Rooftop VIP Boss.",
       "Unlock Tally Row Exterior."
     ],
-    "reward": { "pts": 1100, "coins": 280, "unlocks": 7 },
-    "tileGrid": { "w": 25, "h": 16 },
+    "reward": {
+      "pts": 1100,
+      "coins": 280,
+      "unlocks": 7
+    },
+    "tileGrid": {
+      "w": 25,
+      "h": 16
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#001a30" },
-      { "type": "walls", "color": "#002a45" },
-      { "type": "accent", "color": "#00ccff" }
+      {
+        "type": "floor",
+        "color": "#001a30"
+      },
+      {
+        "type": "walls",
+        "color": "#002a45"
+      },
+      {
+        "type": "accent",
+        "color": "#00ccff"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Gate Crasher", "Gate Crasher"], "zone": "pool_deck" },
-      { "wave": "boss", "enemies": ["Rooftop VIP Boss"], "zone": "vip_cabana" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Gate Crasher",
+          "Gate Crasher"
+        ],
+        "zone": "pool_deck"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Rooftop VIP Boss"
+        ],
+        "zone": "vip_cabana"
+      }
+    ],
+    "bgImage": "assets/venues/outta_interior.png"
   },
   {
-    "id": 7, "name": "Tally Row Exterior", "shortName": "TALLY ROW",
-    "emoji": "🌃", "unlockPts": 4300, "cameraType": "sidescroll",
+    "id": 7,
+    "name": "Tally Row Exterior",
+    "shortName": "TALLY ROW",
+    "emoji": "\ud83c\udf03",
+    "unlockPts": 4300,
+    "cameraType": "sidescroll",
     "desc": "The main strip of Tallahassee nightlife. Street-level connector with parked cars, signage, and the flow of night energy.",
-    "colors": { "sky": "#060018", "ground": "#0c0010", "accent": "#cc44ff" },
-    "bossName": "Street Route Boss", "bossHp": 600, "bossEmoji": "🌃",
+    "colors": {
+      "sky": "#060018",
+      "ground": "#0c0010",
+      "accent": "#cc44ff"
+    },
+    "bossName": "Street Route Boss",
+    "bossHp": 600,
+    "bossEmoji": "\ud83c\udf03",
     "stageFinisher": "Street sign / parked car bounce",
-    "props": ["street_sign", "parked_car", "bus_stop", "alley_gate", "trash_can", "payphone"],
-    "npcs": ["Street Regular", "Night Shift Worker", "Crew Member"],
+    "props": [
+      "street_sign",
+      "parked_car",
+      "bus_stop",
+      "alley_gate",
+      "trash_can",
+      "payphone"
+    ],
+    "npcs": [
+      "Street Regular",
+      "Night Shift Worker",
+      "Crew Member"
+    ],
     "missionSteps": [
       "Navigate the main Tally Row strip.",
       "Make contact with crew members.",
@@ -198,33 +575,107 @@
       "Defeat the Street Route Boss.",
       "Unlock The Den and other upstairs venues."
     ],
-    "reward": { "pts": 1200, "coins": 300, "unlocks": 8 },
+    "reward": {
+      "pts": 1200,
+      "coins": 300,
+      "unlocks": 8
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#060018", "y": 0, "h": 0.5 },
-      { "type": "cityBg", "color": "#100025", "y": 0.1, "h": 0.65 },
-      { "type": "buildings", "color": "#1c0038", "y": 0.05, "h": 0.75 },
-      { "type": "neonSigns", "color": "#cc44ff", "y": 0.2, "h": 0.4 },
-      { "type": "ground", "color": "#080008", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#060018",
+        "y": 0,
+        "h": 0.5
+      },
+      {
+        "type": "cityBg",
+        "color": "#100025",
+        "y": 0.1,
+        "h": 0.65
+      },
+      {
+        "type": "buildings",
+        "color": "#1c0038",
+        "y": 0.05,
+        "h": 0.75
+      },
+      {
+        "type": "neonSigns",
+        "color": "#cc44ff",
+        "y": 0.2,
+        "h": 0.4
+      },
+      {
+        "type": "ground",
+        "color": "#080008",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Opp", "Disruptor", "Hater"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Stalker", "Opp", "Scammer"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Street Route Boss"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Opp",
+          "Disruptor",
+          "Hater"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Stalker",
+          "Opp",
+          "Scammer"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Street Route Boss"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 4500,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/tally_exterior.png"
   },
   {
-    "id": 8, "name": "The Den", "shortName": "THE DEN",
-    "emoji": "🕶️", "unlockPts": 5500, "cameraType": "topdown",
+    "id": 8,
+    "name": "The Den",
+    "shortName": "THE DEN",
+    "emoji": "\ud83d\udd76\ufe0f",
+    "unlockPts": 5500,
+    "cameraType": "topdown",
     "desc": "Underground club-space with deep vibes. Booth seating, speaker stacks, low light, and serious nightlife culture.",
-    "colors": { "floor": "#0a0015", "wall": "#150020", "accent": "#8800ff" },
-    "bossName": "Underground Challenge Boss", "bossHp": 650, "bossEmoji": "👁️",
+    "colors": {
+      "floor": "#0a0015",
+      "wall": "#150020",
+      "accent": "#8800ff"
+    },
+    "bossName": "Underground Challenge Boss",
+    "bossHp": 650,
+    "bossEmoji": "\ud83d\udc41\ufe0f",
     "stageFinisher": "Booth slam / speaker wall burst",
-    "props": ["booth", "speaker_wall", "dj_setup", "strobe_light", "bar_counter", "low_table"],
-    "npcs": ["Den Host", "Underground DJ", "Regular Member", "Lookout"],
+    "props": [
+      "booth",
+      "speaker_wall",
+      "dj_setup",
+      "strobe_light",
+      "bar_counter",
+      "low_table"
+    ],
+    "npcs": [
+      "Den Host",
+      "Underground DJ",
+      "Regular Member",
+      "Lookout"
+    ],
     "missionSteps": [
-      "Access The Den — underground entrance.",
+      "Access The Den \u2014 underground entrance.",
       "Find the den host and get accepted.",
       "Face the underground member challenge.",
       "Clear the underground wave.",
@@ -232,28 +683,86 @@
       "Defeat the Underground Challenge Boss.",
       "Unlock The Itus Pizza."
     ],
-    "reward": { "pts": 1300, "coins": 320, "unlocks": 9 },
-    "tileGrid": { "w": 24, "h": 16 },
+    "reward": {
+      "pts": 1300,
+      "coins": 320,
+      "unlocks": 9
+    },
+    "tileGrid": {
+      "w": 24,
+      "h": 16
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#0a0015" },
-      { "type": "walls", "color": "#150020" },
-      { "type": "accent", "color": "#8800ff" }
+      {
+        "type": "floor",
+        "color": "#0a0015"
+      },
+      {
+        "type": "walls",
+        "color": "#150020"
+      },
+      {
+        "type": "accent",
+        "color": "#8800ff"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Bad-energy NPC", "Stalker"], "zone": "main_floor" },
-      { "wave": 2, "enemies": ["Opp", "Disruptor"], "zone": "back_room" },
-      { "wave": "boss", "enemies": ["Underground Challenge Boss"], "zone": "stage" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Bad-energy NPC",
+          "Stalker"
+        ],
+        "zone": "main_floor"
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Opp",
+          "Disruptor"
+        ],
+        "zone": "back_room"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Underground Challenge Boss"
+        ],
+        "zone": "stage"
+      }
+    ],
+    "bgImage": "assets/venues/tally_den.png"
   },
   {
-    "id": 9, "name": "The Itus Pizza", "shortName": "THE ITUS",
-    "emoji": "🍕", "unlockPts": 6800, "cameraType": "topdown",
-    "desc": "Late-night pizza spot — an upstairs hangout zone with counter culture and kitchen energy. Real Tally staple.",
-    "colors": { "floor": "#1a0800", "wall": "#2a1200", "accent": "#ff4400" },
-    "bossName": "Kitchen Rush Boss", "bossHp": 700, "bossEmoji": "👨‍🍳",
+    "id": 9,
+    "name": "The Itus Pizza",
+    "shortName": "THE ITUS",
+    "emoji": "\ud83c\udf55",
+    "unlockPts": 6800,
+    "cameraType": "topdown",
+    "desc": "Late-night pizza spot \u2014 an upstairs hangout zone with counter culture and kitchen energy. Real Tally staple.",
+    "colors": {
+      "floor": "#1a0800",
+      "wall": "#2a1200",
+      "accent": "#ff4400"
+    },
+    "bossName": "Kitchen Rush Boss",
+    "bossHp": 700,
+    "bossEmoji": "\ud83d\udc68\u200d\ud83c\udf73",
     "stageFinisher": "Pizza oven heat blast / counter slide",
-    "props": ["pizza_oven", "counter", "dining_table", "register", "kitchen_shelf", "soda_machine"],
-    "npcs": ["Counter Staff", "Late Night Regular", "Delivery Runner"],
+    "props": [
+      "pizza_oven",
+      "counter",
+      "dining_table",
+      "register",
+      "kitchen_shelf",
+      "soda_machine"
+    ],
+    "npcs": [
+      "Counter Staff",
+      "Late Night Regular",
+      "Delivery Runner"
+    ],
     "missionSteps": [
       "Enter The Itus Pizza.",
       "Talk to the counter staff.",
@@ -262,117 +771,341 @@
       "Defeat the Kitchen Rush Boss.",
       "Unlock Sammys Stage."
     ],
-    "reward": { "pts": 1400, "coins": 350, "unlocks": 10 },
-    "tileGrid": { "w": 22, "h": 16 },
+    "reward": {
+      "pts": 1400,
+      "coins": 350,
+      "unlocks": 10
+    },
+    "tileGrid": {
+      "w": 22,
+      "h": 16
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#1a0800" },
-      { "type": "walls", "color": "#2a1200" },
-      { "type": "accent", "color": "#ff4400" }
+      {
+        "type": "floor",
+        "color": "#1a0800"
+      },
+      {
+        "type": "walls",
+        "color": "#2a1200"
+      },
+      {
+        "type": "accent",
+        "color": "#ff4400"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Hater", "Gate Crasher"], "zone": "dining" },
-      { "wave": "boss", "enemies": ["Kitchen Rush Boss"], "zone": "kitchen" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Hater",
+          "Gate Crasher"
+        ],
+        "zone": "dining"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Kitchen Rush Boss"
+        ],
+        "zone": "kitchen"
+      }
+    ],
+    "bgImage": "assets/venues/tally_itus.png"
   },
   {
-    "id": 10, "name": "Sammys Stage", "shortName": "SAMMYS STAGE",
-    "emoji": "🎸", "unlockPts": 8200, "cameraType": "topdown",
+    "id": 10,
+    "name": "Sammys Stage",
+    "shortName": "SAMMYS STAGE",
+    "emoji": "\ud83c\udfb8",
+    "unlockPts": 8200,
+    "cameraType": "topdown",
     "desc": "The main performance stage venue. Spotlights, stage poles, live energy. Where creators prove themselves.",
-    "colors": { "floor": "#100020", "wall": "#1a0030", "accent": "#ffdd00" },
-    "bossName": "Stage Showdown Boss", "bossHp": 750, "bossEmoji": "🎸",
+    "colors": {
+      "floor": "#100020",
+      "wall": "#1a0030",
+      "accent": "#ffdd00"
+    },
+    "bossName": "Stage Showdown Boss",
+    "bossHp": 750,
+    "bossEmoji": "\ud83c\udfb8",
     "stageFinisher": "Spotlight slam / stage pole spin finisher",
-    "props": ["main_stage", "spotlight", "stage_pole", "sound_board", "amp", "crowd_barrier"],
-    "npcs": ["Stage Manager", "Performer", "Sound Tech", "Creator"],
+    "props": [
+      "main_stage",
+      "spotlight",
+      "stage_pole",
+      "sound_board",
+      "amp",
+      "crowd_barrier"
+    ],
+    "npcs": [
+      "Stage Manager",
+      "Performer",
+      "Sound Tech",
+      "Creator"
+    ],
     "missionSteps": [
       "Enter Sammys Stage.",
       "Meet the stage manager.",
-      "Complete the open stage challenge — perform for the crowd.",
+      "Complete the open stage challenge \u2014 perform for the crowd.",
       "Clear the stage showdown wave.",
       "Use the stage pole finisher (Y near pole).",
       "Defeat the Stage Showdown Boss.",
       "Unlock Public Hall."
     ],
-    "reward": { "pts": 1500, "coins": 380, "unlocks": 11 },
-    "tileGrid": { "w": 28, "h": 20 },
+    "reward": {
+      "pts": 1500,
+      "coins": 380,
+      "unlocks": 11
+    },
+    "tileGrid": {
+      "w": 28,
+      "h": 20
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#100020" },
-      { "type": "walls", "color": "#1a0030" },
-      { "type": "accent", "color": "#ffdd00" }
+      {
+        "type": "floor",
+        "color": "#100020"
+      },
+      {
+        "type": "walls",
+        "color": "#1a0030"
+      },
+      {
+        "type": "accent",
+        "color": "#ffdd00"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Disruptor", "Bad-energy NPC"], "zone": "crowd_area" },
-      { "wave": "boss", "enemies": ["Stage Showdown Boss"], "zone": "main_stage" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Disruptor",
+          "Bad-energy NPC"
+        ],
+        "zone": "crowd_area"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Stage Showdown Boss"
+        ],
+        "zone": "main_stage"
+      }
+    ],
+    "bgImage": "assets/venues/tally_sammys.png"
   },
   {
-    "id": 11, "name": "Public Hall", "shortName": "PUBLIC HALL",
-    "emoji": "🏛️", "unlockPts": 9700, "cameraType": "topdown",
+    "id": 11,
+    "name": "Public Hall",
+    "shortName": "PUBLIC HALL",
+    "emoji": "\ud83c\udfdb\ufe0f",
+    "unlockPts": 9700,
+    "cameraType": "topdown",
     "desc": "A large public hall venue hosting events and gatherings. Open space with high ceilings and community energy.",
-    "colors": { "floor": "#080018", "wall": "#100028", "accent": "#aaaaff" },
-    "bossName": "Crowd Control Boss", "bossHp": 800, "bossEmoji": "🏛️",
+    "colors": {
+      "floor": "#080018",
+      "wall": "#100028",
+      "accent": "#aaaaff"
+    },
+    "bossName": "Crowd Control Boss",
+    "bossHp": 800,
+    "bossEmoji": "\ud83c\udfdb\ufe0f",
     "stageFinisher": "Crowd surge / hall speaker slam",
-    "props": ["hall_speaker", "podium", "folding_table", "event_banner", "exit_sign", "crowd_barrier"],
-    "npcs": ["Event Coordinator", "Community Member", "Staff", "Security"],
+    "props": [
+      "hall_speaker",
+      "podium",
+      "folding_table",
+      "event_banner",
+      "exit_sign",
+      "crowd_barrier"
+    ],
+    "npcs": [
+      "Event Coordinator",
+      "Community Member",
+      "Staff",
+      "Security"
+    ],
     "missionSteps": [
       "Enter Public Hall during an event.",
       "Speak with the event coordinator.",
-      "Manage the crowd disruption — clear wave.",
+      "Manage the crowd disruption \u2014 clear wave.",
       "Use the speaker slam finisher (Y near speaker).",
       "Defeat the Crowd Control Boss.",
       "Unlock 13 Rave Club."
     ],
-    "reward": { "pts": 1600, "coins": 400, "unlocks": 12 },
-    "tileGrid": { "w": 32, "h": 22 },
+    "reward": {
+      "pts": 1600,
+      "coins": 400,
+      "unlocks": 12
+    },
+    "tileGrid": {
+      "w": 32,
+      "h": 22
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#080018" },
-      { "type": "walls", "color": "#100028" },
-      { "type": "accent", "color": "#aaaaff" }
+      {
+        "type": "floor",
+        "color": "#080018"
+      },
+      {
+        "type": "walls",
+        "color": "#100028"
+      },
+      {
+        "type": "accent",
+        "color": "#aaaaff"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Hater", "Stalker", "Bad-energy NPC"], "zone": "main_floor" },
-      { "wave": 2, "enemies": ["Opp", "Scammer"], "zone": "back" },
-      { "wave": "boss", "enemies": ["Crowd Control Boss"], "zone": "center" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Hater",
+          "Stalker",
+          "Bad-energy NPC"
+        ],
+        "zone": "main_floor"
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Opp",
+          "Scammer"
+        ],
+        "zone": "back"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Crowd Control Boss"
+        ],
+        "zone": "center"
+      }
+    ],
+    "bgImage": "assets/venues/tally_public_hall.png"
   },
   {
-    "id": 12, "name": "13 Rave Club", "shortName": "13 RAVE",
-    "emoji": "🎆", "unlockPts": 11300, "cameraType": "topdown",
-    "desc": "The rave experience — lasers, strobes, bass, and underground rave culture in the heart of Tallahassee nightlife.",
-    "colors": { "floor": "#080030", "wall": "#0f0045", "accent": "#00ffcc" },
-    "bossName": "Laser/Rave Boss", "bossHp": 850, "bossEmoji": "🎆",
+    "id": 12,
+    "name": "13 Rave Club",
+    "shortName": "13 RAVE",
+    "emoji": "\ud83c\udf86",
+    "unlockPts": 11300,
+    "cameraType": "topdown",
+    "desc": "The rave experience \u2014 lasers, strobes, bass, and underground rave culture in the heart of Tallahassee nightlife.",
+    "colors": {
+      "floor": "#080030",
+      "wall": "#0f0045",
+      "accent": "#00ffcc"
+    },
+    "bossName": "Laser/Rave Boss",
+    "bossHp": 850,
+    "bossEmoji": "\ud83c\udf86",
     "stageFinisher": "Laser burst / bass drop finisher",
-    "props": ["laser_rig", "smoke_machine", "strobe_light", "rave_speaker", "dj_platform", "crowd_pit"],
-    "npcs": ["Rave DJ", "Ravers", "Security", "Rave Host"],
+    "props": [
+      "laser_rig",
+      "smoke_machine",
+      "strobe_light",
+      "rave_speaker",
+      "dj_platform",
+      "crowd_pit"
+    ],
+    "npcs": [
+      "Rave DJ",
+      "Ravers",
+      "Security",
+      "Rave Host"
+    ],
     "missionSteps": [
-      "Enter 13 Rave Club — bypass the crowd.",
+      "Enter 13 Rave Club \u2014 bypass the crowd.",
       "Find the rave DJ.",
-      "Survive the rave wave — enemies use the chaos as cover.",
+      "Survive the rave wave \u2014 enemies use the chaos as cover.",
       "Trigger the bass drop finisher (Y near DJ platform).",
       "Defeat the Laser/Rave Boss.",
       "Unlock Dukes & Dimes."
     ],
-    "reward": { "pts": 1700, "coins": 420, "unlocks": 13 },
-    "tileGrid": { "w": 26, "h": 18 },
+    "reward": {
+      "pts": 1700,
+      "coins": 420,
+      "unlocks": 13
+    },
+    "tileGrid": {
+      "w": 26,
+      "h": 18
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#080030" },
-      { "type": "walls", "color": "#0f0045" },
-      { "type": "accent", "color": "#00ffcc" }
+      {
+        "type": "floor",
+        "color": "#080030"
+      },
+      {
+        "type": "walls",
+        "color": "#0f0045"
+      },
+      {
+        "type": "accent",
+        "color": "#00ffcc"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Opp", "Disruptor", "Disruptor"], "zone": "crowd_pit" },
-      { "wave": 2, "enemies": ["Gate Crasher", "Corrupt Security"], "zone": "back" },
-      { "wave": "boss", "enemies": ["Laser/Rave Boss"], "zone": "dj_platform" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Opp",
+          "Disruptor",
+          "Disruptor"
+        ],
+        "zone": "crowd_pit"
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Gate Crasher",
+          "Corrupt Security"
+        ],
+        "zone": "back"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Laser/Rave Boss"
+        ],
+        "zone": "dj_platform"
+      }
+    ],
+    "bgImage": "assets/venues/tally_13rave.png"
   },
   {
-    "id": 13, "name": "Dukes & Dimes", "shortName": "DUKES & DIMES",
-    "emoji": "🎲", "unlockPts": 13000, "cameraType": "topdown",
+    "id": 13,
+    "name": "Dukes & Dimes",
+    "shortName": "DUKES & DIMES",
+    "emoji": "\ud83c\udfb2",
+    "unlockPts": 13000,
+    "cameraType": "topdown",
     "desc": "High-stakes social spot. Dice tables, hustle energy, and sharp characters. Real nightlife economics.",
-    "colors": { "floor": "#0a0a00", "wall": "#181800", "accent": "#ffd700" },
-    "bossName": "Hustle Table Boss", "bossHp": 900, "bossEmoji": "🎲",
+    "colors": {
+      "floor": "#0a0a00",
+      "wall": "#181800",
+      "accent": "#ffd700"
+    },
+    "bossName": "Hustle Table Boss",
+    "bossHp": 900,
+    "bossEmoji": "\ud83c\udfb2",
     "stageFinisher": "Dice table slam / card table flip",
-    "props": ["dice_table", "card_table", "bar_counter", "pool_table", "booth_seat", "cash_drawer"],
-    "npcs": ["House Dealer", "High Roller", "Hustler", "Lookout"],
+    "props": [
+      "dice_table",
+      "card_table",
+      "bar_counter",
+      "pool_table",
+      "booth_seat",
+      "cash_drawer"
+    ],
+    "npcs": [
+      "House Dealer",
+      "High Roller",
+      "Hustler",
+      "Lookout"
+    ],
     "missionSteps": [
       "Enter Dukes & Dimes.",
       "Get into the game with the house dealer.",
@@ -381,115 +1114,373 @@
       "Defeat the Hustle Table Boss.",
       "Unlock Quick Hit Fuel."
     ],
-    "reward": { "pts": 1800, "coins": 450, "unlocks": 14 },
-    "tileGrid": { "w": 24, "h": 16 },
+    "reward": {
+      "pts": 1800,
+      "coins": 450,
+      "unlocks": 14
+    },
+    "tileGrid": {
+      "w": 24,
+      "h": 16
+    },
     "bgLayers": [
-      { "type": "floor", "color": "#0a0a00" },
-      { "type": "walls", "color": "#181800" },
-      { "type": "accent", "color": "#ffd700" }
+      {
+        "type": "floor",
+        "color": "#0a0a00"
+      },
+      {
+        "type": "walls",
+        "color": "#181800"
+      },
+      {
+        "type": "accent",
+        "color": "#ffd700"
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Scammer", "Scammer", "Hater"], "zone": "game_floor" },
-      { "wave": "boss", "enemies": ["Hustle Table Boss"], "zone": "main_table" }
-    ]
+      {
+        "wave": 1,
+        "enemies": [
+          "Scammer",
+          "Scammer",
+          "Hater"
+        ],
+        "zone": "game_floor"
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Hustle Table Boss"
+        ],
+        "zone": "main_table"
+      }
+    ],
+    "bgImage": "assets/venues/dukes_interior.png"
   },
   {
-    "id": 14, "name": "Quick Hit Fuel", "shortName": "QUICK HIT",
-    "emoji": "⛽", "unlockPts": 14800, "cameraType": "sidescroll",
+    "id": 14,
+    "name": "Quick Hit Fuel",
+    "shortName": "QUICK HIT",
+    "emoji": "\u26fd",
+    "unlockPts": 14800,
+    "cameraType": "sidescroll",
     "desc": "Late-night fuel stop. Gas pumps, coolers, and the after-hours crowd between venues. No rest for the after spot crew.",
-    "colors": { "sky": "#040012", "ground": "#080008", "accent": "#ffee00" },
-    "bossName": "Late Night Stop Boss", "bossHp": 950, "bossEmoji": "⛽",
+    "colors": {
+      "sky": "#040012",
+      "ground": "#080008",
+      "accent": "#ffee00"
+    },
+    "bossName": "Late Night Stop Boss",
+    "bossHp": 950,
+    "bossEmoji": "\u26fd",
     "stageFinisher": "Gas pump spray / cooler slam",
-    "props": ["gas_pump", "cooler", "convenience_counter", "dumpster", "street_light", "parked_car"],
-    "npcs": ["Night Clerk", "Late Night Regular", "Delivery Driver"],
+    "props": [
+      "gas_pump",
+      "cooler",
+      "convenience_counter",
+      "dumpster",
+      "street_light",
+      "parked_car"
+    ],
+    "npcs": [
+      "Night Clerk",
+      "Late Night Regular",
+      "Delivery Driver"
+    ],
     "missionSteps": [
-      "Stop at Quick Hit Fuel — late night connector.",
+      "Stop at Quick Hit Fuel \u2014 late night connector.",
       "Talk to the night clerk.",
-      "Handle the late-night disruption — clear wave.",
+      "Handle the late-night disruption \u2014 clear wave.",
       "Use the gas pump finisher (Y near pump).",
       "Defeat the Late Night Stop Boss.",
       "Unlock Rooftop / Parking Connector."
     ],
-    "reward": { "pts": 1900, "coins": 480, "unlocks": 15 },
+    "reward": {
+      "pts": 1900,
+      "coins": 480,
+      "unlocks": 15
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#040012", "y": 0, "h": 0.5 },
-      { "type": "cityBg", "color": "#0a0018", "y": 0.15, "h": 0.6 },
-      { "type": "buildings", "color": "#140025", "y": 0.1, "h": 0.7 },
-      { "type": "neonSigns", "color": "#ffee00", "y": 0.25, "h": 0.35 },
-      { "type": "ground", "color": "#060005", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#040012",
+        "y": 0,
+        "h": 0.5
+      },
+      {
+        "type": "cityBg",
+        "color": "#0a0018",
+        "y": 0.15,
+        "h": 0.6
+      },
+      {
+        "type": "buildings",
+        "color": "#140025",
+        "y": 0.1,
+        "h": 0.7
+      },
+      {
+        "type": "neonSigns",
+        "color": "#ffee00",
+        "y": 0.25,
+        "h": 0.35
+      },
+      {
+        "type": "ground",
+        "color": "#060005",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Gate Crasher", "Stalker"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Hater", "Corrupt Security"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Late Night Stop Boss"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Gate Crasher",
+          "Stalker"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Hater",
+          "Corrupt Security"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Late Night Stop Boss"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 3600,
-    "groundY": 0.75
+    "groundY": 0.75,
+    "bgImage": "assets/venues/qhf_exterior.png"
   },
   {
-    "id": 15, "name": "Rooftop / Parking Connector", "shortName": "ROOFTOP PKG",
-    "emoji": "🅿️", "unlockPts": 16700, "cameraType": "sidescroll",
-    "desc": "Rooftop parking connector — elevated perspective on the whole Tallahassee after-spot circuit. Almost there.",
-    "colors": { "sky": "#020010", "ground": "#050010", "accent": "#ff4488" },
-    "bossName": "Parking Lot Boss", "bossHp": 1000, "bossEmoji": "🅿️",
+    "id": 15,
+    "name": "Rooftop / Parking Connector",
+    "shortName": "ROOFTOP PKG",
+    "emoji": "\ud83c\udd7f\ufe0f",
+    "unlockPts": 16700,
+    "cameraType": "sidescroll",
+    "desc": "Rooftop parking connector \u2014 elevated perspective on the whole Tallahassee after-spot circuit. Almost there.",
+    "colors": {
+      "sky": "#020010",
+      "ground": "#050010",
+      "accent": "#ff4488"
+    },
+    "bossName": "Parking Lot Boss",
+    "bossHp": 1000,
+    "bossEmoji": "\ud83c\udd7f\ufe0f",
     "stageFinisher": "Car hood slam / parking gate finisher",
-    "props": ["car", "parking_gate", "concrete_barrier", "rooftop_ac", "stairwell_door", "security_booth"],
-    "npcs": ["Parking Attendant", "After-Hours Crew", "Late Night Regular"],
+    "props": [
+      "car",
+      "parking_gate",
+      "concrete_barrier",
+      "rooftop_ac",
+      "stairwell_door",
+      "security_booth"
+    ],
+    "npcs": [
+      "Parking Attendant",
+      "After-Hours Crew",
+      "Late Night Regular"
+    ],
     "missionSteps": [
       "Access the rooftop parking connector.",
-      "Navigate the parking lot — late night patrols.",
+      "Navigate the parking lot \u2014 late night patrols.",
       "Clear the parking lot ambush.",
       "Use the car hood finisher (Y near car).",
       "Defeat the Parking Lot Boss.",
-      "Unlock Evo Fest — the final venue."
+      "Unlock Evo Fest \u2014 the final venue."
     ],
-    "reward": { "pts": 2000, "coins": 500, "unlocks": 16 },
+    "reward": {
+      "pts": 2000,
+      "coins": 500,
+      "unlocks": 16
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#020010", "y": 0, "h": 0.45 },
-      { "type": "cityBg", "color": "#080018", "y": 0.1, "h": 0.6 },
-      { "type": "buildings", "color": "#100022", "y": 0.05, "h": 0.68 },
-      { "type": "neonSigns", "color": "#ff4488", "y": 0.2, "h": 0.35 },
-      { "type": "ground", "color": "#040008", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#020010",
+        "y": 0,
+        "h": 0.45
+      },
+      {
+        "type": "cityBg",
+        "color": "#080018",
+        "y": 0.1,
+        "h": 0.6
+      },
+      {
+        "type": "buildings",
+        "color": "#100022",
+        "y": 0.05,
+        "h": 0.68
+      },
+      {
+        "type": "neonSigns",
+        "color": "#ff4488",
+        "y": 0.2,
+        "h": 0.35
+      },
+      {
+        "type": "ground",
+        "color": "#040008",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Opp", "Corrupt Security", "Stalker"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Hater", "Hater", "Disruptor"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Parking Lot Boss"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Opp",
+          "Corrupt Security",
+          "Stalker"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Hater",
+          "Hater",
+          "Disruptor"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Parking Lot Boss"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 4000,
     "groundY": 0.75
   },
   {
-    "id": 16, "name": "Evo Fest", "shortName": "EVO FEST",
-    "emoji": "🎪", "unlockPts": 18700, "cameraType": "sidescroll",
-    "desc": "The legendary Evo Fest — Tallahassee's ultimate nightlife festival. Clear this and you are VIP Legend. Run the night.",
-    "colors": { "sky": "#080020", "ground": "#0f0018", "accent": "#ffd700" },
-    "bossName": "Festival Final Boss", "bossHp": 1200, "bossEmoji": "🎪",
+    "id": 16,
+    "name": "Evo Fest",
+    "shortName": "EVO FEST",
+    "emoji": "\ud83c\udfaa",
+    "unlockPts": 18700,
+    "cameraType": "sidescroll",
+    "desc": "The legendary Evo Fest \u2014 Tallahassee's ultimate nightlife festival. Clear this and you are VIP Legend. Run the night.",
+    "colors": {
+      "sky": "#080020",
+      "ground": "#0f0018",
+      "accent": "#ffd700"
+    },
+    "bossName": "Festival Final Boss",
+    "bossHp": 1200,
+    "bossEmoji": "\ud83c\udfaa",
     "stageFinisher": "Festival stage pyros / crowd wave finisher",
-    "props": ["festival_stage", "pyro_rig", "crowd_barrier", "light_tower", "vip_tent", "food_stand"],
-    "npcs": ["Festival Host", "Creator Stage", "VIP Member", "Festival Security", "Headliner"],
+    "props": [
+      "festival_stage",
+      "pyro_rig",
+      "crowd_barrier",
+      "light_tower",
+      "vip_tent",
+      "food_stand"
+    ],
+    "npcs": [
+      "Festival Host",
+      "Creator Stage",
+      "VIP Member",
+      "Festival Security",
+      "Headliner"
+    ],
     "missionSteps": [
-      "Arrive at Evo Fest — the final venue.",
+      "Arrive at Evo Fest \u2014 the final venue.",
       "Meet the festival host.",
-      "Navigate the festival grounds — multiple waves.",
+      "Navigate the festival grounds \u2014 multiple waves.",
       "Reach the main stage.",
       "Trigger the pyro finisher (Y near pyro rig).",
       "Defeat the Festival Final Boss.",
-      "Achieve VIP Legend status — you run the night."
+      "Achieve VIP Legend status \u2014 you run the night."
     ],
-    "reward": { "pts": 3000, "coins": 1000, "unlocks": 0 },
+    "reward": {
+      "pts": 3000,
+      "coins": 1000,
+      "unlocks": 0
+    },
     "bgLayers": [
-      { "type": "sky", "color": "#080020", "y": 0, "h": 0.5 },
-      { "type": "cityBg", "color": "#120030", "y": 0.1, "h": 0.65 },
-      { "type": "buildings", "color": "#1e0045", "y": 0.05, "h": 0.75 },
-      { "type": "neonSigns", "color": "#ffd700", "y": 0.2, "h": 0.4 },
-      { "type": "ground", "color": "#0a000f", "y": 0.75, "h": 0.25 }
+      {
+        "type": "sky",
+        "color": "#080020",
+        "y": 0,
+        "h": 0.5
+      },
+      {
+        "type": "cityBg",
+        "color": "#120030",
+        "y": 0.1,
+        "h": 0.65
+      },
+      {
+        "type": "buildings",
+        "color": "#1e0045",
+        "y": 0.05,
+        "h": 0.75
+      },
+      {
+        "type": "neonSigns",
+        "color": "#ffd700",
+        "y": 0.2,
+        "h": 0.4
+      },
+      {
+        "type": "ground",
+        "color": "#0a000f",
+        "y": 0.75,
+        "h": 0.25
+      }
     ],
     "waves": [
-      { "wave": 1, "enemies": ["Opp", "Hater", "Gate Crasher", "Disruptor"], "spawnX": 750 },
-      { "wave": 2, "enemies": ["Corrupt Security", "Stalker", "Scammer"], "spawnX": 750 },
-      { "wave": 3, "enemies": ["Opp", "Opp", "Hater", "Hater"], "spawnX": 750 },
-      { "wave": "boss", "enemies": ["Festival Final Boss"], "spawnX": 700 }
+      {
+        "wave": 1,
+        "enemies": [
+          "Opp",
+          "Hater",
+          "Gate Crasher",
+          "Disruptor"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 2,
+        "enemies": [
+          "Corrupt Security",
+          "Stalker",
+          "Scammer"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": 3,
+        "enemies": [
+          "Opp",
+          "Opp",
+          "Hater",
+          "Hater"
+        ],
+        "spawnX": 750
+      },
+      {
+        "wave": "boss",
+        "enemies": [
+          "Festival Final Boss"
+        ],
+        "spawnX": 700
+      }
     ],
     "stageWidth": 5000,
     "groundY": 0.75

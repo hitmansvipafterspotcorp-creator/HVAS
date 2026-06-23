@@ -1,17 +1,10 @@
 'use strict';
-/**
- * SpriteSystem — Auto-slicing sprite engine
- * Frame dimensions computed from actual PNG naturalWidth/naturalHeight at runtime.
- * frameW = naturalWidth / FRAMES_PER_ROW (always 8)
- * frameH = naturalHeight / SHEET_ROWS[sheetKey]
- * Never uses hardcoded pixel sizes.
- */
 const SpriteSystem = (() => {
   const FRAMES_PER_ROW = 8;
+  // Each sprite sheet has a left annotation panel ~297px wide before actual frames begin.
+  // Actual frame width = (naturalWidth - X_OFFSET) / FRAMES_PER_ROW
+  const X_OFFSET = 297;
   const SHEET_ROWS = { loco:6, combat:5, damage:5, supers:4, topdown:8, vfx:8 };
-
-  // Per-character row overrides (takes precedence over SHEET_ROWS defaults)
-  // Used when a char's sheet has different row counts than the defaults
 
   // ── Image cache ──────────────────────────────────────────────────────────
   const _cache = {};
@@ -26,12 +19,12 @@ const SpriteSystem = (() => {
     return img;
   }
 
-  // Compute frame size from loaded image + sheet type + optional char override
   function _dims(img, sheetKey, charId) {
-    if (!img._ready) return { w:128, h:160 };
+    if (!img._ready) return { xOff: X_OFFSET, w:144, h:181 };
     const def = charId != null ? CHAR_DEFS[charId] : null;
     const rows = (def && def.sheetRows && def.sheetRows[sheetKey]) || SHEET_ROWS[sheetKey] || 4;
-    return { w: Math.floor(img.naturalWidth / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
+    const usableW = img.naturalWidth - X_OFFSET;
+    return { xOff: X_OFFSET, w: Math.floor(usableW / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
   }
 
   // ── Character definitions ────────────────────────────────────────────────
@@ -396,6 +389,181 @@ const SpriteSystem = (() => {
       }
     },
 
+    // ── INFLUENCER (id:5) — loco sheet only ─────────────────────────────────
+    5: {
+      sheets: { loco:'assets/characters/influencer_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:6, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo2:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:16,loop:false},
+        special:  {sheet:'loco',row:3,frames:8,fps:14,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:16,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:12,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:10,loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:5, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:14,loop:false,superFlash:true},
+      }
+    },
+
+    // ── PHOTOGRAPHER (id:6) — loco sheet only ───────────────────────────────
+    6: {
+      sheets: { loco:'assets/characters/photographer_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:6, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo2:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:16,loop:false},
+        special:  {sheet:'loco',row:5,frames:8,fps:14,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:16,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:12,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:10,loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:5, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:14,loop:false,superFlash:true},
+      }
+    },
+
+    // ── PROMOTER (id:7) — loco sheet only ───────────────────────────────────
+    7: {
+      sheets: { loco:'assets/characters/promoter_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:6, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo2:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:16,loop:false},
+        special:  {sheet:'loco',row:3,frames:8,fps:14,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:16,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:12,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:10,loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:5, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:14,loop:false,superFlash:true},
+      }
+    },
+
+    // ── DANCER (id:8) — loco sheet only ─────────────────────────────────────
+    8: {
+      sheets: { loco:'assets/characters/dancer_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:6, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:20,loop:false},
+        combo2:   {sheet:'loco',row:2,frames:8,fps:20,loop:false},
+        combo3:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        special:  {sheet:'loco',row:2,frames:8,fps:16,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:16,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:12,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:10,loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:5, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:14,loop:false,superFlash:true},
+      }
+    },
+
+    // ── VENDOR (id:9) — loco sheet only ─────────────────────────────────────
+    9: {
+      sheets: { loco:'assets/characters/vendor_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:5, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:8, loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:11,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:14,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        combo2:   {sheet:'loco',row:3,frames:8,fps:14,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:12,loop:false},
+        special:  {sheet:'loco',row:3,frames:8,fps:12,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:14,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:10,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:8, loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:5, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:4, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:12,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:12,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:12,loop:false,superFlash:true},
+      }
+    },
+
+    // ── SECURITY (id:10) — loco sheet only ──────────────────────────────────
+    10: {
+      sheets: { loco:'assets/characters/security_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:4, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:7, loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:10,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:12,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:6, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false},
+        combo2:   {sheet:'loco',row:4,frames:8,fps:12,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:10,loop:false},
+        special:  {sheet:'loco',row:3,frames:8,fps:10,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:12,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:8, loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:7, loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:4, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:3, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:10,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:4,frames:8,fps:10,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:10,loop:false,superFlash:true},
+      }
+    },
+
+    // ── HOST (id:11) — loco sheet only ──────────────────────────────────────
+    11: {
+      sheets: { loco:'assets/characters/host_sheet01_loco.png' },
+      anims: {
+        idle:     {sheet:'loco',row:0,frames:8,fps:6, loop:true},
+        walk:     {sheet:'loco',row:1,frames:8,fps:10,loop:true},
+        run:      {sheet:'loco',row:2,frames:8,fps:14,loop:true},
+        dodge:    {sheet:'loco',row:3,frames:8,fps:16,loop:false},
+        block:    {sheet:'loco',row:4,frames:8,fps:8, loop:true},
+        interact: {sheet:'loco',row:5,frames:8,fps:8, loop:false},
+        combo1:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo2:   {sheet:'loco',row:3,frames:8,fps:18,loop:false},
+        combo3:   {sheet:'loco',row:2,frames:8,fps:16,loop:false},
+        special:  {sheet:'loco',row:5,frames:8,fps:14,loop:false},
+        hurt:     {sheet:'loco',row:0,frames:4,fps:16,loop:false},
+        knockdown:{sheet:'loco',row:1,frames:4,fps:12,loop:false},
+        recover:  {sheet:'loco',row:2,frames:4,fps:10,loop:false},
+        victory:  {sheet:'loco',row:4,frames:8,fps:6, loop:true},
+        defeated: {sheet:'loco',row:1,frames:4,fps:5, loop:false},
+        super1:   {sheet:'loco',row:3,frames:8,fps:14,loop:false,superFlash:true},
+        super2:   {sheet:'loco',row:2,frames:8,fps:14,loop:false,superFlash:true},
+        super3:   {sheet:'loco',row:5,frames:8,fps:14,loop:false,superFlash:true},
+      }
+    },
+
     // ── ENTRY LINE DISRUPTOR — CAFE8FIFTY VIP BOSS (id:22) ──────────────────
     22: {
       sheetRows: { loco:6, combat:5, damage:6, supers:4, topdown:8, vfx:6 },
@@ -446,6 +614,76 @@ const SpriteSystem = (() => {
       }
     },
   };
+
+  // ── NPC Sprite Sets ──────────────────────────────────────────────────────
+  // Keyed by string (not int) so they don't conflict with playable char IDs.
+  // scene_manager references these by key for random NPC drawing.
+  const NPC_DEFS = {
+    cafe8fifty_a: {
+      sheets: { loco:'assets/characters/cafe8fifty_npcs_a.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    cafe8fifty_b: {
+      sheets: { loco:'assets/characters/cafe8fifty_npcs_b.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    cafe8fifty_c: {
+      sheets: { loco:'assets/characters/cafe8fifty_npcs_c.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    hvas_a: {
+      sheets: { loco:'assets/characters/hvas_npcs_a.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    hvas_b: {
+      sheets: { loco:'assets/characters/hvas_npcs_b.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    hvas_c: {
+      sheets: { loco:'assets/characters/hvas_npcs_c.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    bigsoulja_venue_a: {
+      sheets: { loco:'assets/characters/bigsoulja_venue_npcs_a.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    bigsoulja_venue_b: {
+      sheets: { loco:'assets/characters/bigsoulja_venue_npcs_b.png' },
+      rows: 6, framesPerRow: 8,
+    },
+    bigsoulja_venue_c: {
+      sheets: { loco:'assets/characters/bigsoulja_venue_npcs_c.png' },
+      rows: 6, framesPerRow: 8,
+    },
+  };
+
+  // Draw a single NPC frame: npcKey=string, row=0-5, frame=0-7, dx/dy/dw/dh
+  function drawNPCFrame(ctx, npcKey, row, frame, dx, dy, dw, dh, flipX) {
+    const def = NPC_DEFS[npcKey];
+    if (!def) return false;
+    const img = _img(def.sheets.loco);
+    if (!img || !img._ready || img._failed) return false;
+    const fw = Math.floor((img.naturalWidth - X_OFFSET) / def.framesPerRow);
+    const fh = Math.floor(img.naturalHeight / def.rows);
+    const sx = X_OFFSET + frame * fw;
+    const sy = row * fh;
+    ctx.save();
+    if (flipX) {
+      ctx.translate(dx + dw, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, sy, fw, fh, 0, 0, dw, dh);
+    } else {
+      ctx.drawImage(img, sx, sy, fw, fh, dx, dy, dw, dh);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  function preloadNPCs(keys) {
+    (keys || Object.keys(NPC_DEFS)).forEach(k => {
+      const d = NPC_DEFS[k]; if (d) _img(d.sheets.loco);
+    });
+  }
 
   // ── VFX queue ────────────────────────────────────────────────────────────
   const _vfx = [];
@@ -531,7 +769,7 @@ const SpriteSystem = (() => {
     if (!img || !img._ready || img._failed) return false;
 
     const d = _dims(img, animDef.sheet, charId);
-    const sx = ss.frame * d.w;
+    const sx = d.xOff + ss.frame * d.w;
     const sy = animDef.row * d.h;
 
     ctx.save();
@@ -577,10 +815,10 @@ const SpriteSystem = (() => {
       const img = _img(def.sheets[a.sheet]);
       if (!img || !img._ready || img._failed) return;
       const d = _dims(img, a.sheet, v.charId);
-      ctx.drawImage(img, v.frame*d.w, a.row*d.h, d.w, d.h,
+      ctx.drawImage(img, d.xOff + v.frame*d.w, a.row*d.h, d.w, d.h,
         v.x-(cameraX||0)-v.size/2, v.y-(cameraY||0)-v.size/2, v.size, v.size);
     });
   }
 
-  return { hasSprites, preload, resolveAnim, update, draw, spawnVFX, updateVFX, renderVFX, CHAR_DEFS, SHEET_ROWS };
+  return { hasSprites, preload, resolveAnim, update, draw, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();
