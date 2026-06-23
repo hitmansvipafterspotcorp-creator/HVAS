@@ -111,39 +111,38 @@
 </div>
 
 <!-- ══════════════════════════════════ CHARACTER SELECT ══════════════════════════════════ -->
-<div id="screen-char-select" class="screen cs-screen" style="display:none">
-  <!-- Header bar -->
-  <div class="cs-header">
-    <button class="back-btn cs-back" id="cs-back-btn">← BACK</button>
-    <div class="cs-title">SELECT YOUR FIGHTER</div>
-    <div class="cs-pts-label" id="cs-pts-label"></div>
+<div id="screen-char-select" class="screen" style="display:none;flex-direction:column;padding:12px">
+  <div class="select-header">SELECT YOUR FIGHTER</div>
+  <!-- Two-panel layout: preview left, grid right -->
+  <div style="display:flex;flex:1;overflow:hidden;gap:12px">
+    <!-- LEFT: character preview panel -->
+    <div id="cs-preview" style="width:min(260px,36vw);flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:linear-gradient(135deg,#1a003a,#0d001f);border:1px solid #ff00aa22;border-radius:10px;overflow-y:auto">
+      <div id="cs-preview-emoji" style="font-size:clamp(52px,9vw,100px);line-height:1;filter:drop-shadow(0 0 18px #ff00aa88)">?</div>
+      <div id="cs-preview-name" style="font-family:'Orbitron',sans-serif;font-size:clamp(10px,1.6vw,16px);font-weight:900;color:#ffd700;text-shadow:0 0 12px #ffd70088;letter-spacing:2px;text-align:center">—</div>
+      <div id="cs-preview-style" style="font-size:11px;color:#cc88ff;text-align:center;font-style:italic;line-height:1.4"></div>
+      <div id="cs-preview-stats" style="width:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px"></div>
+      <div id="cs-preview-moves" style="width:100%;margin-top:4px;font-size:11px;border-top:1px solid #ff00aa22;padding-top:8px;font-family:'Rajdhani',sans-serif"></div>
+      <button id="cs-fight-btn" class="back-btn" style="display:none;width:100%;margin-top:8px;color:#000;background:linear-gradient(135deg,#ffd700,#ff8800);border-color:#ffd700;font-size:14px;font-weight:900;letter-spacing:3px">⚔ FIGHT</button>
+    </div>
+    <!-- RIGHT: roster grid -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div id="cs-pts-label" style="font-family:'Orbitron',sans-serif;font-size:11px;color:#ffd700;text-align:right;margin-bottom:8px;flex-shrink:0"></div>
+      <div style="font-size:11px;color:#7766aa;text-align:center;margin-bottom:8px;flex-shrink:0">Locked fighters unlock as STATUS POINTS grow.</div>
+      <div class="char-grid" id="char-grid" style="overflow-y:auto;flex:1;grid-template-columns:repeat(auto-fill,minmax(88px,1fr))"></div>
+    </div>
   </div>
-  <!-- Body: preview left, grid right -->
-  <div class="cs-body">
-    <!-- LEFT: character preview -->
-    <div class="cs-preview" id="cs-preview">
-      <div class="cs-preview-emoji" id="cs-preview-emoji">?</div>
-      <div class="cs-preview-name" id="cs-preview-name">—</div>
-      <div class="cs-preview-style" id="cs-preview-style"></div>
-      <div class="cs-preview-stats" id="cs-preview-stats"></div>
-      <div class="cs-preview-moves" id="cs-preview-moves"></div>
-      <button class="cs-fight-btn" id="cs-fight-btn" style="display:none">⚔ FIGHT</button>
-    </div>
-    <!-- RIGHT: character grid -->
-    <div class="cs-right">
-      <div class="cs-unlock-hint">Locked fighters unlock as STATUS POINTS grow.</div>
-      <div class="char-grid cs-grid" id="char-grid"></div>
-    </div>
+  <div style="margin-top:10px;flex-shrink:0">
+    <button class="back-btn" id="cs-back-btn" onclick="HitgearOS.openGameMenu()">← BACK</button>
   </div>
 </div>
 
 <!-- ══════════════════ VS FLASH OVERLAY ══════════════════ -->
-<div id="vs-flash" style="display:none;position:fixed;inset:0;z-index:8888;align-items:center;justify-content:center;background:#000;flex-direction:column">
-  <div class="vs-split" id="vs-split">
-    <div class="vs-p1" id="vs-p1-panel"></div>
-    <div class="vs-center"><div class="vs-word" id="vs-word">VS</div></div>
-    <div class="vs-p2" id="vs-p2-panel"></div>
+<div id="vs-flash" style="display:none;position:fixed;inset:0;z-index:8888;align-items:center;justify-content:center;background:#000">
+  <div id="vs-p1-panel" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(135deg,#1a0035,#3a0060);height:100vh;clip-path:polygon(0 0,100% 0,82% 100%,0 100%)"></div>
+  <div style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;height:100%">
+    <div id="vs-word" style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(48px,9vw,100px);color:#fff;letter-spacing:6px;text-shadow:0 0 30px #fff,0 0 60px #ff00aa,0 0 100px #ff00aa44;animation:vsPulse 0.5s ease-in-out infinite alternate">VS</div>
   </div>
+  <div id="vs-p2-panel" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(225deg,#001a35,#003060);height:100vh;clip-path:polygon(18% 0,100% 0,100% 100%,0 100%)"></div>
 </div>
 
 <!-- ══════════════════════════════════ VENUE MAP ══════════════════════════════════ -->
