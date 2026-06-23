@@ -244,16 +244,20 @@ const NPCEngine = (() => {
       locked: false, destVenueId: null, destX: canvasW / 2, destY: 100,
       prompt: 'Exit venue', showPrompt: false
     });
-    // Exit/next door — unlocked after mission
+    // Exit/next door(s) — unlocked after mission. unlocks may be a single id
+    // or an array (Tally Row connects to several interiors via multiple
+    // entrances), so we lay out one entrance door per destination.
     if (venue.reward && venue.reward.unlocks) {
-      doors.push({
-        id: 'door_next', x: canvasW - 80, y: canvasH / 2 - 20, w: 48, h: 40,
-        locked: !SaveSystem.isMissionComplete(venue.id),
-        destVenueId: venue.reward.unlocks,
-        destX: 100, destY: canvasH / 2,
-        prompt: 'Go to next venue',
-        lockedText: 'Clear mission to unlock',
-        showPrompt: false
+      const dests = Array.isArray(venue.reward.unlocks)
+        ? venue.reward.unlocks : [venue.reward.unlocks];
+      const locked = !SaveSystem.isMissionComplete(venue.id);
+      const gap = canvasH / (dests.length + 1);
+      dests.forEach((destId, i) => {
+        doors.push({
+          id: 'door_next_' + destId, x: canvasW - 80, y: gap * (i + 1) - 20, w: 48, h: 40,
+          locked, destVenueId: destId, destX: 100, destY: canvasH / 2,
+          prompt: 'Enter venue', lockedText: 'Clear mission to unlock', showPrompt: false
+        });
       });
     }
     return doors;

@@ -523,7 +523,12 @@ const QuestEngine = (() => {
     save.stars = gameState.stars;
     save.level = SaveSystem.calcLevel(gameState.statusPts);
     SaveSystem.completeMission(venue.id);
-    if (reward.unlocks) SaveSystem.unlockVenue(reward.unlocks);
+    // reward.unlocks may be a single id or an array (e.g. Tally Row opens all
+    // its connected interiors at once via its multiple entrances)
+    if (reward.unlocks) {
+      const ids = Array.isArray(reward.unlocks) ? reward.unlocks : [reward.unlocks];
+      ids.forEach(id => SaveSystem.unlockVenue(id));
+    }
     SaveSystem.save(save);
 
     gameState.won = true;
