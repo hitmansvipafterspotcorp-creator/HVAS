@@ -303,6 +303,9 @@ const SceneManager = (() => {
 
     // Try sprite first
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    if (SS && SS.hasSprites && SS.hasSprites(charId)) {
+      SS.update(charId, p, 1/60, false, null);
+    }
     const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
       SS.draw(ctx, charId, p, p.x - charH*0.28, groundY - charH, charH*0.56, charH, flipX);
 
@@ -324,6 +327,9 @@ const SceneManager = (() => {
 
     ctx.save();
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    if (SS && SS.hasSprites && SS.hasSprites(charId)) {
+      SS.update(charId, e, 1/60, false, null);
+    }
     const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
       SS.draw(ctx, charId, e, e.x, e.y, e.w, e.h, facing < 0);
 
@@ -351,6 +357,9 @@ const SceneManager = (() => {
 
     ctx.save();
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    if (SS && SS.hasSprites && SS.hasSprites(charId)) {
+      SS.update(charId, npc, 1/60, false, null);
+    }
     const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
       SS.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
 
@@ -583,7 +592,12 @@ const SceneManager = (() => {
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
     ctx.globalAlpha = alpha;
     const flipX = (p.lastDir && p.lastDir.x < 0);
-    typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+    if (typeof SpriteSystem !== 'undefined') {
+      const lastDir = p.lastDir ? (Math.abs(p.lastDir.x) > Math.abs(p.lastDir.y)
+        ? (p.lastDir.x > 0 ? 'e' : 'w') : (p.lastDir.y > 0 ? 's' : 'n')) : 's';
+      SpriteSystem.update(charId, p, 1/60, true, lastDir);
+      SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+    }
     ctx.globalAlpha = 1;
     ctx.restore();
   }
@@ -594,7 +608,10 @@ const SceneManager = (() => {
     const charId = e.charId || null;
 
     ctx.save();
-    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
+    if (charId && typeof SpriteSystem !== 'undefined') {
+      SpriteSystem.update(charId, e, 1/60, true, 's');
+      SpriteSystem.draw(ctx, charId, e, e.x, e.y, e.w, e.h, (e.facing || 1) < 0);
+    }
 
     // HP bar
     const bx = e.x, by = e.y - 10, bw = e.w;
@@ -612,7 +629,10 @@ const SceneManager = (() => {
     const charId = npc.charId || null;
 
     ctx.save();
-    charId && typeof SpriteSystem !== 'undefined' && SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+    if (charId && typeof SpriteSystem !== 'undefined') {
+      SpriteSystem.update(charId, npc, 1/60, true, 's');
+      SpriteSystem.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
+    }
 
     if (npc.showPrompt) {
       ctx.fillStyle = '#ffd700';
