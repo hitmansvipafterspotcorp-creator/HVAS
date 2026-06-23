@@ -543,8 +543,10 @@ const SceneManager = (() => {
       Stage1Scene.renderInside(ctx, cameraX, cameraY, W, H);
     }
 
-    // Walls
-    if (entities.walls) entities.walls.forEach(w => {
+    // Walls — collision only. When the real venue art is shown they stay
+    // invisible (the painted scene already depicts the walls); we never draw
+    // vector rectangles/lines over the uploaded background.
+    if (!bgImg && entities.walls) entities.walls.forEach(w => {
       ctx.fillStyle = wallColor;
       ctx.fillRect(w.x, w.y, w.w, w.h);
       ctx.strokeStyle = accentColor + '88';
@@ -552,11 +554,12 @@ const SceneManager = (() => {
       ctx.strokeRect(w.x, w.y, w.w, w.h);
     });
 
-    // Props
-    if (entities.props) entities.props.forEach(p => drawTopdownProp(p, accentColor));
+    // Props — when the real venue art is shown it already depicts every prop,
+    // so we only surface the [Y] interaction prompt; no vector boxes are drawn.
+    if (entities.props) entities.props.forEach(p => drawTopdownProp(p, accentColor, !!bgImg));
 
-    // Doors
-    if (entities.doors) entities.doors.forEach(d => drawDoor(d, accentColor));
+    // Doors — same: real art shows the doorway; draw prompt only over real art.
+    if (entities.doors) entities.doors.forEach(d => drawDoor(d, accentColor, !!bgImg));
 
     // NPCs
     if (entities.npcs) entities.npcs.forEach(n => drawTopdownNPC(n));
@@ -644,18 +647,22 @@ const SceneManager = (() => {
     ctx.restore();
   }
 
-  function drawTopdownProp(prop, accentColor) {
+  function drawTopdownProp(prop, accentColor, hasBg) {
     const col = propColors[prop.type] || '#444444';
     ctx.save();
-    ctx.fillStyle = col;
-    if (prop.glow) { ctx.shadowColor = col; ctx.shadowBlur = 10; }
-    ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
-    ctx.shadowBlur = 0;
-    if (prop.emoji) {
-      ctx.font = `${Math.min(prop.w, prop.h) * 0.6}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(prop.emoji, prop.x + prop.w / 2, prop.y + prop.h / 2);
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    // Over real venue art the prop is already painted into the scene — skip the
+    // vector box + emoji and show only the interaction prompt below.
+    if (!hasBg) {
+      ctx.fillStyle = col;
+      if (prop.glow) { ctx.shadowColor = col; ctx.shadowBlur = 10; }
+      ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
+      ctx.shadowBlur = 0;
+      if (prop.emoji) {
+        ctx.font = `${Math.min(prop.w, prop.h) * 0.6}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(prop.emoji, prop.x + prop.w / 2, prop.y + prop.h / 2);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
     }
     if (prop.interactable && prop.showPrompt) {
       ctx.fillStyle = '#ffd700'; ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 6;
@@ -668,22 +675,27 @@ const SceneManager = (() => {
     ctx.restore();
   }
 
-  function drawDoor(door, accentColor) {
+  function drawDoor(door, accentColor, hasBg) {
     ctx.save();
-    ctx.fillStyle = door.locked ? '#330033' : '#220044';
-    ctx.strokeStyle = door.locked ? '#660033' : accentColor;
-    ctx.shadowColor = door.locked ? '#660033' : accentColor;
-    ctx.shadowBlur = 10;
-    ctx.lineWidth = 2;
-    ctx.fillRect(door.x, door.y, door.w, door.h);
-    ctx.strokeRect(door.x, door.y, door.w, door.h);
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = door.locked ? '#aa4444' : accentColor;
-    ctx.font = '10px Orbitron, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(door.locked ? '🔒' : '🚪', door.x + door.w / 2, door.y + door.h / 2 + 4);
+    // Over real venue art the doorway is painted into the scene — skip the
+    // vector box and show only the lock/enter prompt.
+    if (!hasBg) {
+      ctx.fillStyle = door.locked ? '#330033' : '#220044';
+      ctx.strokeStyle = door.locked ? '#660033' : accentColor;
+      ctx.shadowColor = door.locked ? '#660033' : accentColor;
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2;
+      ctx.fillRect(door.x, door.y, door.w, door.h);
+      ctx.strokeRect(door.x, door.y, door.w, door.h);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = door.locked ? '#aa4444' : accentColor;
+      ctx.font = '10px Orbitron, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(door.locked ? '🔒' : '🚪', door.x + door.w / 2, door.y + door.h / 2 + 4);
+    }
     if (door.showPrompt && !door.locked) {
       ctx.fillStyle = '#ffd700'; ctx.font = 'bold 10px Orbitron, monospace';
+      ctx.textAlign = 'center';
       ctx.fillText('[Y] ENTER', door.x + door.w / 2, door.y - 8);
     }
     ctx.textAlign = 'left';
