@@ -35,7 +35,10 @@ CONFIG=[
  ('qhf_pack_05_components_a','qhf','inside'),  # INTERIOR CORE ASSET CATALOG
  ('tally_pack_01_assets','tally','outside'),   # EXTERIOR CORE STRUCTURE & ENTRY
  # Tally sub-venue interiors (each sheet = that venue's interior prop source)
- ('tally_pack_07_itus','tally_den','inside'),       # THE DEN interior
+ ('tally_pack_07_itus','tally_den','inside'),       # THE DEN interior (old sheet)
+ ('tally_den_pack_02_interior_a','tally_den','inside'),# THE DEN INTERIOR ASSET ATLAS A
+ ('tally_den_pack_03_interior_b','tally_den','inside'),# THE DEN INTERIOR ASSET ATLAS B
+ ('tally_den_pack_04_interior_c','tally_den','inside'),# THE DEN INTERIOR ASSET ATLAS C
  ('tally_pack_06_den','tally_itus','inside'),       # THE ITUS PIZZA interior
  ('tally_pack_05_13rave','tally_sammys','inside'),  # SAMMYS STAGE interior
  ('tally_pack_04_sammys','tally_public_hall','inside'),# PUBLIC HALL interior
