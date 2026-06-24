@@ -34,6 +34,12 @@ CONFIG=[
  ('qhf_pack_03_store_interior','qhf','outside'),# EXTERIOR MODULAR STRUCTURE
  ('qhf_pack_05_components_a','qhf','inside'),  # INTERIOR CORE ASSET CATALOG
  ('tally_pack_01_assets','tally','outside'),   # EXTERIOR CORE STRUCTURE & ENTRY
+ # Tally sub-venue interiors (each sheet = that venue's interior prop source)
+ ('tally_pack_07_itus','tally_den','inside'),       # THE DEN interior
+ ('tally_pack_06_den','tally_itus','inside'),       # THE ITUS PIZZA interior
+ ('tally_pack_05_13rave','tally_sammys','inside'),  # SAMMYS STAGE interior
+ ('tally_pack_04_sammys','tally_public_hall','inside'),# PUBLIC HALL interior
+ ('tally_pack_03_public_hall','tally_13rave','inside'),# 13 RAVE CLUB interior
 ]
 # combined-sheet vertical bands (fraction of H)
 OUT_TOP, OUT_BOT = 0.045, 0.47    # outside section band
@@ -116,6 +122,22 @@ def emit(img,M,boxes,dest,prefix):
         cv2.imwrite(f'{dest}/{prefix}_{idx:02d}.png',bgra); idx+=1
     return idx
 
+def segment_scene(M, img, W, y_lo, y_hi):
+    """For dense interior scene sheets: connected-components per object."""
+    sub = M[y_lo:y_hi].copy()
+    # close small gaps so each object is one blob
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7))
+    sub = cv2.morphologyEx(sub, cv2.MORPH_CLOSE, k)
+    n, lbl, stats, _ = cv2.connectedComponentsWithStats(sub, 8)
+    boxes = []
+    for i in range(1, n):
+        x, y, w, h, area = stats[i]
+        if area < 400: continue          # tiny noise
+        if area > W*(y_hi-y_lo)*0.25: continue  # skip near-full-image blobs
+        if w > 0.7*W: continue           # skip full-width labels/headers
+        boxes.append((x, y+y_lo, x+w, y+y_lo+h))
+    return boxes
+
 counts={}
 for sheet,venue,mode in CONFIG:
     p=f'{SRC}/{sheet}.png'
@@ -133,8 +155,16 @@ for sheet,venue,mode in CONFIG:
     else:
         yl,yh=int(H*0.045),int(H*SINGLE_BOT)
         be,bc=segment(Me,W,yl,yh),segment(Mc,W,yl,yh)
-        boxes,M=(bc,Mc) if len(bc)>len(be) else (be,Me)
+        best=max(len(be),len(bc))
+        if best<5:
+            boxes=segment_scene(Mc,img,W,yl,yh); M=Mc
+        else:
+            boxes,M=(bc,Mc) if len(bc)>len(be) else (be,Me)
         n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}')
+        # if projection-profile gave nothing, retry with scene/contour segmenter
+        if n==0 and best>=5:
+            boxes=segment_scene(Mc,img,W,yl,yh); M=Mc
+            n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}')
         counts[(venue,mode)]=counts.get((venue,mode),0)+n
 
 for k in sorted(counts): print(f'{k[0]:7s} {k[1]:8s} {counts[k]}')
