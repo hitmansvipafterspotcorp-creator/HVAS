@@ -40,6 +40,14 @@ CONFIG=[
  ('tally_pack_05_13rave','tally_sammys','inside'),  # SAMMYS STAGE interior
  ('tally_pack_04_sammys','tally_public_hall','inside'),# PUBLIC HALL interior
  ('tally_pack_03_public_hall','tally_13rave','inside'),# 13 RAVE CLUB interior
+ # New dedicated interior asset atlases (Jun 23-24 upload)
+ ('tally_sammys_pack_02_interior_a','tally_sammys','inside'),       # SAMMYS INTERIOR ASSET ATLAS A
+ ('tally_13rave_pack_02_interior_a','tally_13rave','inside'),       # 13 RAVE INTERIOR ASSET ATLAS A
+ ('tally_13rave_pack_03_interior_b','tally_13rave','inside'),       # 13 RAVE INTERIOR ASSET ATLAS B
+ ('tally_public_hall_pack_02_interior_a','tally_public_hall','inside'),# PUBLIC HALL INTERIOR ASSET ATLAS A
+ ('tally_public_hall_pack_03_interior_b','tally_public_hall','inside'),# PUBLIC HALL INTERIOR ASSET ATLAS B
+ ('tally_itus_pack_02_interior_a','tally_itus','inside'),           # THE ITUS INTERIOR ASSET ATLAS A
+ ('tally_itus_pack_03_interior_b','tally_itus','inside'),           # THE ITUS INTERIOR ASSET ATLAS B
 ]
 # combined-sheet vertical bands (fraction of H)
 OUT_TOP, OUT_BOT = 0.045, 0.47    # outside section band
