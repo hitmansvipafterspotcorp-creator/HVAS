@@ -26,8 +26,13 @@ CONFIG=[
  ('kcs_pack_06_props_signs','kcs','inside'),   # INSIDE SPECIALTY/BAR/GAMES
  ('outta_pack_01_assets','outta','combined'),  # CORE ASSET SHEET (mixed)
  ('dukes_pack_01_assets','dukes','combined'),  # CORE ASSET SHEET (mixed)
+ ('outta_pack_04_bar_pool','outta','outside'),  # EXTERIOR STRUCTURE & PARKING MODULES
+ ('outta_pack_05_components_a','outta','inside'),# INTERIOR MODULAR GAMEPLAY ASSETS
+ ('dukes_pack_04_components_a','dukes','outside'),# EXTERIOR MODULAR STRUCTURE & PARKING MODULES
+ ('dukes_pack_05_components_b','dukes','inside'), # INTERIOR MODULAR GAMEPLAY ASSETS
  ('qhf_pack_01_assets','qhf','outside'),       # EXTERIOR CORE ASSET CATALOG
  ('qhf_pack_03_store_interior','qhf','outside'),# EXTERIOR MODULAR STRUCTURE
+ ('qhf_pack_05_components_a','qhf','inside'),  # INTERIOR CORE ASSET CATALOG
  ('tally_pack_01_assets','tally','outside'),   # EXTERIOR CORE STRUCTURE & ENTRY
 ]
 # combined-sheet vertical bands (fraction of H)
