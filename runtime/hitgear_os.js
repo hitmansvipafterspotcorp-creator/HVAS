@@ -62,6 +62,11 @@ const HitgearOS = (() => {
 
   // ──── SCREEN MANAGEMENT ────
   function showScreen(id, opts = {}) {
+    // Stop sprite preview animation when leaving char select
+    if (typeof _spriteAnimRAF !== 'undefined' && _spriteAnimRAF) {
+      cancelAnimationFrame(_spriteAnimRAF);
+      _spriteAnimRAF = null;
+    }
     document.querySelectorAll('.screen').forEach(s => {
       s.classList.remove('active');
       s.style.display = 'none';
@@ -329,9 +334,50 @@ const HitgearOS = (() => {
     if (selected) _updateCharPreview(selected, onSelect);
   }
 
+  let _spriteAnimRAF = null;
+  let _spriteAnimT = 0;
+  let _spriteLastTime = 0;
+  function _startSpritePreview(charId, charColor) {
+    if (_spriteAnimRAF) { cancelAnimationFrame(_spriteAnimRAF); _spriteAnimRAF = null; }
+    const cv = document.getElementById('cs-sprite-canvas');
+    if (!cv) return;
+    const c = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    _spriteAnimT = 0;
+    function loop(ts) {
+      const dt = (ts - (_spriteLastTime || ts)) / 1000;
+      _spriteLastTime = ts;
+      _spriteAnimT += dt;
+      c.clearRect(0, 0, W, H);
+      // Background glow
+      const grd = c.createRadialGradient(W/2, H*0.6, 10, W/2, H*0.6, W*0.55);
+      grd.addColorStop(0, (charColor || '#ff00aa') + '44');
+      grd.addColorStop(1, 'transparent');
+      c.fillStyle = grd;
+      c.fillRect(0, 0, W, H);
+      // Try SpriteSystem first
+      let drawn = false;
+      if (typeof SpriteSystem !== 'undefined') {
+        drawn = SpriteSystem.drawAnim(c, charId, 'idle', _spriteAnimT, W*0.1, H*0.05, W*0.8, H*0.9, { facing: 1 });
+      }
+      // Fallback: CharRenderer humanoid
+      if (!drawn && typeof CharRenderer !== 'undefined') {
+        CharRenderer.draw(c, charId, 'idle', _spriteAnimT, W*0.5, H*0.92, W*0.7, H*0.85, 1, {});
+        drawn = true;
+      }
+      // Frame decoration from frames_emblems
+      if (typeof UIElements !== 'undefined') {
+        UIElements.drawCornerFrames(c, 0, 0, W, H, 28);
+      }
+      _spriteAnimRAF = requestAnimationFrame(loop);
+    }
+    _spriteAnimRAF = requestAnimationFrame(loop);
+  }
+
   function _updateCharPreview(ch, onSelect) {
     const el = id => document.getElementById(id);
-    if (el('cs-preview-emoji')) el('cs-preview-emoji').textContent = ch.emoji || '🎤';
+    // Start animated sprite preview
+    _startSpritePreview(ch.id, ch.color);
     if (el('cs-preview-name'))  el('cs-preview-name').textContent  = ch.shortName || ch.name || '';
     if (el('cs-preview-style')) el('cs-preview-style').textContent = ch.style || ch.desc || '';
 

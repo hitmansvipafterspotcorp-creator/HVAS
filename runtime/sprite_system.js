@@ -969,5 +969,39 @@ const SpriteSystem = (() => {
     });
   }
 
-  return { hasSprites, preload, resolveAnim, update, draw, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
+  /**
+   * Draw a specific animation frame directly — no entity needed.
+   * Useful for menus, character select previews, VS splash.
+   * animName: key from CHAR_DEFS[charId].anims
+   * t: time in seconds (used to advance through frames)
+   * Returns true if drawn, false if not ready.
+   */
+  function drawAnim(ctx, charId, animName, t, dx, dy, dw, dh, opts) {
+    const def = CHAR_DEFS[charId];
+    if (!def) return false;
+    const animDef = def.anims[animName];
+    if (!animDef) return false;
+    const img = _img(def.sheets[animDef.sheet]);
+    if (!img || !img._ready || img._failed) return false;
+    const d = _dims(img, animDef.sheet, charId);
+    const fps = animDef.fps || 8;
+    const frame = Math.floor(t * fps) % (animDef.frames || 8);
+    const sx = d.xOff + frame * d.w;
+    const sy = animDef.row * d.h;
+    opts = opts || {};
+    ctx.save();
+    if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = opts.glowBlur || 20; }
+    if (opts.facing === -1) {
+      ctx.translate(dx + dw, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, sx, sy, d.w, d.h, 0, 0, dw, dh);
+    } else {
+      ctx.drawImage(img, sx, sy, d.w, d.h, dx, dy, dw, dh);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  return { hasSprites, preload, resolveAnim, update, draw, drawAnim, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();

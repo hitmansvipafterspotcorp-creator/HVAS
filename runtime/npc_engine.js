@@ -196,6 +196,11 @@ const NPCEngine = (() => {
       pizza_oven:'🍕', speaker_wall:'🔊', laser_rig:'🎆', festival_stage:'🎪'
     };
 
+    // Preload prop images for this venue
+    if (typeof PropRenderer !== 'undefined') {
+      PropRenderer.preloadForVenue(venue.shortName, 12);
+    }
+
     propList.slice(0, 6).forEach((ptype, i) => {
       const x = isTopdown
         ? 80 + i * Math.floor(canvasW / 7)
@@ -203,8 +208,8 @@ const NPCEngine = (() => {
       const y = isTopdown
         ? 120 + (i % 3) * 80
         : groundY - 60;
-      const w = isTopdown ? 48 : 60;
-      const h = isTopdown ? 48 : 60;
+      const w = isTopdown ? 64 : 72;
+      const h = isTopdown ? 64 : 72;
 
       props.push({
         id: `prop_${ptype}_${i}`,
@@ -216,7 +221,9 @@ const NPCEngine = (() => {
         glow: ptype.includes('light') || ptype.includes('neon') || ptype.includes('laser'),
         showPrompt: false,
         finisherZone: i === 0,
-        missionHook: i === 1 ? `interact_${ptype}` : null
+        missionHook: i === 1 ? `interact_${ptype}` : null,
+        _venue: venue.shortName,
+        _slot: i
       });
     });
     return props;

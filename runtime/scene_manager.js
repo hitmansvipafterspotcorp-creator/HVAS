@@ -384,21 +384,26 @@ const SceneManager = (() => {
   function drawProp(prop, H, groundYFrac) {
     ctx.save();
     const col = propColors[prop.type] || '#444444';
-    ctx.fillStyle = col;
-    if (prop.glow) {
-      ctx.shadowColor = col;
-      ctx.shadowBlur = 12;
-    }
-    ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
-    if (prop.emoji) {
-      ctx.font = `${Math.min(prop.w, prop.h) * 0.6}px sans-serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(prop.emoji, prop.x + prop.w / 2, prop.y + prop.h / 2);
-      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    // Try real prop cutout first via PropRenderer
+    const drawnReal = (typeof PropRenderer !== 'undefined') && prop._venue &&
+      PropRenderer.drawForVenue(ctx, prop._venue, prop.type || 'prop', prop._slot || 0,
+        prop.x, prop.y, prop.w, prop.h,
+        prop.glow ? { glow: col, glowBlur: 12 } : {});
+    if (!drawnReal) {
+      // Fallback: colored rect + emoji
+      ctx.fillStyle = col;
+      if (prop.glow) { ctx.shadowColor = col; ctx.shadowBlur = 12; }
+      ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
+      if (prop.emoji) {
+        ctx.font = `${Math.min(prop.w, prop.h) * 0.6}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(prop.emoji, prop.x + prop.w / 2, prop.y + prop.h / 2);
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      }
     }
     if (prop.interactable && prop.showPrompt) {
-      ctx.fillStyle = '#ffd700';
       ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 6;
+      ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 10px Orbitron, monospace';
       ctx.textAlign = 'center';
       ctx.fillText('[Y]', prop.x + prop.w / 2, prop.y - 8);
@@ -650,9 +655,12 @@ const SceneManager = (() => {
   function drawTopdownProp(prop, accentColor, hasBg) {
     const col = propColors[prop.type] || '#444444';
     ctx.save();
-    // Over real venue art the prop is already painted into the scene — skip the
-    // vector box + emoji and show only the interaction prompt below.
-    if (!hasBg) {
+    // Try real prop cutout; always try even over bg art (they're transparent PNGs)
+    const drawnReal = (typeof PropRenderer !== 'undefined') && prop._venue &&
+      PropRenderer.drawForVenue(ctx, prop._venue, prop.type || 'prop', prop._slot || 0,
+        prop.x, prop.y, prop.w, prop.h,
+        prop.glow ? { glow: col, glowBlur: 10 } : {});
+    if (!drawnReal && !hasBg) {
       ctx.fillStyle = col;
       if (prop.glow) { ctx.shadowColor = col; ctx.shadowBlur = 10; }
       ctx.fillRect(prop.x, prop.y, prop.w, prop.h);

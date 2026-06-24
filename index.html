@@ -117,7 +117,9 @@
   <div style="display:flex;flex:1;overflow:hidden;gap:12px">
     <!-- LEFT: character preview panel -->
     <div id="cs-preview" style="width:min(260px,36vw);flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:linear-gradient(135deg,#1a003a,#0d001f);border:1px solid #ff00aa22;border-radius:10px;overflow-y:auto">
-      <div id="cs-preview-emoji" style="font-size:clamp(52px,9vw,100px);line-height:1;filter:drop-shadow(0 0 18px #ff00aa88)">?</div>
+      <!-- Sprite art canvas preview (E3 quality) -->
+      <canvas id="cs-sprite-canvas" width="180" height="200" style="width:min(160px,28vw);height:auto;image-rendering:pixelated;border-radius:6px;background:transparent"></canvas>
+      <div id="cs-preview-emoji" style="display:none">?</div>
       <div id="cs-preview-name" style="font-family:'Orbitron',sans-serif;font-size:clamp(10px,1.6vw,16px);font-weight:900;color:#ffd700;text-shadow:0 0 12px #ffd70088;letter-spacing:2px;text-align:center">—</div>
       <div id="cs-preview-style" style="font-size:11px;color:#cc88ff;text-align:center;font-style:italic;line-height:1.4"></div>
       <div id="cs-preview-stats" style="width:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px"></div>
@@ -520,6 +522,8 @@ window.VENUES = [
 
 <!-- ══════════════════════════════════ RUNTIME SCRIPTS ══════════════════════════════════ -->
 <script src="runtime/asset_loader.js"></script>
+<script src="runtime/ui_elements.js"></script>
+<script src="runtime/prop_renderer.js"></script>
 <script src="runtime/sprite_system.js"></script>
 <script src="runtime/fighter_engine.js"></script>
 <script src="runtime/stage1_scene.js"></script>
