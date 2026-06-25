@@ -849,21 +849,29 @@ const HitgearOS = (() => {
     const venue = window.VENUES.find(v => v.id === venueId);
     if (!ch || !venue) { alert('Invalid character or venue.'); return; }
 
-    // Show dynamic loading screen in the venue's color
     const accentColor = venue.colors && (venue.colors.accent || venue.colors.neon);
     LoadingScreen.setProgress(0);
     LoadingScreen.show(accentColor, () => {
-      // Callback: actually launch the game after the screen fades out
       _doLaunchGameplay(charId, venueId, ch, venue);
     }, 1500);
 
-    // Simulate progress while show() holds
+    // Kick off sprite frame preloading immediately; advance bar in sync.
+    // preloadReady() resolves when enough frames are in cache to start smoothly.
+    const ssReady = (typeof SpriteSystem !== 'undefined' && SpriteSystem.preloadReady)
+      ? SpriteSystem.preloadReady(charId)
+      : Promise.resolve();
+
     let p = 0;
     const ticker = setInterval(() => {
       p += 0.04 + Math.random() * 0.06;
-      if (p >= 1) { p = 1; clearInterval(ticker); }
-      LoadingScreen.setProgress(p);
+      if (p >= 0.9) clearInterval(ticker); // hold near 90% until sprites ready
+      LoadingScreen.setProgress(Math.min(p, 0.9));
     }, 60);
+
+    ssReady.then(() => {
+      clearInterval(ticker);
+      LoadingScreen.setProgress(1);
+    });
   }
 
   function _doLaunchGameplay(charId, venueId, ch, venue) {

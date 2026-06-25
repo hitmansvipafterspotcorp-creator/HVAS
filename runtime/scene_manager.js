@@ -600,11 +600,16 @@ const SceneManager = (() => {
     const alpha = p.invincible ? 0.5 + Math.sin(Date.now() / 60) * 0.5 : 1;
     ctx.globalAlpha = alpha;
     const flipX = (p.lastDir && p.lastDir.x < 0);
+    let tdDrawn = false;
     if (typeof SpriteSystem !== 'undefined') {
       const lastDir = p.lastDir ? (Math.abs(p.lastDir.x) > Math.abs(p.lastDir.y)
         ? (p.lastDir.x > 0 ? 'e' : 'w') : (p.lastDir.y > 0 ? 's' : 'n')) : 's';
       SpriteSystem.update(charId, p, 1/60, true, lastDir);
-      SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+      tdDrawn = SpriteSystem.draw(ctx, charId, p, p.x, p.y, p.w, p.h, flipX);
+    }
+    if (!tdDrawn && typeof CharRenderer !== 'undefined') {
+      CharRenderer.draw(ctx, charId, 'idle', Date.now() / 1000,
+        p.x + p.w * 0.5, p.y + p.h, p.h * 1.2, 1, { alpha });
     }
     ctx.globalAlpha = 1;
     ctx.restore();

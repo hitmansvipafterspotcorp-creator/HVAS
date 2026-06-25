@@ -1,9 +1,18 @@
 'use strict';
 const SpriteSystem = (() => {
   const FRAMES_PER_ROW = 8;
-  // Sheets are pure atlases — no annotation panel. Content starts at column 0.
-  const X_OFFSET = 0;
   const SHEET_ROWS = { loco:6, combat:5, damage:5, supers:4, topdown:8, vfx:8 };
+
+  // Map charId → folder name under assets/characters/frames/
+  const CHAR_FOLDERS = {
+    1:'creator', 2:'dj', 3:'famu_female', 4:'famu_male',
+    5:'influencer', 6:'photographer', 7:'promoter', 8:'dancer',
+    9:'vendor', 10:'security', 11:'host',
+    12:'fsu_female', 13:'fsu_male',
+    20:'kt', 21:'bigsoulja', 22:'eld',
+    30:'pete', 31:'snow',
+  };
+  const FRAMES_BASE = 'assets/characters/frames/';
 
   // ── Image cache ──────────────────────────────────────────────────────────
   const _cache = {};
@@ -18,11 +27,38 @@ const SpriteSystem = (() => {
     return img;
   }
 
-  function _dims(img, sheetKey, charId) {
-    if (!img._ready) return { xOff: 0, w:181, h:181 };
-    const def = charId != null ? CHAR_DEFS[charId] : null;
-    const rows = (def && def.sheetRows && def.sheetRows[sheetKey]) || SHEET_ROWS[sheetKey] || 4;
-    return { xOff: 0, w: Math.floor(img.naturalWidth / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
+  // Load a pre-sliced BGRA frame (transparent PNG with alpha mask + autocrop).
+  // Path: assets/characters/frames/<folder>/<type>/r<RR>_f<CC>.png
+  function _frame(charId, type, row, col) {
+    const folder = CHAR_FOLDERS[charId];
+    if (!folder) return null;
+    const r = String(row).padStart(2, '0');
+    const c = String(col).padStart(2, '0');
+    return _img(`${FRAMES_BASE}${folder}/${type}/r${r}_f${c}.png`);
+  }
+
+  // Draw one pre-sliced frame onto ctx, scaled to fit dw×dh.
+  // Returns true if the image was ready and drawn.
+  function _drawFrame(ctx, charId, type, row, col, dx, dy, dw, dh, flipX) {
+    const img = _frame(charId, type, row, col);
+    if (!img || !img._ready || img._failed) return false;
+    ctx.save();
+    if (flipX) {
+      ctx.translate(dx + dw, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, dw, dh);
+    } else {
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // Preload a range of frames for a character type.
+  function _preloadFrames(charId, type, rows) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < FRAMES_PER_ROW; c++) _frame(charId, type, r, c);
+    }
   }
 
   // ── Character definitions ────────────────────────────────────────────────
@@ -838,10 +874,38 @@ const SpriteSystem = (() => {
   function preload(charId) {
     const def = CHAR_DEFS[charId];
     if (!def) return;
-    Object.values(def.sheets).forEach(s => _img(s));
+    // Load pre-sliced transparent frames for every animation type
+    Object.entries(def.anims).forEach(([, animDef]) => {
+      const rows = SHEET_ROWS[animDef.sheet] || 8;
+      _preloadFrames(charId, animDef.sheet, rows);
+    });
   }
 
-  function hasSprites(charId) { return !!CHAR_DEFS[charId]; }
+  // Returns a Promise that resolves when all loco frames for charId are loaded.
+  function preloadReady(charId) {
+    const def = CHAR_DEFS[charId];
+    if (!def) return Promise.resolve();
+    preload(charId);
+    const locoRows = SHEET_ROWS.loco;
+    const imgs = [];
+    for (let r = 0; r < locoRows; r++) {
+      for (let c = 0; c < FRAMES_PER_ROW; c++) {
+        const img = _frame(charId, 'loco', r, c);
+        if (img && !img._ready && !img._failed) imgs.push(img);
+      }
+    }
+    if (!imgs.length) return Promise.resolve();
+    return new Promise(resolve => {
+      let done = 0;
+      imgs.forEach(img => {
+        const finish = () => { if (++done >= imgs.length) resolve(); };
+        img.addEventListener('load', finish, { once: true });
+        img.addEventListener('error', finish, { once: true });
+      });
+    });
+  }
+
+  function hasSprites(charId) { return !!CHAR_DEFS[charId] && !!CHAR_FOLDERS[charId]; }
 
   // ── Resolve animation key from entity state ──────────────────────────────
   function resolveAnim(charId, entity, isTopdown, lastDir) {
@@ -904,7 +968,7 @@ const SpriteSystem = (() => {
     }
   }
 
-  // ── Draw — auto-slices using actual PNG dimensions ───────────────────────
+  // ── Draw — uses pre-sliced transparent frame PNGs ───────────────────────
   function draw(ctx, charId, entity, dx, dy, dw, dh, flipX) {
     const def = CHAR_DEFS[charId];
     if (!def || !entity.spriteState) return false;
@@ -912,23 +976,7 @@ const SpriteSystem = (() => {
     if (!ss.currentAnim) return false;
     const animDef = def.anims[ss.currentAnim];
     if (!animDef) return false;
-    const img = _img(def.sheets[animDef.sheet]);
-    if (!img || !img._ready || img._failed) return false;
-
-    const d = _dims(img, animDef.sheet, charId);
-    const sx = d.xOff + ss.frame * d.w;
-    const sy = animDef.row * d.h;
-
-    ctx.save();
-    if (flipX) {
-      ctx.translate(dx + dw, dy);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, sy, d.w, d.h, 0, 0, dw, dh);
-    } else {
-      ctx.drawImage(img, sx, sy, d.w, d.h, dx, dy, dw, dh);
-    }
-    ctx.restore();
-    return true;
+    return _drawFrame(ctx, charId, animDef.sheet, animDef.row, ss.frame, dx, dy, dw, dh, flipX);
   }
 
   // ── VFX overlay ──────────────────────────────────────────────────────────
@@ -959,11 +1007,9 @@ const SpriteSystem = (() => {
       if (!def) return;
       const a = def.anims[v.vfxKey];
       if (!a) return;
-      const img = _img(def.sheets[a.sheet]);
-      if (!img || !img._ready || img._failed) return;
-      const d = _dims(img, a.sheet, v.charId);
-      ctx.drawImage(img, d.xOff + v.frame*d.w, a.row*d.h, d.w, d.h,
-        v.x-(cameraX||0)-v.size/2, v.y-(cameraY||0)-v.size/2, v.size, v.size);
+      const sx = v.x - (cameraX||0) - v.size/2;
+      const sy = v.y - (cameraY||0) - v.size/2;
+      _drawFrame(ctx, v.charId, a.sheet, a.row, v.frame, sx, sy, v.size, v.size, false);
     });
   }
 
@@ -979,27 +1025,25 @@ const SpriteSystem = (() => {
     if (!def) return false;
     const animDef = def.anims[animName];
     if (!animDef) return false;
-    const img = _img(def.sheets[animDef.sheet]);
-    if (!img || !img._ready || img._failed) return false;
-    const d = _dims(img, animDef.sheet, charId);
-    const fps = animDef.fps || 8;
-    const frame = Math.floor(t * fps) % (animDef.frames || 8);
-    const sx = d.xOff + frame * d.w;
-    const sy = animDef.row * d.h;
+    const fps   = animDef.fps || 8;
+    const total = animDef.frames || 8;
+    const frame = Math.floor(t * fps) % total;
     opts = opts || {};
+    const frameImg = _frame(charId, animDef.sheet, animDef.row, frame);
+    if (!frameImg || !frameImg._ready || frameImg._failed) return false;
     ctx.save();
     if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
     if (opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = opts.glowBlur || 20; }
     if (opts.facing === -1) {
       ctx.translate(dx + dw, dy);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, sy, d.w, d.h, 0, 0, dw, dh);
+      ctx.drawImage(frameImg, 0, 0, dw, dh);
     } else {
-      ctx.drawImage(img, sx, sy, d.w, d.h, dx, dy, dw, dh);
+      ctx.drawImage(frameImg, dx, dy, dw, dh);
     }
     ctx.restore();
     return true;
   }
 
-  return { hasSprites, preload, resolveAnim, update, draw, drawAnim, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
+  return { hasSprites, preload, preloadReady, resolveAnim, update, draw, drawAnim, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();
