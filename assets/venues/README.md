@@ -18,6 +18,8 @@ backdrops whenever a file is missing — nothing crashes if art isn't present.
 | `tally_sammys.png`            | id:10 Sammys Stage              | Tally Row — Sheet 05 interior               |
 | `tally_public_hall.png`       | id:11 Public Hall               | Tally Row — Sheet 04 interior               |
 | `tally_13rave.png`            | id:12 13 Rave Club              | Tally Row — Sheet 03 interior               |
+| `social_gaines.png`           | id:5 Social Gaines Bar          | Social Gaines — Sheet 05 outside finished design |
+| `success.png`                 | id:6 Success (rooftop pool & bar) | Success — Sheet 08 rooftop finished design |
 | `dukes_interior.png`          | id:13 Dukes & Dimes (fight stage bg) | Dukes & Dimes — Sheet 08 interior hero |
 | `dukes_exterior.png`          | (spare exterior hero — not used as stage bg) | Dukes & Dimes — Sheet 08 exterior hero |
 | `qhf_exterior.png`            | id:14 Quick Hit Fuel (side)     | Quick Hit Fuel — Sheet 01 night-sky backdrop|
@@ -34,8 +36,10 @@ automatically — no code changes.
 |-------------------------------|------------------------------------------------------|
 | `cafe8fifty_exterior.png`     | id:1 Cafe8Fifty — neon-lit street front (stage 1)    |
 | `hvas_interior.png`           | id:3 HITMANS VIP After Spot — VIP club interior      |
-| `social_gaines.png`           | id:5 Social Gaines Bar — sports bar interior (pool tables, big screens) — NOT Outta Pocket |
-| `success_pool.png`            | id:6 Success Pool — ROOFTOP swimming-pool bar (pool, tiki bar, cabanas, palm trees) — NOT a billiards hall |
 
 Only the Cafe8Fifty / HVAS NPC *character* sheets exist in the repo; no
-background pack for these three venues was uploaded.
+background pack for these two venues was uploaded.
+
+The Social Gaines and Success packs WERE uploaded (10 sheets named
+`ChatGPT Image Jun 19, 2026, 01_45_31 PM (1..10).png`) — `social_gaines.png`
+and `success.png` are cropped from sheets 05 and 08 of that set.

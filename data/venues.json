@@ -353,8 +353,8 @@
   },
   {
     "id": 6,
-    "name": "Success Pool Bar",
-    "shortName": "SUCCESS POOL",
+    "name": "Success",
+    "shortName": "SUCCESS",
     "emoji": "\ud83c\udfca",
     "unlockPts": 3200,
     "cameraType": "topdown",
@@ -431,7 +431,7 @@
         "zone": "vip_cabana"
       }
     ],
-    "bgImage": "assets/venues/success_pool.png"
+    "bgImage": "assets/venues/success.png"
   },
   {
     "id": 7,

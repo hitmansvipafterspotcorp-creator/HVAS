@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v19';
+const CACHE_NAME = 'hitgear-os-v20';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -38,10 +38,12 @@ const CORE_ASSETS = [
   './runtime/dance_minigame.js',
   './runtime/hitgear_os.js',
   // ── Venue backgrounds ────────────────────────────────────────────────────
-  // NOTE: cafe8fifty_exterior.png, hvas_interior.png and success_pool.png are
-  // intentionally NOT cached yet — those venue renders are not in the repo
-  // (Cafe8Fifty / HVAS / rooftop Success Pool art still pending). Drop the
-  // finished files in with those names and they load automatically.
+  // NOTE: cafe8fifty_exterior.png and hvas_interior.png are intentionally NOT
+  // cached yet — those venue renders are not in the repo (Cafe8Fifty / HVAS art
+  // still pending). Drop the finished files in with those names and they load
+  // automatically.
+  './assets/venues/social_gaines.png',
+  './assets/venues/success.png',
   './assets/venues/kingdom_come_saloon.png',
   './assets/venues/kingdom_come_exterior.png',
   './assets/venues/outta_interior.png',
