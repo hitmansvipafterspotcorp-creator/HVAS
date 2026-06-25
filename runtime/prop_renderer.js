@@ -31,26 +31,32 @@ const PropRenderer = (() => {
     'tally_sammys/inside':     18,
     'tally_public_hall/inside':60,
     'tally_13rave/inside':     67,
+    'social_gaines/outside':   47,
+    'social_gaines/inside':    19,
+    'success/inside':          47,
   };
 
   // Map HVAS venue shortNames / ids to prop folder names
+  // UNMIXED: each venue draws ONLY from its own art pack. mode follows the
+  // venue's primary cameraType (sidescroll street = outside, topdown interior =
+  // inside). Keys match venues.json shortNames exactly.
+  // Cafe8Fifty + HVAS have no venue pack yet (only NPC sheets) — they point at
+  // their own (not-yet-sliced) folders so they fall back cleanly instead of
+  // borrowing another venue's props.
   const VENUE_FOLDER = {
-    'CAFE 8FIFTY':   { folder:'kcs',    mode:'outside' },
-    'HIBACHI STREET':{ folder:'outta',  mode:'outside' },
-    'HVAS INTERIOR': { folder:'kcs',    mode:'inside'  },
-    'KINGDOM COME':  { folder:'kcs',    mode:'inside'  },
-    'SOCIAL GAINES': { folder:'outta',  mode:'inside'  },
-    'SUCCESS POOL':  { folder:'outta',  mode:'inside'  },
-    'TALLY ROW':     { folder:'tally',  mode:'outside' },
-    'THE DEN':       { folder:'tally_den',        mode:'inside' },
-    'THE ITUS':      { folder:'tally_itus',        mode:'inside' },
-    'SAMMYS STAGE':  { folder:'tally_sammys',      mode:'inside' },
-    'PUBLIC HALL':   { folder:'tally_public_hall', mode:'inside' },
-    '13 RAVE':       { folder:'tally_13rave',      mode:'inside' },
-    'DUKES & DIMES': { folder:'dukes',  mode:'inside'  },
-    'QUICK HIT':     { folder:'qhf',    mode:'outside' },
-    'ROOFTOP PKG':   { folder:'qhf',    mode:'outside' },
-    'EVO FEST':      { folder:'tally',  mode:'outside' },
+    'CAFE8FIFTY':    { folder:'cafe8fifty',        mode:'outside' }, // pack pending
+    'HVAS INTERIOR': { folder:'hvas',              mode:'inside'  }, // pack pending
+    'KINGDOM COME':  { folder:'kcs',               mode:'inside'  },
+    'SOCIAL GAINES': { folder:'social_gaines',     mode:'inside'  },
+    'SUCCESS':       { folder:'success',           mode:'inside'  },
+    'TALLY ROW':     { folder:'tally',             mode:'outside' },
+    'THE DEN':       { folder:'tally_den',         mode:'inside'  },
+    'THE ITUS':      { folder:'tally_itus',        mode:'inside'  },
+    'SAMMYS STAGE':  { folder:'tally_sammys',      mode:'inside'  },
+    'PUBLIC HALL':   { folder:'tally_public_hall', mode:'inside'  },
+    '13 RAVE':       { folder:'tally_13rave',      mode:'inside'  },
+    'DUKES & DIMES': { folder:'dukes',             mode:'inside'  },
+    'QUICK HIT':     { folder:'qhf',               mode:'outside' },
   };
 
   const _cache = {};  // "folder/mode/NNN" → HTMLImageElement

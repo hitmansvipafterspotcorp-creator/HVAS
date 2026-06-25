@@ -51,6 +51,13 @@ CONFIG=[
  ('tally_public_hall_pack_03_interior_b','tally_public_hall','inside'),# PUBLIC HALL INTERIOR ASSET ATLAS B
  ('tally_itus_pack_02_interior_a','tally_itus','inside'),           # THE ITUS INTERIOR ASSET ATLAS A
  ('tally_itus_pack_03_interior_b','tally_itus','inside'),           # THE ITUS INTERIOR ASSET ATLAS B
+ # Social Gaines (Stage 3) + Success rooftop (Stage 4) — Jun 19 upload (10 sheets)
+ ('social_gaines_pack_01_facade','social_gaines','outside'),        # MAIN FACADE / FACADE WINGS
+ ('social_gaines_pack_03_signage_props','social_gaines','outside'), # STREET SIGNAGE, PROPS & VFX
+ ('social_gaines_pack_02_floor_tiles','social_gaines','inside'),    # DARK / LOUNGE FLOOR TILES & WALLS
+ ('social_gaines_pack_06_interior','social_gaines','inside'),       # SOCIAL GAINES INTERIOR MODULES
+ ('success_pack_01_rooftop_core','success','inside'),               # ROOFTOP CORE MODULES / FLOOR / POOL
+ ('success_pack_03_props_signage','success','inside'),              # ROOFTOP PROPS, SIGNAGE & VFX
 ]
 # combined-sheet vertical bands (fraction of H)
 OUT_TOP, OUT_BOT = 0.045, 0.47    # outside section band
