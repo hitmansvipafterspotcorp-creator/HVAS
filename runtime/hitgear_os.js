@@ -429,7 +429,6 @@ const HitgearOS = (() => {
   }
 
   function _showVSFlash(p1Char, callback) {
-    // Pick a CPU character for display in VS flash (random playable)
     const cpuList = (window.CHARACTERS || []).filter(c => c.id !== p1Char.id).slice(0, 8);
     const cpuChar = cpuList[Math.floor(Math.random() * cpuList.length)] || p1Char;
 
@@ -439,20 +438,52 @@ const HitgearOS = (() => {
     const p1El = document.getElementById('vs-p1-panel');
     const p2El = document.getElementById('vs-p2-panel');
 
-    if (p1El) p1El.innerHTML = `
-      <div class="vs-p-emoji">${p1Char.emoji}</div>
-      <div class="vs-p-name" style="color:${p1Char.color||'#ff00aa'}">${p1Char.shortName || p1Char.name}</div>
-      <div style="font-size:13px;color:#aaa;letter-spacing:2px;font-family:'Orbitron',sans-serif">PLAYER 1</div>`;
-    if (p2El) p2El.innerHTML = `
-      <div class="vs-p-emoji">${cpuChar.emoji}</div>
-      <div class="vs-p-name" style="color:${cpuChar.color||'#44aaff'}">${cpuChar.shortName || cpuChar.name}</div>
-      <div style="font-size:13px;color:#aaa;letter-spacing:2px;font-family:'Orbitron',sans-serif">CPU</div>`;
+    function _buildPanel(el, ch, label, facing) {
+      if (!el) return;
+      el.innerHTML = '';
+      // Sprite canvas
+      const cv = document.createElement('canvas');
+      cv.width = 260; cv.height = 320;
+      cv.style.cssText = 'width:200px;height:240px;image-rendering:pixelated';
+      el.appendChild(cv);
+      // Name + label
+      const nameEl = document.createElement('div');
+      nameEl.className = 'vs-p-name';
+      nameEl.style.color = ch.color || '#ff00aa';
+      nameEl.textContent = ch.shortName || ch.name;
+      el.appendChild(nameEl);
+      const lblEl = document.createElement('div');
+      lblEl.style.cssText = 'font-size:13px;color:#aaa;letter-spacing:2px;font-family:"Orbitron",sans-serif;margin-top:4px';
+      lblEl.textContent = label;
+      el.appendChild(lblEl);
+      // Animate
+      const c = cv.getContext('2d');
+      let t = 0, last = 0, raf;
+      function tick(now) {
+        t += (now - last) / 1000; last = now;
+        c.clearRect(0, 0, cv.width, cv.height);
+        const drawn = typeof SpriteSystem !== 'undefined' &&
+          SpriteSystem.drawAnim(c, ch.id, 'idle', t, 0, 0, cv.width, cv.height, { facing });
+        if (!drawn && typeof CharRenderer !== 'undefined') {
+          CharRenderer.draw(c, ch.id, 'idle', t, cv.width * 0.5, cv.height * 0.95, cv.width * 0.75, cv.height * 0.9, facing, {});
+        }
+        raf = requestAnimationFrame(tick);
+      }
+      raf = requestAnimationFrame(tick);
+      el._vsRAF = raf;
+      el._vsStop = () => { cancelAnimationFrame(raf); };
+    }
+
+    _buildPanel(p1El, p1Char, 'PLAYER 1', 1);
+    _buildPanel(p2El, cpuChar, 'CPU', -1);
 
     flash.style.display = 'flex';
     setTimeout(() => {
       flash.style.display = 'none';
+      if (p1El && p1El._vsStop) p1El._vsStop();
+      if (p2El && p2El._vsStop) p2El._vsStop();
       callback();
-    }, 1800);
+    }, 2200);
   }
 
   // ──── VENUE MAP ────
@@ -460,6 +491,26 @@ const HitgearOS = (() => {
     showScreen('screen-venue-map');
     renderVenueMap();
   }
+
+  // Map venue shortName → best background image
+  const VENUE_BG_MAP = {
+    'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
+    'HIBACHI STREET':'assets/venues/kcs_pack_07_exterior_bg.png',
+    'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
+    'KINGDOM COME':  'assets/venues/kingdom_come_saloon.png',
+    'SOCIAL GAINES': 'assets/venues/outta_interior.png',
+    'SUCCESS POOL':  'assets/venues/outta_exterior.png',
+    'TALLY ROW':     'assets/venues/tally_exterior.png',
+    'THE DEN':       'assets/venues/tally_den.png',
+    'THE ITUS':      'assets/venues/tally_itus.png',
+    'SAMMYS STAGE':  'assets/venues/tally_sammys.png',
+    'PUBLIC HALL':   'assets/venues/tally_public_hall.png',
+    '13 RAVE':       'assets/venues/tally_13rave.png',
+    'DUKES & DIMES': 'assets/venues/dukes_interior.png',
+    'QUICK HIT':     'assets/venues/qhf_exterior.png',
+    'ROOFTOP PKG':   'assets/venues/dukes_pack_07_exterior_bg.png',
+    'EVO FEST':      'assets/venues/outta_pack_07_exterior_bg.png',
+  };
 
   function renderVenueMap() {
     const grid = document.getElementById('venue-grid');
@@ -469,15 +520,26 @@ const HitgearOS = (() => {
     window.VENUES.forEach(v => {
       const unlocked = save.unlockedVenues.includes(v.id);
       const complete = save.completedMissions.includes(v.id);
+      const bg = VENUE_BG_MAP[v.shortName] || '';
       const card = document.createElement('div');
       card.className = 'venue-card ' + (unlocked ? 'unlocked' : 'locked');
+      if (bg) {
+        card.style.cssText += `;background-image:url('${bg}');background-size:cover;background-position:center`;
+      }
       card.innerHTML = `
-        <div class="venue-number">${String(v.id).padStart(2,'0')} / 16</div>
-        <div class="venue-icon">${v.emoji}</div>
-        <div class="venue-name">${v.shortName}</div>
-        <div style="font-size:10px;color:#ff00aa;margin-top:4px;font-family:'Orbitron',sans-serif">${v.cameraType === 'topdown' ? '▣ TOP-DOWN' : '▶ SIDE-SCROLL'}</div>
-        ${complete ? '<div style="font-size:10px;color:#ffd700;margin-top:2px">✓ COMPLETE</div>' : ''}
-        <div class="venue-lock">${unlocked ? '' : '🔒'}</div>`;
+        <div class="venue-card-overlay" style="position:absolute;inset:0;background:${unlocked ? 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 70%)' : 'rgba(0,0,0,0.7)'};border-radius:inherit;pointer-events:none"></div>
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:8px 6px 6px">
+          <div class="venue-number" style="align-self:flex-start">${String(v.id).padStart(2,'0')} / 16</div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center">
+            ${bg ? '' : `<div class="venue-icon">${v.emoji}</div>`}
+          </div>
+          <div>
+            <div class="venue-name">${v.shortName}</div>
+            <div style="font-size:10px;color:#ff00aa;margin-top:2px;font-family:'Orbitron',sans-serif">${v.cameraType === 'topdown' ? '▣ TOP-DOWN' : '▶ SIDE-SCROLL'}</div>
+            ${complete ? '<div style="font-size:10px;color:#ffd700;margin-top:2px">✓ COMPLETE</div>' : ''}
+          </div>
+          <div class="venue-lock">${unlocked ? '' : '🔒'}</div>
+        </div>`;
       if (unlocked) {
         card.addEventListener('click', () => startVenue(v.id));
       }

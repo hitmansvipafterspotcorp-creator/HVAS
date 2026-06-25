@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v9';
+const CACHE_NAME = 'hitgear-os-v10';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -35,6 +35,7 @@ const CORE_ASSETS = [
   './runtime/char_renderer.js',
   './runtime/loading_screen.js',
   './runtime/versus_engine.js',
+  './runtime/dance_minigame.js',
   './runtime/hitgear_os.js',
   // ── Venue backgrounds ────────────────────────────────────────────────────
   './assets/venues/cafe8fifty_exterior.png',

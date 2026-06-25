@@ -147,6 +147,16 @@
   <div id="vs-p2-panel" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(225deg,#001a35,#003060);height:100vh;clip-path:polygon(18% 0,100% 0,100% 100%,0 100%)"></div>
 </div>
 
+<!-- ══════════════════════════════════ DANCE FLOOR MINIGAME ══════════════════════════════════ -->
+<div id="dance-minigame" style="display:none;position:fixed;inset:0;z-index:9000;background:#000;flex-direction:column;align-items:center;justify-content:center">
+  <canvas id="dance-canvas" style="width:100%;max-width:600px;height:auto;display:block"></canvas>
+  <div id="dance-result" style="display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85)">
+    <div id="dance-result-title" style="font-family:'Orbitron',sans-serif;font-size:clamp(28px,6vw,56px);font-weight:900;color:#fff;text-shadow:0 0 30px #ff00aa;margin-bottom:16px"></div>
+    <div id="dance-result-score" style="font-family:'Rajdhani',sans-serif;font-size:24px;color:#ffd700;margin-bottom:32px"></div>
+    <button class="menu-btn" onclick="DanceMinigame.close()">BACK TO VENUE</button>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════ VENUE MAP ══════════════════════════════════ -->
 <div id="screen-venue-map" class="screen" style="display:none">
   <div class="select-header">VENUE MAP</div>
@@ -540,6 +550,7 @@ window.VENUES = [
 <script src="runtime/story_mode.js"></script>
 <script src="runtime/char_renderer.js"></script>
 <script src="runtime/loading_screen.js"></script>
+<script src="runtime/dance_minigame.js"></script>
 <script src="runtime/hitgear_os.js"></script>
 
 <script>

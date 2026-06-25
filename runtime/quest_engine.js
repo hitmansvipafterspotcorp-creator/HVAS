@@ -420,9 +420,20 @@ const QuestEngine = (() => {
         }
         break;
       }
-      case 'dance_minigame':
-        showNotification('DANCE FLOOR — HIT THE FLOOR! [coming soon]');
+      case 'dance_minigame': {
+        const charId = gameState && gameState.charId ? gameState.charId : 'creator';
+        const bgSrc  = gameState && gameState.venue && gameState.venue.bg ? gameState.venue.bg : null;
+        if (typeof DanceMinigame !== 'undefined') {
+          DanceMinigame.open(charId, bgSrc, result => {
+            if (result && result.win) {
+              showNotification('🔥 DANCE BATTLE WON! +150 Status Points');
+            } else {
+              showNotification('BETTER LUCK NEXT TIME — Keep practicing!');
+            }
+          });
+        }
         break;
+      }
       case 'exit_back':
         showNotification('BACK EXIT — Returning outside...');
         break;
