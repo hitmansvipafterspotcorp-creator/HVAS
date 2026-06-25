@@ -343,6 +343,7 @@ const VersusEngine = (() => {
       hitstop = Math.max(hitstop, m.cinematic ? 0.12 : m.knockdown ? 0.09 : 0.05);
       shake = Math.max(shake, m.cinematic ? 18 : m.knockdown ? 10 : 5);
       spark(def.x, def.y - def.h*0.55, att.color, m.knockdown ? 16 : 10);
+      spawnHitVFX(att, def.x, def.y - def.h*0.5, m);
       popup(def.x, def.y - def.h, String(dmg), m.cinematic ? '#ffd700' : '#ff5566', m.cinematic ? 26 : 16);
       if (att.combo >= 2) popup(att.x, att.y - att.h - 22, att.combo + ' HIT', '#ffdd00', 15);
     }
@@ -359,6 +360,30 @@ const VersusEngine = (() => {
       const level = n >= 16 ? 4 : n >= 10 ? 3 : n >= 8 ? 2 : 1;
       CharRenderer.spawnHitSpark(x, y, level, color);
     }
+  }
+
+  // Pick the first VFX animation key that actually exists for this character,
+  // from a priority list — sprite sheets differ (bosses use vfx_jab/vfx_fire,
+  // fighters use vfx_hit_l/vfx_hit_h, etc.). Returns null if none exist.
+  function _pickVfx(charId, candidates) {
+    const SS = window.SpriteSystem;
+    const def = SS && SS.CHAR_DEFS && SS.CHAR_DEFS[charId];
+    if (!def || !def.anims) return null;
+    for (const k of candidates) if (def.anims[k]) return k;
+    return null;
+  }
+
+  // Spawn the real sprite-sheet VFX for a connecting attack, tier-appropriate.
+  function spawnHitVFX(att, x, y, m) {
+    const SS = window.SpriteSystem;
+    if (!SS || !SS.spawnVFX || !att.char) return;
+    let cands, size;
+    if (m.cinematic)        { cands = ['vfx_finisher','vfx_finisher_col','vfx_finisher_shockwave','vfx_super','vfx_super_ring','vfx_blast']; size = 220; }
+    else if (m.cost === 25) { cands = ['vfx_blast','vfx_burst','vfx_impact','vfx_fire','vfx_ice_burst','vfx_soundwave','vfx_basswave','vfx_arc','vfx_hit_h']; size = 150; }
+    else if (m.knockdown)   { cands = ['vfx_hit_h','vfx_impact','vfx_fire','vfx_burst','vfx_hit_l','vfx_jab']; size = 120; }
+    else                    { cands = ['vfx_hit_l','vfx_jab','vfx_punch','vfx_hit_h','vfx_impact']; size = 90; }
+    const key = _pickVfx(att.char.id, cands);
+    if (key) SS.spawnVFX(att.char.id, key, x, y, size);
   }
   function popup(x, y, text, color, size) { popups.push({ x, y, text, color, size, life: .9, vy: -70 }); }
 
@@ -613,6 +638,12 @@ const VersusEngine = (() => {
     else winner = (p1.hp >= p2.hp) ? p1 : p2;
     if (winner) winner.rounds++;
     flash = 0.6; shake = 14;
+    // KO burst VFX on the loser
+    const loser = winner === p1 ? p2 : winner === p2 ? p1 : null;
+    if (loser && typeof SpriteSystem !== 'undefined' && SpriteSystem.spawnVFX) {
+      const k = _pickVfx(loser.char && loser.char.id, ['vfx_finisher','vfx_finisher_col','vfx_super','vfx_blast','vfx_hit_h']);
+      if (k) SpriteSystem.spawnVFX(loser.char.id, k, loser.x, loser.y - loser.h*0.5, 200);
+    }
     if (winner === p1) { bigText = 'K.O.'; bigSub = 'ROUND WON'; }
     else if (winner === p2) { bigText = 'K.O.'; bigSub = 'ROUND LOST'; }
     else { bigText = 'DOUBLE K.O.'; bigSub=''; }
@@ -650,6 +681,7 @@ const VersusEngine = (() => {
       if (p.life<=0) popups.splice(i,1);
     }
     if (typeof CharRenderer !== 'undefined') CharRenderer.updateVFX(dt);
+    if (typeof SpriteSystem !== 'undefined' && SpriteSystem.updateVFX) SpriteSystem.updateVFX(dt);
   }
 
   // ── render ───────────────────────────────────────────────────────────────────
@@ -665,7 +697,10 @@ const VersusEngine = (() => {
     const order = [p1, p2].sort((a,b)=>a.y-b.y);
     order.forEach(drawFighter);
     projectiles.forEach(drawProjectile);
-    // CharRenderer VFX layer (over fighters, under HUD)
+    // VFX layer (over fighters, under HUD) — real sprite-sheet VFX + sparks
+    if (typeof SpriteSystem !== 'undefined' && SpriteSystem.renderVFX) {
+      SpriteSystem.renderVFX(ctx, 0, 0);
+    }
     if (typeof CharRenderer !== 'undefined') {
       CharRenderer.drawVFX(ctx, W, H);
     }
@@ -832,7 +867,12 @@ const VersusEngine = (() => {
     else if (f.attack === 'crouch')  { e.comboStep = 3; }
     else if (f.attack === 'special' || f.attack === 'special2' || f.attack === 'special3') { e.specialAnim = true; }
     else if (f.attack === 'super') {
-      e.superAnim = 1; e.finishering = (f.char && f.char.isBoss);
+      // Prefer the dedicated cinematic FINISHER art if the character has it,
+      // otherwise fall back to the super1 pose (loco-only characters).
+      const SS = window.SpriteSystem;
+      const anims = SS && SS.CHAR_DEFS && f.char && SS.CHAR_DEFS[f.char.id] && SS.CHAR_DEFS[f.char.id].anims;
+      if (anims && anims.finisher) { e.finishering = true; }
+      else { e.superAnim = 1; }
     }
     return e;
   }
