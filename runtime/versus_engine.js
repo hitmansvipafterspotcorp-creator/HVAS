@@ -1,4 +1,21 @@
 'use strict';
+
+// ── Element asset cache (HUD art) ────────────────────────────────────────────
+const _elemCache = {};
+function _elem(path) {
+  if (_elemCache[path]) return _elemCache[path];
+  const img = new Image(); img._r=false; img._f=false;
+  img.onload=()=>{img._r=true;}; img.onerror=()=>{img._f=true;};
+  img.src=path; _elemCache[path]=img; return img;
+}
+function _drawElem(ctx,path,dx,dy,dw,dh,opts){
+  const img=_elem(path); if(!img||!img._r||img._f)return false;
+  ctx.save();
+  if(opts&&opts.alpha!=null)ctx.globalAlpha=opts.alpha;
+  ctx.drawImage(img,dx,dy,dw,dh);
+  ctx.restore(); return true;
+}
+
 /**
  * VersusEngine — 1v1 versus fighter (Street Fighter / Mortal Kombat style)
  *
@@ -918,9 +935,15 @@ const VersusEngine = (() => {
     const pad = Math.max(12, W*0.018);
     const bw = W*0.40, bh = Math.max(18, H*0.035);
 
-    // P1 left, P2 right (mirrored)
+    // P1 left, P2 right (mirrored) — draw bar frame art behind, then fill
+    _drawElem(ctx,'assets/ui/elements/hud/hud_003.png', pad, pad, bw, bh*1.4);
+    _drawElem(ctx,'assets/ui/elements/hud/hud_003.png', W-pad-bw, pad, bw, bh*1.4);
     drawHealth(pad, pad, bw, bh, p1, false);
     drawHealth(W - pad - bw, pad, bw, bh, p2, true);
+
+    // portrait frames
+    _drawElem(ctx,'assets/ui/elements/hud/hud_022.png', pad, pad+bh+2, bh*2, bh*2.4);
+    _drawElem(ctx,'assets/ui/elements/hud/hud_022.png', W-pad-bh*2, pad+bh+2, bh*2, bh*2.4);
 
     // names
     ctx.font=`700 ${Math.max(12,H*0.026)}px Orbitron, monospace`;
@@ -935,7 +958,7 @@ const VersusEngine = (() => {
       drawPip(W - pad - bw - 14 - i*18, pad+bh*0.5, p2.rounds>i, p2.color);
     }
 
-    // timer box (canvas primitives — no raw sheet overlay)
+    // timer box — art frame + digit
     {
       const tw = Math.max(64, H * 0.12), th = tw * 0.6;
       const tx = W/2 - tw/2, ty = pad;
@@ -945,6 +968,7 @@ const VersusEngine = (() => {
       ctx.lineWidth = 2;
       _roundRect(ctx, tx, ty, tw, th, 6);
       ctx.fill(); ctx.stroke();
+      _drawElem(ctx,'assets/ui/elements/hud/hud_021.png', tx, ty, tw, th);
       ctx.font=`900 ${Math.max(18,H*0.042)}px Orbitron, monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
@@ -953,8 +977,10 @@ const VersusEngine = (() => {
       ctx.shadowBlur=0; ctx.restore();
     }
 
-    // super meters
+    // super meters — art frames behind colored fill
     const mw=bw, mh=Math.max(8,H*0.018), my=H-pad-mh;
+    _drawElem(ctx,'assets/ui/elements/hud/hud_017.png', pad, my-2, mw, mh+4);
+    _drawElem(ctx,'assets/ui/elements/hud/hud_018.png', W-pad-mw, my-2, mw, mh+4);
     drawMeter(pad, my, mw, mh, p1.meter, false, p1.color);
     drawMeter(W-pad-mw, my, mw, mh, p2.meter, true, p2.color);
   }

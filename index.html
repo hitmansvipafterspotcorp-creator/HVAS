@@ -70,6 +70,9 @@
     </div>
   </div>
 
+  <!-- Title banner -->
+  <img src="assets/ui/elements/title_menu/title_menu_000.png" style="max-width:80%;height:auto;display:block;margin:0 auto 12px;image-rendering:auto;filter:drop-shadow(0 0 16px #ff00aa88)" alt="HITMANS VIP AFTER SPOT">
+
   <!-- Icon grid -->
   <div class="os-icon-grid" id="os-icon-grid"></div>
 
@@ -123,7 +126,8 @@
   <!-- Two-panel layout: preview left, grid right -->
   <div style="display:flex;flex:1;overflow:hidden;gap:12px">
     <!-- LEFT: character preview panel -->
-    <div id="cs-preview" style="width:min(260px,36vw);flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:linear-gradient(135deg,#1a003a,#0d001f);border:1px solid #ff00aa22;border-radius:10px;overflow-y:auto">
+    <div id="cs-preview" style="position:relative;width:min(260px,36vw);flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:linear-gradient(135deg,#1a003a,#0d001f);border:1px solid #ff00aa22;border-radius:10px;overflow-y:auto">
+      <img src="assets/ui/elements/character_select/character_select_027.png" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:0.6;pointer-events:none" alt="">
       <!-- Sprite art canvas preview (E3 quality) -->
       <canvas id="cs-sprite-canvas" width="180" height="200" style="width:min(160px,28vw);height:auto;image-rendering:pixelated;border-radius:6px;background:transparent"></canvas>
       <div id="cs-preview-emoji" style="display:none">?</div>

@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v15';
+const CACHE_NAME = 'hitgear-os-v16';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -61,6 +61,21 @@ const CORE_ASSETS = [
   // ── UI shell ─────────────────────────────────────────────────────────────
   './assets/ui/hitgear_shell.png',
   './assets/ui/hvas_logo.png',
+  // ── E3 UI elements ───────────────────────────────────────────────────────
+  './assets/ui/elements/frames_emblems/frames_emblems_002.png',
+  './assets/ui/elements/frames_emblems/frames_emblems_003.png',
+  './assets/ui/elements/frames_emblems/frames_emblems_011.png',
+  './assets/ui/elements/frames_emblems/frames_emblems_014.png',
+  './assets/ui/elements/frames_emblems/frames_emblems_013.png',
+  './assets/ui/elements/frames_emblems/frames_emblems_005.png',
+  './assets/ui/elements/hud/hud_003.png',
+  './assets/ui/elements/hud/hud_021.png',
+  './assets/ui/elements/hud/hud_022.png',
+  './assets/ui/elements/hud/hud_017.png',
+  './assets/ui/elements/hud/hud_018.png',
+  './assets/ui/elements/character_select/character_select_027.png',
+  './assets/ui/elements/title_menu/title_menu_000.png',
+  './assets/ui/elements/venue_map/venue_map_001.png',
   // ── Character sheets — playable fighters ─────────────────────────────────
   './assets/characters/creator_sheet01_loco.png',
   './assets/characters/creator_sheet02_combat.png',

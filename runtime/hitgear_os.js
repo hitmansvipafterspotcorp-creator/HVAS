@@ -153,18 +153,18 @@ const HitgearOS = (() => {
     const grid = document.getElementById('os-icon-grid');
     if (!grid) return;
     const icons = [
-      { label: 'STORY\nMODE', emblem: 'r00_f00', action: () => StoryMode.startStory() },
-      { label: 'ARCADE\nFIGHT', emblem: 'r00_f01', action: () => StoryMode.startArcade() },
-      { label: 'HITMANS VIP\nQUEST', emblem: 'r00_f02', action: () => openGameMenu() },
-      { label: 'VENUES\n& SPOTS', emblem: 'r00_f03', action: () => openVenueMap() },
-      { label: 'VIP\nSTATUS', emblem: 'r00_f04', action: () => openVIPStatus() },
-      { label: 'LIP SYNC\nBINGO', emblem: 'r00_f05', action: () => openBingo() }
+      { label: 'STORY\nMODE', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_002.png', action: () => StoryMode.startStory() },
+      { label: 'ARCADE\nFIGHT', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_003.png', action: () => StoryMode.startArcade() },
+      { label: 'HITMANS VIP\nQUEST', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_011.png', action: () => openGameMenu() },
+      { label: 'VENUES\n& SPOTS', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_014.png', action: () => openVenueMap() },
+      { label: 'VIP\nSTATUS', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_013.png', action: () => openVIPStatus() },
+      { label: 'LIP SYNC\nBINGO', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_005.png', action: () => openBingo() }
     ];
     grid.innerHTML = '';
     icons.forEach((ic, i) => {
       const div = document.createElement('div');
       div.className = 'os-icon' + (i === selectedOsIcon ? ' selected' : '');
-      div.innerHTML = `<div class="os-icon-img"><img src="assets/ui/frames/frames_emblems/${ic.emblem}.png" style="width:100%;height:100%;object-fit:contain;image-rendering:pixelated" alt=""></div><div class="os-icon-label">${ic.label.replace('\n','<br>')}</div>`;
+      div.innerHTML = `<div class="os-icon-img"><img src="${ic.emblem}" style="width:100%;height:100%;object-fit:contain;image-rendering:auto" alt=""></div><div class="os-icon-label">${ic.label.replace('\n','<br>')}</div>`;
       div.addEventListener('click', ic.action);
       div.addEventListener('mouseenter', () => {
         document.querySelectorAll('.os-icon').forEach(d => d.classList.remove('selected'));
@@ -206,15 +206,15 @@ const HitgearOS = (() => {
 
   let gameMenuIdx = 0;
   const gameMenuItems = [
-    { label: 'STORY MODE (FIGHTER)', emblem: 'r00_f00', action: () => StoryMode.startStory() },
-    { label: 'ARCADE FIGHT',         emblem: 'r00_f01', action: () => StoryMode.startArcade() },
-    { label: 'CONTINUE QUEST', emblem: 'r00_f02', action: () => continueQuest() },
-    { label: 'NEW GAME',       emblem: 'r00_f03', action: () => newGame() },
-    { label: 'VENUE MAP',      emblem: 'r00_f04', action: () => openVenueMap() },
-    { label: 'VIP STATUS',     emblem: 'r00_f05', action: () => openVIPStatus() },
-    { label: 'LIP SYNC BINGO', emblem: 'r00_f06', action: () => openBingo() },
-    { label: 'OPTIONS',        emblem: 'r00_f07', action: () => openOptions() },
-    { label: 'EXIT TO OS',     emblem: 'r01_f00', action: () => openOSMenu() }
+    { label: 'STORY MODE (FIGHTER)', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_000.png', action: () => StoryMode.startStory() },
+    { label: 'ARCADE FIGHT',         emblem: 'assets/ui/elements/frames_emblems/frames_emblems_001.png', action: () => StoryMode.startArcade() },
+    { label: 'CONTINUE QUEST', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_002.png', action: () => continueQuest() },
+    { label: 'NEW GAME',       emblem: 'assets/ui/elements/frames_emblems/frames_emblems_003.png', action: () => newGame() },
+    { label: 'VENUE MAP',      emblem: 'assets/ui/elements/frames_emblems/frames_emblems_004.png', action: () => openVenueMap() },
+    { label: 'VIP STATUS',     emblem: 'assets/ui/elements/frames_emblems/frames_emblems_005.png', action: () => openVIPStatus() },
+    { label: 'LIP SYNC BINGO', emblem: 'assets/ui/elements/frames_emblems/frames_emblems_006.png', action: () => openBingo() },
+    { label: 'OPTIONS',        emblem: 'assets/ui/elements/frames_emblems/frames_emblems_007.png', action: () => openOptions() },
+    { label: 'EXIT TO OS',     emblem: 'assets/ui/elements/frames_emblems/frames_emblems_008.png', action: () => openOSMenu() }
   ];
 
   function renderGameMenu() {
@@ -229,8 +229,8 @@ const HitgearOS = (() => {
         div.style.opacity = '0.35'; div.style.cursor = 'default';
       }
       div.innerHTML =
-        `<img src="assets/ui/frames/frames_emblems/${item.emblem}.png" ` +
-        `style="width:28px;height:28px;vertical-align:middle;margin-right:10px;` +
+        `<img src="${item.emblem}" ` +
+        `style="width:28px;height:28px;vertical-align:middle;margin-right:10px;object-fit:contain;image-rendering:auto;` +
         `filter:drop-shadow(0 0 6px #ffd70066)" alt="">` +
         `<span style="vertical-align:middle">${item.label}</span>`;
       div.addEventListener('click', () => { gameMenuIdx = i; renderGameMenu(); item.action(); });
@@ -569,10 +569,12 @@ const HitgearOS = (() => {
       const bg = VENUE_BG_MAP[v.shortName] || '';
       const card = document.createElement('div');
       card.className = 'venue-card ' + (unlocked ? 'unlocked' : 'locked');
+      card.style.cssText += ';position:relative;overflow:hidden';
       if (bg) {
         card.style.cssText += `;background-image:url('${bg}');background-size:cover;background-position:center`;
       }
       card.innerHTML = `
+        <img src="assets/ui/elements/venue_map/venue_map_001.png" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;pointer-events:none;z-index:0" alt="">
         <div class="venue-card-overlay" style="position:absolute;inset:0;background:${unlocked ? 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 70%)' : 'rgba(0,0,0,0.7)'};border-radius:inherit;pointer-events:none"></div>
         <img src="assets/ui/frames/venue_map_stage_select/${unlocked ? 'r00_f02' : 'r00_f00'}.png" style="position:absolute;top:4px;right:4px;width:32px;height:32px;object-fit:contain;image-rendering:pixelated;z-index:2;pointer-events:none" alt="">
         <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:8px 6px 6px">
