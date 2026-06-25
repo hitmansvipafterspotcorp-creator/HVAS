@@ -18,7 +18,48 @@ import os, cv2, numpy as np, glob, re
 SRC     = 'assets/characters'
 OUT     = 'assets/characters/frames'
 COLS    = 8
-X_OFFSET = 297   # annotation panel width (pixels)
+# Measured from the numbered column headers (1..8) on the source sheets: the
+# 8-frame grid starts at x=346 with a 131px stride. There is a ~56px right
+# margin, so frame width is NOT (W - X_OFFSET)//COLS — deriving it from the
+# full width made every column drift right, capturing ~1.5 characters by the
+# last cell, and left the per-row label badges bleeding into column 0.
+GRID_X0  = 346   # left edge of frame column 0 (px)
+FRAME_W  = 131   # per-column stride / cell width (px)
+X_OFFSET = GRID_X0   # kept for legacy logging
+
+
+def clear_left_annotation(alpha):
+    """Column 0 only: drop a leftmost annotation badge (row label like WALK /
+    'x Jab' / class icon) that is separated from the character by an empty
+    vertical band. Finds the rightmost near-empty column inside the left 45%
+    that still has content to its left, and clears everything left of it."""
+    h, w = alpha.shape
+    colhas = (alpha > 16).sum(axis=0)
+    limit = int(w * 0.45)
+    cut = 0
+    for x in range(limit, 0, -1):
+        if colhas[x] <= max(1, int(h * 0.01)) and colhas[:x].max() > h * 0.03:
+            cut = x
+            break
+    if cut:
+        alpha[:, :cut] = 0
+    return alpha
+
+
+def clear_top_banner(alpha):
+    """Row 0 only: drop a top title banner / numbered column header separated
+    from the character by an empty horizontal band (top 30% of the cell)."""
+    h, w = alpha.shape
+    rowhas = (alpha > 16).sum(axis=1)
+    limit = int(h * 0.30)
+    cut = 0
+    for y in range(limit, 0, -1):
+        if rowhas[y] <= max(1, int(w * 0.01)) and rowhas[:y].max() > w * 0.03:
+            cut = y
+            break
+    if cut:
+        alpha[:cut, :] = 0
+    return alpha
 
 # ── ML background removal (rembg / U^2-Net) — professional-grade matting ─────
 # Far cleaner than colour heuristics on flat illustrations with painted
@@ -232,7 +273,7 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
     H, W = img_full.shape[:2]
     has_alpha = img_full.ndim == 4 and img_full.shape[2] == 4
 
-    frame_w = (W - X_OFFSET) // COLS
+    frame_w = FRAME_W
     frame_h = H // rows
 
     dest = f'{OUT}/{char_name}/{sheet_type}'
@@ -241,7 +282,7 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
     sheet_frames = 0
     for row in range(rows):
         for col in range(COLS):
-            x0 = X_OFFSET + col * frame_w
+            x0 = GRID_X0 + col * frame_w
             y0 = row * frame_h
             crop = img_full[y0:y0 + frame_h, x0:x0 + frame_w]
 
@@ -257,6 +298,14 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
                     alpha_ch = make_alpha_mask(crop_bgr)
                 bgra = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2BGRA)
                 bgra[:, :, 3] = alpha_ch
+
+            # Strip annotation bleed: row-label badges live in column 0, title
+            # banners / numbered headers live across the top of row 0.
+            if col == 0:
+                alpha_ch = clear_left_annotation(alpha_ch)
+            if row == 0:
+                alpha_ch = clear_top_banner(alpha_ch)
+            bgra[:, :, 3] = alpha_ch
 
             # Professional sprite pipeline: every frame is a UNIFORM cell
             # (frame_w x frame_h) with the character's feet anchored at the
