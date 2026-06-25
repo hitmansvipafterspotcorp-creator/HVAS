@@ -206,15 +206,15 @@ const HitgearOS = (() => {
 
   let gameMenuIdx = 0;
   const gameMenuItems = [
-    { label: 'STORY MODE (FIGHTER)', action: () => StoryMode.startStory() },
-    { label: 'ARCADE FIGHT',         action: () => StoryMode.startArcade() },
-    { label: 'CONTINUE QUEST', action: () => continueQuest() },
-    { label: 'NEW GAME',       action: () => newGame() },
-    { label: 'VENUE MAP',      action: () => openVenueMap() },
-    { label: 'VIP STATUS',     action: () => openVIPStatus() },
-    { label: 'LIP SYNC BINGO', action: () => openBingo() },
-    { label: 'OPTIONS',        action: () => openOptions() },
-    { label: 'EXIT TO OS',     action: () => openOSMenu() }
+    { label: 'STORY MODE (FIGHTER)', emblem: 'r00_f00', action: () => StoryMode.startStory() },
+    { label: 'ARCADE FIGHT',         emblem: 'r00_f01', action: () => StoryMode.startArcade() },
+    { label: 'CONTINUE QUEST', emblem: 'r00_f02', action: () => continueQuest() },
+    { label: 'NEW GAME',       emblem: 'r00_f03', action: () => newGame() },
+    { label: 'VENUE MAP',      emblem: 'r00_f04', action: () => openVenueMap() },
+    { label: 'VIP STATUS',     emblem: 'r00_f05', action: () => openVIPStatus() },
+    { label: 'LIP SYNC BINGO', emblem: 'r00_f06', action: () => openBingo() },
+    { label: 'OPTIONS',        emblem: 'r00_f07', action: () => openOptions() },
+    { label: 'EXIT TO OS',     emblem: 'r01_f00', action: () => openOSMenu() }
   ];
 
   function renderGameMenu() {
@@ -228,7 +228,11 @@ const HitgearOS = (() => {
       if (item.label === 'CONTINUE QUEST' && !SaveSystem.hasSave()) {
         div.style.opacity = '0.35'; div.style.cursor = 'default';
       }
-      div.textContent = item.label;
+      div.innerHTML =
+        `<img src="assets/ui/frames/frames_emblems/${item.emblem}.png" ` +
+        `style="width:28px;height:28px;vertical-align:middle;margin-right:10px;` +
+        `filter:drop-shadow(0 0 6px #ffd70066)" alt="">` +
+        `<span style="vertical-align:middle">${item.label}</span>`;
       div.addEventListener('click', () => { gameMenuIdx = i; renderGameMenu(); item.action(); });
       div.addEventListener('mouseenter', () => { gameMenuIdx = i; renderGameMenu(); });
       list.appendChild(div);
