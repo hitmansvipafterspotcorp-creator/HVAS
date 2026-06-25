@@ -1045,5 +1045,68 @@ const SpriteSystem = (() => {
     return true;
   }
 
-  return { hasSprites, preload, preloadReady, resolveAnim, update, draw, drawAnim, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
+  // ── Feet-anchored, aspect-correct grounded draw ──────────────────────────
+  // Every frame is now a uniform cell with the character's feet at the cell
+  // bottom, so we draw the frame at its native aspect ratio with its BOTTOM
+  // edge on groundY and centred on footX. This keeps the character planted on
+  // the floor and correctly proportioned across all animation frames — no more
+  // "portrait jittering in a moving box".
+  //
+  // If the requested frame isn't loaded yet, we fall back to the idle frame
+  // (loco r0 f0, always preloaded first) so a REAL sprite always renders and
+  // the procedural fallback never appears.
+  function _bestFrame(charId, sheet, row, frame) {
+    let img = _frame(charId, sheet, row, frame);
+    if (img && img._ready && !img._failed && img.naturalWidth > 1) return img;
+    img = _frame(charId, 'loco', 0, 0);            // idle fallback
+    if (img && img._ready && !img._failed && img.naturalWidth > 1) return img;
+    return null;
+  }
+
+  function _blitGrounded(ctx, img, footX, groundY, targetH, flipX, opts) {
+    const aspect = (img.naturalWidth / img.naturalHeight) || 0.79;
+    const w = targetH * aspect;
+    ctx.save();
+    if (opts && opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    if (opts && opts.glow) { ctx.shadowColor = opts.glow; ctx.shadowBlur = opts.glowBlur || 20; }
+    if (flipX) {
+      ctx.translate(footX + w / 2, groundY - targetH);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, targetH);
+    } else {
+      ctx.drawImage(img, footX - w / 2, groundY - targetH, w, targetH);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // Entity-driven (uses spriteState advanced by update()).
+  function drawGrounded(ctx, charId, entity, footX, groundY, targetH, flipX, opts) {
+    const def = CHAR_DEFS[charId];
+    if (!def) return false;
+    let sheet = 'loco', row = 0, frame = 0;
+    const ss = entity && entity.spriteState;
+    if (ss && ss.currentAnim && def.anims[ss.currentAnim]) {
+      const a = def.anims[ss.currentAnim];
+      sheet = a.sheet; row = a.row; frame = ss.frame || 0;
+    }
+    const img = _bestFrame(charId, sheet, row, frame);
+    if (!img) return false;
+    return _blitGrounded(ctx, img, footX, groundY, targetH, flipX, opts);
+  }
+
+  // Time-driven (for menus / previews — no entity needed).
+  function drawAnimGrounded(ctx, charId, animName, t, footX, groundY, targetH, opts) {
+    const def = CHAR_DEFS[charId];
+    if (!def) return false;
+    const a = def.anims[animName] || def.anims.idle;
+    if (!a) return false;
+    const fps = a.fps || 8, total = a.frames || 8;
+    const frame = Math.floor(t * fps) % total;
+    const img = _bestFrame(charId, a.sheet, a.row, frame);
+    if (!img) return false;
+    return _blitGrounded(ctx, img, footX, groundY, targetH, (opts && opts.facing === -1), opts);
+  }
+
+  return { hasSprites, preload, preloadReady, resolveAnim, update, draw, drawAnim, drawGrounded, drawAnimGrounded, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();

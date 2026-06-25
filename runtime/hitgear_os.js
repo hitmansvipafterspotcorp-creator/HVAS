@@ -361,7 +361,7 @@ const HitgearOS = (() => {
         c.clearRect(0, 0, cv.width, cv.height);
         let drawn = false;
         if (typeof SpriteSystem !== 'undefined') {
-          drawn = SpriteSystem.drawAnim(c, ch.id, 'idle', _gridThumbT, 0, 0, cv.width, cv.height, { facing: 1 });
+          drawn = SpriteSystem.drawAnimGrounded(c, ch.id, 'idle', _gridThumbT, cv.width * 0.5, cv.height * 0.98, cv.height * 0.96, { facing: 1 });
         }
         if (!drawn && typeof CharRenderer !== 'undefined') {
           CharRenderer.draw(c, ch.id, 'idle', _gridThumbT, cv.width * 0.5, cv.height * 0.95, cv.width * 0.85, cv.height * 0.9, 1, {});
@@ -396,7 +396,7 @@ const HitgearOS = (() => {
       // Try SpriteSystem first
       let drawn = false;
       if (typeof SpriteSystem !== 'undefined') {
-        drawn = SpriteSystem.drawAnim(c, charId, 'idle', _spriteAnimT, W*0.1, H*0.05, W*0.8, H*0.9, { facing: 1 });
+        drawn = SpriteSystem.drawAnimGrounded(c, charId, 'idle', _spriteAnimT, W*0.5, H*0.96, H*0.92, { facing: 1 });
       }
       // Fallback: CharRenderer humanoid
       if (!drawn && typeof CharRenderer !== 'undefined') {
@@ -505,13 +505,9 @@ const HitgearOS = (() => {
         t += (now - last) / 1000; last = now;
         c.clearRect(0, 0, cv.width, cv.height);
         const drawn = typeof SpriteSystem !== 'undefined' &&
-          SpriteSystem.drawAnim(c, ch.id, 'idle', t, 0, 0, cv.width, cv.height, { facing });
+          SpriteSystem.drawAnimGrounded(c, ch.id, 'idle', t, cv.width * 0.5, cv.height * 0.98, cv.height * 0.96, { facing });
         if (!drawn && typeof CharRenderer !== 'undefined') {
           CharRenderer.draw(c, ch.id, 'idle', t, cv.width * 0.5, cv.height * 0.95, cv.width * 0.75, cv.height * 0.9, facing, {});
-        }
-        // Portrait frame overlay from HUD sheet (r00_f02)
-        if (typeof UIElements !== 'undefined') {
-          UIElements.draw(c, 'hud', 0, 2, 0, 0, cv.width, cv.height, { alpha: 0.85 });
         }
         raf = requestAnimationFrame(tick);
       }

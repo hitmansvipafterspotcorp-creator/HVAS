@@ -301,18 +301,18 @@ const SceneManager = (() => {
 
     const flipX = (p.facing || 1) < 0;
 
-    // Try sprite first
+    // Real sprite, feet anchored on the ground line, aspect-correct.
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    let drawn = false;
     if (SS && SS.hasSprites && SS.hasSprites(charId)) {
       SS.update(charId, p, 1/60, false, null);
+      drawn = SS.drawGrounded(ctx, charId, p, p.x, groundY, charH, flipX, { alpha });
     }
-    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
-      SS.draw(ctx, charId, p, p.x - charH*0.28, groundY - charH, charH*0.56, charH, flipX);
 
     if (!drawn && typeof CharRenderer !== 'undefined') {
       const state = _smAnimState(p);
       CharRenderer.draw(ctx, charId, state, _smAnimT(state),
-        p.x + charH * 0.28 * (flipX ? 1 : 0), groundY, charH, (p.facing || 1), { alpha });
+        p.x, groundY, charH, (p.facing || 1), { alpha });
     }
 
     ctx.globalAlpha = 1;
@@ -327,11 +327,11 @@ const SceneManager = (() => {
 
     ctx.save();
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    let drawn = false;
     if (SS && SS.hasSprites && SS.hasSprites(charId)) {
       SS.update(charId, e, 1/60, false, null);
+      drawn = SS.drawGrounded(ctx, charId, e, e.x + e.w * 0.5, groundY, charH, facing < 0);
     }
-    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
-      SS.draw(ctx, charId, e, e.x, e.y, e.w, e.h, facing < 0);
 
     if (!drawn && typeof CharRenderer !== 'undefined') {
       const state = _smAnimState(e);
@@ -357,11 +357,11 @@ const SceneManager = (() => {
 
     ctx.save();
     const SS = typeof SpriteSystem !== 'undefined' ? SpriteSystem : null;
+    let drawn = false;
     if (SS && SS.hasSprites && SS.hasSprites(charId)) {
       SS.update(charId, npc, 1/60, false, null);
+      drawn = SS.drawGrounded(ctx, charId, npc, npc.x + nw * 0.5, groundY, charH, (npc.facing || 1) < 0);
     }
-    const drawn = SS && SS.hasSprites && SS.hasSprites(charId) &&
-      SS.draw(ctx, charId, npc, npc.x, npc.y, nw, nh, false);
 
     if (!drawn && typeof CharRenderer !== 'undefined') {
       CharRenderer.draw(ctx, charId, 'idle', _smAnimT('idle'),

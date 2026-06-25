@@ -198,15 +198,26 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
                                     cv2.COLOR_BGR2BGRA)
                 bgra[:, :, 3] = alpha_ch
 
-            # Skip essentially blank frames
+            # Professional sprite pipeline: every frame is a UNIFORM cell
+            # (frame_w x frame_h) with the character's feet anchored at the
+            # cell bottom. We do NOT tight-crop per frame — that destroys the
+            # anchor and makes the character jitter/scale between frames.
+            # Blank frames are written as a full-size transparent cell so the
+            # animation keeps a constant frame size.
             if alpha_ch.mean() < 4:
-                blank = np.zeros((1, 1, 4), np.uint8)
+                blank = np.zeros((frame_h, frame_w, 4), np.uint8)
                 cv2.imwrite(f'{dest}/r{row:02d}_f{col:02d}.png', blank)
+                sheet_frames += 1
                 continue
 
-            cropped = autocrop_alpha(bgra)
+            # Guarantee exact uniform cell dimensions
+            if bgra.shape[0] != frame_h or bgra.shape[1] != frame_w:
+                fixed = np.zeros((frame_h, frame_w, 4), np.uint8)
+                hh = min(bgra.shape[0], frame_h); ww = min(bgra.shape[1], frame_w)
+                fixed[:hh, :ww] = bgra[:hh, :ww]
+                bgra = fixed
             out_path = f'{dest}/r{row:02d}_f{col:02d}.png'
-            cv2.imwrite(out_path, cropped)
+            cv2.imwrite(out_path, bgra)
             sheet_frames += 1
 
     total_frames += sheet_frames

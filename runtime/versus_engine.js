@@ -875,32 +875,39 @@ const VersusEngine = (() => {
     const state  = _vsAnimState(f);
     const animT  = _vsAnimT(f, state);
 
-    // ── Try real sprite sheet first ────────────────────────────────────────
+    // ── Real sprite, feet-anchored & aspect-correct (always renders) ───────
+    // drawGrounded falls back to the idle frame internally if a frame isn't
+    // loaded, so the procedural CharRenderer is NEVER used during a fight.
     const SS = window.SpriteSystem;
     if (SS && f.char && SS.hasSprites(f.char.id)) {
       const b   = buildOf(f);
-      const ww  = charH * 0.55 * b.bw;
       const se  = _toSpriteEnt(f);
       SS.update(f.char.id, se, 1/60, false, null);
       ctx.save();
       if (f.flashHit > 0) { ctx.globalAlpha = 0.7; ctx.filter = 'brightness(4)'; }
-      const didDraw = SS.draw(ctx, f.char.id, se, f.x - ww*0.5, groundY - charH, ww, charH, f.facing < 0);
+      const didDraw = SS.drawGrounded(ctx, f.char.id, se, f.x, groundY, charH * b.bh, f.facing < 0);
       ctx.restore();
-      if (didDraw) return;
+      if (didDraw) {
+        if (f.char && f.char.isBoss) drawBossCrown(f, charH);
+        return;
+      }
     }
 
-    // ── Canvas CharRenderer fallback (always available) ────────────────────
+    // ── Canvas fallback (only if sprites genuinely unavailable) ────────────
     CR.draw(ctx, charId, state, animT, f.x, groundY, charH, f.facing, {
       flashHit: f.flashHit || 0,
       charged: f.meter >= 100,
     });
 
-    // Boss crown above head
-    if (f.char && f.char.isBoss) {
-      ctx.font = `${Math.round(charH * 0.12)}px serif`;
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('👑', f.x, groundY - charH - charH * 0.08);
-    }
+    // Boss crown above head (fallback path)
+    if (f.char && f.char.isBoss) drawBossCrown(f, charH);
+  }
+
+  function drawBossCrown(f, charH) {
+    ctx.font = `${Math.round(charH * 0.12)}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('👑', f.x, groundY - charH - charH * 0.08);
+    ctx.textBaseline = 'alphabetic';
   }
 
   function drawProjectile(p) {
@@ -1076,12 +1083,13 @@ const VersusEngine = (() => {
       // P1 left side — idle facing right
       const p1id = p1.char ? p1.char.id : 1;
       const p2id = p2.char ? p2.char.id : 1;
-      if (!SS.drawAnim(ctx, p1id, 'idle', t, W*0.05, H*0.5 - charH*0.85, W*0.38, charH, { facing: 1 })) {
-        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p1id, 'idle', t, W*0.22, groundY, charH, 1, {});
+      const splashFootY = H * 0.5 + charH * 0.15;
+      if (!SS.drawAnimGrounded(ctx, p1id, 'idle', t, W*0.24, splashFootY, charH, { facing: 1 })) {
+        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p1id, 'idle', t, W*0.24, splashFootY, charH, 1, {});
       }
       // P2 right side — idle facing left
-      if (!SS.drawAnim(ctx, p2id, 'idle', t, W*0.57, H*0.5 - charH*0.85, W*0.38, charH, { facing: -1 })) {
-        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p2id, 'idle', t, W*0.78, groundY, charH, -1, {});
+      if (!SS.drawAnimGrounded(ctx, p2id, 'idle', t, W*0.76, splashFootY, charH, { facing: -1 })) {
+        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p2id, 'idle', t, W*0.76, splashFootY, charH, -1, {});
       }
       // VS badge
       ctx.textAlign='center';

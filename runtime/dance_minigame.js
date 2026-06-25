@@ -250,7 +250,7 @@ const DanceMinigame = (() => {
     const animName = _dancerT % 0.5 < 0.25 ? 'idle' : 'walk';  // bob effect
     let drawn = false;
     if (typeof SpriteSystem !== 'undefined') {
-      drawn = SpriteSystem.drawAnim(ctx, _charId, 'idle', _dancerT, dx, dy, dancerW, dancerH, { facing: 1 });
+      drawn = SpriteSystem.drawAnimGrounded(ctx, _charId, 'idle', _dancerT, W * 0.5, dy + dancerH, dancerH, { facing: 1 });
     }
     if (!drawn && typeof CharRenderer !== 'undefined') {
       CharRenderer.draw(ctx, _charId, 'idle', _dancerT, dx + dancerW * 0.5, dy + dancerH, dancerW * 0.8, dancerH, 1, {});
