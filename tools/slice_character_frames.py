@@ -20,6 +20,34 @@ OUT     = 'assets/characters/frames'
 COLS    = 8
 X_OFFSET = 297   # annotation panel width (pixels)
 
+# ── ML background removal (rembg / U^2-Net) — professional-grade matting ─────
+# Far cleaner than colour heuristics on flat illustrations with painted
+# floors/shadows. Falls back to the flood-fill heuristic if rembg is missing.
+_REMBG = None
+def _get_rembg():
+    global _REMBG
+    if _REMBG is None:
+        try:
+            from rembg import new_session, remove
+            _REMBG = (new_session('u2net'), remove)
+        except Exception as e:
+            print(f'  rembg unavailable ({e}); using heuristic mask')
+            _REMBG = False
+    return _REMBG
+
+def rembg_alpha(crop_bgr):
+    """Return an alpha channel (HxW uint8) via rembg, or None if unavailable."""
+    r = _get_rembg()
+    if not r:
+        return None
+    sess, remove = r
+    rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+    out = remove(rgb, session=sess, post_process_mask=True)
+    arr = np.array(out)
+    if arr.ndim == 3 and arr.shape[2] == 4:
+        return arr[:, :, 3]
+    return None
+
 # Known row counts per sheet type
 TYPE_ROWS = {
     'loco':    6,
@@ -113,35 +141,65 @@ def make_alpha_mask_checkerboard(img_bgr):
 
 
 def make_alpha_mask(img_bgr):
-    """Build alpha mask — auto-detects checkerboard vs solid background."""
+    """Build alpha mask — auto-detects checkerboard vs solid background.
+
+    Professional flat-illustration cutout: BORDER FLOOD-FILL. The character is an
+    interior island; the background (including painted floor/shadow/wall, which
+    may be several different colours) is whatever is connected to the frame edge.
+    We flood-fill inward from every border pixel with a colour tolerance, so all
+    border-connected background is removed while the character is preserved. This
+    fixes the opaque 'floor slab' the old single-colour distance mask left under
+    the character's feet.
+    """
     if is_checkerboard(img_bgr):
         return make_alpha_mask_checkerboard(img_bgr)
     H, W = img_bgr.shape[:2]
-    # Sample frame CORNERS to detect background — not the full frame, which can be
-    # dominated by a photorealistic character's own colors (e.g. KT skin tones).
-    pad = max(8, min(20, H // 8, W // 8))
-    corner_samples = np.concatenate([
-        img_bgr[0:pad, 0:pad].reshape(-1, 3),
-        img_bgr[0:pad, W-pad:W].reshape(-1, 3),
-        img_bgr[H-pad:H, 0:pad].reshape(-1, 3),
-        img_bgr[H-pad:H, W-pad:W].reshape(-1, 3),
-    ], axis=0)
-    vals, counts = np.unique(corner_samples // 8, axis=0, return_counts=True)
-    bg = vals[counts.argmax()].astype(np.float32) * 8 + 4
-    dist = np.linalg.norm(img_bgr.astype(np.int16) - bg, axis=2)
-    mask = (dist > 30).astype(np.uint8)
-    # Close small holes
-    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k)
+    img = img_bgr.astype(np.uint8)
+
+    # floodFill fills pixels connected to a seed whose colour is within
+    # loDiff/upDiff of the SEED. Run it from a ring of border seeds so multi-tone
+    # backgrounds (gradient sky, floor, shadow) all get caught.
+    filled = np.zeros((H, W), np.uint8)           # 1 = background
+    tol = (32, 32, 32)
+    seeds = []
+    step = max(4, W // 16)
+    for x in range(0, W, step):
+        seeds.append((x, 0)); seeds.append((x, H - 1))
+    step = max(4, H // 16)
+    for y in range(0, H, step):
+        seeds.append((0, y)); seeds.append((W - 1, y))
+    for (sx, sy) in seeds:
+        if filled[sy, sx]:
+            continue
+        ffmask = np.zeros((H + 2, W + 2), np.uint8)
+        # only fill where not already background
+        ffmask[1:-1, 1:-1] = filled
+        cv2.floodFill(img.copy(), ffmask, (sx, sy), 0,
+                      loDiff=tol, upDiff=tol,
+                      flags=4 | (255 << 8) | cv2.FLOODFILL_MASK_ONLY)
+        filled |= (ffmask[1:-1, 1:-1] > 0).astype(np.uint8)
+
+    fg = (filled == 0).astype(np.uint8)           # character = NOT background
+
+    # Clean up: drop tiny speckles, keep the largest connected component(s)
     k2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k2)
-    # Fill interior holes via flood fill
-    h, w = mask.shape
-    ff = mask.copy()
+    fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, k2)
+    fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE,
+                          cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    # Fill interior holes inside the character
+    h, w = fg.shape
+    ff = fg.copy()
     mm = np.zeros((h + 2, w + 2), np.uint8)
     cv2.floodFill(ff, mm, (0, 0), 1)
-    mask = (mask | (1 - ff)).astype(np.uint8)
-    alpha = cv2.GaussianBlur((mask * 255).astype(np.uint8), (3, 3), 0)
+    fg = (fg | (1 - ff)).astype(np.uint8)
+
+    # Keep only the largest component (the character) to drop stray bg islands
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(fg, 8)
+    if n > 1:
+        biggest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+        fg = (lab == biggest).astype(np.uint8)
+
+    alpha = cv2.GaussianBlur((fg * 255).astype(np.uint8), (3, 3), 0)
     return alpha
 
 total_frames = 0
@@ -192,10 +250,12 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
                 bgra = crop.copy()
                 alpha_ch = bgra[:, :, 3]
             else:
-                # Detect background and build alpha mask
-                alpha_ch = make_alpha_mask(crop[:, :, :3] if crop.ndim == 4 else crop)
-                bgra = cv2.cvtColor(crop[:, :, :3] if crop.ndim == 4 else crop,
-                                    cv2.COLOR_BGR2BGRA)
+                crop_bgr = crop[:, :, :3] if crop.ndim == 4 else crop
+                # Primary: ML matting (rembg). Fallback: flood-fill heuristic.
+                alpha_ch = rembg_alpha(crop_bgr)
+                if alpha_ch is None:
+                    alpha_ch = make_alpha_mask(crop_bgr)
+                bgra = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2BGRA)
                 bgra[:, :, 3] = alpha_ch
 
             # Professional sprite pipeline: every frame is a UNIFORM cell
