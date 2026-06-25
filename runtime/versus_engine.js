@@ -145,6 +145,11 @@ const VersusEngine = (() => {
     p1.rounds = 0; p2.rounds = 0;
     roundNum = 1;
     if (typeof InputManager !== 'undefined') InputManager.init();
+    // Preload sprite frames for both fighters so they're ready when the fight starts
+    if (typeof SpriteSystem !== 'undefined') {
+      SpriteSystem.preload(opts.p1CharId);
+      SpriteSystem.preload(opts.p2CharId);
+    }
     beginRound();
     running = true;
     last = performance.now();
@@ -912,14 +917,6 @@ const VersusEngine = (() => {
   function drawHUD() {
     const pad = Math.max(12, W*0.018);
     const bw = W*0.40, bh = Math.max(18, H*0.035);
-    const UI = typeof UIElements !== 'undefined' ? UIElements : null;
-
-    // Fighter portrait frames (hud r00_f02) flanking the center
-    if (UI) {
-      const pfSize = Math.max(54, H * 0.10);
-      UI.draw(ctx, 'hud', 0, 2, pad, pad, pfSize, pfSize * 1.2);
-      UI.draw(ctx, 'hud', 0, 2, W - pad - pfSize, pad, pfSize, pfSize * 1.2, { alpha: 1 });
-    }
 
     // P1 left, P2 right (mirrored)
     drawHealth(pad, pad, bw, bh, p1, false);
@@ -938,24 +935,22 @@ const VersusEngine = (() => {
       drawPip(W - pad - bw - 14 - i*18, pad+bh*0.5, p2.rounds>i, p2.color);
     }
 
-    // timer — real HUD_TIMER_01 art (hud r00_f07) with actual number drawn on top
-    if (UI) {
-      const tw = Math.max(64, H * 0.12), th = tw;
-      const tx = W/2 - tw/2, ty = pad - 4;
-      UI.draw(ctx, 'hud', 0, 7, tx, ty, tw, th);
+    // timer box (canvas primitives — no raw sheet overlay)
+    {
+      const tw = Math.max(64, H * 0.12), th = tw * 0.6;
+      const tx = W/2 - tw/2, ty = pad;
+      ctx.save();
+      ctx.fillStyle='rgba(0,0,20,0.75)';
+      ctx.strokeStyle = timer<=10 ? '#ff3344' : '#ffffff55';
+      ctx.lineWidth = 2;
+      _roundRect(ctx, tx, ty, tw, th, 6);
+      ctx.fill(); ctx.stroke();
       ctx.font=`900 ${Math.max(18,H*0.042)}px Orbitron, monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
       ctx.shadowColor='#000'; ctx.shadowBlur=6;
-      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.42);
-      ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
-    } else {
-      ctx.font=`900 ${Math.max(22,H*0.06)}px Orbitron, monospace`;
-      ctx.textAlign='center'; ctx.textBaseline='top';
-      ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
-      ctx.shadowColor='#000'; ctx.shadowBlur=6;
-      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, pad);
-      ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.5);
+      ctx.shadowBlur=0; ctx.restore();
     }
 
     // super meters
@@ -964,29 +959,35 @@ const VersusEngine = (() => {
     drawMeter(W-pad-mw, my, mw, mh, p2.meter, true, p2.color);
   }
 
+  function _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  }
+
   function drawHealth(x,y,w,h,f,mirror) {
     ctx.save();
-    // Dark background
-    ctx.fillStyle='#0a0014';
-    ctx.fillRect(x,y,w,h);
+    // Dark background with rounded corners
+    ctx.fillStyle='rgba(0,0,20,0.80)';
+    _roundRect(ctx, x, y, w, h, 3); ctx.fill();
     // Colored fill
     const pct=Math.max(0,f.hp/f.maxHp);
     const col = pct>0.5?'#46e24a':pct>0.22?'#ffd23f':'#ff3344';
     const fw=(w-4)*pct;
     ctx.fillStyle=col;
+    ctx.shadowColor=col; ctx.shadowBlur=6;
     if (mirror) ctx.fillRect(x+w-2-fw, y+2, fw, h-4);
     else        ctx.fillRect(x+2, y+2, fw, h-4);
-    // Overlay real bar art frame (hud r00_f05 = 3 bars stacked: health on top)
-    const UI = typeof UIElements !== 'undefined' ? UIElements : null;
-    if (UI) {
-      // r00_f05 shows all 3 bars stacked; draw it spanning across just the top third
-      // by scaling the image so only the top bar aligns with our bar rect
-      UI.draw(ctx, 'hud', 0, 5, x, y - h*0.15, w, h * 3.5, { alpha: 0.90 });
-    } else {
-      ctx.strokeStyle=f.color; ctx.lineWidth=2;
-      ctx.shadowColor=f.color; ctx.shadowBlur=8;
-      ctx.strokeRect(x,y,w,h); ctx.shadowBlur=0;
-    }
+    ctx.shadowBlur=0;
+    // Glowing border in character color
+    ctx.strokeStyle=f.color; ctx.lineWidth=2;
+    ctx.shadowColor=f.color; ctx.shadowBlur=8;
+    _roundRect(ctx, x, y, w, h, 3); ctx.stroke();
+    ctx.shadowBlur=0;
     ctx.restore();
   }
   function drawMeter(x,y,w,h,val,mirror,color){
@@ -1040,12 +1041,42 @@ const VersusEngine = (() => {
     ctx.save();
     const a=Math.min(1,bigT*1.5);
     ctx.globalAlpha=a;
-    ctx.textAlign='center';
-    ctx.font=`900 ${Math.max(40,H*0.13)}px Orbitron, monospace`;
-    ctx.fillStyle = bigText.includes('K.O')?'#ff2244':'#ffd700';
-    ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=24;
-    ctx.fillText(bigText, W/2, H*0.42);
-    if (bigSub){ ctx.font=`700 ${Math.max(16,H*0.04)}px Orbitron, monospace`; ctx.fillStyle='#fff'; ctx.shadowBlur=8; ctx.fillText(bigSub, W/2, H*0.42+Math.max(30,H*0.08)); }
+
+    // During ROUND intro — draw animated VS character splash
+    if (phase === 'intro' && bigText.startsWith('ROUND') && typeof SpriteSystem !== 'undefined') {
+      const charH = Math.min(H * 0.65, 340);
+      const t = performance.now() / 1000;
+      const SS = SpriteSystem;
+      // P1 left side — idle facing right
+      const p1id = p1.char ? p1.char.id : 1;
+      const p2id = p2.char ? p2.char.id : 1;
+      if (!SS.drawAnim(ctx, p1id, 'idle', t, W*0.05, H*0.5 - charH*0.85, W*0.38, charH, { facing: 1 })) {
+        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p1id, 'idle', t, W*0.22, groundY, charH, 1, {});
+      }
+      // P2 right side — idle facing left
+      if (!SS.drawAnim(ctx, p2id, 'idle', t, W*0.57, H*0.5 - charH*0.85, W*0.38, charH, { facing: -1 })) {
+        if (typeof CharRenderer !== 'undefined') CharRenderer.draw(ctx, p2id, 'idle', t, W*0.78, groundY, charH, -1, {});
+      }
+      // VS badge
+      ctx.textAlign='center';
+      ctx.font=`900 ${Math.max(28,H*0.07)}px Orbitron, monospace`;
+      ctx.fillStyle='#ffd700'; ctx.shadowColor='#ffd700'; ctx.shadowBlur=20;
+      ctx.fillText('VS', W/2, H*0.5);
+      ctx.shadowBlur=0;
+      // Player name tags
+      ctx.font=`700 ${Math.max(13,H*0.028)}px Orbitron, monospace`;
+      ctx.fillStyle='#fff'; ctx.shadowColor='#000'; ctx.shadowBlur=6;
+      ctx.textAlign='left';  ctx.fillText(p1.name, W*0.04, H*0.5 + Math.max(20,H*0.06));
+      ctx.textAlign='right'; ctx.fillText(p2.name, W*0.96, H*0.5 + Math.max(20,H*0.06));
+      ctx.shadowBlur=0;
+    } else {
+      ctx.textAlign='center';
+      ctx.font=`900 ${Math.max(40,H*0.13)}px Orbitron, monospace`;
+      ctx.fillStyle = bigText.includes('K.O')?'#ff2244':'#ffd700';
+      ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=24;
+      ctx.fillText(bigText, W/2, H*0.42);
+      if (bigSub){ ctx.font=`700 ${Math.max(16,H*0.04)}px Orbitron, monospace`; ctx.fillStyle='#fff'; ctx.shadowBlur=8; ctx.fillText(bigSub, W/2, H*0.42+Math.max(30,H*0.08)); }
+    }
     ctx.restore();
   }
 

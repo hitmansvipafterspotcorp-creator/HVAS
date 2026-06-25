@@ -403,10 +403,14 @@ const HitgearOS = (() => {
         CharRenderer.draw(c, charId, 'idle', _spriteAnimT, W*0.5, H*0.92, W*0.7, H*0.85, 1, {});
         drawn = true;
       }
-      // Portrait frame from character_select sheet (r01_f00 = PORTRAIT_FRAME_UNSELECTED)
-      if (typeof UIElements !== 'undefined') {
-        UIElements.draw(c, 'hud', 0, 2, 0, 0, W, H, { alpha: 0.80 });
-      }
+      // Glowing border ring (canvas, no opaque sheet overlay)
+      c.save();
+      c.strokeStyle = charColor || '#ff00aa';
+      c.lineWidth = 3;
+      c.shadowColor = charColor || '#ff00aa';
+      c.shadowBlur = 18;
+      c.strokeRect(2, 2, W - 4, H - 4);
+      c.restore();
       _spriteAnimRAF = requestAnimationFrame(loop);
     }
     _spriteAnimRAF = requestAnimationFrame(loop);
