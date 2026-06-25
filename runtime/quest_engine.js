@@ -557,7 +557,7 @@ const QuestEngine = (() => {
       <div class="game-overlay-sub">${gameState.venue.name.toUpperCase()}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:14px 0;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,215,0,0.12);border:1px solid #ffd70066;border-radius:8px;padding:8px 16px">
-          <img src="assets/ui/frames/dialogue_mission_reward/r03_f00.png" style="height:32px;width:auto" alt="">
+          <img src="assets/ui/elements/dialogue_mission/dialogue_mission_003.png" style="height:32px;width:auto" alt="">
           <span style="color:#ffd700;font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900">+${rPts} STATUS</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,170,0,0.12);border:1px solid #ffaa0066;border-radius:8px;padding:8px 16px">

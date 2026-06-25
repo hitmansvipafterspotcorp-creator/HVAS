@@ -576,7 +576,7 @@ const HitgearOS = (() => {
       card.innerHTML = `
         <img src="assets/ui/elements/venue_map/venue_map_001.png" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.35;pointer-events:none;z-index:0" alt="">
         <div class="venue-card-overlay" style="position:absolute;inset:0;background:${unlocked ? 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 70%)' : 'rgba(0,0,0,0.7)'};border-radius:inherit;pointer-events:none"></div>
-        <img src="assets/ui/frames/venue_map_stage_select/${unlocked ? 'r00_f02' : 'r00_f00'}.png" style="position:absolute;top:4px;right:4px;width:32px;height:32px;object-fit:contain;image-rendering:pixelated;z-index:2;pointer-events:none" alt="">
+        <img src="assets/ui/elements/venue_map/${unlocked ? 'venue_map_012' : 'venue_map_004'}.png" style="position:absolute;top:4px;right:4px;width:32px;height:32px;object-fit:contain;image-rendering:auto;z-index:2;pointer-events:none" alt="">
         <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:8px 6px 6px">
           <div class="venue-number" style="align-self:flex-start">${String(v.id).padStart(2,'0')} / 16</div>
           <div style="flex:1;display:flex;align-items:center;justify-content:center">
@@ -636,7 +636,7 @@ const HitgearOS = (() => {
     if (!area) return;
     area.innerHTML = `
       <div style="text-align:center;margin-bottom:24px">
-        <img src="assets/ui/frames/dialogue_mission_reward/r00_f00.png" style="height:clamp(56px,9vw,80px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 16px #ffd700cc);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto" alt="">
+        <img src="assets/ui/elements/dialogue_mission/dialogue_mission_003.png" style="height:clamp(56px,9vw,80px);width:auto;image-rendering:auto;filter:drop-shadow(0 0 16px #ffd700cc);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto" alt="">
       </div>
       <div style="text-align:center;margin-bottom:24px">
         <h2 class="select-header" style="color:#ffd700">🎤 LIP SYNC BINGO</h2>
@@ -809,9 +809,9 @@ const HitgearOS = (() => {
 
     area.innerHTML = `
       <div style="text-align:center;margin-bottom:16px">
-        <img src="assets/ui/frames/options_settings/r00_f00.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
-        <img src="assets/ui/frames/options_settings/r00_f01.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
-        <img src="assets/ui/frames/options_settings/r00_f02.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+        <img src="assets/ui/elements/options_settings/options_settings_010.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:auto;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+        <img src="assets/ui/elements/options_settings/options_settings_013.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:auto;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+        <img src="assets/ui/elements/options_settings/options_settings_015.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:auto;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
       </div>
       <div class="vip-stats-grid" style="max-width:500px;margin:0 auto">
         ${toggle('sfx', 'SOUND EFFECTS', '🔊')}
