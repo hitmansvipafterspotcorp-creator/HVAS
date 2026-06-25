@@ -16,48 +16,48 @@ const StoryMode = (() => {
   // a canonical character. Difficulty scales with the rung index.
   const LADDER = [
     // ── ACT I — THE STREET ──────────────────────────────────────────────────
-    { opp:31, venue:'QUICK HIT FUEL — LATE STOP', stage:{sky:'#040014',ground:'#060005',accent:'#ffee00',name:'QUICK HIT FUEL',bgImage:'assets/venues/qhf_pack_07_exterior_bg.png'},
+    { opp:31, venue:'QUICK HIT FUEL — LATE STOP', stage:{sky:'#040014',ground:'#060005',accent:'#ffee00',name:'QUICK HIT FUEL',bgImage:'assets/venues/qhf_exterior.png'},
       pre:['AGENT SNOW: "Scene\'s shutting down tonight. Starting with you."',
            'YOU: "Cold night for the wrong move, agent."'],
       win:'SNOW\'s case goes cold. The block stays open. Word starts to travel.' },
 
-    { opp:4, venue:'TALLY ROW — THE STRIP', stage:{sky:'#060018',ground:'#0c0010',accent:'#ffdd00',name:'TALLY ROW EXTERIOR',bgImage:'assets/venues/tally_pack_02_exterior_stage.png'},
+    { opp:4, venue:'TALLY ROW — THE STRIP', stage:{sky:'#060018',ground:'#0c0010',accent:'#ffdd00',name:'TALLY ROW EXTERIOR',bgImage:'assets/venues/tally_exterior.png'},
       pre:['FAMU MALE: "Rattler pride runs this strip. You sure you wanna walk it?"',
            'YOU: "I don\'t walk it. I own it."'],
       win:'FAMU Male tips his head. Respect. The strip opens up.' },
 
-    { opp:3, venue:'THE ITUS PIZZA — KITCHEN RUSH', stage:{sky:'#1a0800',ground:'#0a0400',accent:'#ff4400',name:'THE ITUS PIZZA',bgImage:'assets/venues/tally_itus_pack_04_finished_layout.png'},
+    { opp:3, venue:'THE ITUS PIZZA — KITCHEN RUSH', stage:{sky:'#1a0800',ground:'#0a0400',accent:'#ff4400',name:'THE ITUS PIZZA',bgImage:'assets/venues/tally_itus.png'},
       pre:['FAMU FEMALE: "Rattler rush — you can\'t keep up with me."',
            'YOU: "Watch the counter, then. This one\'s on the house."'],
       win:'FAMU Female salutes. Pizza • People • Party — and you ran it.' },
 
     // ── ACT II — THE VENUES ──────────────────────────────────────────────────
-    { opp:13, venue:'SAMMYS STAGE — THE SHOWDOWN', stage:{sky:'#100020',ground:'#0a0010',accent:'#ffdd00',name:'SAMMYS STAGE',bgImage:'assets/venues/tally_sammys_pack_02_interior_a.png'},
+    { opp:13, venue:'SAMMYS STAGE — THE SHOWDOWN', stage:{sky:'#100020',ground:'#0a0010',accent:'#ffdd00',name:'SAMMYS STAGE',bgImage:'assets/venues/tally_sammys.png'},
       pre:['FSU FEMALE: "I counter everything. No move you\'ve got is new to me."',
            'YOU: "Then watch this one, gold standard."'],
       win:'The counter game breaks. Sammys crowd chants your name.' },
 
-    { opp:12, venue:'PUBLIC HALL — CROWD CONTROL', stage:{sky:'#080018',ground:'#0a0014',accent:'#aaaaff',name:'PUBLIC HALL',bgImage:'assets/venues/tally_public_hall_pack_04_finished_layout.png'},
+    { opp:12, venue:'PUBLIC HALL — CROWD CONTROL', stage:{sky:'#080018',ground:'#0a0014',accent:'#aaaaff',name:'PUBLIC HALL',bgImage:'assets/venues/tally_public_hall.png'},
       pre:['FSU MALE: "Garnet and gold runs this hall. Seminoles don\'t fold."',
            'YOU: "Open season. Let\'s see who\'s still standing."'],
       win:'Garnet and Gold hits the floor. Public Hall belongs to the night.' },
 
-    { opp:30, venue:'13 RAVE CLUB — THE BASS DROP', stage:{sky:'#080030',ground:'#0a000f',accent:'#00ffcc',name:'13 RAVE CLUB',bgImage:'assets/venues/tally_13rave_pack_04_finished_layout.png'},
+    { opp:30, venue:'13 RAVE CLUB — THE BASS DROP', stage:{sky:'#080030',ground:'#0a000f',accent:'#00ffcc',name:'13 RAVE CLUB',bgImage:'assets/venues/tally_13rave.png'},
       pre:['PREDATOR PETE: "Smooth operator works the floor. You\'re cramping it."',
            'YOU: "Your act\'s played out, Pete. Lights up."'],
       win:'PETE slithers off mid-bass-drop. 13 Rave is yours.' },
 
-    { opp:31, venue:'THE DEN — UNDERGROUND', stage:{sky:'#0a0015',ground:'#0a0010',accent:'#8800ff',name:'THE DEN',bgImage:'assets/venues/tally_den_pack_05_finished_layout.png'},
+    { opp:31, venue:'THE DEN — UNDERGROUND', stage:{sky:'#0a0015',ground:'#0a0010',accent:'#8800ff',name:'THE DEN',bgImage:'assets/venues/tally_den.png'},
       pre:['AGENT SNOW: "You shouldn\'t have made it this far. Rematch. Final answer."',
            'YOU: "Cold case. Closed twice."'],
       win:'SNOW taps out for good. The Den answers to you now.' },
 
-    { opp:12, venue:'DUKES & DIMES — HIGH STAKES', stage:{sky:'#0a0a00',ground:'#181800',accent:'#ffd700',name:'DUKES & DIMES',bgImage:'assets/venues/dukes_pack_08_interior_bg.png'},
+    { opp:12, venue:'DUKES & DIMES — HIGH STAKES', stage:{sky:'#0a0a00',ground:'#181800',accent:'#ffd700',name:'DUKES & DIMES',bgImage:'assets/venues/dukes_interior.png'},
       pre:['FSU MALE: "Double or nothing. House always wins."',
            'YOU: "Not tonight. I am the house."'],
       win:'The table flips. Dukes & Dimes folds. The hustle is yours.' },
 
-    { opp:13, venue:'KINGDOM COME SALOON — LAST CALL', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#ffaa00',name:'KINGDOM COME SALOON',bgImage:'assets/venues/kcs_pack_07_exterior_bg.png'},
+    { opp:13, venue:'KINGDOM COME SALOON — LAST CALL', stage:{sky:'#1a1000',ground:'#0a0500',accent:'#ffaa00',name:'KINGDOM COME SALOON',bgImage:'assets/venues/kingdom_come_exterior.png'},
       pre:['FSU FEMALE: "Last call, hotshot. Country brawlers don\'t miss."',
            'YOU: "Then it\'s a good thing I never do."'],
       win:'Last call rings out. Kingdom Come Saloon bows to the night.' },

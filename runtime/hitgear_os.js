@@ -535,23 +535,27 @@ const HitgearOS = (() => {
   }
 
   // Map venue shortName → best background image
+  // CLEAN finished venue renders only. The *_pack_NN_*.png files are design /
+  // assembly SPEC SHEETS (title bars, annotation panels, component callouts) —
+  // never use them as backgrounds. The simple-named files are the finished,
+  // label-free venue art.
   const VENUE_BG_MAP = {
     'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
-    'HIBACHI STREET':'assets/venues/kcs_pack_07_exterior_bg.png',
+    'HIBACHI STREET':'assets/venues/outta_exterior.png',
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
-    'KINGDOM COME':  'assets/venues/kcs_pack_08_interior_bg.png',
-    'SOCIAL GAINES': 'assets/venues/outta_pack_08_interior_bg.png',
-    'SUCCESS POOL':  'assets/venues/outta_pack_07_exterior_bg.png',
-    'TALLY ROW':     'assets/venues/tally_pack_02_exterior_stage.png',
-    'THE DEN':       'assets/venues/tally_den_pack_05_finished_layout.png',
-    'THE ITUS':      'assets/venues/tally_itus_pack_04_finished_layout.png',
-    'SAMMYS STAGE':  'assets/venues/tally_sammys_pack_02_interior_a.png',
-    'PUBLIC HALL':   'assets/venues/tally_public_hall_pack_04_finished_layout.png',
-    '13 RAVE':       'assets/venues/tally_13rave_pack_04_finished_layout.png',
-    'DUKES & DIMES': 'assets/venues/dukes_pack_08_interior_bg.png',
-    'QUICK HIT':     'assets/venues/qhf_pack_07_exterior_bg.png',
-    'ROOFTOP PKG':   'assets/venues/dukes_pack_07_exterior_bg.png',
-    'EVO FEST':      'assets/venues/outta_pack_07_exterior_bg.png',
+    'KINGDOM COME':  'assets/venues/kingdom_come_exterior.png',
+    'SOCIAL GAINES': 'assets/venues/outta_interior.png',
+    'SUCCESS POOL':  'assets/venues/outta_interior.png',
+    'TALLY ROW':     'assets/venues/tally_exterior.png',
+    'THE DEN':       'assets/venues/tally_den.png',
+    'THE ITUS':      'assets/venues/tally_itus.png',
+    'SAMMYS STAGE':  'assets/venues/tally_sammys.png',
+    'PUBLIC HALL':   'assets/venues/tally_public_hall.png',
+    '13 RAVE':       'assets/venues/tally_13rave.png',
+    'DUKES & DIMES': 'assets/venues/dukes_exterior.png',
+    'QUICK HIT':     'assets/venues/qhf_exterior.png',
+    'ROOFTOP PKG':   'assets/venues/dukes_exterior.png',
+    'EVO FEST':      'assets/venues/tally_exterior.png',
   };
 
   function renderVenueMap() {

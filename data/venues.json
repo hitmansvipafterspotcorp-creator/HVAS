@@ -373,7 +373,7 @@
         "zone": "bar"
       }
     ],
-    "bgImage": "assets/venues/kcs_pack_08_interior_bg.png"
+    "bgImage": "assets/venues/kingdom_come_exterior.png"
   },
   {
     "id": 5,
@@ -579,7 +579,13 @@
     "reward": {
       "pts": 1200,
       "coins": 300,
-      "unlocks": [8, 9, 10, 11, 12]
+      "unlocks": [
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
     },
     "bgLayers": [
       {
@@ -1156,7 +1162,7 @@
         "zone": "main_table"
       }
     ],
-    "bgImage": "assets/venues/dukes_interior.png"
+    "bgImage": "assets/venues/dukes_exterior.png"
   },
   {
     "id": 14,
@@ -1260,7 +1266,7 @@
     ],
     "stageWidth": 3600,
     "groundY": 0.75,
-    "bgImage": "assets/venues/qhf_pack_07_exterior_bg.png"
+    "bgImage": "assets/venues/qhf_exterior.png"
   },
   {
     "id": 15,
@@ -1366,7 +1372,7 @@
     ],
     "stageWidth": 4000,
     "groundY": 0.75,
-    "bgImage": "assets/venues/dukes_pack_07_exterior_bg.png"
+    "bgImage": "assets/venues/dukes_exterior.png"
   },
   {
     "id": 16,
@@ -1486,6 +1492,6 @@
     ],
     "stageWidth": 5000,
     "groundY": 0.75,
-    "bgImage": "assets/venues/tally_pack_02_exterior_stage.png"
+    "bgImage": "assets/venues/tally_exterior.png"
   }
 ]
