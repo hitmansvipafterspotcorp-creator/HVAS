@@ -738,10 +738,9 @@ body {
   width: 100%;
   height: 100%;
   /* COVER = fill the entire viewport, no black letterbox bars.
-     object-position favors the top so the HITGEAR branding stays visible
-     and only the empty device edge below the buttons gets cropped. */
+     Centered so the device is fully visible on most aspect ratios. */
   object-fit: cover;
-  object-position: 50% 10%;
+  object-position: 50% 50%;
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
