@@ -153,18 +153,18 @@ const HitgearOS = (() => {
     const grid = document.getElementById('os-icon-grid');
     if (!grid) return;
     const icons = [
-      { label: 'STORY\nMODE', emoji: '🥊', action: () => StoryMode.startStory() },
-      { label: 'ARCADE\nFIGHT', emoji: '🕹️', action: () => StoryMode.startArcade() },
-      { label: 'HITMANS VIP\nQUEST', emoji: '👑', action: () => openGameMenu() },
-      { label: 'VENUES\n& SPOTS', emoji: '🗺️', action: () => openVenueMap() },
-      { label: 'VIP\nSTATUS', emoji: '⭐', action: () => openVIPStatus() },
-      { label: 'LIP SYNC\nBINGO', emoji: '🎤', action: () => openBingo() }
+      { label: 'STORY\nMODE', emblem: 'r00_f00', action: () => StoryMode.startStory() },
+      { label: 'ARCADE\nFIGHT', emblem: 'r00_f01', action: () => StoryMode.startArcade() },
+      { label: 'HITMANS VIP\nQUEST', emblem: 'r00_f02', action: () => openGameMenu() },
+      { label: 'VENUES\n& SPOTS', emblem: 'r00_f03', action: () => openVenueMap() },
+      { label: 'VIP\nSTATUS', emblem: 'r00_f04', action: () => openVIPStatus() },
+      { label: 'LIP SYNC\nBINGO', emblem: 'r00_f05', action: () => openBingo() }
     ];
     grid.innerHTML = '';
     icons.forEach((ic, i) => {
       const div = document.createElement('div');
       div.className = 'os-icon' + (i === selectedOsIcon ? ' selected' : '');
-      div.innerHTML = `<div class="os-icon-img">${ic.emoji}</div><div class="os-icon-label">${ic.label.replace('\n','<br>')}</div>`;
+      div.innerHTML = `<div class="os-icon-img"><img src="assets/ui/frames/frames_emblems/${ic.emblem}.png" style="width:100%;height:100%;object-fit:contain;image-rendering:pixelated" alt=""></div><div class="os-icon-label">${ic.label.replace('\n','<br>')}</div>`;
       div.addEventListener('click', ic.action);
       div.addEventListener('mouseenter', () => {
         document.querySelectorAll('.os-icon').forEach(d => d.classList.remove('selected'));
@@ -316,10 +316,11 @@ const HitgearOS = (() => {
       const locked = (ch.unlockPts || 0) > pts;
       const card = document.createElement('div');
       card.className = 'char-card' + (ch.id === selectedCharId ? ' active' : '') + (locked ? ' locked-char' : '');
+      const cid = `cs-thumb-${ch.id}`;
       card.innerHTML = `
-        <div class="char-avatar">${ch.emoji}</div>
+        <canvas id="${cid}" width="60" height="70" style="width:60px;height:70px;image-rendering:pixelated;display:block;margin:0 auto"></canvas>
         <div class="char-name">${ch.shortName || ch.name}</div>
-        ${locked ? `<div class="char-locked">🔒</div>` : ''}`;
+        ${locked ? '<div class="char-locked">🔒</div>' : ''}`;
 
       card.addEventListener('click', () => {
         if (locked) return;
@@ -336,9 +337,39 @@ const HitgearOS = (() => {
       grid.appendChild(card);
     });
 
+    // Animate idle thumbnails on the grid
+    _startGridThumbAnim();
+
     // Show preview for current selection
     const selected = window.CHARACTERS.find(c => c.id === selectedCharId);
     if (selected) _updateCharPreview(selected, onSelect);
+  }
+
+  let _gridThumbRAF = null;
+  let _gridThumbT = 0;
+  let _gridThumbLast = 0;
+  function _startGridThumbAnim() {
+    if (_gridThumbRAF) { cancelAnimationFrame(_gridThumbRAF); _gridThumbRAF = null; }
+    function loop(ts) {
+      const dt = (ts - (_gridThumbLast || ts)) / 1000;
+      _gridThumbLast = ts;
+      _gridThumbT += dt;
+      (window.CHARACTERS || []).forEach(ch => {
+        const cv = document.getElementById(`cs-thumb-${ch.id}`);
+        if (!cv) return;
+        const c = cv.getContext('2d');
+        c.clearRect(0, 0, cv.width, cv.height);
+        let drawn = false;
+        if (typeof SpriteSystem !== 'undefined') {
+          drawn = SpriteSystem.drawAnim(c, ch.id, 'idle', _gridThumbT, 0, 0, cv.width, cv.height, { facing: 1 });
+        }
+        if (!drawn && typeof CharRenderer !== 'undefined') {
+          CharRenderer.draw(c, ch.id, 'idle', _gridThumbT, cv.width * 0.5, cv.height * 0.95, cv.width * 0.85, cv.height * 0.9, 1, {});
+        }
+      });
+      _gridThumbRAF = requestAnimationFrame(loop);
+    }
+    _gridThumbRAF = requestAnimationFrame(loop);
   }
 
   let _spriteAnimRAF = null;
@@ -508,17 +539,17 @@ const HitgearOS = (() => {
     'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
     'HIBACHI STREET':'assets/venues/kcs_pack_07_exterior_bg.png',
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
-    'KINGDOM COME':  'assets/venues/kingdom_come_saloon.png',
-    'SOCIAL GAINES': 'assets/venues/outta_interior.png',
-    'SUCCESS POOL':  'assets/venues/outta_exterior.png',
-    'TALLY ROW':     'assets/venues/tally_exterior.png',
-    'THE DEN':       'assets/venues/tally_den.png',
-    'THE ITUS':      'assets/venues/tally_itus.png',
-    'SAMMYS STAGE':  'assets/venues/tally_sammys.png',
-    'PUBLIC HALL':   'assets/venues/tally_public_hall.png',
-    '13 RAVE':       'assets/venues/tally_13rave.png',
-    'DUKES & DIMES': 'assets/venues/dukes_interior.png',
-    'QUICK HIT':     'assets/venues/qhf_exterior.png',
+    'KINGDOM COME':  'assets/venues/kcs_pack_08_interior_bg.png',
+    'SOCIAL GAINES': 'assets/venues/outta_pack_08_interior_bg.png',
+    'SUCCESS POOL':  'assets/venues/outta_pack_07_exterior_bg.png',
+    'TALLY ROW':     'assets/venues/tally_pack_02_exterior_stage.png',
+    'THE DEN':       'assets/venues/tally_den_pack_05_finished_layout.png',
+    'THE ITUS':      'assets/venues/tally_itus_pack_04_finished_layout.png',
+    'SAMMYS STAGE':  'assets/venues/tally_sammys_pack_02_interior_a.png',
+    'PUBLIC HALL':   'assets/venues/tally_public_hall_pack_04_finished_layout.png',
+    '13 RAVE':       'assets/venues/tally_13rave_pack_04_finished_layout.png',
+    'DUKES & DIMES': 'assets/venues/dukes_pack_08_interior_bg.png',
+    'QUICK HIT':     'assets/venues/qhf_pack_07_exterior_bg.png',
     'ROOFTOP PKG':   'assets/venues/dukes_pack_07_exterior_bg.png',
     'EVO FEST':      'assets/venues/outta_pack_07_exterior_bg.png',
   };
@@ -539,6 +570,7 @@ const HitgearOS = (() => {
       }
       card.innerHTML = `
         <div class="venue-card-overlay" style="position:absolute;inset:0;background:${unlocked ? 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 70%)' : 'rgba(0,0,0,0.7)'};border-radius:inherit;pointer-events:none"></div>
+        <img src="assets/ui/frames/venue_map_stage_select/${unlocked ? 'r00_f02' : 'r00_f00'}.png" style="position:absolute;top:4px;right:4px;width:32px;height:32px;object-fit:contain;image-rendering:pixelated;z-index:2;pointer-events:none" alt="">
         <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:8px 6px 6px">
           <div class="venue-number" style="align-self:flex-start">${String(v.id).padStart(2,'0')} / 16</div>
           <div style="flex:1;display:flex;align-items:center;justify-content:center">
@@ -597,6 +629,9 @@ const HitgearOS = (() => {
     const area = document.getElementById('bingo-area');
     if (!area) return;
     area.innerHTML = `
+      <div style="text-align:center;margin-bottom:24px">
+        <img src="assets/ui/frames/dialogue_mission_reward/r00_f00.png" style="height:clamp(56px,9vw,80px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 16px #ffd700cc);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto" alt="">
+      </div>
       <div style="text-align:center;margin-bottom:24px">
         <h2 class="select-header" style="color:#ffd700">🎤 LIP SYNC BINGO</h2>
         <p style="font-family:'Rajdhani',sans-serif;font-size:14px;color:#ccbbee;max-width:400px;margin:0 auto">
@@ -767,6 +802,11 @@ const HitgearOS = (() => {
       </div>`;
 
     area.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px">
+        <img src="assets/ui/frames/options_settings/r00_f00.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+        <img src="assets/ui/frames/options_settings/r00_f01.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+        <img src="assets/ui/frames/options_settings/r00_f02.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:pixelated;filter:drop-shadow(0 0 12px #ff00aa88)" alt="">
+      </div>
       <div class="vip-stats-grid" style="max-width:500px;margin:0 auto">
         ${toggle('sfx', 'SOUND EFFECTS', '🔊')}
         ${toggle('music', 'MUSIC', '🎵')}
