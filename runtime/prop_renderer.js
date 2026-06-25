@@ -31,9 +31,9 @@ const PropRenderer = (() => {
     'tally_sammys/inside':     18,
     'tally_public_hall/inside':60,
     'tally_13rave/inside':     67,
-    'social_gaines/outside':   47,
-    'social_gaines/inside':    19,
-    'success/inside':          47,
+    'social_gaines/outside':   24,
+    'social_gaines/inside':    11,
+    'success/inside':          32,
   };
 
   // Map HVAS venue shortNames / ids to prop folder names
