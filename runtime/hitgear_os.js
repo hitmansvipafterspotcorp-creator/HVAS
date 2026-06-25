@@ -541,7 +541,6 @@ const HitgearOS = (() => {
   // label-free venue art.
   const VENUE_BG_MAP = {
     'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
-    'HIBACHI STREET':'assets/venues/outta_exterior.png',
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
     'KINGDOM COME':  'assets/venues/kingdom_come_exterior.png',
     'SOCIAL GAINES': 'assets/venues/outta_interior.png',
@@ -554,8 +553,6 @@ const HitgearOS = (() => {
     '13 RAVE':       'assets/venues/tally_13rave.png',
     'DUKES & DIMES': 'assets/venues/dukes_exterior.png',
     'QUICK HIT':     'assets/venues/qhf_exterior.png',
-    'ROOFTOP PKG':   'assets/venues/dukes_exterior.png',
-    'EVO FEST':      'assets/venues/tally_exterior.png',
   };
 
   function renderVenueMap() {
@@ -578,7 +575,7 @@ const HitgearOS = (() => {
         <div class="venue-card-overlay" style="position:absolute;inset:0;background:${unlocked ? 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(0,0,0,0.7) 70%)' : 'rgba(0,0,0,0.7)'};border-radius:inherit;pointer-events:none"></div>
         <img src="assets/ui/elements/venue_map/${unlocked ? 'venue_map_012' : 'venue_map_004'}.png" style="position:absolute;top:4px;right:4px;width:32px;height:32px;object-fit:contain;image-rendering:auto;z-index:2;pointer-events:none" alt="">
         <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;height:100%;padding:8px 6px 6px">
-          <div class="venue-number" style="align-self:flex-start">${String(v.id).padStart(2,'0')} / 16</div>
+          <div class="venue-number" style="align-self:flex-start">${String(v.id).padStart(2,'0')} / ${window.VENUES.length}</div>
           <div style="flex:1;display:flex;align-items:center;justify-content:center">
             ${bg ? '' : `<div class="venue-icon">${v.emoji}</div>`}
           </div>

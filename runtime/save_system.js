@@ -6,7 +6,7 @@ const SaveSystem = (() => {
     playerName: 'NEW MEMBER',
     characterId: 1,
     currentVenueId: 1,
-    unlockedVenues: [1, 2],
+    unlockedVenues: [1],
     completedMissions: [],
     level: 1,
     statusPts: 0,
