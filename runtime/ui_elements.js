@@ -1,75 +1,82 @@
 'use strict';
 /**
- * UIElements — lazy image registry for all assets/ui/elements/ cutouts.
+ * UIElements — registry for all UI sprite sheet frames.
+ * Source: assets/ui/frames/<sheet_name>/r<RR>_f<CC>.png
+ * Each sheet is 8 cols x 4 rows = 32 transparent BGRA frame PNGs.
  *
- * Categories match the folder names produced by slice_ui_elements.py:
- *   title_menu, frames_emblems, pause_menu, character_select,
- *   hud, venue_map, dialogue_mission, options_settings
+ * Sheet names (match folder names):
+ *   title_main_menu, frames_emblems, pause_menu, character_select,
+ *   hud, venue_map_stage_select, dialogue_mission_reward,
+ *   options_settings, build_summary
  *
  * Usage:
- *   UIElements.preload('hud', 'title_menu');
- *   const img = UIElements.get('hud', 0);   // null until loaded
- *   UIElements.draw(ctx, 'frames_emblems', 2, x, y, w, h);
+ *   UIElements.preload('hud', 'title_main_menu');
+ *   UIElements.draw(ctx, 'hud', row, col, x, y, w, h);
+ *   UIElements.drawIdx(ctx, 'frames_emblems', 3, x, y, w, h);  // linear index
  */
 const UIElements = (() => {
-  // Max elements per category (counts from slice run)
-  const COUNTS = {
-    title_menu:       57,
-    frames_emblems:   28,
-    pause_menu:       35,
-    character_select: 44,
-    hud:              30,
-    venue_map:        36,
-    dialogue_mission: 16,
-    options_settings: 33,
-  };
+  const SHEETS = [
+    'title_main_menu',
+    'frames_emblems',
+    'pause_menu',
+    'character_select',
+    'hud',
+    'venue_map_stage_select',
+    'dialogue_mission_reward',
+    'options_settings',
+    'build_summary',
+  ];
+  const ROWS = 4;
+  const COLS = 8;
+  const BASE = 'assets/ui/frames/';
+  const _cache = {};
 
-  const BASE = 'assets/ui/elements/';
-  const _cache = {};   // "cat/NNN" → HTMLImageElement
+  function _key(sheet, row, col) {
+    return `${sheet}/r${String(row).padStart(2,'0')}_f${String(col).padStart(2,'0')}`;
+  }
 
-  function _key(cat, idx) { return cat + '/' + String(idx).padStart(3, '0'); }
-
-  function _load(cat, idx) {
-    const k = _key(cat, idx);
+  function _load(sheet, row, col) {
+    const k = _key(sheet, row, col);
     if (_cache[k]) return _cache[k];
     const img = new Image();
     img._ready = false; img._failed = false;
-    img.onload  = () => { img._ready = true; };
+    img.onload  = () => { img._ready  = true; };
     img.onerror = () => { img._failed = true; };
-    img.src = `${BASE}${cat}/${cat}_${String(idx).padStart(3, '0')}.png`;
+    img.src = `${BASE}${sheet}/r${String(row).padStart(2,'0')}_f${String(col).padStart(2,'0')}.png`;
     _cache[k] = img;
     return img;
   }
 
-  /** Get a loaded image or null if not yet ready / missing. */
-  function get(cat, idx) {
-    const img = _load(cat, idx);
+  /** Get image by sheet + row + col, or null if not ready. */
+  function get(sheet, row, col) {
+    const img = _load(sheet, row, col);
     return (img && img._ready) ? img : null;
   }
 
-  /** Returns how many elements the category has. */
-  function count(cat) { return COUNTS[cat] || 0; }
+  /** Get by linear index (0–31). row = floor(idx/8), col = idx%8 */
+  function getIdx(sheet, idx) {
+    return get(sheet, Math.floor(idx / COLS), idx % COLS);
+  }
 
-  /** Kick off loads for every element in each named category. */
-  function preload(...cats) {
-    cats.forEach(cat => {
-      const n = COUNTS[cat] || 0;
-      for (let i = 0; i < n; i++) _load(cat, i);
+  /** Kick off all 32 frame loads for each named sheet. */
+  function preload(...sheets) {
+    sheets.forEach(sheet => {
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) _load(sheet, r, c);
     });
   }
 
   /**
-   * Draw one element (contain-fit) into a rect.
+   * Draw one UI frame (contain-fit) into a rect.
    * Falls back silently if not loaded.
    */
-  function draw(ctx, cat, idx, x, y, w, h, opts) {
-    const img = get(cat, idx);
+  function draw(ctx, sheet, row, col, x, y, w, h, opts) {
+    const img = get(sheet, row, col);
     if (!img) return false;
     opts = opts || {};
     ctx.save();
     if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
     if (opts.shadow) { ctx.shadowColor = opts.shadow; ctx.shadowBlur = opts.shadowBlur || 16; }
-    // contain-fit
     const ir = img.naturalWidth / img.naturalHeight;
     const rr = w / h;
     let dw, dh, dx, dy;
@@ -80,51 +87,36 @@ const UIElements = (() => {
     return true;
   }
 
-  /**
-   * Draw a decorative row of N elements from a category,
-   * spaced evenly across [x, x+totalW].
-   */
-  function drawRow(ctx, cat, count, x, y, totalW, h, opts) {
-    const n = COUNTS[cat] || 0;
-    const step = totalW / Math.max(count - 1, 1);
-    for (let i = 0; i < count; i++) {
-      const idx = i % n;
-      draw(ctx, cat, idx, x + i * step - h / 2, y, h, h, opts);
-    }
+  /** Draw by linear index. */
+  function drawIdx(ctx, sheet, idx, x, y, w, h, opts) {
+    return draw(ctx, sheet, Math.floor(idx / COLS), idx % COLS, x, y, w, h, opts);
   }
 
   /**
-   * Draw four corner elements from frames_emblems category to frame a rect.
-   * Great for menus, character select panels, etc.
+   * Draw decorative corner frames using frames_emblems sheet.
    */
   function drawCornerFrames(ctx, x, y, w, h, cornerSize) {
-    const n = COUNTS['frames_emblems'] || 0;
-    if (!n) return;
-    // pick 4 sequential elements that look like corners
-    const picks = [0, 1, 2, 3].map(i => i % n);
     const s = cornerSize || Math.min(w, h) * 0.12;
-    draw(ctx, 'frames_emblems', picks[0], x,         y,         s, s);
-    draw(ctx, 'frames_emblems', picks[1], x + w - s, y,         s, s);
-    draw(ctx, 'frames_emblems', picks[2], x,         y + h - s, s, s);
-    draw(ctx, 'frames_emblems', picks[3], x + w - s, y + h - s, s, s);
+    draw(ctx, 'frames_emblems', 0, 0, x,         y,         s, s);
+    draw(ctx, 'frames_emblems', 0, 1, x + w - s, y,         s, s);
+    draw(ctx, 'frames_emblems', 0, 2, x,         y + h - s, s, s);
+    draw(ctx, 'frames_emblems', 0, 3, x + w - s, y + h - s, s, s);
   }
 
   /**
-   * Draw a sprite preview for a character id using SpriteSystem.
-   * Renders the idle frame of the loco sheet to an off-screen canvas,
-   * then blits it to the target position.
-   * Returns true if drawn.
+   * Draw a character sprite preview using SpriteSystem.
    */
   function drawCharSprite(ctx, charId, x, y, w, h, opts) {
     if (typeof SpriteSystem === 'undefined') return false;
     opts = opts || {};
-    const anim = opts.anim || (opts.topdown ? 'td_idle_s' : 'idle');
-    return SpriteSystem.drawFrame(ctx, charId, anim, 0, x, y, w, h, { facing: opts.facing || 1 });
+    const anim = opts.anim || 'idle';
+    const t = opts.t || (Date.now() / 1000);
+    return SpriteSystem.drawAnim(ctx, charId, anim, t, x, y, w, h, { facing: opts.facing || 1 });
   }
 
-  // Preload the most critical categories immediately (small sets used in menus)
-  preload('hud', 'frames_emblems', 'title_menu');
+  // Preload the most-used sheets immediately
+  preload('hud', 'frames_emblems', 'title_main_menu', 'character_select');
 
-  return { get, count, draw, drawRow, drawCornerFrames, drawCharSprite, preload };
+  return { get, getIdx, draw, drawIdx, drawCornerFrames, drawCharSprite, preload, SHEETS, ROWS, COLS };
 })();
 window.UIElements = UIElements;
