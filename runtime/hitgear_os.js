@@ -544,7 +544,7 @@ const HitgearOS = (() => {
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
     'KINGDOM COME':  'assets/venues/kingdom_come_exterior.png',
     'SOCIAL GAINES': 'assets/venues/outta_interior.png',
-    'SUCCESS POOL':  'assets/venues/outta_interior.png',
+    'SUCCESS POOL':  'assets/venues/success_pool.png',
     'TALLY ROW':     'assets/venues/tally_exterior.png',
     'THE DEN':       'assets/venues/tally_den.png',
     'THE ITUS':      'assets/venues/tally_itus.png',

@@ -10,8 +10,8 @@ backdrops whenever a file is missing — nothing crashes if art isn't present.
 |-------------------------------|---------------------------------|---------------------------------------------|
 | `kingdom_come_saloon.png`     | id:4 Kingdom Come Saloon (top)  | Kingdom Come Stage 2 — Sheet 08 interior    |
 | `kingdom_come_exterior.png`   | story: Kingdom Come "Last Call" | Kingdom Come Stage 2 — Sheet 07 exterior    |
-| `outta_interior.png`          | id:5 Social Gaines, id:6 Success Pool | Outta Pocket — Sheet 08 interior hero |
-| `outta_exterior.png`          | (spare exterior hero)           | Outta Pocket — Sheet 08 exterior hero       |
+| `outta_interior.png`          | id:5 Social Gaines (sports-bar fit) | Outta Pocket — Sheet 08 interior hero   |
+| `outta_exterior.png`          | Outta Pocket (its own separate venue) | Outta Pocket — Sheet 08 exterior hero |
 | `tally_exterior.png`          | id:7 Tally Row Exterior (side)  | Tally Row — Sheet 02 brawler exterior       |
 | `tally_den.png`               | id:8 The Den                    | Tally Row — Sheet 07 interior               |
 | `tally_itus.png`              | id:9 The Itus Pizza             | Tally Row — Sheet 06 interior               |
@@ -22,17 +22,19 @@ backdrops whenever a file is missing — nothing crashes if art isn't present.
 | `dukes_exterior.png`          | (spare exterior hero)           | Dukes & Dimes — Sheet 08 exterior hero      |
 | `qhf_exterior.png`            | id:14 Quick Hit Fuel (side)     | Quick Hit Fuel — Sheet 01 night-sky backdrop|
 
-## STILL NEEDED — Stage 1 (Cafe 8Fifty / HITMANS VIP AFTER SPOT)
+## STILL NEEDED — venue renders not present in the repo
 
-These two are referenced by the home venues + the final boss gauntlet but the
-**Cafe 8Fifty Stage 1 venue pack was not found in the repo** (only the KT /
-Cafe8Fifty NPC *character* sheets are here). Until they're uploaded, those
-venues run on the neon-vector fallback.
+These venues are distinct and must NOT borrow Outta Pocket art (Outta Pocket is
+its own separate venue). The wrong Outta-Pocket placeholder copies that were
+previously sitting in `cafe8fifty_exterior.png` / `hvas_interior.png` have been
+removed. Drop a finished render in here with the exact filename and it lights up
+automatically — no code changes.
 
-| Needed file                   | Used by                                              |
+| Needed file                   | Venue                                                |
 |-------------------------------|------------------------------------------------------|
-| `cafe8fifty_exterior.png`     | id:1 Cafe 8Fifty, story: The Door (ELD), HVAS (Soulja)|
-| `hvas_interior.png`           | id:3 HVAS interior, story: KT final boss             |
+| `cafe8fifty_exterior.png`     | id:1 Cafe8Fifty — neon-lit street front (stage 1)    |
+| `hvas_interior.png`           | id:3 HITMANS VIP After Spot — VIP club interior      |
+| `success_pool.png`            | id:6 Success Pool — ROOFTOP swimming-pool bar (pool, tiki bar, cabanas, palm trees) — NOT a billiards hall |
 
-Drop a finished Cafe 8Fifty exterior render + an HVAS interior render in here
-with those exact names and they light up automatically — no code changes.
+Only the Cafe8Fifty / HVAS NPC *character* sheets exist in the repo; no
+background pack for these three venues was uploaded.

@@ -38,8 +38,10 @@ const CORE_ASSETS = [
   './runtime/dance_minigame.js',
   './runtime/hitgear_os.js',
   // ── Venue backgrounds ────────────────────────────────────────────────────
-  './assets/venues/cafe8fifty_exterior.png',
-  './assets/venues/hvas_interior.png',
+  // NOTE: cafe8fifty_exterior.png, hvas_interior.png and success_pool.png are
+  // intentionally NOT cached yet — those venue renders are not in the repo
+  // (Cafe8Fifty / HVAS / rooftop Success Pool art still pending). Drop the
+  // finished files in with those names and they load automatically.
   './assets/venues/kingdom_come_saloon.png',
   './assets/venues/kingdom_come_exterior.png',
   './assets/venues/outta_interior.png',
