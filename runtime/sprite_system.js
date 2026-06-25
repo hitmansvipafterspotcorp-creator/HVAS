@@ -1,9 +1,8 @@
 'use strict';
 const SpriteSystem = (() => {
   const FRAMES_PER_ROW = 8;
-  // Each sprite sheet has a left annotation panel ~297px wide before actual frames begin.
-  // Actual frame width = (naturalWidth - X_OFFSET) / FRAMES_PER_ROW
-  const X_OFFSET = 297;
+  // Sheets are pure atlases — no annotation panel. Content starts at column 0.
+  const X_OFFSET = 0;
   const SHEET_ROWS = { loco:6, combat:5, damage:5, supers:4, topdown:8, vfx:8 };
 
   // ── Image cache ──────────────────────────────────────────────────────────
@@ -20,11 +19,10 @@ const SpriteSystem = (() => {
   }
 
   function _dims(img, sheetKey, charId) {
-    if (!img._ready) return { xOff: X_OFFSET, w:144, h:181 };
+    if (!img._ready) return { xOff: 0, w:181, h:181 };
     const def = charId != null ? CHAR_DEFS[charId] : null;
     const rows = (def && def.sheetRows && def.sheetRows[sheetKey]) || SHEET_ROWS[sheetKey] || 4;
-    const usableW = img.naturalWidth - X_OFFSET;
-    return { xOff: X_OFFSET, w: Math.floor(usableW / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
+    return { xOff: 0, w: Math.floor(img.naturalWidth / FRAMES_PER_ROW), h: Math.floor(img.naturalHeight / rows) };
   }
 
   // ── Character definitions ────────────────────────────────────────────────
@@ -812,9 +810,9 @@ const SpriteSystem = (() => {
     if (!def) return false;
     const img = _img(def.sheets.loco);
     if (!img || !img._ready || img._failed) return false;
-    const fw = Math.floor((img.naturalWidth - X_OFFSET) / def.framesPerRow);
+    const fw = Math.floor(img.naturalWidth / def.framesPerRow);
     const fh = Math.floor(img.naturalHeight / def.rows);
-    const sx = X_OFFSET + frame * fw;
+    const sx = frame * fw;
     const sy = row * fh;
     ctx.save();
     if (flipX) {
