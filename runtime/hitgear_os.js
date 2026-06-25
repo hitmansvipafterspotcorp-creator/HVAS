@@ -542,7 +542,7 @@ const HitgearOS = (() => {
   const VENUE_BG_MAP = {
     'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
-    'KINGDOM COME':  'assets/venues/kingdom_come_exterior.png',
+    'KINGDOM COME':  'assets/venues/kingdom_come_saloon.png',
     'SOCIAL GAINES': 'assets/venues/social_gaines.png',
     'SUCCESS':       'assets/venues/success.png',
     'TALLY ROW':     'assets/venues/tally_exterior.png',

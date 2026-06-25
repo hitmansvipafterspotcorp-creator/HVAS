@@ -268,7 +268,7 @@
         "zone": "bar"
       }
     ],
-    "bgImage": "assets/venues/kingdom_come_exterior.png"
+    "bgImage": "assets/venues/kingdom_come_saloon.png"
   },
   {
     "id": 5,
@@ -307,7 +307,7 @@
       "Clear the competitive wave on the main floor.",
       "Use the cue stick finisher (Y near pool table).",
       "Defeat the Pool Table Shark boss.",
-      "Unlock Success Pool Bar upstairs."
+      "Unlock Success upstairs."
     ],
     "reward": {
       "pts": 1000,
