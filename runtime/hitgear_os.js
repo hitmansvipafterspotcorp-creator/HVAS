@@ -245,12 +245,15 @@ const HitgearOS = (() => {
     preview.innerHTML = `
       <div style="padding:20px;height:100%;display:flex;flex-direction:column;justify-content:space-between;">
         <div>
-          <div style="font-family:'Orbitron',sans-serif;font-size:clamp(22px,4vw,38px);font-weight:900;line-height:1">
-            <span style="color:#e8d5ff">HITMANS</span>
-            <span style="color:#ff00aa;text-shadow:0 0 12px #ff00aa"> VIP</span>
-            <span style="display:block;font-size:0.45em;color:#ffd700;letter-spacing:6px;margin-top:4px">QUEST</span>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px">
+            <img src="assets/ui/hvas_logo.png" style="width:clamp(52px,8vw,80px);height:auto;filter:drop-shadow(0 0 14px #ffd70088)" alt="HVAS">
+            <div style="font-family:'Orbitron',sans-serif;font-size:clamp(14px,2.5vw,26px);font-weight:900;line-height:1.1">
+              <span style="color:#e8d5ff">HITMANS</span>
+              <span style="color:#ff00aa;text-shadow:0 0 12px #ff00aa"> VIP</span>
+              <span style="display:block;font-size:0.45em;color:#ffd700;letter-spacing:6px;margin-top:4px">QUEST</span>
+            </div>
           </div>
-          <div style="margin-top:16px;font-size:13px;color:#ccbbee;font-family:'Rajdhani',sans-serif;line-height:1.5">
+          <div style="margin-top:12px;font-size:13px;color:#ccbbee;font-family:'Rajdhani',sans-serif;line-height:1.5">
             Start outside Cafe8Fifty. Earn status. Unlock venues. Run the night.
           </div>
         </div>
@@ -365,9 +368,9 @@ const HitgearOS = (() => {
         CharRenderer.draw(c, charId, 'idle', _spriteAnimT, W*0.5, H*0.92, W*0.7, H*0.85, 1, {});
         drawn = true;
       }
-      // Frame decoration from frames_emblems
+      // Portrait frame from character_select sheet (r01_f00 = PORTRAIT_FRAME_UNSELECTED)
       if (typeof UIElements !== 'undefined') {
-        UIElements.drawCornerFrames(c, 0, 0, W, H, 28);
+        UIElements.draw(c, 'hud', 0, 2, 0, 0, W, H, { alpha: 0.80 });
       }
       _spriteAnimRAF = requestAnimationFrame(loop);
     }
@@ -466,6 +469,10 @@ const HitgearOS = (() => {
           SpriteSystem.drawAnim(c, ch.id, 'idle', t, 0, 0, cv.width, cv.height, { facing });
         if (!drawn && typeof CharRenderer !== 'undefined') {
           CharRenderer.draw(c, ch.id, 'idle', t, cv.width * 0.5, cv.height * 0.95, cv.width * 0.75, cv.height * 0.9, facing, {});
+        }
+        // Portrait frame overlay from HUD sheet (r00_f02)
+        if (typeof UIElements !== 'undefined') {
+          UIElements.draw(c, 'hud', 0, 2, 0, 0, cv.width, cv.height, { alpha: 0.85 });
         }
         raf = requestAnimationFrame(tick);
       }

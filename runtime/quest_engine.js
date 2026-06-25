@@ -549,11 +549,25 @@ const QuestEngine = (() => {
   function showVictoryScreen() {
     const overlay = document.getElementById('game-overlay');
     if (!overlay) return;
+    const rPts = gameState.venue.reward?.pts || 0;
+    const rCoins = gameState.venue.reward?.coins || 0;
     overlay.innerHTML = `
+      <img src="assets/ui/hvas_logo.png" style="width:clamp(64px,12vw,110px);height:auto;filter:drop-shadow(0 0 18px #ffd700cc);margin-bottom:8px" alt="HVAS">
       <div class="game-overlay-title win">MISSION COMPLETE</div>
       <div class="game-overlay-sub">${gameState.venue.name.toUpperCase()}</div>
-      <div style="color:#ffd700;font-family:'Orbitron',sans-serif;font-size:16px;margin:12px 0">
-        +${gameState.venue.reward?.pts || 0} STATUS  •  +${gameState.venue.reward?.coins || 0} COINS  •  +1 ⭐
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:14px 0;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,215,0,0.12);border:1px solid #ffd70066;border-radius:8px;padding:8px 16px">
+          <img src="assets/ui/frames/dialogue_mission_reward/r03_f00.png" style="height:32px;width:auto" alt="">
+          <span style="color:#ffd700;font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900">+${rPts} STATUS</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,170,0,0.12);border:1px solid #ffaa0066;border-radius:8px;padding:8px 16px">
+          <span style="font-size:22px">🪙</span>
+          <span style="color:#ffcc44;font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900">+${rCoins} COINS</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid #ffffff33;border-radius:8px;padding:8px 16px">
+          <span style="font-size:22px">⭐</span>
+          <span style="color:#fff;font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900">+1 STAR</span>
+        </div>
       </div>
       <div class="game-overlay-actions">
         <button class="game-overlay-btn primary" onclick="HitgearOS.returnToMenu()">CONTINUE</button>

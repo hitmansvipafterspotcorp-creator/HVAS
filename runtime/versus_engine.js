@@ -912,6 +912,15 @@ const VersusEngine = (() => {
   function drawHUD() {
     const pad = Math.max(12, W*0.018);
     const bw = W*0.40, bh = Math.max(18, H*0.035);
+    const UI = typeof UIElements !== 'undefined' ? UIElements : null;
+
+    // Fighter portrait frames (hud r00_f02) flanking the center
+    if (UI) {
+      const pfSize = Math.max(54, H * 0.10);
+      UI.draw(ctx, 'hud', 0, 2, pad, pad, pfSize, pfSize * 1.2);
+      UI.draw(ctx, 'hud', 0, 2, W - pad - pfSize, pad, pfSize, pfSize * 1.2, { alpha: 1 });
+    }
+
     // P1 left, P2 right (mirrored)
     drawHealth(pad, pad, bw, bh, p1, false);
     drawHealth(W - pad - bw, pad, bw, bh, p2, true);
@@ -929,13 +938,25 @@ const VersusEngine = (() => {
       drawPip(W - pad - bw - 14 - i*18, pad+bh*0.5, p2.rounds>i, p2.color);
     }
 
-    // timer
-    ctx.font=`900 ${Math.max(22,H*0.06)}px Orbitron, monospace`;
-    ctx.textAlign='center'; ctx.textBaseline='top';
-    ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
-    ctx.shadowColor='#000'; ctx.shadowBlur=6;
-    ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, pad);
-    ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+    // timer — real HUD_TIMER_01 art (hud r00_f07) with actual number drawn on top
+    if (UI) {
+      const tw = Math.max(64, H * 0.12), th = tw;
+      const tx = W/2 - tw/2, ty = pad - 4;
+      UI.draw(ctx, 'hud', 0, 7, tx, ty, tw, th);
+      ctx.font=`900 ${Math.max(18,H*0.042)}px Orbitron, monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
+      ctx.shadowColor='#000'; ctx.shadowBlur=6;
+      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.42);
+      ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+    } else {
+      ctx.font=`900 ${Math.max(22,H*0.06)}px Orbitron, monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
+      ctx.shadowColor='#000'; ctx.shadowBlur=6;
+      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, pad);
+      ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+    }
 
     // super meters
     const mw=bw, mh=Math.max(8,H*0.018), my=H-pad-mh;
@@ -945,15 +966,27 @@ const VersusEngine = (() => {
 
   function drawHealth(x,y,w,h,f,mirror) {
     ctx.save();
-    ctx.fillStyle='#0a0014'; ctx.strokeStyle=f.color; ctx.lineWidth=2;
-    ctx.shadowColor=f.color; ctx.shadowBlur=8;
-    ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h); ctx.shadowBlur=0;
+    // Dark background
+    ctx.fillStyle='#0a0014';
+    ctx.fillRect(x,y,w,h);
+    // Colored fill
     const pct=Math.max(0,f.hp/f.maxHp);
     const col = pct>0.5?'#46e24a':pct>0.22?'#ffd23f':'#ff3344';
     const fw=(w-4)*pct;
     ctx.fillStyle=col;
     if (mirror) ctx.fillRect(x+w-2-fw, y+2, fw, h-4);
     else        ctx.fillRect(x+2, y+2, fw, h-4);
+    // Overlay real bar art frame (hud r00_f05 = 3 bars stacked: health on top)
+    const UI = typeof UIElements !== 'undefined' ? UIElements : null;
+    if (UI) {
+      // r00_f05 shows all 3 bars stacked; draw it spanning across just the top third
+      // by scaling the image so only the top bar aligns with our bar rect
+      UI.draw(ctx, 'hud', 0, 5, x, y - h*0.15, w, h * 3.5, { alpha: 0.90 });
+    } else {
+      ctx.strokeStyle=f.color; ctx.lineWidth=2;
+      ctx.shadowColor=f.color; ctx.shadowBlur=8;
+      ctx.strokeRect(x,y,w,h); ctx.shadowBlur=0;
+    }
     ctx.restore();
   }
   function drawMeter(x,y,w,h,val,mirror,color){
