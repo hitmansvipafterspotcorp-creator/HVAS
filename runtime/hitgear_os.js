@@ -543,7 +543,7 @@ const HitgearOS = (() => {
     'CAFE8FIFTY':    'assets/venues/cafe8fifty_exterior.png',
     'HVAS INTERIOR': 'assets/venues/hvas_interior.png',
     'KINGDOM COME':  'assets/venues/kingdom_come_exterior.png',
-    'SOCIAL GAINES': 'assets/venues/outta_interior.png',
+    'SOCIAL GAINES': 'assets/venues/social_gaines.png',
     'SUCCESS POOL':  'assets/venues/success_pool.png',
     'TALLY ROW':     'assets/venues/tally_exterior.png',
     'THE DEN':       'assets/venues/tally_den.png',
@@ -551,7 +551,7 @@ const HitgearOS = (() => {
     'SAMMYS STAGE':  'assets/venues/tally_sammys.png',
     'PUBLIC HALL':   'assets/venues/tally_public_hall.png',
     '13 RAVE':       'assets/venues/tally_13rave.png',
-    'DUKES & DIMES': 'assets/venues/dukes_exterior.png',
+    'DUKES & DIMES': 'assets/venues/dukes_interior.png',
     'QUICK HIT':     'assets/venues/qhf_exterior.png',
   };
 

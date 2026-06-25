@@ -349,7 +349,7 @@
         "zone": "pool_room"
       }
     ],
-    "bgImage": "assets/venues/outta_interior.png"
+    "bgImage": "assets/venues/social_gaines.png"
   },
   {
     "id": 6,
@@ -1057,7 +1057,7 @@
         "zone": "main_table"
       }
     ],
-    "bgImage": "assets/venues/dukes_exterior.png"
+    "bgImage": "assets/venues/dukes_interior.png"
   },
   {
     "id": 14,
