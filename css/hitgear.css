@@ -736,9 +736,11 @@ body {
   top: 0; left: 0;
   width: 100%;
   height: 100%;
-  /* COVER = fill the entire viewport, no black letterbox bars.
-     Centered so the device is fully visible on most aspect ratios. */
-  object-fit: cover;
+  /* CONTAIN = the WHOLE device is always visible, never cropped.
+     The letterbox area is filled by the #console-shell background gradient,
+     so the handheld reads as a device sitting on a surface. The JS overlay
+     maps the screen cutout against this same contain rect. */
+  object-fit: contain;
   object-position: 50% 50%;
   pointer-events: none;
   user-select: none;
