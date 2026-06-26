@@ -23,23 +23,25 @@ backdrops whenever a file is missing — nothing crashes if art isn't present.
 | `dukes_interior.png`          | id:13 Dukes & Dimes (fight stage bg) | Dukes & Dimes — Sheet 08 interior hero |
 | `dukes_exterior.png`          | (spare exterior hero — not used as stage bg) | Dukes & Dimes — Sheet 08 exterior hero |
 | `qhf_exterior.png`            | id:14 Quick Hit Fuel (side)     | Quick Hit Fuel — Sheet 01 night-sky backdrop|
+| `cafe8fifty_exterior.png`     | id:1 Cafe8Fifty (side, Stage 1) | Stage 1 pack — Sheet 07 exterior finished design |
+| `hvas_interior.png`           | id:3 HITMANS VIP After Spot     | Stage 1 pack — Sheet 08 interior finished design |
 
-## STILL NEEDED — venue renders not present in the repo
+All 13 venues now have real backdrop art — no placeholders, no borrowed art.
 
-These venues are distinct and must NOT borrow Outta Pocket art (Outta Pocket is
-its own separate venue). The wrong Outta-Pocket placeholder copies that were
-previously sitting in `cafe8fifty_exterior.png` / `hvas_interior.png` have been
-removed. Drop a finished render in here with the exact filename and it lights up
-automatically — no code changes.
+## Prop cutouts
 
-| Needed file                   | Venue                                                |
-|-------------------------------|------------------------------------------------------|
-| `cafe8fifty_exterior.png`     | id:1 Cafe8Fifty — neon-lit street front (stage 1)    |
-| `hvas_interior.png`           | id:3 HITMANS VIP After Spot — VIP club interior      |
+Two pipelines build the transparent prop cutouts under `props/<venue>/<mode>/`:
 
-Only the Cafe8Fifty / HVAS NPC *character* sheets exist in the repo; no
-background pack for these two venues was uploaded.
+- **`tools/cut_props_labeled.py`** (preferred, precise): label-anchored cutter.
+  Each pack sheet captions every prop in snake_case; the tool OCRs the caption,
+  cuts the cell above it, tight-masks it, and saves a **named** cutout
+  (`cafe8fifty_outside_dj_booth_main.png`) plus a `_manifest.json`. PropRenderer
+  matches a venue's `props` names straight to these files. Used by Cafe8Fifty +
+  HVAS (Stage 1); other venues are migrating to it.
+- **`tools/slice_venue_props.py`** (legacy): CV blob segmentation → anonymous
+  indexed cutouts. Still in use for venues not yet migrated.
 
-The Social Gaines and Success packs WERE uploaded (10 sheets named
-`ChatGPT Image Jun 19, 2026, 01_45_31 PM (1..10).png`) — `social_gaines.png`
-and `success.png` are cropped from sheets 05 and 08 of that set.
+The Stage 1 pack (10 sheets `ChatGPT Image Jun 18 ...`, renamed
+`cafe8fifty_pack_01..04`, `hvas_pack_05..06`, finished `_07/_08`, route-test
+`_09/_10`) is the source for both Stage 1 venues. Sheets 09/10 (route test) are
+excluded; 07/08 (finished design) are the backdrop crops, not prop sources.

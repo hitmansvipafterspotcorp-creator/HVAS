@@ -59,25 +59,50 @@ const PropRenderer = (() => {
     'QUICK HIT':     { folder:'qhf',               mode:'outside' },
   };
 
-  const _cache = {};  // "folder/mode/NNN" → HTMLImageElement
+  const _cache = {};  // "folder/mode/key" → HTMLImageElement
+  // Named-prop manifests (precise label-cut venues). folder/mode → [slug,...]
+  // null = not loaded yet, false = no manifest (indexed venue), array = loaded.
+  const _manifest = {};
 
   function _fmtIdx(i) { return String(i).padStart(2, '0'); }
 
-  function _load(folder, mode, idx) {
-    const k = `${folder}/${mode}/${idx}`;
+  /** Load by explicit file key (index "07" or slug "dj_booth_main"). */
+  function _loadKey(folder, mode, key) {
+    const k = `${folder}/${mode}/${key}`;
     if (_cache[k]) return _cache[k];
     const img = new Image();
     img._ready = false; img._failed = false;
     img.onload  = () => { img._ready = true; };
     img.onerror = () => { img._failed = true; };
-    img.src = `${BASE}${folder}/${mode}/${folder}_${mode}_${_fmtIdx(idx)}.png`;
+    img.src = `${BASE}${folder}/${mode}/${folder}_${mode}_${key}.png`;
     _cache[k] = img;
     return img;
   }
 
+  function _load(folder, mode, idx) { return _loadKey(folder, mode, _fmtIdx(idx)); }
+
+  /** Fetch a folder's named-prop manifest once (async). */
+  function _loadManifest(folder, mode) {
+    const key = `${folder}/${mode}`;
+    if (_manifest[key] !== undefined) return;       // already fetched / fetching
+    _manifest[key] = null;
+    fetch(`${BASE}${folder}/${mode}/_manifest.json`)
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { _manifest[key] = j ? Object.keys(j) : false; })
+      .catch(() => { _manifest[key] = false; });
+  }
+
   /** Kick off loads for first N props in a venue/mode. */
   function preload(folder, mode, n) {
-    const max = COUNTS[`${folder}/${mode}`] || 0;
+    _loadManifest(folder, mode);
+    const key = `${folder}/${mode}`;
+    const slugs = _manifest[key];
+    if (Array.isArray(slugs) && slugs.length) {
+      const lim = Math.min(n || slugs.length, slugs.length);
+      for (let i = 0; i < lim; i++) _loadKey(folder, mode, slugs[i]);
+      return;
+    }
+    const max = COUNTS[key] || 0;
     const lim = Math.min(n || max, max);
     for (let i = 0; i < lim; i++) _load(folder, mode, i);
   }
@@ -108,6 +133,11 @@ const PropRenderer = (() => {
     const idx = propSlot % total;
     const img = getImage(folder, mode, idx);
     if (!img) return false;
+    return _blit(ctx, img, x, y, w, h, opts);
+  }
+
+  /** Contain-fit blit of a ready image into (x,y,w,h) with optional glow/alpha. */
+  function _blit(ctx, img, x, y, w, h, opts) {
     opts = opts || {};
     ctx.save();
     if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
@@ -115,7 +145,6 @@ const PropRenderer = (() => {
       ctx.shadowColor = opts.glow;
       ctx.shadowBlur  = opts.glowBlur || 14;
     }
-    // contain-fit
     const ir = img.naturalWidth / img.naturalHeight;
     const rr = w / h;
     let dw, dh, dx, dy;
@@ -133,10 +162,26 @@ const PropRenderer = (() => {
   function drawForVenue(ctx, shortName, propType, slotOffset, x, y, w, h, opts) {
     const res = _resolve(shortName);
     if (!res) return false;
-    // Use propType string hash + slotOffset for consistent-but-varied assignment
+    _loadManifest(res.folder, res.mode);
+    const mkey = `${res.folder}/${res.mode}`;
+    const slugs = _manifest[mkey];
+    // Named (precise) venue: match propType to the closest labelled prop.
+    if (Array.isArray(slugs) && slugs.length) {
+      const want = String(propType || '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      let pick = slugs.indexOf(want);
+      if (pick < 0) pick = slugs.findIndex(s => s.includes(want) || want.includes(s));
+      if (pick < 0) {  // no semantic match → stable hash spread
+        let hash = 0;
+        for (let i = 0; i < want.length; i++) hash = (hash * 31 + want.charCodeAt(i)) & 0xffff;
+        pick = (hash + slotOffset) % slugs.length;
+      }
+      const img = _loadKey(res.folder, res.mode, slugs[pick]);
+      return (img && img._ready) ? _blit(ctx, img, x, y, w, h, opts) : false;
+    }
+    // Indexed (legacy) venue: hash propType + slotOffset across COUNTS.
     let hash = 0;
     for (let i = 0; i < propType.length; i++) hash = (hash * 31 + propType.charCodeAt(i)) & 0xffff;
-    const slot = (hash + slotOffset) % Math.max(COUNTS[`${res.folder}/${res.mode}`] || 1, 1);
+    const slot = (hash + slotOffset) % Math.max(COUNTS[mkey] || 1, 1);
     return draw(ctx, res.folder, res.mode, slot, x, y, w, h, opts);
   }
 

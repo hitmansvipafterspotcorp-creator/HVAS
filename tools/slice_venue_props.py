@@ -58,6 +58,9 @@ CONFIG=[
  ('social_gaines_pack_06_interior','social_gaines','inside'),       # SOCIAL GAINES INTERIOR MODULES
  ('success_pack_01_rooftop_core','success','inside'),               # ROOFTOP CORE MODULES / FLOOR / POOL
  ('success_pack_03_props_signage','success','inside'),              # ROOFTOP PROPS, SIGNAGE & VFX
+ # NOTE: Stage 1 (cafe8fifty / hvas) is built by tools/cut_props_labeled.py —
+ # the precise label-anchored cutter that produces NAMED prop cutouts. Other
+ # venues are migrating to that tool too; this blob slicer is legacy.
 ]
 # combined-sheet vertical bands (fraction of H)
 OUT_TOP, OUT_BOT = 0.045, 0.47    # outside section band
@@ -121,8 +124,8 @@ def segment(M,W,y_lo,y_hi):
                 out.append((x0+ix0,py0,x0+ix1,py1))
     return out
 
-def emit(img,M,boxes,dest,prefix):
-    H,W=img.shape[:2]; os.makedirs(dest,exist_ok=True); idx=0
+def emit(img,M,boxes,dest,prefix,start=0):
+    H,W=img.shape[:2]; os.makedirs(dest,exist_ok=True); idx=start
     for (x0,y0,x1,y1) in boxes:
         w,h=x1-x0,y1-y0; ar=h/w
         if w>440: continue            # text / section panels / backdrop strips
@@ -138,7 +141,7 @@ def emit(img,M,boxes,dest,prefix):
         cmf=cv2.morphologyEx(cmf,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3)))
         bgra=cv2.cvtColor(crop,cv2.COLOR_BGR2BGRA); bgra[:,:,3]=cmf*255
         cv2.imwrite(f'{dest}/{prefix}_{idx:02d}.png',bgra); idx+=1
-    return idx
+    return idx-start
 
 def segment_scene(M, img, W, y_lo, y_hi):
     """For dense interior scene sheets: connected-components per object."""
@@ -168,7 +171,7 @@ for sheet,venue,mode in CONFIG:
             yl,yh=int(H*lo),int(H*hi)
             be,bc=segment(Me,W,yl,yh),segment(Mc,W,yl,yh)
             boxes,M=(bc,Mc) if len(bc)>len(be) else (be,Me)
-            n=emit(img,M,boxes,f'{OUT}/{venue}/{band}',f'{venue}_{band}')
+            n=emit(img,M,boxes,f'{OUT}/{venue}/{band}',f'{venue}_{band}',counts.get((venue,band),0))
             counts[(venue,band)]=counts.get((venue,band),0)+n
     else:
         yl,yh=int(H*0.045),int(H*SINGLE_BOT)
@@ -178,11 +181,12 @@ for sheet,venue,mode in CONFIG:
             boxes=segment_scene(Mc,img,W,yl,yh); M=Mc
         else:
             boxes,M=(bc,Mc) if len(bc)>len(be) else (be,Me)
-        n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}')
+        base=counts.get((venue,mode),0)
+        n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}',base)
         # if projection-profile gave nothing, retry with scene/contour segmenter
         if n==0 and best>=5:
             boxes=segment_scene(Mc,img,W,yl,yh); M=Mc
-            n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}')
+            n=emit(img,M,boxes,f'{OUT}/{venue}/{mode}',f'{venue}_{mode}',base)
         counts[(venue,mode)]=counts.get((venue,mode),0)+n
 
 for k in sorted(counts): print(f'{k[0]:7s} {k[1]:8s} {counts[k]}')
