@@ -301,8 +301,14 @@ const VersusEngine = (() => {
 
   function spawnProjectile(f, m) {
     const cinematic = !!m.cinematic;
+    // Back the projectile with the character's REAL vfx sprite (no canvas orb).
+    const cid  = f.char ? f.char.id : f.charId;
+    const cands = cinematic
+      ? ['vfx_super','vfx_finisher','vfx_blast','vfx_soundwave']
+      : ['vfx_blast','vfx_soundwave','vfx_basswave','vfx_ice_burst','vfx_fire','vfx_radio','vfx_arc','vfx_super'];
     projectiles.push({
-      owner: f, x: f.x + f.facing * 50, y: f.y - f.h * 0.55,
+      owner: f, charId: cid, vfxKey: _pickVfx(cid, cands), facing: f.facing, t: 0,
+      x: f.x + f.facing * 50, y: f.y - f.h * 0.55,
       vx: f.facing * (cinematic ? 980 : 720),
       r: cinematic ? 46 : 26,
       dmg: f.baseDmg * m.dmgK, m, cinematic,
@@ -329,7 +335,7 @@ const VersusEngine = (() => {
       def.vx = dir * 120;
       att.meter = Math.min(100, att.meter + (m.meter||6) * 0.5);
       def.meter = Math.min(100, def.meter + 4);
-      spark(def.x, def.y - def.h*0.5, '#66ccff', 8);
+      spawnBlockVFX(att, def, def.x, def.y - def.h*0.5);
       popup(def.x, def.y - def.h, 'BLOCK', '#66ccff', 13);
     } else {
       def.hitstun = m.hitstun;
@@ -342,7 +348,6 @@ const VersusEngine = (() => {
       def.flashHit = 0.12;
       hitstop = Math.max(hitstop, m.cinematic ? 0.12 : m.knockdown ? 0.09 : 0.05);
       shake = Math.max(shake, m.cinematic ? 18 : m.knockdown ? 10 : 5);
-      spark(def.x, def.y - def.h*0.55, att.color, m.knockdown ? 16 : 10);
       spawnHitVFX(att, def.x, def.y - def.h*0.5, m);
       popup(def.x, def.y - def.h, String(dmg), m.cinematic ? '#ffd700' : '#ff5566', m.cinematic ? 26 : 16);
       if (att.combo >= 2) popup(att.x, att.y - att.h - 22, att.combo + ' HIT', '#ffdd00', 15);
@@ -350,16 +355,13 @@ const VersusEngine = (() => {
   }
 
   // ── fx ───────────────────────────────────────────────────────────────────────
-  function spark(x, y, color, n) {
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 260;
-      sparks.push({ x, y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 60, life: .35, color });
-    }
-    // CharRenderer VFX overlay
-    if (typeof CharRenderer !== 'undefined') {
-      const level = n >= 16 ? 4 : n >= 10 ? 3 : n >= 8 ? 2 : 1;
-      CharRenderer.spawnHitSpark(x, y, level, color);
-    }
+  // All hit/block/super feedback is real per-character sprite-sheet vfx — no
+  // canvas-drawn sparks or particle overlays (E3 art-only rule).
+  function spawnBlockVFX(att, def, x, y) {
+    const SS = window.SpriteSystem;
+    if (!SS || !SS.spawnVFX || !def.char) return;
+    const key = _pickVfx(def.char.id, ['vfx_shield','vfx_shield_hex','vfx_block','vfx_guard','vfx_impact','vfx_hit_l']);
+    if (key) SS.spawnVFX(def.char.id, key, x, y, 96);
   }
 
   // Pick the first VFX animation key that actually exists for this character,
@@ -660,7 +662,7 @@ const VersusEngine = (() => {
   function updateProjectiles(dt) {
     for (let i = projectiles.length-1; i >= 0; i--) {
       const p = projectiles[i];
-      p.x += p.vx * dt; p.life -= dt;
+      p.x += p.vx * dt; p.life -= dt; p.t += dt;
       const target = (p.owner === p1) ? p2 : p1;
       if (!p.hit && overlap({x:p.x-p.r,y:p.y-p.r,w:p.r*2,h:p.r*2}, hurtBox(target))) {
         hitFighter(p.owner, target, p.m, p.x);
@@ -951,6 +953,14 @@ const VersusEngine = (() => {
   }
 
   function drawProjectile(p) {
+    // Real per-character vfx sprite for the projectile.
+    const SS = window.SpriteSystem;
+    if (SS && SS.drawAnim && p.charId && p.vfxKey) {
+      const s = p.r * 2.6;
+      if (SS.drawAnim(ctx, p.charId, p.vfxKey, p.t, p.x - s/2, p.y - s/2, s, s,
+                      { facing: p.facing, glow: p.color })) return;
+    }
+    // last-resort fallback only if the sprite frame isn't available
     ctx.save();
     const g = ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,p.r);
     g.addColorStop(0,'#fff'); g.addColorStop(0.4,p.color); g.addColorStop(1,'transparent');
@@ -959,13 +969,7 @@ const VersusEngine = (() => {
     ctx.restore();
   }
 
-  function drawSparks() {
-    sparks.forEach(s=>{
-      ctx.save(); ctx.globalAlpha=Math.max(0,s.life/0.35);
-      ctx.fillStyle=s.color; ctx.shadowColor=s.color; ctx.shadowBlur=8;
-      ctx.fillRect(s.x-2,s.y-2,4,4); ctx.restore();
-    });
-  }
+  function drawSparks() { /* removed — hit feedback is real per-character vfx art */ }
 
   function drawPopups() {
     popups.forEach(p=>{
