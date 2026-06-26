@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v22';
+const CACHE_NAME = 'hitgear-os-v23';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -73,7 +73,10 @@ const CORE_ASSETS = [
   './assets/ui/elements/frames_emblems/frames_emblems_014.png',
   './assets/ui/elements/frames_emblems/frames_emblems_013.png',
   './assets/ui/elements/frames_emblems/frames_emblems_005.png',
+  './assets/ui/elements/hud/hud_001.png',
+  './assets/ui/elements/hud/hud_002.png',
   './assets/ui/elements/hud/hud_003.png',
+  './assets/ui/elements/hud/hud_health_bar.png',
   './assets/ui/elements/hud/hud_021.png',
   './assets/ui/elements/hud/hud_022.png',
   './assets/ui/elements/hud/hud_017.png',

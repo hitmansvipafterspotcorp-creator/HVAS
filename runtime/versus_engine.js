@@ -986,15 +986,13 @@ const VersusEngine = (() => {
     const pad = Math.max(12, W*0.018);
     const bw = W*0.40, bh = Math.max(18, H*0.035);
 
-    // P1 left, P2 right (mirrored) — draw bar frame art behind, then fill
-    _drawElem(ctx,'assets/ui/elements/hud/hud_003.png', pad, pad, bw, bh*1.4);
-    _drawElem(ctx,'assets/ui/elements/hud/hud_003.png', W-pad-bw, pad, bw, bh*1.4);
+    // P1 left, P2 right (mirrored). Real HUD_HEALTH_BAR_01 housing art + fill.
     drawHealth(pad, pad, bw, bh, p1, false);
     drawHealth(W - pad - bw, pad, bw, bh, p2, true);
 
-    // portrait frames
-    _drawElem(ctx,'assets/ui/elements/hud/hud_022.png', pad, pad+bh+2, bh*2, bh*2.4);
-    _drawElem(ctx,'assets/ui/elements/hud/hud_022.png', W-pad-bh*2, pad+bh+2, bh*2, bh*2.4);
+    // portrait frames — HUD_PORTRAIT_FRAME_01 (hud_001)
+    _drawElem(ctx,'assets/ui/elements/hud/hud_001.png', pad, pad+bh+2, bh*2, bh*2.4);
+    _drawElem(ctx,'assets/ui/elements/hud/hud_001.png', W-pad-bh*2, pad+bh+2, bh*2, bh*2.4);
 
     // names
     ctx.font=`700 ${Math.max(12,H*0.026)}px Orbitron, monospace`;
@@ -1009,29 +1007,22 @@ const VersusEngine = (() => {
       drawPip(W - pad - bw - 14 - i*18, pad+bh*0.5, p2.rounds>i, p2.color);
     }
 
-    // timer box — art frame + digit
+    // timer — HUD_TIMER_01 (hud_002) art frame + digit, no canvas box
     {
-      const tw = Math.max(64, H * 0.12), th = tw * 0.6;
-      const tx = W/2 - tw/2, ty = pad;
+      const tw = Math.max(72, H * 0.13), th = tw * 0.78;
+      const tx = W/2 - tw/2, ty = pad - 2;
+      _drawElem(ctx,'assets/ui/elements/hud/hud_002.png', tx, ty, tw, th);
       ctx.save();
-      ctx.fillStyle='rgba(0,0,20,0.75)';
-      ctx.strokeStyle = timer<=10 ? '#ff3344' : '#ffffff55';
-      ctx.lineWidth = 2;
-      _roundRect(ctx, tx, ty, tw, th, 6);
-      ctx.fill(); ctx.stroke();
-      _drawElem(ctx,'assets/ui/elements/hud/hud_021.png', tx, ty, tw, th);
-      ctx.font=`900 ${Math.max(18,H*0.042)}px Orbitron, monospace`;
+      ctx.font=`900 ${Math.max(16,H*0.036)}px Orbitron, monospace`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
       ctx.shadowColor='#000'; ctx.shadowBlur=6;
-      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.5);
+      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.44);
       ctx.shadowBlur=0; ctx.restore();
     }
 
-    // super meters — art frames behind colored fill
-    const mw=bw, mh=Math.max(8,H*0.018), my=H-pad-mh;
-    _drawElem(ctx,'assets/ui/elements/hud/hud_017.png', pad, my-2, mw, mh+4);
-    _drawElem(ctx,'assets/ui/elements/hud/hud_018.png', W-pad-mw, my-2, mw, mh+4);
+    // super meters — HUD_SUPER_BAR_01 (hud_003) housing + fill
+    const mw=bw, mh=Math.max(10,H*0.022), my=H-pad-mh;
     drawMeter(pad, my, mw, mh, p1.meter, false, p1.color);
     drawMeter(W-pad-mw, my, mw, mh, p2.meter, true, p2.color);
   }
@@ -1046,38 +1037,36 @@ const VersusEngine = (() => {
     ctx.closePath();
   }
 
-  function drawHealth(x,y,w,h,f,mirror) {
-    ctx.save();
-    // Dark background with rounded corners
-    ctx.fillStyle='rgba(0,0,20,0.80)';
-    _roundRect(ctx, x, y, w, h, 3); ctx.fill();
-    // Colored fill
-    const pct=Math.max(0,f.hp/f.maxHp);
-    const col = pct>0.5?'#46e24a':pct>0.22?'#ffd23f':'#ff3344';
-    const fw=(w-4)*pct;
-    ctx.fillStyle=col;
-    ctx.shadowColor=col; ctx.shadowBlur=6;
-    if (mirror) ctx.fillRect(x+w-2-fw, y+2, fw, h-4);
-    else        ctx.fillRect(x+2, y+2, fw, h-4);
-    ctx.shadowBlur=0;
-    // Glowing border in character color
-    ctx.strokeStyle=f.color; ctx.lineWidth=2;
-    ctx.shadowColor=f.color; ctx.shadowBlur=8;
-    _roundRect(ctx, x, y, w, h, 3); ctx.stroke();
-    ctx.shadowBlur=0;
-    ctx.restore();
+  // Draw a real bar housing PNG, then clip its inner fill region to `pct` so the
+  // depleting fill is the bar art itself (depleted side darkened). Bars deplete
+  // from the inner edge: P1 (left) empties right→left mirrored, P2 mirrors.
+  function _drawBar(artPath, x, y, w, h, pct, mirror) {
+    pct = Math.max(0, Math.min(1, pct));
+    _drawElem(ctx, artPath, x, y, w, h);          // full housing+fill art
+    // darken the depleted portion (inner area only, leaving the end caps)
+    const inset = w * 0.07, iw = w - inset*2;
+    const dw = iw * (1 - pct);
+    if (dw > 0.5) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(6,4,16,0.78)';
+      if (mirror) ctx.fillRect(x + inset, y + h*0.18, dw, h*0.64);
+      else        ctx.fillRect(x + inset + (iw - dw), y + h*0.18, dw, h*0.64);
+      ctx.restore();
+    }
   }
-  function drawMeter(x,y,w,h,val,mirror,color){
-    ctx.save();
-    ctx.fillStyle='#0a0014'; ctx.strokeStyle='#ffffff33'; ctx.lineWidth=1;
-    ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
-    const pct=val/100, fw=(w-2)*pct;
-    const g=ctx.createLinearGradient(x,y,x+w,y);
-    g.addColorStop(0,'#0044ff'); g.addColorStop(0.6,'#8b00ff'); g.addColorStop(1,'#ffd700');
-    ctx.fillStyle = pct>=1 ? '#ffd700' : g;
-    if (mirror) ctx.fillRect(x+w-1-fw,y+1,fw,h-2); else ctx.fillRect(x+1,y+1,fw,h-2);
-    if (pct>=1){ ctx.fillStyle='#000'; ctx.font=`900 ${h+2}px Orbitron`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('SUPER', x+w/2, y+h/2); ctx.textBaseline='alphabetic'; }
-    ctx.restore();
+  function drawHealth(x,y,w,h,f,mirror) {
+    const pct = Math.max(0, f.hp/f.maxHp);
+    _drawBar('assets/ui/elements/hud/hud_health_bar.png', x, y, w, h*1.4, pct, mirror);
+  }
+  function drawMeter(x,y,w,h,val,mirror){
+    _drawBar('assets/ui/elements/hud/hud_003.png', x, y-h*0.4, w, h*1.8, val/100, mirror);
+    if (val >= 100) {
+      ctx.save();
+      ctx.fillStyle='#ffd700'; ctx.font=`900 ${h+2}px Orbitron, monospace`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.shadowColor='#000'; ctx.shadowBlur=4;
+      ctx.fillText('SUPER', x+w/2, y+h/2); ctx.restore();
+    }
   }
   function drawPip(x,y,on,color){
     ctx.save(); ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2);
