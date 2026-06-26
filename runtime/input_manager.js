@@ -3,6 +3,7 @@ const InputManager = (() => {
   const state = {
     left: false, right: false, up: false, down: false,
     attack: false, special: false, dodge: false, interact: false,
+    super: false, finisher: false,
     confirm: false, back: false, pause: false, start: false, select: false,
     block: false
   };
@@ -19,6 +20,8 @@ const InputManager = (() => {
     x: 'special', X: 'special',
     c: 'dodge', C: 'dodge',
     v: 'interact', V: 'interact',
+    b: 'super', B: 'super',
+    f: 'finisher', F: 'finisher',
     Enter: 'confirm',
     ' ': 'confirm',
     Backspace: 'back',
@@ -36,7 +39,7 @@ const InputManager = (() => {
       state[action] = down;
       if (down) callbacks.forEach(cb => cb(action));
     }
-    if (['up','down','left','right','confirm','back','attack','special','dodge','interact','pause','select'].includes(action)) {
+    if (['up','down','left','right','confirm','back','attack','special','dodge','interact','super','finisher','pause','select'].includes(action)) {
       e.preventDefault();
     }
   }
@@ -74,6 +77,8 @@ const InputManager = (() => {
     { idx: 1, action: 'special' },   // B / back
     { idx: 2, action: 'dodge' },     // X
     { idx: 3, action: 'interact' },  // Y
+    { idx: 5, action: 'super' },     // RB — super
+    { idx: 4, action: 'finisher' },  // LB — finisher
     { idx: 8, action: 'select' },    // Select/Back
     { idx: 9, action: 'pause' }      // Start
   ];

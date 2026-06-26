@@ -287,11 +287,15 @@ const QuestEngine = (() => {
         FighterEngine.executeAttack(p, 'special');
         break;
 
-      case 'super':
+      case 'super': {
         FighterEngine.pushInput('super');
-        p.superAnim = 1;
-        FighterEngine.executeAttack(p, 'super');
+        // 3 supers per character — fire the highest level the meter can afford
+        // (super3=100, super2=66, super1=33). Finisher is its own input below.
+        const m = FighterEngine.getMeter();
+        p.superAnim = m >= 100 ? 3 : m >= 66 ? 2 : 1;
+        if (!FighterEngine.executeAttack(p, 'super')) p.superAnim = 0;
         break;
+      }
 
       case 'dodge':
         FighterEngine.pushInput('dodge');
@@ -347,7 +351,7 @@ const QuestEngine = (() => {
       const bossEnemy = entities.enemies.find(e => e.hp > 0 && e.hp < e.maxHp * 0.25);
       if (bossEnemy) {
         FighterEngine.executeAttack(p, 'super');
-        FighterEngine.applyHit(p, bossEnemy, { damage: bossEnemy.maxHp, hitstop: 0.22, launch: true, meterGain: 0 });
+        FighterEngine.applyHit(p, bossEnemy, { dmg: bossEnemy.maxHp, unblockable: true, heavy: true, launch: true, meterGain: 0 });
         onEnemyHit(bossEnemy, 9999);
         gameState.finisherAvailable = false;
       }

@@ -495,7 +495,8 @@ const FighterEngine = (() => {
 
       let dmg = player.charData ? player.charData.baseDmg : 15;
       if (isFinisher)       dmg *= 4;
-      else if (isSuper)     dmg *= 2.5;
+      // 3 supers escalate with meter cost: super1 2.0x, super2 2.8x, super3 3.6x
+      else if (isSuper)     dmg *= player.superAnim === 3 ? 3.6 : player.superAnim === 2 ? 2.8 : 2.0;
       else if (isSpecial)   dmg *= 1.8;
       else if (player.comboStep === 3) dmg *= 1.4;
       else if (player.comboStep === 2) dmg *= 1.1;
