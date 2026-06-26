@@ -17,12 +17,12 @@
     "bossEmoji": "\ud83d\udc4a",
     "stageFinisher": "Neon sign slam / velvet rope launch",
     "props": [
-      "velvet_rope",
-      "neon_sign",
-      "entry_door",
-      "security_post",
-      "street_light",
-      "sidewalk_barricade"
+      "red_rope_stanchion",
+      "cafe8fifty_main_sign",
+      "front_double_door",
+      "checkin_podium",
+      "streetlamp",
+      "queue_barricade_gate"
     ],
     "npcs": [
       "Door Security",
@@ -124,13 +124,13 @@
     "bossEmoji": "\ud83c\udfc6",
     "stageFinisher": "Stage light drop / VIP rope bounce",
     "props": [
-      "dj_booth",
-      "vip_rope",
-      "stage_light",
-      "bar_counter",
-      "lounge_booth",
-      "smoke_machine",
-      "speaker_stack"
+      "dj_booth_main",
+      "vip_rope_straight",
+      "vip_lounge_couch",
+      "long_marble_counter_straight",
+      "bar_bottle_display",
+      "speaker_stack",
+      "backbar_shelf"
     ],
     "npcs": [
       "VIP Host",
