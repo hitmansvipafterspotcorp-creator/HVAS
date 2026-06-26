@@ -552,10 +552,14 @@ body {
 }
 .game-hp-bar { display: flex; align-items: center; gap: 8px; }
 .hp-label { color: #ff4444; font-size: 11px; }
-.hp-track { width: 140px; height: 10px; background: #ffffff22; border: 1px solid #ff444488; border-radius: 5px; overflow: hidden; }
-.hp-fill { height: 100%; background: linear-gradient(90deg, #ff4444, #ff8800); border-radius: 5px; transition: width 0.2s; }
-.sp-track { background: #ffffff22; border: 1px solid var(--pink); }
-.sp-fill { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+/* Real HUD bar art (HUD_HEALTH_BAR_01 / HUD_SUPER_BAR_01). The fill width
+   shrinks, cropping the bar art from the right — a real-art depleting fill. */
+.hp-track { width: 150px; height: 16px; background: #0a0010; border-radius: 5px; overflow: hidden; }
+.hp-fill { height: 100%; background-image: url(../assets/ui/elements/hud/hud_health_bar.png);
+  background-size: 150px 100%; background-repeat: no-repeat; background-position: left center;
+  transition: width 0.2s; }
+.sp-track { background: #0a0010; }
+.sp-fill { background-image: url(../assets/ui/elements/hud/hud_003.png); background-size: 150px 100%; }
 .game-score-hud { display: flex; gap: 16px; align-items: center; }
 .score-item { display: flex; align-items: center; gap: 4px; color: var(--gold); }
 

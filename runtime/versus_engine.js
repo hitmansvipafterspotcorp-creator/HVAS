@@ -990,6 +990,14 @@ const VersusEngine = (() => {
     drawHealth(pad, pad, bw, bh, p1, false);
     drawHealth(W - pad - bw, pad, bw, bh, p2, true);
 
+    // DANGER LOW HEALTH overlay art (hud_009) — flashes when a fighter is low
+    const dw = Math.max(120, W*0.18), dh = dw*0.34;
+    const blink = (Math.ceil(timer*3) % 2) === 0;
+    if (p1.hp/p1.maxHp < 0.25 && blink)
+      _drawElem(ctx,'assets/ui/elements/hud/hud_009.png', pad, pad+bh*2, dw, dh);
+    if (p2.hp/p2.maxHp < 0.25 && blink)
+      _drawElem(ctx,'assets/ui/elements/hud/hud_009.png', W-pad-dw, pad+bh*2, dw, dh);
+
     // portrait frames — HUD_PORTRAIT_FRAME_01 (hud_001)
     _drawElem(ctx,'assets/ui/elements/hud/hud_001.png', pad, pad+bh+2, bh*2, bh*2.4);
     _drawElem(ctx,'assets/ui/elements/hud/hud_001.png', W-pad-bh*2, pad+bh+2, bh*2, bh*2.4);
