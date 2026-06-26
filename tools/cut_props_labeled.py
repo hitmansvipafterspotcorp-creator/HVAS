@@ -28,6 +28,7 @@ from pytesseract import Output
 
 SRC = 'assets/venues'
 OUT = 'assets/venues/props'
+SINGLE_BOT = 0.88   # ignore the bottom legend/notes strip of a sheet
 
 # (sheet_stem, venue, mode) — prop-source sheets only (no finished/route/map).
 SHEETS = [
@@ -37,19 +38,35 @@ SHEETS = [
  ('cafe8fifty_pack_04_outside_components','cafe8fifty','outside'),
  ('hvas_pack_05_inside_core','hvas','inside'),
  ('hvas_pack_06_inside_specialty','hvas','inside'),
+ # Kingdom Come Saloon (Stage 2) — clean per-prop catalogs, both modes.
+ ('kcs_pack_01_assets','kcs','outside'),
+ ('kcs_pack_02_patio_assets','kcs','outside'),
+ ('kcs_pack_03_exterior_components','kcs','outside'),
+ ('kcs_pack_04_interior_bar','kcs','outside'),
+ ('kcs_pack_05_interior_stage','kcs','inside'),
+ ('kcs_pack_06_props_signs','kcs','inside'),
 ]
+# Other venues (Outta, QHF, Dukes, Tally, Social Gaines, Success) intentionally
+# stay on tools/slice_venue_props.py: their packs use category-GROUP captions or
+# dense atlases, where blob segmentation yields better per-item cutouts than
+# label-anchoring (which would produce merged group panels). Verified empirically.
 
 # ── caption helpers ────────────────────────────────────────────────────────
 def slug(s):
     s = s.strip().lower().lstrip("'`‘’")
+    s = re.sub(r'^\s*\d+\s*[.)]\s*', '', s)   # drop leading "5." / "5)" index
     s = re.sub(r'[^a-z0-9]+', '_', s).strip('_')
     return s
 
+NUM_RE = re.compile(r'^\s*\d+\s*[.)]\s+\S')   # "5. FRONT DOUBLE DOORS"
+
 def is_prop_caption(text):
-    """Real prop names are snake_case (have an underscore) or a single lowercase
-    word token; banner headers are spaced ALL-CAPS words."""
+    """Prop names are snake_case (underscore), numbered titles ('5. FRONT DOOR'),
+    or a single word; banner/section headers are bare spaced ALL-CAPS words."""
     t = text.strip()
     if '_' in t:
+        return True
+    if NUM_RE.match(t):                        # numbered catalog caption
         return True
     # single-word prop labels (STREETLAMP) — allow if one token, not a known header word
     HEADERS = {'backdrops','doors','signage','windows','greenery','planters',
@@ -112,8 +129,14 @@ def cut_sheet(stem, venue, mode, debug=False):
     if img is None:
         print('  MISSING', stem); return {}
     H, W = img.shape[:2]
-    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # OCR on a 2x upscale — tesseract reads the small catalog captions far more
+    # accurately at higher res; coords are divided back to original scale.
+    OS = 2
+    big = cv2.resize(img, (W*OS, H*OS), interpolation=cv2.INTER_CUBIC)
+    rgb = cv2.cvtColor(big, cv2.COLOR_BGR2RGB)
     d = pytesseract.image_to_data(rgb, output_type=Output.DICT)
+    for key in ('left','top','width','height'):
+        d[key] = [v//OS for v in d[key]]
 
     # group tokens into lines via (block,par,line), then SPLIT each line into
     # separate captions wherever there is a big horizontal gap (prop names are
@@ -139,24 +162,29 @@ def cut_sheet(stem, venue, mode, debug=False):
                 cur.append(i)            # tight tokens (rare 2-word labels, '&')
         groups.append(cur)
 
-    caps = []   # (cx, top, x0, x1, slug)
+    caps = []   # [cx, top, bot, x0, x1, slug]
+    numbered = 0
     for idxs in groups:
         text = ' '.join(d['text'][i].strip() for i in idxs)
         x0 = min(d['left'][i] for i in idxs)
         x1 = max(d['left'][i]+d['width'][i] for i in idxs)
         top = min(d['top'][i] for i in idxs)
         bot = max(d['top'][i]+d['height'][i] for i in idxs)
-        if top < H*0.085: continue           # title strip
+        if top < H*0.04: continue           # title strip
         if not is_prop_caption(text): continue
         s = slug(text)
         if len(s) < 3: continue              # OCR garbage ('ie')
         if banner_behind(img, x0, top, x1-x0, bot-top): continue
-        caps.append([ (x0+x1)//2, top, x0, x1, s ])
+        if NUM_RE.match(text): numbered += 1
+        caps.append([ (x0+x1)//2, top, bot, x0, x1, s ])
 
     if not caps:
         print(f'  {stem}: no captions'); return {}
 
-    # cluster into rows by caption top (rows ~ within 24px)
+    # caption style: numbered titles sit ABOVE their prop; snake_case sits BELOW.
+    above_style = numbered >= max(3, 0.4*len(caps))
+
+    # cluster into rows by caption top (rows ~ within 26px)
     caps.sort(key=lambda c: c[1])
     rows, cur = [], [caps[0]]
     for c in caps[1:]:
@@ -166,6 +194,7 @@ def cut_sheet(stem, venue, mode, debug=False):
             rows.append(cur); cur = [c]
     rows.append(cur)
     for r in rows: r.sort(key=lambda c: c[0])
+    row_tops = [min(c[1] for c in r) for r in rows]
 
     bands = banner_bands(img)
 
@@ -175,24 +204,31 @@ def cut_sheet(stem, venue, mode, debug=False):
     mpath = f'{dest}/_manifest.json'
     manifest = json.load(open(mpath)) if os.path.exists(mpath) else {}
     dbg = img.copy() if debug else None
-    prev_row_bottom = int(H*0.085)
+    prev_row_bottom = int(H*0.04)
 
     for ri, row in enumerate(rows):
-        row_top = min(c[1] for c in row)
         for ci, c in enumerate(row):
-            cx, top, x0, x1, name = c
+            cx, top, bot, x0, x1, name = c
             # horizontal cell bounds = midpoints to neighbours
             left  = (row[ci-1][0] + cx)//2 if ci>0 else max(0, x0 - (x1-x0))
             right = (row[ci+1][0] + cx)//2 if ci<len(row)-1 else min(W, x1 + (x1-x0))
-            # vertical: prop sits between previous row bottom and this caption top
-            cy_top = prev_row_bottom + 4
-            cy_bot = top - 3
-            # clip top to just below the nearest banner bar above the caption
-            above = [b1 for (b0,b1) in bands if b1 <= top and b1 > cy_top]
-            if above:
-                cy_top = max(above) + 4
-            if cy_bot - cy_top < 24:  # too thin, give it room
-                cy_top = max(prev_row_bottom, top - 230)
+            if above_style:
+                # numbered title sits ABOVE its prop -> cut the cell BELOW caption,
+                # down to just above the next caption row (or sheet bottom).
+                cy_top = bot + 3
+                nxt = row_tops[ri+1] if ri+1 < len(row_tops) else int(H*SINGLE_BOT)
+                cy_bot = nxt - 4
+                if cy_bot - cy_top < 24:
+                    cy_bot = min(int(H*SINGLE_BOT), bot + 230)
+            else:
+                # snake_case caption sits BELOW its prop -> cut the cell ABOVE it.
+                cy_top = prev_row_bottom + 4
+                cy_bot = top - 3
+                bb = [b1 for (b0,b1) in bands if b1 <= top and b1 > cy_top]
+                if bb:
+                    cy_top = max(bb) + 4
+                if cy_bot - cy_top < 24:  # too thin, give it room
+                    cy_top = max(prev_row_bottom, top - 230)
             cell = img[cy_top:cy_bot, left:right]
             if cell.size == 0: continue
             # mask: keep non-checker content

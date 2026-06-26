@@ -16,9 +16,9 @@ const PropRenderer = (() => {
   const BASE = 'assets/venues/props/';
 
   // How many prop files exist per venue/mode (from the slice run)
+  // Indexed (legacy blob-sliced) venues. kcs/cafe8fifty/hvas are NOT here —
+  // they're label-cut (named props + _manifest.json), resolved via the manifest.
   const COUNTS = {
-    'kcs/outside':             52,
-    'kcs/inside':              32,
     'outta/outside':           60,
     'outta/inside':            50,
     'dukes/outside':           18,

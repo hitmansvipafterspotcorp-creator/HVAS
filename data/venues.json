@@ -17,12 +17,12 @@
     "bossEmoji": "\ud83d\udc4a",
     "stageFinisher": "Neon sign slam / velvet rope launch",
     "props": [
-      "red_rope_stanchion",
       "cafe8fifty_main_sign",
-      "front_double_door",
-      "checkin_podium",
+      "neon_eight_sign",
+      "side_door",
+      "queue_barricade_gate",
       "streetlamp",
-      "queue_barricade_gate"
+      "round_cafe_table"
     ],
     "npcs": [
       "Door Security",
@@ -126,11 +126,11 @@
     "props": [
       "dj_booth_main",
       "vip_rope_straight",
-      "vip_lounge_couch",
-      "long_marble_counter_straight",
+      "dj_equipment_set",
+      "long_marble_counter_end",
       "bar_bottle_display",
       "speaker_stack",
-      "backbar_shelf"
+      "stool_front"
     ],
     "npcs": [
       "VIP Host",
@@ -207,12 +207,12 @@
     "bossEmoji": "\ud83e\udd20",
     "stageFinisher": "Saloon door throw / bar counter finisher",
     "props": [
-      "bar_counter",
-      "pool_table",
-      "saloon_door",
-      "jukebox",
-      "bar_stool",
-      "neon_beer_sign"
+      "kcs_service_counter_front",
+      "kcs_pool_rack",
+      "kcs_cue_rack",
+      "kcs_dartboard_set",
+      "kcs_beer_sign",
+      "kcs_bottle_shelf_wall"
     ],
     "npcs": [
       "Bartender",
