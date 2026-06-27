@@ -1088,25 +1088,30 @@ const VersusEngine = (() => {
     ctx.save();
     ctx.globalAlpha = Math.min(1, Math.max(0, 1.4 - phaseT));
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const fs = Math.max(11, H * 0.026);
-    const rows = [
-      ['Ⓐ', 'LIGHT — tap to auto-combo', '#33ddff'],
-      ['Ⓑ', 'HEAVY — tap to auto-combo', '#ff9933'],
-      ['Ⓧ', 'BLOCK — hold to guard',      '#66ff99'],
-      ['Ⓨ', 'SPECIAL  →1  ↓2  ←3  ↑FINISHER', '#ff55cc'],
+    // Real action-button art (HUD_BUTTON_LIGHT/HEAVY_COMBO, BLOCK, SPECIAL).
+    const btns = [
+      ['assets/ui/elements/hud/hud_011.png', 'A'],   // LIGHT COMBO
+      ['assets/ui/elements/hud/hud_012.png', 'B'],   // HEAVY COMBO
+      ['assets/ui/elements/hud/hud_019.png', 'X'],   // BLOCK
+      ['assets/ui/elements/hud/hud_020.png', 'Y'],   // SPECIAL
     ];
-    const lh = fs * 1.7, y0 = H * 0.66;
-    ctx.font = `700 ${fs}px Orbitron, monospace`;
-    const boxW = W * 0.6, boxX = W/2 - boxW/2;
-    ctx.fillStyle = 'rgba(2,0,8,0.55)';
-    ctx.fillRect(boxX, y0 - lh*0.8, boxW, lh*rows.length + lh*0.4);
-    rows.forEach((r, i) => {
-      const y = y0 + i*lh;
-      ctx.fillStyle = r[2]; ctx.shadowColor = r[2]; ctx.shadowBlur = 10;
-      ctx.fillText(r[0], boxX + boxW*0.12, y);
-      ctx.shadowBlur = 0; ctx.fillStyle = '#fff';
-      ctx.fillText(r[1], boxX + boxW*0.58, y);
+    const bw2 = Math.min(W*0.20, 230), bh2 = bw2*0.26, gap = bh2*0.45;
+    const totalH = btns.length*(bh2+gap);
+    let by = H*0.60 - totalH/2;
+    const bx = W/2 - bw2/2;
+    btns.forEach(([art, key]) => {
+      if (!_drawElem(ctx, art, bx, by, bw2, bh2)) {
+        ctx.fillStyle='rgba(2,0,8,0.6)'; ctx.fillRect(bx,by,bw2,bh2);
+      }
+      ctx.font = `900 ${bh2*0.5}px Orbitron, monospace`;
+      ctx.fillStyle = '#fff'; ctx.shadowColor='#000'; ctx.shadowBlur=6;
+      ctx.fillText(key, bx - bh2*0.5, by + bh2*0.5);
+      ctx.shadowBlur = 0;
+      by += bh2 + gap;
     });
+    ctx.font = `700 ${Math.max(10,H*0.02)}px Orbitron, monospace`;
+    ctx.fillStyle = '#ff55cc'; ctx.shadowColor='#000'; ctx.shadowBlur=5;
+    ctx.fillText('SPECIAL →1  ↓2  ←3   ↑ FINISHER', W/2, by + bh2*0.4);
     ctx.restore();
   }
 
