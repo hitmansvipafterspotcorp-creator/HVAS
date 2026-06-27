@@ -54,12 +54,14 @@ const VersusEngine = (() => {
     special2: { startup:.06, active:.14, recovery:.34, reach:104, hh:230, dmgK:1.2,  hitstun:.55, block:.28, kb:280, meter:0,  cost:25, knockdown:true,  launch:true,    name:'RISING' },
     // BACK + Y → Special 3: lunging advancing strike (melee, covers ground)
     special3: { startup:.12, active:.10, recovery:.26, reach:180, hh:130, dmgK:1.25, hitstun:.50, block:.30, kb:480, meter:0,  cost:25, knockdown:true,  dash:true,      name:'LUNGE' },
-    // UP + Y → FINISHER: cinematic super (full meter)
-    super:    { startup:.16, active:.30, recovery:.40, reach:520, hh:300, dmgK:3.2,  hitstun:.70, block:.40, kb:560, meter:0,  cost:100, knockdown:true, projectile:true, cinematic:true, name:'FINISHER' },
+    // UP + Y → SUPER: 3 levels by meter. super1 (33), super2 (66), super (100).
+    super1:   { startup:.14, active:.22, recovery:.34, reach:300, hh:210, dmgK:2.0,  hitstun:.60, block:.36, kb:440, meter:0,  cost:33,  knockdown:true,                  name:'SUPER I'  },
+    super2:   { startup:.15, active:.26, recovery:.38, reach:400, hh:250, dmgK:2.6,  hitstun:.65, block:.38, kb:500, meter:0,  cost:66,  knockdown:true, launch:true,     name:'SUPER II' },
+    super:    { startup:.16, active:.30, recovery:.40, reach:520, hh:300, dmgK:3.6,  hitstun:.70, block:.40, kb:560, meter:0,  cost:100, knockdown:true, projectile:true, cinematic:true, name:'SUPER III' },
   };
 
   // magic-series tiers — higher tier cancels lower on hit (auto-combo glue)
-  const TIER = { light:1, crouch:1, air:1, heavy:2, special:3, special2:3, special3:3, super:4 };
+  const TIER = { light:1, crouch:1, air:1, heavy:2, special:3, special2:3, special3:3, super1:4, super2:4, super:4 };
 
   // ── module state ────────────────────────────────────────────────────────────
   let canvas, ctx, W, H, groundY, rafId = null, running = false;
@@ -272,6 +274,11 @@ const VersusEngine = (() => {
     let moveKey = kind;
     if (kind === 'light' && f.crouching) moveKey = 'crouch';
     if (kind === 'light' && !f.onGround) moveKey = 'air';
+    // SUPER: fire the highest level the meter affords (3 supers per character)
+    if (kind === 'super') {
+      moveKey = f.meter >= 100 ? 'super' : f.meter >= 66 ? 'super2' : f.meter >= 33 ? 'super1' : null;
+      if (!moveKey) return;
+    }
     const m = MOVES[moveKey];
     if (!m) return;
 
@@ -491,7 +498,7 @@ const VersusEngine = (() => {
 
     // state label for rendering
     if (stunned) f.state = f.hitstun>0 ? 'hurt' : 'block';
-    else if (f.attack) f.state = (f.attack==='super')?'super':(f.attack.indexOf('special')===0)?'special':(f.attack);
+    else if (f.attack) f.state = (f.attack.indexOf('super')===0)?'super':(f.attack.indexOf('special')===0)?'special':(f.attack);
     else if (!f.onGround) f.state = 'air';
     else if (f.crouching) f.state = 'crouch';
     else if (f.blocking) f.state = 'block';
@@ -805,7 +812,7 @@ const VersusEngine = (() => {
       ['→ ＋ Ⓨ', 'SPECIAL 1 — ' + MOVES.special.name,  'Ranged projectile'],
       ['↓ ＋ Ⓨ', 'SPECIAL 2 — ' + MOVES.special2.name, 'Rising anti-air (launches)'],
       ['← ＋ Ⓨ', 'SPECIAL 3 — ' + MOVES.special3.name, 'Advancing lunge'],
-      ['↑ ＋ Ⓨ', MOVES.super.name, 'Cinematic super (full meter)'],
+      ['↑ ＋ Ⓨ', '3 SUPERS', 'Fires highest level meter allows: I(⅓) II(⅔) III(full)'],
       ['Ⓧ (hold)', 'GUARD', 'Block; ＋DOWN guards low'],
     ];
     const fs = Math.max(12, H*0.026), lh = fs*2.0, y0 = H*0.25;
@@ -868,13 +875,14 @@ const VersusEngine = (() => {
     else if (f.attack === 'heavy')   { e.comboStep = 2; }
     else if (f.attack === 'crouch')  { e.comboStep = 3; }
     else if (f.attack === 'special' || f.attack === 'special2' || f.attack === 'special3') { e.specialAnim = true; }
-    else if (f.attack === 'super') {
-      // Prefer the dedicated cinematic FINISHER art if the character has it,
-      // otherwise fall back to the super1 pose (loco-only characters).
+    else if (f.attack === 'super1' || f.attack === 'super2' || f.attack === 'super') {
+      // 3 super levels -> super1/super2/super3 sprite rows. Level 3 prefers the
+      // dedicated FINISHER art if the character has it.
+      const lvl = f.attack === 'super' ? 3 : f.attack === 'super2' ? 2 : 1;
       const SS = window.SpriteSystem;
       const anims = SS && SS.CHAR_DEFS && f.char && SS.CHAR_DEFS[f.char.id] && SS.CHAR_DEFS[f.char.id].anims;
-      if (anims && anims.finisher) { e.finishering = true; }
-      else { e.superAnim = 1; }
+      if (lvl === 3 && anims && anims.finisher) { e.finishering = true; }
+      else { e.superAnim = lvl; }
     }
     return e;
   }
@@ -887,7 +895,7 @@ const VersusEngine = (() => {
     if (f.attack === 'special') return 'special1';
     if (f.attack === 'special2') return 'special2';
     if (f.attack === 'special3') return 'special3';
-    if (f.attack === 'super')   return 'super';
+    if (f.attack === 'super1' || f.attack === 'super2' || f.attack === 'super') return 'super';
     if (f.hitstun > 0)          return 'hurt';
     if (f.blocking)             return 'block';
     if (f.crouching)            return 'crouch';
