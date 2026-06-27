@@ -218,7 +218,13 @@ const StoryMode = (() => {
     show('screen-versus');
 
     const set = (id,v)=>{ const e=document.getElementById(id); if(e) e.textContent=v; };
-    const port = (id, ch)=>{ const e=document.getElementById(id); if(e){ e.textContent=ch.emoji||'🥊'; e.style.color=ch.color||'#fff'; e.style.borderColor=ch.color||'#fff'; e.style.boxShadow=`0 0 28px ${ch.color||'#fff'}99, inset 0 0 18px ${ch.color||'#fff'}44`; } };
+    const port = (id, ch)=>{ const e=document.getElementById(id); if(!e) return;
+      e.style.color=ch.color||'#fff'; e.style.borderColor=ch.color||'#fff';
+      e.style.boxShadow=`0 0 28px ${ch.color||'#fff'}99, inset 0 0 18px ${ch.color||'#fff'}44`;
+      const src = (window.SpriteSystem && SpriteSystem.portraitSrc) ? SpriteSystem.portraitSrc(ch.id) : null;
+      if (src) { e.innerHTML = `<img src="${src}" alt="${ch.shortName||ch.name||''}" style="width:100%;height:100%;object-fit:contain;image-rendering:auto;filter:drop-shadow(0 0 10px ${ch.color||'#fff'}cc)">`; }
+      else { e.textContent = ch.emoji||'🥊'; }
+    };
     port('vs-p1-portrait', p); port('vs-p2-portrait', o);
     set('vs-p1-name', p.shortName||p.name||'YOU');
     set('vs-p2-name', o.shortName||o.name||'RIVAL');

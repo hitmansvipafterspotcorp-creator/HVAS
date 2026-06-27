@@ -1050,6 +1050,13 @@ const SpriteSystem = (() => {
 
   function hasSprites(charId) { return !!CHAR_DEFS[charId] && !!CHAR_FOLDERS[charId]; }
 
+  // Real portrait image path (idle frame 0) for DOM use — menus, VS splash,
+  // character select. Returns null if the character has no sliced frames.
+  function portraitSrc(charId) {
+    const folder = CHAR_FOLDERS[charId];
+    return folder ? `${FRAMES_BASE}${folder}/loco/r00_f00.png` : null;
+  }
+
   // ── Resolve animation key from entity state ──────────────────────────────
   function resolveAnim(charId, entity, isTopdown, lastDir) {
     const def = CHAR_DEFS[charId];
@@ -1251,5 +1258,5 @@ const SpriteSystem = (() => {
     return _blitGrounded(ctx, img, footX, groundY, targetH, (opts && opts.facing === -1), opts);
   }
 
-  return { hasSprites, preload, preloadReady, resolveAnim, update, draw, drawAnim, drawGrounded, drawAnimGrounded, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
+  return { hasSprites, portraitSrc, preload, preloadReady, resolveAnim, update, draw, drawAnim, drawGrounded, drawAnimGrounded, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();
