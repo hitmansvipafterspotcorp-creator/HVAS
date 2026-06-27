@@ -563,6 +563,13 @@ body {
 .pause-art-btn { height: clamp(40px,7vh,58px); width:auto; cursor:pointer; image-rendering:auto;
   filter: drop-shadow(0 0 8px #00000088); transition: transform .12s, filter .12s; }
 .pause-art-btn:hover { transform: scale(1.06); filter: drop-shadow(0 0 14px #ffd700cc); }
+/* Art buttons (real UI-kit button art) */
+button.art-btn { background:transparent!important; border:none!important; padding:0!important; cursor:pointer; }
+button.art-btn img { height:clamp(34px,5.2vh,48px); width:auto; display:block; margin:0 auto;
+  transition:transform .12s, filter .12s; filter:drop-shadow(0 0 6px #00000088); }
+button.art-btn:hover img { transform:scale(1.06); filter:drop-shadow(0 0 12px #ffd700cc); }
+button.art-btn:disabled img, button.art-btn[style*="display:none"] { }
+
 
 .game-score-hud { display: flex; gap: 16px; align-items: center; }
 .score-item { display: flex; align-items: center; gap: 4px; color: var(--gold); }
