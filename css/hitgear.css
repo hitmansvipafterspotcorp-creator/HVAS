@@ -560,6 +560,10 @@ body {
   transition: width 0.2s; }
 .sp-track { background: #0a0010; }
 .sp-fill { background-image: url(../assets/ui/elements/hud/hud_003.png); background-size: 150px 100%; }
+.pause-art-btn { height: clamp(40px,7vh,58px); width:auto; cursor:pointer; image-rendering:auto;
+  filter: drop-shadow(0 0 8px #00000088); transition: transform .12s, filter .12s; }
+.pause-art-btn:hover { transform: scale(1.06); filter: drop-shadow(0 0 14px #ffd700cc); }
+
 .game-score-hud { display: flex; gap: 16px; align-items: center; }
 .score-item { display: flex; align-items: center; gap: 4px; color: var(--gold); }
 

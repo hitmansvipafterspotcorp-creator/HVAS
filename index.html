@@ -212,10 +212,10 @@
     <div class="pause-screen" id="pause-screen">
       <img src="assets/ui/elements/pause_menu/pause_menu_000.png" style="height:clamp(48px,8vw,72px);width:auto;image-rendering:auto;filter:drop-shadow(0 0 14px #ffd700cc);margin-bottom:8px" alt="">
       <div class="pause-title">PAUSED</div>
-      <div style="display:flex;flex-direction:column;gap:12px;margin-top:20px">
-        <button class="back-btn" onclick="QuestEngine.togglePause()">▶ RESUME</button>
-        <button class="back-btn" onclick="HitgearOS.returnToMenu()">⬅ MAIN MENU</button>
-        <button class="back-btn" onclick="HitgearOS.openOptions()">⚙ OPTIONS</button>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px;align-items:center">
+        <img class="pause-art-btn" src="assets/ui/elements/pause_menu/pause_menu_007.png" onclick="QuestEngine.togglePause()" alt="RESUME">
+        <img class="pause-art-btn" src="assets/ui/elements/pause_menu/pause_menu_021.png" onclick="HitgearOS.openOptions()" alt="SETTINGS">
+        <img class="pause-art-btn" src="assets/ui/elements/pause_menu/pause_menu_026.png" onclick="HitgearOS.returnToMenu()" alt="QUIT TO MENU">
       </div>
     </div>
 
