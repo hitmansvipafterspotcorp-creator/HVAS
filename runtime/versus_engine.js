@@ -1077,6 +1077,9 @@ const VersusEngine = (() => {
     }
   }
   function drawPip(x,y,on,color){
+    const s = 18;
+    if (_drawElem(ctx,'assets/ui/elements/hud/hud_pip_star.png', x-s/2, y-s/2, s, s,
+                  { alpha: on ? 1 : 0.28 })) return;
     ctx.save(); ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2);
     ctx.fillStyle=on?color:'#ffffff22'; ctx.shadowColor=color; ctx.shadowBlur=on?8:0;
     ctx.fill(); ctx.restore();
