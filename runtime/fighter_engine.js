@@ -44,6 +44,15 @@ const FighterEngine = (() => {
   const JUGGLE_DECAY     = 0.75;   // each juggle hit knocks up 75% as much
   const WALL_BOUNCE_VEL  = -300;   // px/s horizontal on wall bounce
 
+  // ── tiny image cache (real HUD art) ───────────────────────────────────────
+  const _img = {};
+  function _elem(path) {
+    if (_img[path]) return _img[path];
+    const im = new Image(); im._r = false; im._f = false;
+    im.onload = () => { im._r = true; }; im.onerror = () => { im._f = true; };
+    im.src = path; _img[path] = im; return im;
+  }
+
   // ── Module state ──────────────────────────────────────────────────────────
   let hitstopTimer   = 0;
   let superFlashTimer = 0;
@@ -603,16 +612,22 @@ const FighterEngine = (() => {
     const scale = Math.min(1, 1 + (COMBO_TIMEOUT - comboTimer) * 0.3);
     ctx.translate(x, y);
     ctx.scale(scale, scale);
-    ctx.font = `bold ${22 + comboCount}px Orbitron, monospace`;
-    ctx.fillStyle = '#ffdd00';
-    ctx.shadowColor = '#ff8800';
-    ctx.shadowBlur = 18;
-    ctx.textAlign = 'left';
-    ctx.fillText(comboCount + ' HIT', 0, 0);
-    ctx.font = 'bold 11px Rajdhani, sans-serif';
-    ctx.fillStyle = '#ff00aa';
-    ctx.shadowBlur = 6;
-    ctx.fillText('COMBO', 0, 18);
+    // live count in gold + the real COMBO badge art beside it
+    const numFont = 30 + comboCount;
+    ctx.font = `900 ${numFont}px Orbitron, monospace`;
+    ctx.fillStyle = '#ffdd00'; ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 18;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(String(comboCount), 0, 0);
+    ctx.shadowBlur = 0;
+    const numW = ctx.measureText(String(comboCount)).width;
+    const badge = _elem('assets/ui/elements/hud/hud_combo_label.png');
+    if (badge && badge._r && !badge._f) {
+      const bh = numFont * 1.15, bw = bh * (badge.naturalWidth/badge.naturalHeight);
+      ctx.drawImage(badge, numW + 6, -bh*0.82, bw, bh);
+    } else {
+      ctx.font = `bold ${numFont*0.45}px Rajdhani, sans-serif`;
+      ctx.fillStyle = '#ff00aa'; ctx.fillText('COMBO', numW + 8, -numFont*0.2);
+    }
     ctx.restore();
   }
 
