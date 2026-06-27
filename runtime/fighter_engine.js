@@ -266,8 +266,14 @@ const FighterEngine = (() => {
       ctx.shadowColor = isSuper ? '#ff8800' : '#000';
       ctx.shadowBlur  = 8;
       ctx.textAlign   = 'center';
-      ctx.fillText(isBlock ? 'BLOCK' : (isSuper ? '★' + d.dmg : d.dmg),
-        d.x - (cameraX||0), d.y - (cameraY||0));
+      const dx = d.x - (cameraX||0), dy = d.y - (cameraY||0);
+      if (!isBlock && typeof DigitFont !== 'undefined' &&
+          DigitFont.draw(ctx, d.dmg, dx, dy, isSuper?26:18,
+                         { align:'center', alpha:d.alpha, glow:isSuper?'#ff8800':'#000' })) {
+        // drawn as digit art
+      } else {
+        ctx.fillText(isBlock ? 'BLOCK' : (isSuper ? '★' + d.dmg : d.dmg), dx, dy);
+      }
       ctx.restore();
     });
   }
@@ -614,12 +620,18 @@ const FighterEngine = (() => {
     ctx.scale(scale, scale);
     // live count in gold + the real COMBO badge art beside it
     const numFont = 30 + comboCount;
-    ctx.font = `900 ${numFont}px Orbitron, monospace`;
-    ctx.fillStyle = '#ffdd00'; ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 18;
-    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-    ctx.fillText(String(comboCount), 0, 0);
-    ctx.shadowBlur = 0;
-    const numW = ctx.measureText(String(comboCount)).width;
+    let numW;
+    if (typeof DigitFont !== 'undefined' &&
+        DigitFont.draw(ctx, comboCount, 0, -numFont*0.42, numFont, { align:'left', glow:'#ff8800' })) {
+      numW = DigitFont.measure(String(comboCount), numFont, numFont*0.06);
+    } else {
+      ctx.font = `900 ${numFont}px Orbitron, monospace`;
+      ctx.fillStyle = '#ffdd00'; ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 18;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(String(comboCount), 0, 0);
+      ctx.shadowBlur = 0;
+      numW = ctx.measureText(String(comboCount)).width;
+    }
     const badge = _elem('assets/ui/elements/hud/hud_combo_label.png');
     if (badge && badge._r && !badge._f) {
       const bh = numFont * 1.15, bw = bh * (badge.naturalWidth/badge.naturalHeight);

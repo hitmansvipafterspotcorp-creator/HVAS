@@ -120,6 +120,7 @@ const HitgearOS = (() => {
         window.CHARACTERS.forEach(c => SpriteSystem.preload(c.id));
         if (SpriteSystem.preloadNPCs) SpriteSystem.preloadNPCs();
       }
+      if (typeof DigitFont !== 'undefined') DigitFont.preload();
     }, 200);
 
     if ('serviceWorker' in navigator) {

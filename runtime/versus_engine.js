@@ -981,7 +981,14 @@ const VersusEngine = (() => {
 
   function drawPopups() {
     popups.forEach(p=>{
-      ctx.save(); ctx.globalAlpha=Math.max(0,p.life/0.9);
+      const a = Math.max(0, p.life/0.9);
+      // pure-numeric popups (damage) render in real digit art; words stay text
+      if (/^\d+$/.test(p.text)) {
+        DigitFont.draw(ctx, p.text, p.x, p.y, p.size*1.3,
+                       { align:'center', alpha:a, glow:p.color, glowBlur:8 });
+        return;
+      }
+      ctx.save(); ctx.globalAlpha=a;
       ctx.font=`900 ${p.size}px Orbitron, monospace`;
       ctx.textAlign='center';
       ctx.fillStyle=p.color; ctx.shadowColor='#000'; ctx.shadowBlur=6;
@@ -1028,13 +1035,10 @@ const VersusEngine = (() => {
       const tw = Math.max(72, H * 0.13), th = tw * 0.78;
       const tx = W/2 - tw/2, ty = pad - 2;
       _drawElem(ctx,'assets/ui/elements/hud/hud_002.png', tx, ty, tw, th);
-      ctx.save();
-      ctx.font=`900 ${Math.max(16,H*0.036)}px Orbitron, monospace`;
-      ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillStyle = timer<=10 ? '#ff3344' : '#fff';
-      ctx.shadowColor='#000'; ctx.shadowBlur=6;
-      ctx.fillText(Math.max(0,Math.ceil(timer)), W/2, ty + th*0.44);
-      ctx.shadowBlur=0; ctx.restore();
+      // timer digits in real digit-font art
+      const tv = Math.max(0, Math.ceil(timer));
+      DigitFont.draw(ctx, tv, W/2, ty + th*0.44, Math.max(18,H*0.05),
+                     { align:'center', glow: timer<=10 ? '#ff3344' : '#000', color: timer<=10?'#ff3344':'#fff' });
     }
 
     // super meters — HUD_SUPER_BAR_01 (hud_003) housing + fill
