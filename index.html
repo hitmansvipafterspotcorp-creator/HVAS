@@ -21,12 +21,24 @@
 /* ── inline overrides ── */
 #screen-bingo { overflow-y: auto; }
 #bingo-area { width: 100%; max-width: 800px; padding: 16px; }
-.bingo-table { border-collapse: collapse; width: 100%; max-width: 500px; margin: 0 auto; }
-.bingo-table th { background: #ff00aa; color: #fff; font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 900; text-align: center; padding: 8px; text-shadow: 0 0 8px #ff00aa; }
-.bingo-cell { border: 1px solid #330044; background: #12001e; color: #e8d5ff; font-family: 'Rajdhani', sans-serif; font-size: 11px; text-align: center; padding: 8px 4px; cursor: pointer; transition: all 0.15s; vertical-align: middle; min-height: 52px; }
-.bingo-cell:hover { background: #1e0033; border-color: #ff00aa44; }
-.bingo-cell.marked { background: #2a0045; border-color: #ff00aa; color: #ff00aa; box-shadow: inset 0 0 12px #ff00aa22; font-weight: 700; }
-.bingo-cell.free { background: #1a1000; border-color: #ffd700; color: #ffd700; font-weight: 900; font-size: 13px; box-shadow: inset 0 0 12px #ffd70022; }
+/* card framed like a real panel */
+.bingo-card-frame { max-width: 520px; margin: 0 auto; padding: 12px; border-radius: 14px;
+  background: linear-gradient(160deg, #1c0040, #0c0018);
+  border: 2px solid var(--gold); box-shadow: 0 0 24px #ffd70044, inset 0 0 24px #8b00ff22; }
+.bingo-table { border-collapse: separate; border-spacing: 4px; width: 100%; margin: 0 auto; }
+.bingo-table th { background: linear-gradient(180deg,#ff00aa,#8b00ff); color: #fff; font-family: 'Orbitron', sans-serif; font-size: clamp(16px,3vw,22px); font-weight: 900; text-align: center; padding: 6px; border-radius: 6px; text-shadow: 0 0 10px #ff00aa; }
+.bingo-cell { position: relative; border: 1px solid #3a0055; background: #160026; color: #e8d5ff; font-family: 'Rajdhani', sans-serif; font-size: 11px; line-height: 1.15; text-align: center; padding: 6px 4px; cursor: pointer; transition: transform .12s, background .15s, box-shadow .15s; vertical-align: middle; height: 58px; border-radius: 6px; }
+.bingo-cell:hover { background: #220038; border-color: #ff00aa88; transform: translateY(-1px); }
+/* marked = gold star daub stamped over the cell */
+.bingo-cell.marked { background: #2a0045; border-color: #ffd700; color: #fff; font-weight: 700;
+  box-shadow: inset 0 0 14px #ffd70033, 0 0 10px #ffd70055; }
+.bingo-cell.marked::after { content: ''; position: absolute; top: 2px; right: 2px; width: 22px; height: 22px;
+  background: url(assets/ui/elements/hud/hud_pip_star.png) center/contain no-repeat;
+  filter: drop-shadow(0 0 5px #ffd700cc); animation: daub .28s cubic-bezier(.2,1.6,.4,1); }
+@keyframes daub { 0% { transform: scale(0) rotate(-25deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: .92; } }
+.bingo-cell.free { background: #1a1000; border-color: #ffd700; color: #ffd700; font-weight: 900; font-size: 12px; box-shadow: inset 0 0 14px #ffd70033; }
+.bingo-cell.free::after { content: ''; position: absolute; inset: 8px;
+  background: url(assets/ui/elements/hud/hud_pip_star.png) center/contain no-repeat; opacity:.9; filter: drop-shadow(0 0 8px #ffd700); }
 #options-area { width: 100%; max-width: 600px; }
 </style>
 </head>

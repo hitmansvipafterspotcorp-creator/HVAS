@@ -149,7 +149,7 @@ const BingoEngine = (() => {
     if (!grid) return '<p style="color:#ff00aa">No card found.</p>';
 
     const header = ['B', 'I', 'N', 'G', 'O'];
-    let html = '<table class="bingo-table">';
+    let html = '<div class="bingo-card-frame"><table class="bingo-table">';
     html += '<tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr>';
     for (let r = 0; r < 5; r++) {
       html += '<tr>';
@@ -157,22 +157,27 @@ const BingoEngine = (() => {
         const isMarked = marked.has(`${r},${c}`);
         const isFree = r === 2 && c === 2;
         const cls = isFree ? 'bingo-cell free' : (isMarked ? 'bingo-cell marked' : 'bingo-cell');
-        const text = isFree ? '⭐<br>FREE' : grid[r][c];
+        const text = isFree ? 'FREE' : grid[r][c];
         const onclick = `BingoEngine._markCell('${cardId}',${r},${c})`;
         html += `<td class="${cls}" onclick="${onclick}" data-r="${r}" data-c="${c}">${text}</td>`;
       }
       html += '</tr>';
     }
-    html += '</table>';
+    html += '</table></div>';
     return html;
   }
 
   // Exposed for onclick
   function _markCell(cardId, r, c) {
+    const already = state.markedCells[cardId] && state.markedCells[cardId].has(`${r},${c}`);
     markCell(cardId, r, c);
-    // Re-render card UI
-    const el = document.getElementById('bingo-card-area');
-    if (el) el.innerHTML = renderCardHTML(cardId);
+    // Update only the clicked cell so the daub animation plays once (no full re-render flicker)
+    const cell = document.querySelector(`#bingo-card-area td[data-r="${r}"][data-c="${c}"]`);
+    if (cell && !already && !cell.classList.contains('free')) cell.classList.add('marked');
+    else if (!cell) {
+      const el = document.getElementById('bingo-card-area');
+      if (el) el.innerHTML = renderCardHTML(cardId);
+    }
   }
 
   return {

@@ -761,16 +761,44 @@ const HitgearOS = (() => {
     if (!bingoPlayerCardId) return;
     const round = BingoEngine.getRound();
     if (BingoEngine.checkWin(bingoPlayerCardId, round)) {
+      // reward + celebration
+      try { const s = SaveSystem.load() || SaveSystem.defaults();
+        s.coins = (s.coins||0) + 150; s.statusPts = (s.statusPts||0) + 300; SaveSystem.save(s); } catch(e){}
+      const stars = Array.from({length:5}).map((_,i)=>
+        `<img src="assets/ui/elements/hud/hud_pip_star.png" style="width:clamp(28px,5vw,44px);height:auto;filter:drop-shadow(0 0 10px #ffd700);animation:daub .4s ${i*0.08}s both">`).join('');
       const content = document.getElementById('bingo-content');
       if (content) content.innerHTML = `
-        <div style="text-align:center;padding:40px">
-          <div style="font-family:'Orbitron',sans-serif;font-size:48px;font-weight:900;color:#ffd700;text-shadow:0 0 30px #ffd700">🎉 BINGO!</div>
-          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;color:#ff00aa;margin-top:12px">ROUND ${round} WINNER!</div>
-          <div style="margin-top:24px"><button class="back-btn" onclick="HitgearOS.renderBingoMenu()">PLAY AGAIN</button></div>
+        <div style="text-align:center;padding:32px 16px">
+          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">${stars}</div>
+          <img src="assets/ui/elements/dialogue_mission/dialogue_mission_003.png" style="height:clamp(60px,10vw,96px);width:auto;filter:drop-shadow(0 0 20px #ffd700cc);margin-bottom:8px" alt="BINGO">
+          <div style="font-family:'Orbitron',sans-serif;font-size:clamp(32px,7vw,52px);font-weight:900;color:#ffd700;text-shadow:0 0 30px #ffd700;letter-spacing:4px">BINGO!</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:18px;color:#ff00aa;margin-top:8px">ROUND ${round} WINNER &nbsp;·&nbsp; +300 STATUS &nbsp;·&nbsp; +150 🪙</div>
+          <div style="margin-top:24px;display:flex;gap:12px;justify-content:center">
+            ${round<3?`<button class="back-btn" style="color:#ffd700;border-color:#ffd700" onclick="HitgearOS.bingoNextRound()">NEXT ROUND →</button>`:''}
+            <button class="back-btn" onclick="HitgearOS.renderBingoMenu()">PLAY AGAIN</button>
+          </div>
         </div>`;
     } else {
-      alert('Not a bingo yet — keep marking!');
+      showNotification('Not a bingo yet — keep marking your card!');
     }
+  }
+
+  function bingoNextRound() {
+    BingoEngine.advanceRound();
+    renderPlayerCard();
+  }
+
+  // lightweight non-blocking toast (replaces alert())
+  function showNotification(msg, ms = 2200) {
+    let el = document.getElementById('os-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'os-toast';
+      el.style.cssText = 'position:fixed;top:8%;left:50%;transform:translateX(-50%);z-index:600;background:#1a0030ee;border:1px solid #ffd700;color:#ffd700;font-family:Orbitron,sans-serif;font-size:13px;letter-spacing:1px;padding:10px 22px;border-radius:6px;box-shadow:0 0 18px #ffd70055;pointer-events:none;text-align:center;max-width:80vw';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg; el.style.opacity = '1';
+    clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0'; }, ms);
   }
 
   function viewBingoHistory() {
@@ -1013,7 +1041,7 @@ const HitgearOS = (() => {
     newGame, continueQuest, startVenue, retryVenue, returnToMenu,
     renderBingoMenu, startBingoPlayer, startBingoHost, startBingoParty,
     renderPlayerCard, renderHostControl, hostCallNext, hostAdvanceRound,
-    hostVerifyCard, checkBingoWin, viewBingoHistory,
+    hostVerifyCard, checkBingoWin, viewBingoHistory, bingoNextRound,
     toggleSetting, toggleDevMode, devForceUnlock, devAddPts, devResetSave,
     installPWA
   };
