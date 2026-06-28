@@ -1309,3 +1309,6 @@ const SpriteSystem = (() => {
 
   return { hasSprites, portraitSrc, preload, preloadReady, resolveAnim, update, draw, drawAnim, drawGrounded, drawAnimGrounded, spawnVFX, updateVFX, renderVFX, drawNPCFrame, preloadNPCs, CHAR_DEFS, NPC_DEFS, SHEET_ROWS };
 })();
+// Expose on window — versus_engine and others reference window.SpriteSystem;
+// without this the Versus fighters fell back to vector blobs and VFX no-op'd.
+if (typeof window !== 'undefined') window.SpriteSystem = SpriteSystem;
