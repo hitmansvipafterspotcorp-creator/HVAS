@@ -186,24 +186,63 @@ const StoryMode = (() => {
     });
   }
 
+  // Arcade difficulty → number of fights before/including the boss climb.
+  const ARCADE_DIFF = {
+    novice: { fights: 5,  label: 'NOVICE', bosses: 1, color: '#46e24a' },
+    medium: { fights: 8,  label: 'MEDIUM', bosses: 2, color: '#ffd23f' },
+    hard:   { fights: 12, label: 'HARD',   bosses: 3, color: '#ff3344' },
+  };
+
   function startArcade() {
     ensureScreens();
     promptName(() => {
-      HitgearOS.openCharSelect(charId => {
-        run = { playerCharId: charId, idx: 0, mode: 'arcade',
-          ladder: shuffledLadder() };
-        nextRung();
+      promptDifficulty(diff => {
+        HitgearOS.openCharSelect(charId => {
+          run = { playerCharId: charId, idx: 0, mode: 'arcade', diff,
+            ladder: buildArcadeLadder(diff) };
+          nextRung();
+        });
       });
     });
   }
 
-  function shuffledLadder() {
-    // shuffle the regular rungs, but keep the boss gauntlet (ELD → Big Soulja → KT)
-    // locked in order at the end so the climax always lands right.
+  // Streets-of-Rage arcade ladder: N street fights across ALL stages, then the
+  // boss gauntlet. Novice 5 / Medium 8 / Hard 12. Secret bosses unlock when the
+  // player's entered name is a code (see SECRET_CODES) — adds a hidden finale.
+  const SECRET_CODES = { 'RUNTHENIGHT':20, 'AFTERSPOT':21, 'HITMAN23':22 };
+  function buildArcadeLadder(diffKey) {
+    const d = ARCADE_DIFF[diffKey] || ARCADE_DIFF.novice;
     const regular = LADDER.filter(r => !r.boss);
     const bosses  = LADDER.filter(r => r.boss);
-    for (let i=regular.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [regular[i],regular[j]]=[regular[j],regular[i]]; }
-    return regular.concat(bosses);
+    // shuffle the regular pool, repeat to fill the required street-fight count
+    const pool = regular.slice();
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    const streetCount = Math.max(1, d.fights - d.bosses);
+    const street = [];
+    for (let i=0;i<streetCount;i++) street.push(pool[i % pool.length]);
+    // boss gauntlet — last d.bosses bosses, in order, as the climax
+    const gauntlet = bosses.slice(-d.bosses);
+    // SECRET: if the player's name matches a code, splice in a secret boss finale
+    const secretId = SECRET_CODES[(loadName()||'').toUpperCase().replace(/[^A-Z0-9]/g,'')];
+    const secret = secretId ? LADDER.filter(r => r.boss && r.opp === secretId) : [];
+    return street.concat(gauntlet, secret);
+  }
+
+  // lightweight difficulty picker overlay
+  function promptDifficulty(cb) {
+    let ov = document.getElementById('arcade-diff');
+    if (ov) ov.remove();
+    ov = document.createElement('div');
+    ov.id = 'arcade-diff';
+    ov.style.cssText = 'position:absolute;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(5,0,12,0.92)';
+    const btns = Object.entries(ARCADE_DIFF).map(([k,d]) =>
+      `<button class="back-btn" data-k="${k}" style="min-width:220px;color:${d.color};border-color:${d.color};font-size:16px;letter-spacing:3px">${d.label} — ${d.fights} FIGHTS</button>`).join('');
+    ov.innerHTML = `<div style="font-family:'Orbitron',sans-serif;font-size:clamp(18px,4vw,30px);font-weight:900;color:#ffd700;letter-spacing:4px;text-shadow:0 0 16px #ffd700">SELECT DIFFICULTY</div>
+      ${btns}
+      <div style="font-family:'Rajdhani',sans-serif;font-size:12px;color:#888;max-width:340px;text-align:center">More fights before the boss gauntlet. Enter a code as your name to unlock secret bosses.</div>`;
+    (document.getElementById('screen-area')||document.body).appendChild(ov);
+    ov.querySelectorAll('button[data-k]').forEach(b =>
+      b.addEventListener('click', () => { const k=b.dataset.k; ov.remove(); cb(k); }));
   }
 
   function ladder() { return (run && run.ladder) || LADDER; }

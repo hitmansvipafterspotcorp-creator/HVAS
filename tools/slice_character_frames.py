@@ -255,6 +255,9 @@ for path in sorted(glob.glob(f'{SRC}/*.png')):
         continue
 
     char_name = m.group(1)
+    import sys as _sys
+    if len(_sys.argv) > 1 and char_name not in _sys.argv[1:]:
+        continue   # filter: only slice named characters
     sheet_type = m.group(2)
     rows = TYPE_ROWS.get(sheet_type)
     if rows is None:
