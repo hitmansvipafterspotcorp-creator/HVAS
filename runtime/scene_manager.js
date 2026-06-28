@@ -399,15 +399,16 @@ const SceneManager = (() => {
         prop.x, prop.y, prop.w, prop.h,
         prop.glow ? { glow: col, glowBlur: 12 } : {});
     if (!drawnReal) {
-      // Fallback: colored rect + emoji
-      ctx.fillStyle = col;
-      if (prop.glow) { ctx.shadowColor = col; ctx.shadowBlur = 12; }
-      ctx.fillRect(prop.x, prop.y, prop.w, prop.h);
+      // No garish colored-box fallback (looked like missing-texture errors).
+      // The street backdrop already contains the scene; a not-yet-loaded prop
+      // cutout just shows the emoji glyph subtly, or nothing.
       if (prop.emoji) {
-        ctx.font = `${Math.min(prop.w, prop.h) * 0.6}px sans-serif`;
+        ctx.globalAlpha = 0.85;
+        ctx.font = `${Math.min(prop.w, prop.h) * 0.7}px sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(prop.emoji, prop.x + prop.w / 2, prop.y + prop.h / 2);
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        ctx.globalAlpha = 1;
       }
     }
     if (prop.interactable && prop.showPrompt) {

@@ -32,6 +32,12 @@ const CharRenderer = (() => {
     11: { col1:'#ffaa44', col2:'#aa6600', skin:'#c68642', glow:'#ffcc88', bulk:1.00, height:1.02, acc:'mic' },
     12: { col1:'#cc4400', col2:'#882200', skin:'#8B4513', glow:'#ff6622', bulk:1.10, height:1.00, acc:'football' },
     13: { col1:'#bb8800', col2:'#775500', skin:'#c08030', glow:'#ddaa33', bulk:0.90, height:1.00, acc:'scroll' },
+    14: { col1:'#cc2222', col2:'#7a0f0f', skin:'#5a3825', glow:'#ff5555', bulk:1.02, height:1.01, acc:'mic' },
+    20: { col1:'#2288cc', col2:'#114466', skin:'#5a3825', glow:'#66bbff', bulk:1.05, height:1.02, acc:'none' },
+    21: { col1:'#33aa55', col2:'#1a5530', skin:'#6b4423', glow:'#66dd88', bulk:1.18, height:1.03, acc:'none' },
+    22: { col1:'#ddaa22', col2:'#886600', skin:'#6b4423', glow:'#ffcc55', bulk:1.00, height:1.00, acc:'none' },
+    30: { col1:'#9933cc', col2:'#551a77', skin:'#c68642', glow:'#cc77ee', bulk:0.95, height:1.00, acc:'none' },
+    31: { col1:'#dddddd', col2:'#999999', skin:'#f4c5a0', glow:'#ffffff', bulk:0.92, height:0.99, acc:'none' },
   };
 
   // ── ANIMATION POSE KEYFRAMES ────────────────────────────────────────────────
