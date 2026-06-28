@@ -13,6 +13,7 @@ import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EnemyAISystem } from '../systems/EnemyAISystem';
 import { WaveSystem, type WaveDef } from '../systems/WaveSystem';
+import { PLAYER_ID, ENEMY_IDS } from '../data/roster';
 
 // BrawlerScene: the playable Streets-of-Rage graybox. Boots with a player on a
 // floor, runs camera-locked waves, resolves combat through the depth gate, and
@@ -49,14 +50,14 @@ export class BrawlerScene extends Phaser.Scene {
     g.lineStyle(2, COLORS.floorLine, 1);
     g.strokeRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
 
-    // Player.
-    this.player = new Fighter(this, 'player', 180, FLOOR_BOTTOM - 20, 120);
+    // Player — uses real sprite art if its anims are built, else graybox.
+    this.player = new Fighter(this, 'player', 180, FLOOR_BOTTOM - 20, 120, PLAYER_ID);
 
     // Systems.
     this.controls = new InputSystem(this);
     this.combat = new CombatSystem(this);
     this.ai = new EnemyAISystem();
-    this.waves = new WaveSystem(this, DEFAULT_WAVES);
+    this.waves = new WaveSystem(this, DEFAULT_WAVES, ENEMY_IDS);
 
     // HUD.
     this.hud = this.add
@@ -149,12 +150,14 @@ export class BrawlerScene extends Phaser.Scene {
 
     // Super.
     if (b.superMove && this.combat.trySuper(p, this.waves.enemies)) {
+      p.playOneShot('super1');
       this.flashBanner('SUPER!');
       return;
     }
 
-    // Attack start.
+    // Attack start — cycle combo1 -> combo2 -> combo3.
     if (b.attack) {
+      p.attackIndex = (p.attackIndex + 1) % 3;
       p.state = 'attack';
       p.stateTimer = 300;
       p.attackActive = false;

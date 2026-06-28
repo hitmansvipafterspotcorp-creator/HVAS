@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { AnimationSystem } from '../systems/AnimationSystem';
+import { BRAWLER_ANIMS, VENUE_ANIMS } from '../data/animMap';
+import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
 
 // PreloadScene: shows an animated HITGEAR-style logo pulse while assets load.
 // Right now the brawler runs on graybox primitives (no texture loads required),
@@ -52,9 +55,31 @@ export class PreloadScene extends Phaser.Scene {
       bar.width = Math.max(1, barW * p);
     });
     barBg.setData('noop', true); // referenced so it isn't tree-shaken visually
+
+    // Queue the real character frames the brawler + venue actually use.
+    const chars = new Set<number>([
+      PLAYER_ID,
+      ...ENEMY_IDS,
+      ...VENUE_NPC_IDS,
+    ]);
+    for (const id of chars) {
+      AnimationSystem.queue(this, id, BRAWLER_ANIMS);
+      AnimationSystem.queue(this, id, VENUE_ANIMS);
+    }
   }
 
   create(): void {
+    // All queued frames are now loaded — assemble animations once, globally.
+    const chars = new Set<number>([
+      PLAYER_ID,
+      ...ENEMY_IDS,
+      ...VENUE_NPC_IDS,
+    ]);
+    for (const id of chars) {
+      AnimationSystem.build(this, id, BRAWLER_ANIMS);
+      AnimationSystem.build(this, id, VENUE_ANIMS);
+    }
+
     // Brief hold so the splash reads, then into the menu.
     this.time.delayedCall(600, () => this.scene.start(SCENE.MainMenu));
   }

@@ -6,6 +6,11 @@
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
 
+// Where the character/venue art lives, relative to the served page.
+// Dev (vite root = game/) serves the symlinked public/assets at /assets/.
+// Prod build is deployed to /hvas/game/ with the repo assets at /hvas/assets/.
+export const ASSET_BASE = import.meta.env.DEV ? 'assets/' : '../assets/';
+
 // The walkable floor is the vertical band where feet (the y of a fighter)
 // may sit. Smaller y = farther back ("up the screen"), larger y = closer.
 export const FLOOR_TOP = 360; // back wall of the playable floor

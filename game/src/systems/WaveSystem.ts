@@ -10,13 +10,16 @@ export type WaveDef = { count: number; hp: number };
 export class WaveSystem {
   private scene: Phaser.Scene;
   private waves: WaveDef[];
+  private enemyCharIds: number[];
+  private spawnCount = 0;
   private index = -1;
   enemies: Fighter[] = [];
   cleared = false; // all waves done
 
-  constructor(scene: Phaser.Scene, waves: WaveDef[]) {
+  constructor(scene: Phaser.Scene, waves: WaveDef[], enemyCharIds: number[] = []) {
     this.scene = scene;
     this.waves = waves;
+    this.enemyCharIds = enemyCharIds;
   }
 
   get current(): number {
@@ -52,7 +55,12 @@ export class WaveSystem {
         ? -40 - i * 30
         : GAME_WIDTH + 40 + i * 30;
       const feetY = Phaser.Math.Between(FLOOR_TOP + 20, FLOOR_BOTTOM - 10);
-      this.enemies.push(new Fighter(this.scene, 'enemy', x, feetY, def.hp));
+      const charId =
+        this.enemyCharIds.length > 0
+          ? this.enemyCharIds[this.spawnCount % this.enemyCharIds.length]
+          : 0;
+      this.spawnCount += 1;
+      this.enemies.push(new Fighter(this.scene, 'enemy', x, feetY, def.hp, charId));
     }
   }
 
@@ -62,13 +70,15 @@ export class WaveSystem {
       if (!e.alive) {
         e.stateTimer -= 16;
         if (e.stateTimer < 99000) {
-          e.body.setAlpha(Math.max(0, e.body.alpha - 0.04));
+          const view = e.sprite ?? e.body;
+          view.setAlpha(Math.max(0, view.alpha - 0.04));
           e.shadow.setAlpha(Math.max(0, e.shadow.alpha - 0.04));
         }
       }
     }
-    this.enemies = this.enemies.filter(
-      (e) => e.alive || e.body.alpha > 0.02,
-    );
+    this.enemies = this.enemies.filter((e) => {
+      const a = (e.sprite ?? e.body).alpha;
+      return e.alive || a > 0.02;
+    });
   }
 }
