@@ -43,18 +43,34 @@ src/
 
 - App boots Boot → Preload → MainMenu with **zero console errors**.
 - Brawler: player moves 8-way, attacks, lands hits (meter fills, enemies KO).
+- **Real character sprites** wired over the graybox: player + enemies use the
+  pre-sliced 131×181 frames from `assets/characters/frames/` via AnimationSystem
+  (idle/walk/combo1-3/hurt/knockdown/defeated/supers).
 - **Depth gate verified**: in-lane attacks connect, wrong-lane attacks miss.
 - Two-way combat: enemies rush/circle and damage the player.
 - Camera-locked waves (3 waves) with HUD (HP / SUPER / COMBO / WAVE).
 - MvC-style super at full meter (screen flash + lane-wide hit).
 - F1 debug overlay: floor band, feet contact points, hurt spans, attack reach.
+- **Top-down VenueScene** (Hitmans VIP After Spot interior), JSON-authored:
+  player walks 8-way with td_ sprites, talks to NPCs (DialogueSystem), uses
+  doors/hotspots (InteractionSystem). A door routes to the Cafe8Fifty streets
+  (Brawler). New venues are pure data (`src/data/venues/*.json`).
+
+## Asset pipeline
+
+- `src/data/animMap.ts` — uniform frame layout for all 19 fighters.
+- `AnimationSystem` lazily loads only the frames a mode needs and builds Phaser
+  anims globally (reused across scenes). Missing frames are skipped so a
+  partially-sliced character (e.g. pete/snow top-down) still gets a playable
+  fallback instead of breaking the build.
+- Venue interior backdrop is probed optionally — drop
+  `assets/venues/hitmans_vip_inside.png` and it appears automatically.
 
 ## Next passes (priority order from the master prompt)
 
-- F. VenueScene top-down (Pokémon-style) + InteractionSystem/DialogueSystem
-- G. StageLoader + JSON stage schema + AssetManifestLoader
-- H. Wire real character sprite sheets from `../assets` over the graybox bodies
+- G. StageLoader + JSON stage schema + AssetManifestLoader (extends venue JSON)
 - I. WeaponSystem (bat pickup) + PropDestructionSystem + drops
 - J. BossSystem + garage-door reveal cutscene
 - K. LevelEditorScene
 - Bingo / TV / Host scenes ported from the existing vanilla-JS modules
+- Polish: top-down sprite scale/label spacing, real venue backdrops

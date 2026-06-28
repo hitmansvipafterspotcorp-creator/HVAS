@@ -1,0 +1,87 @@
+{
+  "id": "hitmans_vip_inside",
+  "name": "Hitmans VIP After Spot",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 430 },
+  "walkable": { "x": 60, "y": 120, "w": 840, "h": 380 },
+  "colliders": [
+    { "x": 80, "y": 130, "w": 220, "h": 70, "label": "bar counter" },
+    { "x": 660, "y": 130, "w": 220, "h": 80, "label": "dj booth" },
+    { "x": 420, "y": 140, "w": 120, "h": 60, "label": "stage" }
+  ],
+  "npcs": [
+    {
+      "id": "dj",
+      "charId": 2,
+      "x": 760,
+      "y": 230,
+      "facing": "s",
+      "name": "DJ",
+      "lines": [
+        "Welcome to Cafe8Fifty.",
+        "I run the booth all night — Tue through Sat.",
+        "Stay locked in, the set's just getting started."
+      ]
+    },
+    {
+      "id": "host",
+      "charId": 11,
+      "x": 480,
+      "y": 220,
+      "facing": "s",
+      "name": "Host",
+      "lines": [
+        "You on the list? Good.",
+        "VIP After Spot members get the back section.",
+        "Network, mingle, make it count."
+      ]
+    },
+    {
+      "id": "vendor",
+      "charId": 9,
+      "x": 180,
+      "y": 220,
+      "facing": "s",
+      "name": "Vendor",
+      "lines": [
+        "Drinks, merch, member cards — I got you.",
+        "First round's on the house for new members."
+      ]
+    },
+    {
+      "id": "security",
+      "charId": 10,
+      "x": 480,
+      "y": 470,
+      "facing": "n",
+      "name": "Security",
+      "lines": [
+        "Streets are rough out there tonight.",
+        "Head out the front if you're looking for a fight."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_street",
+      "x": 440,
+      "y": 502,
+      "w": 90,
+      "h": 30,
+      "type": "scene",
+      "target": "Brawler",
+      "label": "Cafe8Fifty Streets"
+    },
+    {
+      "id": "exit_menu",
+      "x": 70,
+      "y": 470,
+      "w": 80,
+      "h": 40,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

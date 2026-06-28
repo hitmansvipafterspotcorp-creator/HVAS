@@ -45,4 +45,5 @@ export const SCENE = {
   Preload: 'Preload',
   MainMenu: 'MainMenu',
   Brawler: 'Brawler',
+  Venue: 'Venue',
 } as const;

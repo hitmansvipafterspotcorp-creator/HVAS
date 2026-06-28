@@ -12,6 +12,7 @@ export type Buttons = {
   attackHeld: boolean;
   dodge: boolean; // edge-triggered
   superMove: boolean; // edge-triggered
+  interact: boolean; // edge-triggered (E / Enter / Space)
 };
 
 export class InputSystem {
@@ -20,7 +21,7 @@ export class InputSystem {
   constructor(scene: Phaser.Scene) {
     const kb = scene.input.keyboard!;
     this.keys = kb.addKeys(
-      'LEFT,RIGHT,UP,DOWN,A,D,W,S,J,K,L,SPACE,SHIFT',
+      'LEFT,RIGHT,UP,DOWN,A,D,W,S,J,K,L,SPACE,SHIFT,E,ENTER',
     ) as Record<string, Phaser.Input.Keyboard.Key>;
   }
 
@@ -35,6 +36,10 @@ export class InputSystem {
       attackHeld: k.J.isDown,
       dodge: Phaser.Input.Keyboard.JustDown(k.SHIFT),
       superMove: Phaser.Input.Keyboard.JustDown(k.K),
+      interact:
+        Phaser.Input.Keyboard.JustDown(k.E) ||
+        Phaser.Input.Keyboard.JustDown(k.ENTER) ||
+        Phaser.Input.Keyboard.JustDown(k.SPACE),
     };
   }
 }
