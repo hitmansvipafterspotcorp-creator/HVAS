@@ -296,12 +296,15 @@ const HitgearOS = (() => {
   });
 
   // ──── CHAR SELECT ────
-  function openCharSelect(onSelect) {
+  // opts.allUnlocked → every roster character is selectable (Arcade mode);
+  // story/venue mode keeps the status-point unlock grind.
+  function openCharSelect(onSelect, opts) {
     showScreen('screen-char-select');
-    renderCharSelect(onSelect);
+    renderCharSelect(onSelect, opts || {});
   }
 
-  function renderCharSelect(onSelect) {
+  function renderCharSelect(onSelect, opts) {
+    opts = opts || {};
     const grid = document.getElementById('char-grid');
     if (!grid || !window.CHARACTERS) return;
     grid.innerHTML = '';
@@ -325,7 +328,7 @@ const HitgearOS = (() => {
     }
 
     window.CHARACTERS.forEach(ch => {
-      const locked = (ch.unlockPts || 0) > pts;
+      const locked = !opts.allUnlocked && (ch.unlockPts || 0) > pts;
       const card = document.createElement('div');
       card.className = 'char-card' + (ch.id === selectedCharId ? ' active' : '') + (locked ? ' locked-char' : '');
       const cid = `cs-thumb-${ch.id}`;

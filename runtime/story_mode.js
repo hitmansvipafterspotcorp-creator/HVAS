@@ -201,7 +201,7 @@ const StoryMode = (() => {
           run = { playerCharId: charId, idx: 0, mode: 'arcade', diff,
             ladder: buildArcadeLadder(diff) };
           nextRung();
-        });
+        }, { allUnlocked: true });   // Arcade: full roster selectable
       });
     });
   }
