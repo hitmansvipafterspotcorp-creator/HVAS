@@ -1,7 +1,7 @@
 'use strict';
 // Relative paths so the SW works whether hosted at domain root or a /subpath/
 // (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v36';
+const CACHE_NAME = 'hitgear-os-v37';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -110,6 +110,12 @@ const CORE_ASSETS = [
   './assets/ui/elements/title_menu/title_menu_000.png',
   './assets/ui/elements/venue_map/venue_map_001.png',
   // ── Character sheets — playable fighters ─────────────────────────────────
+  './assets/characters/kendrick_sheet01_loco.png',
+  './assets/characters/kendrick_sheet02_combat.png',
+  './assets/characters/kendrick_sheet03_damage.png',
+  './assets/characters/kendrick_sheet04_supers.png',
+  './assets/characters/kendrick_sheet05_topdown.png',
+  './assets/characters/kendrick_sheet06_vfx.png',
   './assets/characters/creator_sheet01_loco.png',
   './assets/characters/creator_sheet02_combat.png',
   './assets/characters/creator_sheet03_damage.png',
