@@ -199,8 +199,17 @@ const SceneManager = (() => {
     const bgImg = (typeof AssetLoader !== 'undefined' && venue.bgImage)
       ? AssetLoader.get(venue.bgImage) : null;
 
-    if (bgImg) {
-      AssetLoader.drawCover(ctx, bgImg, 0, 0, W, H);
+    const bgW0 = bgImg && (bgImg.naturalWidth || bgImg.width);
+    const bgH0 = bgImg && (bgImg.naturalHeight || bgImg.height);
+    if (bgImg && bgW0) {
+      // Streets-of-Rage parallax: the wide street art PANS with the camera
+      // across the full stage instead of sitting static/cropped.
+      const bw = H * (bgW0 / bgH0);
+      const stageW = venue.stageWidth || W;
+      const span = Math.max(0, bw - W);
+      const prog = stageW > W ? Math.min(1, Math.max(0, cameraX / (stageW - W))) : 0;
+      ctx.fillStyle = '#050008'; ctx.fillRect(0, 0, W, H);
+      ctx.drawImage(bgImg, -span * prog, 0, bw, H);
     } else {
       ctx.fillStyle = '#050008';
       ctx.fillRect(0, 0, W, H);
