@@ -257,13 +257,21 @@ const NPCEngine = (() => {
     if (venue.reward && venue.reward.unlocks) {
       const dests = Array.isArray(venue.reward.unlocks)
         ? venue.reward.unlocks : [venue.reward.unlocks];
-      const locked = !SaveSystem.isMissionComplete(venue.id);
+      // LAUNCH GATE: only Cafe8Fifty (1) + HITMANS VIP After Spot (3) open at
+      // launch. Doors to any other venue stay locked as a visible "COMING SOON"
+      // pathway. (Keep in sync with HitgearOS LAUNCH_VENUES.)
+      const LL = (typeof window !== 'undefined') && window.HVAS_LAUNCH_LOCK;
+      const LAUNCH_VENUES = (typeof window !== 'undefined' && window.HVAS_LAUNCH_VENUES) || [1, 3];
       const gap = canvasH / (dests.length + 1);
       dests.forEach((destId, i) => {
+        const comingSoon = LL && !LAUNCH_VENUES.includes(destId);
+        const locked = comingSoon || !SaveSystem.isMissionComplete(venue.id);
         doors.push({
           id: 'door_next_' + destId, x: canvasW - 80, y: gap * (i + 1) - 20, w: 48, h: 40,
           locked, destVenueId: destId, destX: 100, destY: canvasH / 2,
-          prompt: 'Enter venue', lockedText: 'Clear mission to unlock', showPrompt: false
+          prompt: 'Enter venue', comingSoon,
+          lockedText: comingSoon ? 'COMING SOON — unlocks after launch' : 'Clear mission to unlock',
+          showPrompt: false
         });
       });
     }

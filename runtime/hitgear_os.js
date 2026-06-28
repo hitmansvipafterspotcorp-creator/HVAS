@@ -54,6 +54,17 @@ const MusicEngine = (() => {
 })();
 
 const HitgearOS = (() => {
+  // ── LAUNCH GATE ──────────────────────────────────────────────────────────
+  // Members get into the app via Cafe8Fifty (id:1, outside street stage) and
+  // HITMANS VIP After Spot (id:3, inside). Every other venue shows on the map
+  // as a locked "COMING SOON" pathway and cannot be entered yet. Flip
+  // LAUNCH_LOCK to false (or expand LAUNCH_VENUES) to open the rest — or wire a
+  // pay-to-unlock check into isVenuePlayable().
+  const LAUNCH_LOCK = true;
+  const LAUNCH_VENUES = [1, 3];
+  const isVenuePlayable = (id) => !LAUNCH_LOCK || LAUNCH_VENUES.includes(id);
+  if (typeof window !== 'undefined') { window.HVAS_LAUNCH_LOCK = LAUNCH_LOCK; window.HVAS_LAUNCH_VENUES = LAUNCH_VENUES; }
+
   let currentScreen = 'screen-boot';
   let selectedCharId = 3;
   let selectedVenueId = 1;
@@ -562,7 +573,12 @@ const HitgearOS = (() => {
     const save = SaveSystem.load() || SaveSystem.defaults();
     grid.innerHTML = '';
     window.VENUES.forEach(v => {
-      const unlocked = save.unlockedVenues.includes(v.id);
+      // LAUNCH GATE: only Cafe8Fifty (1, outside) + HITMANS VIP After Spot (3,
+      // inside) are playable at launch. Others appear on the map as a locked
+      // pathway ("COMING SOON") until unlocked / paid-unlock is enabled.
+      const launchOpen = !LAUNCH_LOCK || LAUNCH_VENUES.includes(v.id);
+      const unlocked = launchOpen && save.unlockedVenues.includes(v.id);
+      const comingSoon = LAUNCH_LOCK && !LAUNCH_VENUES.includes(v.id);
       const complete = save.completedMissions.includes(v.id);
       const bg = VENUE_BG_MAP[v.shortName] || '';
       const card = document.createElement('div');
@@ -585,10 +601,12 @@ const HitgearOS = (() => {
             <div style="font-size:10px;color:#ff00aa;margin-top:2px;font-family:'Orbitron',sans-serif">${v.cameraType === 'topdown' ? '▣ TOP-DOWN' : '▶ SIDE-SCROLL'}</div>
             ${complete ? '<div style="font-size:10px;color:#ffd700;margin-top:2px">✓ COMPLETE</div>' : ''}
           </div>
-          <div class="venue-lock">${unlocked ? '' : '🔒'}</div>
+          <div class="venue-lock">${unlocked ? '' : (comingSoon ? '🔒 COMING SOON' : '🔒')}</div>
         </div>`;
       if (unlocked) {
         card.addEventListener('click', () => startVenue(v.id));
+      } else if (comingSoon) {
+        card.addEventListener('click', () => showNotification('🔒 ' + v.shortName + ' — COMING SOON. Cafe8Fifty & HITMANS VIP are open now.'));
       }
       grid.appendChild(card);
     });
@@ -918,6 +936,11 @@ const HitgearOS = (() => {
   }
 
   function startVenue(venueId) {
+    if (!isVenuePlayable(venueId)) {
+      const v = (window.VENUES || []).find(x => x.id === venueId);
+      showNotification('🔒 ' + ((v && v.shortName) || 'That venue') + ' — COMING SOON.');
+      return;
+    }
     selectedVenueId = venueId;
     SaveSystem.patch({ currentVenueId: venueId });
     openCharSelect(charId => { selectedCharId = charId; launchGameplay(charId, venueId); });
