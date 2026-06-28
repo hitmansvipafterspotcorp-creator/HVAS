@@ -1195,5 +1195,14 @@ const VersusEngine = (() => {
     return `rgb(${r},${g},${b})`;
   }
 
-  return { start, stop, resize, togglePause, rematch, isPaused: () => paused };
+  return {
+    start, stop, resize, togglePause, rematch, isPaused: () => paused,
+    // debug/state hook (used by verification + future telemetry)
+    getState: () => (p1 && p2) ? {
+      phase, timer: Math.ceil(timer),
+      p1: { hp: Math.round(p1.hp), max: p1.maxHp, rounds: p1.rounds, x: Math.round(p1.x), combo: p1.combo|0, meter: Math.round(p1.meter) },
+      p2: { hp: Math.round(p2.hp), max: p2.maxHp, rounds: p2.rounds, x: Math.round(p2.x), combo: p2.combo|0, meter: Math.round(p2.meter) },
+    } : null,
+  };
 })();
+if (typeof window !== 'undefined') window.VersusEngine = VersusEngine;
