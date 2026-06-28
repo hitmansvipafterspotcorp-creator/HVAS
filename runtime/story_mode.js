@@ -199,33 +199,55 @@ const StoryMode = (() => {
       promptDifficulty(diff => {
         HitgearOS.openCharSelect(charId => {
           run = { playerCharId: charId, idx: 0, mode: 'arcade', diff,
-            ladder: buildArcadeLadder(diff) };
+            ladder: buildArcadeLadder(diff, charId) };
           nextRung();
         }, { allUnlocked: true });   // Arcade: full roster selectable
       });
     });
   }
 
-  // Streets-of-Rage arcade ladder: N street fights across ALL stages, then the
-  // boss gauntlet. Novice 5 / Medium 8 / Hard 12. Secret bosses unlock when the
-  // player's entered name is a code (see SECRET_CODES) — adds a hidden finale.
+  // Streets-of-Rage arcade ladder: N street fights across ALL stages, then a
+  // boss gauntlet. ANY roster character can be an opponent or a boss (for now).
+  // Novice 5 / Medium 8 / Hard 12. Secret codes splice a hidden real-boss finale.
   const SECRET_CODES = { 'RUNTHENIGHT':20, 'AFTERSPOT':21, 'HITMAN23':22 };
-  function buildArcadeLadder(diffKey) {
+  function _shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+  function _arcadeStages() {
+    return (window.VENUES||[]).filter(v=>v.bgImage).map(v=>({
+      venue: v.name || v.shortName,
+      stage: {
+        sky:    (v.colors&&(v.colors.sky||v.colors.floor))||'#080010',
+        ground: (v.colors&&(v.colors.ground||v.colors.wall))||'#0a0010',
+        accent: (v.colors&&v.colors.accent)||'#ff00aa',
+        name:   v.shortName, bgImage: v.bgImage,
+      }
+    }));
+  }
+  function _mkRung(oppId, st, isBoss, isFinal) {
+    const o = charById(oppId) || {};
+    const nm = o.shortName || o.name || 'RIVAL';
+    return {
+      opp: oppId, venue: st.venue, stage: st.stage, boss: !!isBoss, final: !!isFinal,
+      pre: [ `${nm} steps to you at ${st.stage.name}.`, `YOU: "Run the night."` ],
+      win: `${nm} goes down. ${st.stage.name} is yours.`,
+    };
+  }
+  function buildArcadeLadder(diffKey, playerId) {
     const d = ARCADE_DIFF[diffKey] || ARCADE_DIFF.novice;
-    const regular = LADDER.filter(r => !r.boss);
-    const bosses  = LADDER.filter(r => r.boss);
-    // shuffle the regular pool, repeat to fill the required street-fight count
-    const pool = regular.slice();
-    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    const stages = _shuffle(_arcadeStages());
+    if (!stages.length) return LADDER.slice(0, d.fights);   // safety fallback
+    // opponent pool = every roster fighter except the player
+    let pool = _shuffle((window.CHARACTERS||[]).map(c=>c.id).filter(id=>id!==playerId));
+    if (!pool.length) pool = [1];
     const streetCount = Math.max(1, d.fights - d.bosses);
-    const street = [];
-    for (let i=0;i<streetCount;i++) street.push(pool[i % pool.length]);
-    // boss gauntlet — last d.bosses bosses, in order, as the climax
-    const gauntlet = bosses.slice(-d.bosses);
-    // SECRET: if the player's name matches a code, splice in a secret boss finale
+    const rungs = [];
+    for (let i=0;i<streetCount;i++) rungs.push(_mkRung(pool[i%pool.length], stages[i%stages.length], false, false));
+    // boss gauntlet — any characters, scaled as bosses; last one is FINAL
+    const bossPool = _shuffle(pool);
+    for (let i=0;i<d.bosses;i++) rungs.push(_mkRung(bossPool[i%bossPool.length], stages[(streetCount+i)%stages.length], true, i===d.bosses-1));
+    // SECRET: name code splices a real-boss finale after the gauntlet
     const secretId = SECRET_CODES[(loadName()||'').toUpperCase().replace(/[^A-Z0-9]/g,'')];
-    const secret = secretId ? LADDER.filter(r => r.boss && r.opp === secretId) : [];
-    return street.concat(gauntlet, secret);
+    if (secretId) rungs.push(_mkRung(secretId, stages[0], true, true));
+    return rungs;
   }
 
   // lightweight difficulty picker overlay
