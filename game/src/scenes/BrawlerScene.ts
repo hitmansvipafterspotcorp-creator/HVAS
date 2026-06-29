@@ -656,25 +656,21 @@ export class BrawlerScene extends Phaser.Scene {
     // Dim backdrop
     g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setScrollFactor(0));
 
-    // Panel art (pausePanel 607×385) or fallback rectangle
-    if (this.textures.exists(UI.pausePanel)) {
-      const panel = this.add.image(cx, cy, UI.pausePanel).setOrigin(0.5).setScrollFactor(0);
-      const panelScale = Math.min(560 / panel.width, 340 / panel.height);
-      panel.setScale(panelScale);
-      g.add(panel);
-    } else {
-      g.add(this.add.rectangle(cx, cy, 560, 340, 0x110022, 0.95).setScrollFactor(0));
-    }
+    // Menu panel — clean dark rectangle with gold border
+    g.add(this.add
+      .rectangle(cx, cy, 400, 320, 0x0a0614, 0.97)
+      .setStrokeStyle(2, 0xffd700, 0.9)
+      .setScrollFactor(0));
 
-    // Title art (pauseTitle 578×111) or fallback text
+    // Title banner art (pause_menu_000.png) or fallback text
     if (this.textures.exists(UI.pauseTitle)) {
       const title = this.add.image(cx, cy - 130, UI.pauseTitle).setOrigin(0.5).setScrollFactor(0);
-      title.setScale(Math.min(340 / title.width, 70 / title.height));
+      title.setScale(Math.min(380 / title.width, 70 / title.height));
       g.add(title);
     } else {
-      g.add(this.add.text(cx, cy - 130, 'PAUSED', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 6,
+      g.add(this.add.text(cx, cy - 130, '★ PAUSE MENU ★', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 5,
       }).setOrigin(0.5).setScrollFactor(0));
     }
 

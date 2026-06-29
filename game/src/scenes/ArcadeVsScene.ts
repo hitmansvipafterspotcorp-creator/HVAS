@@ -918,24 +918,17 @@ export class ArcadeVsScene extends Phaser.Scene {
       .setScrollFactor(0);
     this.pauseGroup.add(dim);
 
-    // Panel from UI art
-    if (this.textures.exists(UI.pausePanel)) {
-      const panel = this.add.image(0, 0, UI.pausePanel)
-        .setDisplaySize(480, 300);
-      this.pauseGroup.add(panel);
-    } else {
-      const panel = this.add.rectangle(0, 0, 480, 300, 0x0d0818)
-        .setStrokeStyle(2, 0xffd700);
-      this.pauseGroup.add(panel);
-    }
+    // Menu panel — clean dark rectangle with gold border
+    this.pauseGroup.add(this.add.rectangle(0, 0, 480, 300, 0x0d0818)
+      .setStrokeStyle(2, 0xffd700, 0.9));
 
-    // PAUSED title from art or text
+    // Title banner art (pause_menu_000.png) or fallback text
     if (this.textures.exists(UI.pauseTitle)) {
-      this.pauseGroup.add(this.add.image(0, -108, UI.pauseTitle).setDisplaySize(340, 60));
+      this.pauseGroup.add(this.add.image(0, -108, UI.pauseTitle).setDisplaySize(380, 60));
     } else {
-      this.pauseGroup.add(this.add.text(0, -100, 'PAUSED', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 6,
+      this.pauseGroup.add(this.add.text(0, -100, '★ PAUSE MENU ★', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 5,
       }).setOrigin(0.5));
     }
 
