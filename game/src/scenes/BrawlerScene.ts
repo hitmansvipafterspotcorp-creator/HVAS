@@ -485,8 +485,33 @@ export class BrawlerScene extends Phaser.Scene {
     if (p.hp <= 0 && p.state !== 'ko') {
       p.state = 'ko';
       this.flashBanner('K.O.');
-      this.time.delayedCall(1500, () => this.scene.start(SCENE.StageSelect));
+      this.time.delayedCall(1200, () => this.showKoScreen());
     }
+  }
+
+  private showKoScreen(): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+
+    const overlay = this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
+      .setDepth(90000).setScrollFactor(0);
+    this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.72 }, duration: 300 });
+
+    this.add.text(cx, cy - 50, 'K.O.', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '64px', color: '#ff2244',
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    this.add.text(cx, cy + 14, 'RETRY STAGE?', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffffff',
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    this.add.text(cx, cy + 50, 'SPACE — Retry     ESC — Stage Select', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    const kb = this.input.keyboard!;
+    kb.once('keydown-SPACE', () => this.scene.restart());
+    kb.once('keydown-ESC',   () => this.scene.start(SCENE.StageSelect));
   }
 
   // Debug overlay: floor contact points, depth bands, attack reach + hurt spans.

@@ -19,5 +19,6 @@
     "name": "Big Soulja",
     "hp": 200,
     "revealLabel": "BIG SOULJA"
-  }
+  },
+  "venueUnlocks": "hitmans_vip_inside"
 }
