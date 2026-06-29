@@ -13,5 +13,11 @@
     { "type": "folding_chair", "x": 450, "feetY": 440, "drop": "weapon" },
     { "type": "trashcan",      "x": 680, "feetY": 430, "drop": "meter"  },
     { "type": "safety_cone",   "x": 820, "feetY": 450, "drop": "none"   }
-  ]
+  ],
+  "boss": {
+    "charId": 21,
+    "name": "Big Soulja",
+    "hp": 200,
+    "revealLabel": "BIG SOULJA"
+  }
 }

@@ -14,6 +14,14 @@ export type PropDef = {
   drop?: PropDropType;
 };
 
+export type BossDef = {
+  charId: number;
+  name: string;
+  hp: number;
+  /** Text shown in the warning banner during the reveal, e.g. "BIG SOULJA" */
+  revealLabel: string;
+};
+
 export type StageData = {
   id: string;
   name: string;
@@ -24,6 +32,8 @@ export type StageData = {
   enemies: number[];
   /** Breakable foreground props. */
   props?: PropDef[];
+  /** Optional end-of-stage boss encounter. */
+  boss?: BossDef;
   /** future: audio path relative to ASSET_BASE */
   music?: string;
 };

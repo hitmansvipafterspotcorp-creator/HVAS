@@ -16,6 +16,7 @@ import { WaveSystem } from '../systems/WaveSystem';
 import { StageLoader } from '../systems/StageLoader';
 import { PropDestructionSystem } from '../systems/PropDestructionSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
+import { BossSystem } from '../systems/BossSystem';
 import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import type { StageData } from '../data/stageTypes';
@@ -35,6 +36,8 @@ export class BrawlerScene extends Phaser.Scene {
   private waves!: WaveSystem;
   private props!: PropDestructionSystem;
   private weapon!: WeaponSystem;
+  private boss: BossSystem | null = null;
+  private bossRevealTriggered = false;
 
   private hud!: Phaser.GameObjects.Text; // wave/enemies line (text)
   private banner!: Phaser.GameObjects.Text;
@@ -79,6 +82,7 @@ export class BrawlerScene extends Phaser.Scene {
     this.weapon = new WeaponSystem();
     this.props = new PropDestructionSystem(this);
     if (this.stage.props?.length) this.props.init(this.stage.props, this.stage.id);
+    if (this.stage.boss) this.boss = new BossSystem(this, this.stage.boss);
 
     // HUD — real art kit when available, text otherwise.
     this.buildHud();
@@ -124,16 +128,33 @@ export class BrawlerScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    // Cutscene: freeze player and AI but keep rendering.
+    const inCutscene = this.boss?.cutsceneRunning ?? false;
     const run = this.combat.tick(delta);
-    if (run) {
+    if (run && !inCutscene) {
       this.updatePlayer(delta);
       this.ai.update(this.waves.enemies, this.player, this.combat, delta);
       this.waves.reap();
       this.handleWaveFlow();
     }
 
+    // Boss AI + HP bar (runs outside hit-stop but not during cutscene).
+    if (!inCutscene && this.boss?.active) {
+      const alive = this.boss.update(this.player, this.combat, delta);
+      if (!alive && !this.boss.defeated) {
+        // boss.defeated is set internally; handled in drawHud
+      }
+    }
+
     // Prop hit check runs whenever player attack is active (outside hit-stop).
     if (this.player.attackActive) this.props.checkHits(this.player);
+    // Also allow hits on boss.
+    if (this.player.attackActive && this.boss?.active && this.boss.boss) {
+      this.props.checkHits(this.player); // props
+      const opts = this.weapon.augmentOpts({ damage: 9, knockback: 18, meterGain: 8 });
+      const hit = this.combat.resolve(this.player, [this.boss.boss], opts);
+      if (hit) this.weapon.use();
+    }
 
     // Drop pickup checks every frame.
     this.props.checkPickup(this.player, (kind) => {
@@ -216,14 +237,36 @@ export class BrawlerScene extends Phaser.Scene {
 
   private handleWaveFlow(): void {
     if (this.waves.cleared) {
+      // Boss stage: trigger reveal once, then watch for boss defeat.
+      if (this.boss) {
+        if (!this.bossRevealTriggered) {
+          this.bossRevealTriggered = true;
+          this.boss.reveal(() => {
+            this.flashBanner(`FIGHT ${this.def.name ?? this.stage.boss!.name}!`.trim());
+          });
+        }
+        if (this.boss.defeated) {
+          this.banner.setText('STAGE CLEAR!');
+          this.banner.setVisible(true);
+          this.time.delayedCall(2000, () => this.scene.start(SCENE.MainMenu));
+        }
+        return;
+      }
+      // No boss — immediate clear.
       this.banner.setText('STAGE CLEAR!');
       this.banner.setVisible(true);
+      this.time.delayedCall(2000, () => this.scene.start(SCENE.MainMenu));
       return;
     }
     if (!this.waves.locked) {
       const advanced = this.waves.tryAdvance();
       if (advanced) this.flashBanner(`WAVE ${this.waves.current + 1}`);
     }
+  }
+
+  // Convenience: boss def alias for the reveal callback label.
+  private get def(): { name: string } {
+    return this.stage.boss ?? { name: '' };
   }
 
   private flashBanner(text: string): void {
