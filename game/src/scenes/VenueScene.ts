@@ -40,6 +40,9 @@ const VENUE_REGISTRY: Record<string, VenueData> = {
 
 const DEFAULT_VENUE_ID = 'hitmans_vip_inside';
 const SPEED = 150;
+// Top-down frame dimensions are 131×135 px (not the 181 px brawler frames).
+// Scale to ~74 px display height so characters are clearly readable in venues.
+const TD_SCALE = 0.55;
 
 // ── VenueScene ──────────────────────────────────────────────────────────────
 // Generic top-down interior. Accepts { venueId } in scene init data;
@@ -55,6 +58,7 @@ export class VenueScene extends Phaser.Scene {
   private py = 0;
   private facing: Facing = 's';
   private lastAnim = '';
+  private lastFlipX = false;
   private npcPositions: { x: number; y: number }[] = [];
 
   constructor() {
@@ -113,7 +117,7 @@ export class VenueScene extends Phaser.Scene {
         .sprite(npc.x, npc.y, '__DEFAULT')
         .setOrigin(0.5, 1)
         .setDepth(npc.y);
-      sprite.setScale(78 / 181);
+      sprite.setScale(TD_SCALE);
       if (this.anims.exists(idleKey)) sprite.play(idleKey);
       else this.fallbackBlock(npc.x, npc.y, COLORS.enemy);
 
@@ -190,7 +194,7 @@ export class VenueScene extends Phaser.Scene {
     this.player = this.add
       .sprite(this.px, this.py, '__DEFAULT')
       .setOrigin(0.5, 1);
-    this.player.setScale(82 / 181);
+    this.player.setScale(TD_SCALE);
     this.playAnim('td_idle_s');
 
     this.add
@@ -243,10 +247,15 @@ export class VenueScene extends Phaser.Scene {
   }
 
   private playAnim(name: string): void {
-    const key = AnimationSystem.animKey(PLAYER_ID, name);
+    // Row 7 of the topdown sheet is props — east walk mirrors the west walk.
+    const flipX = name === 'td_walk_e';
+    const resolved = flipX ? 'td_walk_w' : name;
+    const key = AnimationSystem.animKey(PLAYER_ID, resolved);
     if (!this.anims.exists(key)) return;
-    if (this.lastAnim === key) return;
+    if (this.lastAnim === key && this.lastFlipX === flipX) return;
     this.lastAnim = key;
+    this.lastFlipX = flipX;
+    this.player.setFlipX(flipX);
     this.player.play(key, true);
   }
 

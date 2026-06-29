@@ -72,7 +72,8 @@ export const ANIMS: Record<string, AnimDef> = {
   td_walk_s: { type: 'topdown', row: 4, frames: 8, fps: 10, loop: true },
   td_walk_n: { type: 'topdown', row: 5, frames: 8, fps: 10, loop: true },
   td_walk_w: { type: 'topdown', row: 6, frames: 8, fps: 10, loop: true },
-  td_walk_e: { type: 'topdown', row: 7, frames: 8, fps: 10, loop: true },
+  // Row 7 of the topdown sheet is character props/accessories — no separate
+  // east walk exists. East walking is handled by mirroring td_walk_w (setFlipX).
 };
 
 // Which anims each mode needs (keeps loads small — we never preload all frames).
@@ -100,5 +101,5 @@ export const VENUE_ANIMS = [
   'td_walk_s',
   'td_walk_n',
   'td_walk_w',
-  'td_walk_e',
+  // td_walk_e intentionally omitted — east walking mirrors td_walk_w in scene
 ];
