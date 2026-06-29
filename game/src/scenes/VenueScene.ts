@@ -54,6 +54,7 @@ export class VenueScene extends Phaser.Scene {
   private py = 0;
   private facing: Facing = 's';
   private lastAnim = '';
+  private npcPositions: { x: number; y: number }[] = [];
 
   constructor() {
     super(SCENE.Venue);
@@ -122,6 +123,7 @@ export class VenueScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(npc.y);
 
+      this.npcPositions.push({ x: npc.x, y: npc.y });
       this.interactions.register({
         x: npc.x,
         y: npc.y,
@@ -295,6 +297,18 @@ export class VenueScene extends Phaser.Scene {
         this.py < c.y + c.h + 14
       ) {
         this.py = c.y + c.h + 14;
+      }
+    }
+
+    const NPC_RADIUS = 28;
+    for (const npc of this.npcPositions) {
+      const dx = this.px - npc.x;
+      const dy = this.py - npc.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < NPC_RADIUS && dist > 0) {
+        const push = NPC_RADIUS - dist;
+        this.px += (dx / dist) * push;
+        this.py += (dy / dist) * push;
       }
     }
   }

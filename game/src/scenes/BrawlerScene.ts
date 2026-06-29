@@ -349,8 +349,7 @@ export class BrawlerScene extends Phaser.Scene {
     this.add
       .text(cx, cy, label, { fontFamily: 'monospace', fontSize: '11px', color: '#ffd700' })
       .setOrigin(0.5)
-      .setDepth(cy + 1)
-      .setScrollFactor(0);
+      .setDepth(cy + 1);
 
     // Simple proximity check each frame via a zone.
     const zone = this.add.zone(cx, cy, W, H).setDepth(cy);
