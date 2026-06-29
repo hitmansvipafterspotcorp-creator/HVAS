@@ -8,7 +8,7 @@ export const FRAME_W = 131;
 export const FRAME_H = 181;
 export const COLS = 8; // frames per row
 
-// charId -> frames folder name.
+// charId -> frames folder name. Must match assets/characters/frames/{folder}/.
 export const CHAR_FOLDERS: Record<number, string> = {
   1: 'creator',
   2: 'dj',
@@ -25,11 +25,15 @@ export const CHAR_FOLDERS: Record<number, string> = {
   13: 'fsu_male',
   14: 'kendrick',
   20: 'kt',
-  21: 'bigsoulja',
+  21: 'big_soulja',
   22: 'eld',
-  30: 'pete',
-  31: 'snow',
+  30: 'predator_pete',
+  31: 'agent_snow',
 };
+
+// Only these chars have sliced topdown direction frames.
+// All others fall back to loco idle in VenueScene.
+export const TOPDOWN_CHAR_IDS = [1, 10, 14, 20, 30, 31] as const;
 
 export type AnimDef = {
   type: string; // sheet/type folder
@@ -65,15 +69,18 @@ export const ANIMS: Record<string, AnimDef> = {
   super3: { type: 'supers', row: 2, frames: 8, fps: 14, loop: false },
   finisher: { type: 'supers', row: 3, frames: 8, fps: 10, loop: false },
   // top-down (4 facings × idle/walk)
-  td_idle_s: { type: 'topdown', row: 0, frames: 8, fps: 6, loop: true },
-  td_idle_n: { type: 'topdown', row: 1, frames: 8, fps: 6, loop: true },
-  td_idle_w: { type: 'topdown', row: 2, frames: 8, fps: 6, loop: true },
-  td_idle_e: { type: 'topdown', row: 3, frames: 8, fps: 6, loop: true },
-  td_walk_s: { type: 'topdown', row: 4, frames: 8, fps: 10, loop: true },
-  td_walk_n: { type: 'topdown', row: 5, frames: 8, fps: 10, loop: true },
-  td_walk_w: { type: 'topdown', row: 6, frames: 8, fps: 10, loop: true },
-  // Row 7 of the topdown sheet is character props/accessories — no separate
-  // east walk exists. East walking is handled by mirroring td_walk_w (setFlipX).
+  // Sheets have col 0 = label; frames start at col 2 for most chars (6 frames),
+  // col 1 for pete/snow style sheets (7 frames). animMap uses 6 — extra f06
+  // for pete/snow is silently skipped rather than the other way around.
+  td_idle_s: { type: 'topdown', row: 0, frames: 6, fps: 6, loop: true },
+  td_idle_n: { type: 'topdown', row: 1, frames: 6, fps: 6, loop: true },
+  td_idle_w: { type: 'topdown', row: 2, frames: 6, fps: 6, loop: true },
+  td_idle_e: { type: 'topdown', row: 3, frames: 6, fps: 6, loop: true },
+  td_walk_s: { type: 'topdown', row: 4, frames: 6, fps: 10, loop: true },
+  td_walk_n: { type: 'topdown', row: 5, frames: 6, fps: 10, loop: true },
+  td_walk_w: { type: 'topdown', row: 6, frames: 6, fps: 10, loop: true },
+  // Row 7 = props/accessories for creator-type sheets; not an east walk.
+  // East walking is handled by mirroring td_walk_w via setFlipX in VenueScene.
 };
 
 // Which anims each mode needs (keeps loads small — we never preload all frames).
@@ -93,6 +100,7 @@ export const BRAWLER_ANIMS = [
   'finisher',
 ];
 
+// Only loaded for chars listed in TOPDOWN_CHAR_IDS to avoid mass 404s.
 export const VENUE_ANIMS = [
   'td_idle_s',
   'td_idle_n',
@@ -101,5 +109,5 @@ export const VENUE_ANIMS = [
   'td_walk_s',
   'td_walk_n',
   'td_walk_w',
-  // td_walk_e intentionally omitted — east walking mirrors td_walk_w in scene
+  // td_walk_e omitted — east walking mirrors td_walk_w via setFlipX
 ];

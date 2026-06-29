@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { AnimationSystem } from '../systems/AnimationSystem';
-import { BRAWLER_ANIMS, VENUE_ANIMS } from '../data/animMap';
+import { BRAWLER_ANIMS, VENUE_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
 import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
@@ -71,18 +71,20 @@ export class PreloadScene extends Phaser.Scene {
     // Priority: player + current-mode enemies first so they animate fastest.
     const priority = new Set<number>([PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS]);
     const rest = allChars.filter(id => !priority.has(id));
+    const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
     for (const id of [...priority, ...rest]) {
       AnimationSystem.queue(this, id, BRAWLER_ANIMS);
-      AnimationSystem.queue(this, id, VENUE_ANIMS);
+      if (topdownSet.has(id)) AnimationSystem.queue(this, id, VENUE_ANIMS);
     }
   }
 
   create(): void {
     // Build animations for every queued character.
     const allChars = Object.keys(CHAR_FOLDERS).map(Number);
+    const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
     for (const id of allChars) {
       AnimationSystem.build(this, id, BRAWLER_ANIMS);
-      AnimationSystem.build(this, id, VENUE_ANIMS);
+      if (topdownSet.has(id)) AnimationSystem.build(this, id, VENUE_ANIMS);
     }
 
     // Brief hold so the splash reads, then into the menu.
