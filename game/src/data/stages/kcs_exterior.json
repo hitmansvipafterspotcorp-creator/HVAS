@@ -1,18 +1,52 @@
 {
   "id": "kcs_exterior",
-  "name": "Kingdom Come Saloon — Outside",
+  "name": "Kingdom Come Saloon \u2014 Outside",
   "backdrop": "venues/kingdom_come_exterior.png",
   "waves": [
-    { "count": 3, "hp": 50 },
-    { "count": 5, "hp": 55 },
-    { "count": 6, "hp": 65 }
+    {
+      "count": 3,
+      "hp": 50
+    },
+    {
+      "count": 5,
+      "hp": 55
+    },
+    {
+      "count": 6,
+      "hp": 65
+    }
   ],
-  "enemies": [8, 10, 2, 11],
+  "enemies": [
+    8,
+    10,
+    2,
+    11
+  ],
   "props": [
-    { "type": "whiskey_barrel",                  "x": 180, "feetY": 425, "drop": "health" },
-    { "type": "barrel_table",                    "x": 400, "feetY": 440, "drop": "weapon" },
-    { "type": "wooden_crate_small_wooden_crate_large", "x": 640, "feetY": 435, "drop": "meter" },
-    { "type": "prop_set_a",                      "x": 830, "feetY": 445, "drop": "none" }
+    {
+      "type": "trashcan",
+      "x": 180,
+      "feetY": 425,
+      "drop": "health"
+    },
+    {
+      "type": "folding_chair",
+      "x": 400,
+      "feetY": 440,
+      "drop": "weapon"
+    },
+    {
+      "type": "round_cafe_table",
+      "x": 640,
+      "feetY": 435,
+      "drop": "meter"
+    },
+    {
+      "type": "safety_cone",
+      "x": 830,
+      "feetY": 445,
+      "drop": "none"
+    }
   ],
   "boss": {
     "charId": 20,

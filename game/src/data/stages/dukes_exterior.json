@@ -1,18 +1,52 @@
 {
   "id": "dukes_exterior",
-  "name": "Duke's — Outside",
+  "name": "Duke's \u2014 Outside",
   "backdrop": "venues/dukes_exterior.png",
   "waves": [
-    { "count": 3, "hp": 45 },
-    { "count": 4, "hp": 50 },
-    { "count": 6, "hp": 60 }
+    {
+      "count": 3,
+      "hp": 45
+    },
+    {
+      "count": 4,
+      "hp": 50
+    },
+    {
+      "count": 6,
+      "hp": 60
+    }
   ],
-  "enemies": [10, 11, 8, 2],
+  "enemies": [
+    10,
+    11,
+    8,
+    2
+  ],
   "props": [
-    { "type": "12", "x": 200, "feetY": 430, "drop": "health" },
-    { "type": "13", "x": 420, "feetY": 445, "drop": "weapon" },
-    { "type": "14", "x": 650, "feetY": 435, "drop": "meter" },
-    { "type": "15", "x": 820, "feetY": 450, "drop": "none" }
+    {
+      "type": "trashcan",
+      "x": 200,
+      "feetY": 430,
+      "drop": "health"
+    },
+    {
+      "type": "folding_chair",
+      "x": 420,
+      "feetY": 445,
+      "drop": "weapon"
+    },
+    {
+      "type": "round_cafe_table",
+      "x": 650,
+      "feetY": 435,
+      "drop": "meter"
+    },
+    {
+      "type": "safety_cone",
+      "x": 820,
+      "feetY": 450,
+      "drop": "none"
+    }
   ],
   "boss": {
     "charId": 22,

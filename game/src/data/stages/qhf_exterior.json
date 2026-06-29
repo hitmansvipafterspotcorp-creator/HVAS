@@ -1,18 +1,52 @@
 {
   "id": "qhf_exterior",
-  "name": "Quick Hit Fuel — Outside",
+  "name": "Quick Hit Fuel \u2014 Outside",
   "backdrop": "venues/qhf_exterior.png",
   "waves": [
-    { "count": 4, "hp": 52 },
-    { "count": 5, "hp": 60 },
-    { "count": 6, "hp": 70 }
+    {
+      "count": 4,
+      "hp": 52
+    },
+    {
+      "count": 5,
+      "hp": 60
+    },
+    {
+      "count": 6,
+      "hp": 70
+    }
   ],
-  "enemies": [10, 8, 2, 11],
+  "enemies": [
+    10,
+    8,
+    2,
+    11
+  ],
   "props": [
-    { "type": "11", "x": 200, "feetY": 430, "drop": "health" },
-    { "type": "13", "x": 410, "feetY": 443, "drop": "weapon" },
-    { "type": "15", "x": 640, "feetY": 432, "drop": "meter" },
-    { "type": "18", "x": 820, "feetY": 447, "drop": "none" }
+    {
+      "type": "trashcan",
+      "x": 200,
+      "feetY": 430,
+      "drop": "health"
+    },
+    {
+      "type": "folding_chair",
+      "x": 410,
+      "feetY": 443,
+      "drop": "weapon"
+    },
+    {
+      "type": "round_cafe_table",
+      "x": 640,
+      "feetY": 432,
+      "drop": "meter"
+    },
+    {
+      "type": "safety_cone",
+      "x": 820,
+      "feetY": 447,
+      "drop": "none"
+    }
   ],
   "boss": {
     "charId": 8,

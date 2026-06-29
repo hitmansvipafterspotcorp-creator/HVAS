@@ -9,9 +9,9 @@
   ],
   "enemies": [10, 8, 2, 11],
   "props": [
-    { "type": "08", "x": 200, "feetY": 425, "drop": "health" },
-    { "type": "10", "x": 430, "feetY": 440, "drop": "weapon" },
-    { "type": "12", "x": 660, "feetY": 430, "drop": "meter" }
+    { "type": "round_cafe_table", "x": 200, "feetY": 425, "drop": "health" },
+    { "type": "folding_chair",    "x": 430, "feetY": 440, "drop": "weapon" },
+    { "type": "round_cafe_table", "x": 660, "feetY": 430, "drop": "meter"  }
   ],
   "boss": {
     "charId": 5,

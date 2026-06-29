@@ -1,18 +1,52 @@
 {
   "id": "social_gaines_exterior",
-  "name": "Social Gaines — Outside",
+  "name": "Social Gaines \u2014 Outside",
   "backdrop": "venues/social_gaines.png",
   "waves": [
-    { "count": 4, "hp": 55 },
-    { "count": 5, "hp": 63 },
-    { "count": 6, "hp": 73 }
+    {
+      "count": 4,
+      "hp": 55
+    },
+    {
+      "count": 5,
+      "hp": 63
+    },
+    {
+      "count": 6,
+      "hp": 73
+    }
   ],
-  "enemies": [2, 10, 11, 8],
+  "enemies": [
+    2,
+    10,
+    11,
+    8
+  ],
   "props": [
-    { "type": "10", "x": 190, "feetY": 428, "drop": "health" },
-    { "type": "12", "x": 400, "feetY": 440, "drop": "weapon" },
-    { "type": "14", "x": 630, "feetY": 432, "drop": "meter" },
-    { "type": "16", "x": 815, "feetY": 446, "drop": "none" }
+    {
+      "type": "trashcan",
+      "x": 190,
+      "feetY": 428,
+      "drop": "health"
+    },
+    {
+      "type": "folding_chair",
+      "x": 400,
+      "feetY": 440,
+      "drop": "weapon"
+    },
+    {
+      "type": "round_cafe_table",
+      "x": 630,
+      "feetY": 432,
+      "drop": "meter"
+    },
+    {
+      "type": "safety_cone",
+      "x": 815,
+      "feetY": 446,
+      "drop": "none"
+    }
   ],
   "boss": {
     "charId": 6,
