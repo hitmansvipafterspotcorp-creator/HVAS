@@ -1,0 +1,11 @@
+{
+  "id": "kingdom_come_exterior",
+  "name": "Kingdom Come Saloon — Outside",
+  "backdrop": "venues/kingdom_come_exterior.png",
+  "waves": [
+    { "count": 4, "hp": 50 },
+    { "count": 5, "hp": 55 },
+    { "count": 6, "hp": 65 }
+  ],
+  "enemies": [8, 10, 2, 11]
+}

@@ -157,27 +157,25 @@ export class VenueScene extends Phaser.Scene {
       .setDepth(y);
   }
 
-  // Optional venue backdrop. Probe the URL with a plain Image first so a
-  // missing file never spams the Phaser loader with a "failed to process"
-  // error — graybox simply stays until real interior art is added.
+  // Optional venue backdrop. Uses the explicit `backdrop` path from the venue
+  // JSON — probed via native Image so a missing file never spams the loader.
   private tryLoadBackdrop(): void {
+    if (!VENUE.backdrop) return;
     const key = `venue_bg_${VENUE.id}`;
     if (this.textures.exists(key)) {
       this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
         .setDisplaySize(VENUE.width, VENUE.height);
       return;
     }
-    const url = `${ASSET_BASE}venues/${VENUE.id}.png`;
     const probe = new Image();
     probe.onload = () => {
-      if (this.scene.isActive() && !this.textures.exists(key)) {
-        this.textures.addImage(key, probe);
-        this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
-          .setDisplaySize(VENUE.width, VENUE.height);
-      }
+      if (!this.scene.isActive()) return;
+      if (!this.textures.exists(key)) this.textures.addImage(key, probe);
+      this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
+        .setDisplaySize(VENUE.width, VENUE.height);
     };
     probe.onerror = () => {}; // silent: graybox stays
-    probe.src = url;
+    probe.src = `${ASSET_BASE}${VENUE.backdrop}`;
   }
 
   private playAnim(name: string): void {

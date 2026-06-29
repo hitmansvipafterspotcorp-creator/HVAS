@@ -37,4 +37,6 @@ export type VenueData = {
   colliders: VenueCollider[];
   npcs: VenueNpc[];
   triggers: VenueTrigger[];
+  /** Optional backdrop path relative to ASSET_BASE, e.g. "venues/hvas_interior.png" */
+  backdrop?: string;
 };

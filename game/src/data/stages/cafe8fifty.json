@@ -1,0 +1,11 @@
+{
+  "id": "cafe8fifty",
+  "name": "Cafe8Fifty Streets",
+  "backdrop": "venues/cafe8fifty_exterior.png",
+  "waves": [
+    { "count": 3, "hp": 40 },
+    { "count": 4, "hp": 45 },
+    { "count": 5, "hp": 55 }
+  ],
+  "enemies": [2, 10, 11, 8]
+}

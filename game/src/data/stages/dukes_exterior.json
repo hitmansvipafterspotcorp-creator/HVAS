@@ -1,0 +1,11 @@
+{
+  "id": "dukes_exterior",
+  "name": "Duke's — Outside",
+  "backdrop": "venues/dukes_exterior.png",
+  "waves": [
+    { "count": 3, "hp": 45 },
+    { "count": 4, "hp": 50 },
+    { "count": 6, "hp": 60 }
+  ],
+  "enemies": [10, 11, 8, 2]
+}

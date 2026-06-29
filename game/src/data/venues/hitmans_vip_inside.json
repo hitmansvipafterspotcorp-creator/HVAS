@@ -1,6 +1,7 @@
 {
   "id": "hitmans_vip_inside",
   "name": "Hitmans VIP After Spot",
+  "backdrop": "venues/hvas_interior.png",
   "width": 960,
   "height": 540,
   "spawn": { "x": 480, "y": 430 },

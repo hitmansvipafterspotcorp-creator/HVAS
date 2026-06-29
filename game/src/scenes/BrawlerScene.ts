@@ -12,20 +12,20 @@ import { Fighter } from '../entities/Fighter';
 import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EnemyAISystem } from '../systems/EnemyAISystem';
-import { WaveSystem, type WaveDef } from '../systems/WaveSystem';
-import { PLAYER_ID, ENEMY_IDS } from '../data/roster';
+import { WaveSystem } from '../systems/WaveSystem';
+import { StageLoader } from '../systems/StageLoader';
+import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
+import type { StageData } from '../data/stageTypes';
+import cafe8fiftyStage from '../data/stages/cafe8fifty.json';
 
-// BrawlerScene: the playable Streets-of-Rage graybox. Boots with a player on a
-// floor, runs camera-locked waves, resolves combat through the depth gate, and
-// shows an HUD + debug overlay. Real backdrops/sprites slot in over this layer.
-const DEFAULT_WAVES: WaveDef[] = [
-  { count: 3, hp: 40 },
-  { count: 4, hp: 45 },
-  { count: 5, hp: 55 },
-];
+// BrawlerScene: data-driven brawler. Defaults to the Cafe8Fifty street stage;
+// pass a different StageData via scene.start(SCENE.Brawler, { stage: ... })
+// to load any JSON-authored stage without touching this file.
+const DEFAULT_STAGE: StageData = cafe8fiftyStage as StageData;
 
 export class BrawlerScene extends Phaser.Scene {
+  private stage!: StageData;
   private player!: Fighter;
   private controls!: InputSystem;
   private combat!: CombatSystem;
@@ -49,14 +49,19 @@ export class BrawlerScene extends Phaser.Scene {
     super(SCENE.Brawler);
   }
 
-  create(): void {
+  create(data?: { stage?: StageData }): void {
+    this.stage = data?.stage ?? DEFAULT_STAGE;
+
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    // Floor band — the walkable depth region.
-    const g = this.add.graphics().setDepth(-2000);
-    g.fillStyle(COLORS.floor, 1);
+    // Real backdrop if the PNG exists; graybox floor always drawn underneath.
+    StageLoader.loadBackdrop(this, this.stage);
+
+    // Floor band — visible over the backdrop so the walkable lane reads clearly.
+    const g = this.add.graphics().setDepth(-1999);
+    g.fillStyle(COLORS.floor, 0.45);
     g.fillRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
-    g.lineStyle(2, COLORS.floorLine, 1);
+    g.lineStyle(2, COLORS.floorLine, 0.6);
     g.strokeRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
 
     // Player — uses real sprite art if its anims are built, else graybox.
@@ -66,7 +71,7 @@ export class BrawlerScene extends Phaser.Scene {
     this.controls = new InputSystem(this);
     this.combat = new CombatSystem(this);
     this.ai = new EnemyAISystem();
-    this.waves = new WaveSystem(this, DEFAULT_WAVES, ENEMY_IDS);
+    this.waves = new WaveSystem(this, this.stage.waves, this.stage.enemies);
 
     // HUD — real art kit when available, text otherwise.
     this.buildHud();
