@@ -29,9 +29,9 @@ const VENUE_NAMES: Record<string, string> = {
   tally_itus_inside:        'Itus',
 };
 
-const CARD_W = 130;
+const CARD_W = 120;
 const CARD_H = 170;
-const CARD_PAD = 18;
+const CARD_PAD = 12;
 const TOTAL_W = STAGE_SEQUENCE.length * (CARD_W + CARD_PAD) - CARD_PAD;
 const START_X = (GAME_WIDTH - TOTAL_W) / 2 + CARD_W / 2;
 const CARDS_Y = GAME_HEIGHT / 2 - 10;
