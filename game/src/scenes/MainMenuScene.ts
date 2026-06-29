@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { AudioSystem } from '../systems/AudioSystem';
@@ -31,8 +31,7 @@ export class MainMenuScene extends Phaser.Scene {
     AudioSystem.playForScene(this, 'MainMenu');
     const cx = GAME_WIDTH / 2;
 
-    // Title sheet backdrop — real art when loaded.
-    UISystem.backdrop(this, UI.sheetTitle, 1, -5000);
+    this.cameras.main.setBackgroundColor(COLORS.bg);
 
     // Real HITGEAR logo if loaded; text fallback otherwise.
     if (UISystem.ready(this)) {

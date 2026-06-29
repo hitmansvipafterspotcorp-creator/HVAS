@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS, ASSET_BASE } from '../config';
 import { ProgressionSystem, STAGE_SEQUENCE, STAGE_UNLOCKS } from '../systems/ProgressionSystem';
 import type { StageId } from '../systems/ProgressionSystem';
-import { UISystem, UI } from '../systems/UISystem';
 
 // Stage display metadata — name, boss name, boss charId, backdrop hint.
 const STAGE_META: Record<StageId, { name: string; boss: string; bossCharId: number }> = {
@@ -47,7 +46,6 @@ export class StageSelectScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
-    UISystem.backdrop(this, UI.sheetVenueMap, 0.92, -5000);
 
     // Title.
     this.add.text(GAME_WIDTH / 2, 28, 'QUEST — STAGE SELECT', {

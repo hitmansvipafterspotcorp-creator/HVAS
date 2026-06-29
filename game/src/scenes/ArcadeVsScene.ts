@@ -8,7 +8,7 @@ import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { VFXSystem } from '../systems/VFXSystem';
-import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
+import { UI, NumberDisplay } from '../systems/UISystem';
 import { CHAR_NAMES } from '../data/roster';
 import { AudioSystem } from '../systems/AudioSystem';
 
@@ -109,12 +109,7 @@ export class ArcadeVsScene extends Phaser.Scene {
     const grp = this.add.container(0, 0);
     this.selGroup = grp;
 
-    // Background sheet
-    if (UISystem.ready(this)) {
-      UISystem.backdrop(this, UI.sheetCharSelect, 0.88, -6000);
-    } else {
-      this.cameras.main.setBackgroundColor(0x0a0614);
-    }
+    this.cameras.main.setBackgroundColor(0x0a0614);
 
     // Title
     grp.add(this.add.text(GAME_WIDTH / 2, 24, 'ARCADE VS', {
