@@ -7,5 +7,11 @@
     { "count": 4, "hp": 45 },
     { "count": 5, "hp": 55 }
   ],
-  "enemies": [2, 10, 11, 8]
+  "enemies": [2, 10, 11, 8],
+  "props": [
+    { "type": "trashcan",      "x": 200, "feetY": 420, "drop": "health" },
+    { "type": "folding_chair", "x": 450, "feetY": 440, "drop": "weapon" },
+    { "type": "trashcan",      "x": 680, "feetY": 430, "drop": "meter"  },
+    { "type": "safety_cone",   "x": 820, "feetY": 450, "drop": "none"   }
+  ]
 }

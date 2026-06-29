@@ -14,6 +14,8 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { EnemyAISystem } from '../systems/EnemyAISystem';
 import { WaveSystem } from '../systems/WaveSystem';
 import { StageLoader } from '../systems/StageLoader';
+import { PropDestructionSystem } from '../systems/PropDestructionSystem';
+import { WeaponSystem } from '../systems/WeaponSystem';
 import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import type { StageData } from '../data/stageTypes';
@@ -31,6 +33,8 @@ export class BrawlerScene extends Phaser.Scene {
   private combat!: CombatSystem;
   private ai!: EnemyAISystem;
   private waves!: WaveSystem;
+  private props!: PropDestructionSystem;
+  private weapon!: WeaponSystem;
 
   private hud!: Phaser.GameObjects.Text; // wave/enemies line (text)
   private banner!: Phaser.GameObjects.Text;
@@ -72,6 +76,9 @@ export class BrawlerScene extends Phaser.Scene {
     this.combat = new CombatSystem(this);
     this.ai = new EnemyAISystem();
     this.waves = new WaveSystem(this, this.stage.waves, this.stage.enemies);
+    this.weapon = new WeaponSystem();
+    this.props = new PropDestructionSystem(this);
+    if (this.stage.props?.length) this.props.init(this.stage.props, this.stage.id);
 
     // HUD — real art kit when available, text otherwise.
     this.buildHud();
@@ -117,7 +124,6 @@ export class BrawlerScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
-    // Hit-stop freezes the world (but not the render) for impact weight.
     const run = this.combat.tick(delta);
     if (run) {
       this.updatePlayer(delta);
@@ -126,7 +132,16 @@ export class BrawlerScene extends Phaser.Scene {
       this.handleWaveFlow();
     }
 
-    // Always sync views + HUD so freeze frames still render correctly.
+    // Prop hit check runs whenever player attack is active (outside hit-stop).
+    if (this.player.attackActive) this.props.checkHits(this.player);
+
+    // Drop pickup checks every frame.
+    this.props.checkPickup(this.player, (kind) => {
+      if (kind === 'health') this.player.hp = Math.min(this.player.hp + 30, this.player.maxHp);
+      else this.player.meter = Math.min(this.player.meter + 25, 100);
+    });
+    this.weapon.checkPickup(this.player, this.props.weaponDrops);
+
     this.player.syncView();
     for (const e of this.waves.enemies) e.syncView();
     this.combat.decayCombo(this.player, delta);
@@ -148,11 +163,10 @@ export class BrawlerScene extends Phaser.Scene {
       if (p.state === 'attack') {
         p.attackActive = p.stateTimer > 120 && p.stateTimer < 240;
         if (p.attackActive) {
-          this.combat.resolve(p, this.waves.enemies, {
-            damage: 9,
-            knockback: 18,
-            meterGain: 8,
-          });
+          const base = { damage: 9, knockback: 18, meterGain: 8 };
+          const opts = this.weapon.augmentOpts(base);
+          const hit = this.combat.resolve(p, this.waves.enemies, opts);
+          if (hit) this.weapon.use();
         }
       }
       if (p.stateTimer <= 0) {
@@ -288,6 +302,7 @@ export class BrawlerScene extends Phaser.Scene {
     const p = this.player;
     const alive = this.waves.enemies.filter((e) => e.alive).length;
 
+    const weaponTag = this.weapon.equipped ? `  BAT x${this.weapon.durability}` : '';
     if (this.hpFill) {
       // Real-art HUD.
       const frac = Phaser.Math.Clamp(p.hp / p.maxHp, 0, 1);
@@ -300,7 +315,7 @@ export class BrawlerScene extends Phaser.Scene {
       this.comboNum?.setVisible(showCombo);
       if (showCombo) this.comboNum?.setValue(p.combo);
       this.hud.setText(
-        `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}`,
+        `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}${weaponTag}`,
       );
     } else {
       // Text fallback.
@@ -309,7 +324,7 @@ export class BrawlerScene extends Phaser.Scene {
       this.hud.setText(
         `HP [${hpBars}] ${Math.ceil(p.hp)}/${p.maxHp}\n` +
           `SUPER [${meter}] ${p.meter}%   COMBO x${p.combo}\n` +
-          `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}`,
+          `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}${weaponTag}`,
       );
     }
 

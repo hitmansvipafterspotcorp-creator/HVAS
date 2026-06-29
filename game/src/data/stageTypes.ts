@@ -3,6 +3,17 @@
 import type { WaveDef } from '../systems/WaveSystem';
 export type { WaveDef };
 
+export type PropDropType = 'health' | 'meter' | 'weapon' | 'none';
+
+export type PropDef = {
+  /** Key matching the prop PNG stem, e.g. "trashcan" -> loads café8fifty_outside_trashcan.png */
+  type: string;
+  x: number;
+  /** Depth position (feet Y). Defaults to FLOOR_BOTTOM - 20 if omitted. */
+  feetY?: number;
+  drop?: PropDropType;
+};
+
 export type StageData = {
   id: string;
   name: string;
@@ -11,6 +22,8 @@ export type StageData = {
   waves: WaveDef[];
   /** charIds to cycle for enemy spawns — matches CHAR_FOLDERS in animMap */
   enemies: number[];
+  /** Breakable foreground props. */
+  props?: PropDef[];
   /** future: audio path relative to ASSET_BASE */
   music?: string;
 };
