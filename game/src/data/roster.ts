@@ -4,7 +4,7 @@
 
 export const PLAYER_ID = 1; // creator
 export const ENEMY_IDS = [2, 10, 11, 8]; // dj, security, host, dancer
-export const VENUE_NPC_IDS = [2, 9, 10, 11]; // dj, vendor, security, host
+export const VENUE_NPC_IDS = [2, 9, 10, 11, 30, 31]; // dj, vendor, security, host, pete, snow
 
 // Display names for HUD / dialogue headers.
 export const CHAR_NAMES: Record<number, string> = {

@@ -113,16 +113,25 @@ export class VenueScene extends Phaser.Scene {
         .ellipse(npc.x, npc.y, 40, 14, 0x000000, 0.3)
         .setDepth(npc.y - 1000);
       const idleKey = AnimationSystem.animKey(npc.charId, `td_idle_${npc.facing}`);
+      const locoKey  = AnimationSystem.animKey(npc.charId, 'idle');
       const sprite = this.add
         .sprite(npc.x, npc.y, '__DEFAULT')
         .setOrigin(0.5, 1)
         .setDepth(npc.y);
-      sprite.setScale(TD_SCALE);
-      if (this.anims.exists(idleKey)) sprite.play(idleKey);
-      else this.fallbackBlock(npc.x, npc.y, COLORS.enemy);
+      if (this.anims.exists(idleKey)) {
+        // Has proper top-down art — use it at topdown scale
+        sprite.setScale(TD_SCALE);
+        sprite.play(idleKey);
+      } else if (this.anims.exists(locoKey)) {
+        // No topdown art yet — fall back to brawler idle scaled for venue
+        sprite.setScale(TD_SCALE * 0.72); // 181px loco frames, target same display height
+        sprite.play(locoKey);
+      } else {
+        this.fallbackBlock(npc.x, npc.y, COLORS.enemy);
+      }
 
       this.add
-        .text(npc.x, npc.y - 84, npc.name, {
+        .text(npc.x, npc.y - 88, npc.name, {
           fontFamily: 'Arial, sans-serif',
           fontSize: '12px',
           color: '#ffd700',
