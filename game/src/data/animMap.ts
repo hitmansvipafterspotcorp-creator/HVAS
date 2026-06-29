@@ -33,7 +33,7 @@ export const CHAR_FOLDERS: Record<number, string> = {
 
 // Only these chars have sliced topdown direction frames.
 // All others fall back to loco idle in VenueScene.
-export const TOPDOWN_CHAR_IDS = [1, 10, 14, 20, 30, 31] as const;
+export const TOPDOWN_CHAR_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 30, 31] as const;
 
 export type AnimDef = {
   type: string; // sheet/type folder
