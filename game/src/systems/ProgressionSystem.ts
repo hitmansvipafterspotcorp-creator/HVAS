@@ -10,11 +10,13 @@ export type VenueId =
   | 'outta_inside'
   | 'qhf_inside'
   | 'social_gaines_inside'
+  | 'success_inside'
   | 'tally_public_hall_inside'
   | 'tally_sammys_inside'
   | 'tally_13rave_inside'
   | 'tally_den_inside'
-  | 'tally_itus_inside';
+  | 'tally_itus_inside'
+  | 'success_rooftop'; // stored as unlock token, not an actual venue
 
 export type StageId =
   | 'cafe8fifty'

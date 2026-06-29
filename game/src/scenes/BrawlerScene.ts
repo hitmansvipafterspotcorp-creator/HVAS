@@ -284,10 +284,13 @@ export class BrawlerScene extends Phaser.Scene {
         }
         return;
       }
-      // No boss — immediate clear.
-      this.banner.setText('STAGE CLEAR!');
-      this.banner.setVisible(true);
-      this.time.delayedCall(2000, () => this.scene.start(SCENE.StageSelect));
+      // No boss — immediate clear (guard so this only fires once).
+      if (!this.venueDoorSpawned) {
+        this.venueDoorSpawned = true;
+        this.banner.setText('STAGE CLEAR!');
+        this.banner.setVisible(true);
+        this.time.delayedCall(2000, () => this.scene.start(SCENE.StageSelect));
+      }
       return;
     }
     if (!this.waves.locked) {

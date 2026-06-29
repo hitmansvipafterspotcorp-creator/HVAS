@@ -61,6 +61,7 @@ export class VenueScene extends Phaser.Scene {
   }
 
   create(data?: { venueId?: string }): void {
+    this.npcPositions = [];
     const venueId = data?.venueId ?? DEFAULT_VENUE_ID;
     this.venue = VENUE_REGISTRY[venueId] ?? VENUE_REGISTRY[DEFAULT_VENUE_ID];
     const VENUE = this.venue;
