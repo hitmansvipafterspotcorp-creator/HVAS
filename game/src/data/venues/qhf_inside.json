@@ -1,0 +1,90 @@
+{
+  "id": "qhf_inside",
+  "name": "Quick Hit Fuel — Inside",
+  "backdrop": "venues/qhf_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "colliders": [
+    { "x": 60,  "y": 115, "w": 230, "h": 75, "label": "fuel counter" },
+    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "cooler wall" },
+    { "x": 380, "y": 125, "w": 200, "h": 60, "label": "center shelves" }
+  ],
+  "npcs": [
+    {
+      "id": "cashier",
+      "charId": 9,
+      "x": 170,
+      "y": 215,
+      "facing": "s",
+      "name": "Cashier",
+      "lines": [
+        "QHF — fuel up and keep movin'.",
+        "Energy drinks, snacks, whatever you need.",
+        "Swipe or cash, we take both."
+      ]
+    },
+    {
+      "id": "regular",
+      "charId": 7,
+      "x": 480,
+      "y": 250,
+      "facing": "s",
+      "name": "Regular",
+      "lines": [
+        "The Dancer used to hold sessions right out front.",
+        "This spot stay open late — that's why I'm here.",
+        "Best energy drinks in the city, I'm tellin' you."
+      ]
+    },
+    {
+      "id": "stock_clerk",
+      "charId": 11,
+      "x": 770,
+      "y": 225,
+      "facing": "w",
+      "name": "Stock Clerk",
+      "lines": [
+        "Shipment just came in. We're fully stocked.",
+        "Grab what you need from the cooler.",
+        "Don't make a mess of the shelves."
+      ]
+    },
+    {
+      "id": "security",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Security",
+      "lines": [
+        "No loitering inside.",
+        "Exit's right behind you."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_street",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "qhf_exterior",
+      "label": "Back Outside"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

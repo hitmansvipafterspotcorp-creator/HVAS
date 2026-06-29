@@ -22,6 +22,12 @@ export type BossDef = {
   revealLabel: string;
 };
 
+export type StripEntrance = {
+  venueId: string;
+  x: number;
+  label: string;
+};
+
 export type StageData = {
   id: string;
   name: string;
@@ -34,6 +40,13 @@ export type StageData = {
   props?: PropDef[];
   /** Optional end-of-stage boss encounter. */
   boss?: BossDef;
+  /** VenueId unlocked after boss defeat — spawns the main entrance door. */
+  venueUnlocks?: string;
+  /** VenueId for an upper/rooftop level unlocked after boss defeat. */
+  aboveVenueUnlocks?: string;
+  /** Multiple venue entrances on a single exterior (e.g. Tally strip). */
+  stripEntrances?: StripEntrance[];
   /** future: audio path relative to ASSET_BASE */
   music?: string;
+  note?: string;
 };

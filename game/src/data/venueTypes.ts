@@ -20,9 +20,12 @@ export type VenueTrigger = {
   w: number;
   h: number;
   type: 'scene' | 'talk';
-  target?: string; // scene key for type 'scene'
+  target?: string;        // scene key for type 'scene'
+  targetStage?: string;   // stageId to pass when target is 'Brawler'
+  targetVenue?: string;   // venueId to pass when target is 'Venue'
+  requiresUnlock?: string; // venueId or stageId that must be unlocked first
   label: string;
-  lines?: string[]; // for type 'talk'
+  lines?: string[];       // for type 'talk'
 };
 
 export type VenueCollider = { x: number; y: number; w: number; h: number; label?: string };

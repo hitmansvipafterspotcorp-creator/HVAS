@@ -1,0 +1,90 @@
+{
+  "id": "tally_sammys_inside",
+  "name": "Sammy's — Inside",
+  "backdrop": "venues/tally_sammys_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "colliders": [
+    { "x": 60,  "y": 115, "w": 220, "h": 75, "label": "main bar" },
+    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "kitchen window" },
+    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "dining section" }
+  ],
+  "npcs": [
+    {
+      "id": "sammy",
+      "charId": 9,
+      "x": 170,
+      "y": 215,
+      "facing": "s",
+      "name": "Sammy",
+      "lines": [
+        "Sammy's been on the strip since '98.",
+        "Wings, drinks, good vibes — that's all we do.",
+        "Late night spot for the whole city."
+      ]
+    },
+    {
+      "id": "waitress",
+      "charId": 3,
+      "x": 480,
+      "y": 250,
+      "facing": "s",
+      "name": "Waitress",
+      "lines": [
+        "Kitchen closes at two but the bar stays open.",
+        "Trivia night's on Thursdays. You should come.",
+        "Sammy's got the best buffalo sauce in Tally."
+      ]
+    },
+    {
+      "id": "patron",
+      "charId": 11,
+      "x": 760,
+      "y": 250,
+      "facing": "w",
+      "name": "Patron",
+      "lines": [
+        "Every game night I'm posted right here.",
+        "Sammy's never lets me down.",
+        "Try the loaded fries — trust me on that."
+      ]
+    },
+    {
+      "id": "door",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Door",
+      "lines": [
+        "Enjoy your meal.",
+        "Tally strip is right outside."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_strip",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "tally_exterior",
+      "label": "Back to Strip"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "id": "tally_itus_inside",
+  "name": "Itus — Inside",
+  "backdrop": "venues/tally_itus_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "colliders": [
+    { "x": 60,  "y": 115, "w": 220, "h": 75, "label": "bar counter" },
+    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "stage platform" },
+    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "standing area" }
+  ],
+  "npcs": [
+    {
+      "id": "bartender",
+      "charId": 9,
+      "x": 170,
+      "y": 215,
+      "facing": "s",
+      "name": "Bartender",
+      "lines": [
+        "Itus — the strip's hidden gem.",
+        "We book local talent mostly. Real ones.",
+        "Happy hour runs till ten on weeknights."
+      ]
+    },
+    {
+      "id": "performer",
+      "charId": 2,
+      "x": 760,
+      "y": 200,
+      "facing": "s",
+      "name": "Performer",
+      "lines": [
+        "Itus gave me my first real booking.",
+        "Stage in here is small but the crowd is locked in.",
+        "I perform here every other week — it's home."
+      ]
+    },
+    {
+      "id": "student",
+      "charId": 3,
+      "x": 480,
+      "y": 260,
+      "facing": "s",
+      "name": "Student",
+      "lines": [
+        "Itus is basically FAMU's second student union.",
+        "They support local artists real heavy here.",
+        "Best spot on the strip if you want real music."
+      ]
+    },
+    {
+      "id": "door",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Door",
+      "lines": [
+        "Enjoy the show.",
+        "Tally strip is right outside."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_strip",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "tally_exterior",
+      "label": "Back to Strip"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

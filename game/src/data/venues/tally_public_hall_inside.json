@@ -1,0 +1,90 @@
+{
+  "id": "tally_public_hall_inside",
+  "name": "Tally Row — Public Hall",
+  "backdrop": "venues/tally_public_hall_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 100, "w": 840, "h": 400 },
+  "colliders": [
+    { "x": 60,  "y": 105, "w": 240, "h": 80, "label": "main stage" },
+    { "x": 680, "y": 105, "w": 220, "h": 75, "label": "sound booth" },
+    { "x": 360, "y": 110, "w": 240, "h": 65, "label": "general admission floor" }
+  ],
+  "npcs": [
+    {
+      "id": "event_manager",
+      "charId": 7,
+      "x": 160,
+      "y": 210,
+      "facing": "s",
+      "name": "Event Manager",
+      "lines": [
+        "Public Hall holds three thousand easy.",
+        "Biggest venue on the whole Tally strip.",
+        "Kendrick shut it down when he headlined here."
+      ]
+    },
+    {
+      "id": "sound_tech",
+      "charId": 2,
+      "x": 760,
+      "y": 200,
+      "facing": "s",
+      "name": "Sound Tech",
+      "lines": [
+        "Sound system in here is world class.",
+        "We do linecheck at six every show night.",
+        "Don't touch the board — I'm serious."
+      ]
+    },
+    {
+      "id": "usher",
+      "charId": 11,
+      "x": 480,
+      "y": 250,
+      "facing": "s",
+      "name": "Usher",
+      "lines": [
+        "Floor tickets are standing only.",
+        "VIP balcony is upstairs to the left.",
+        "Merch table's by the back exit."
+      ]
+    },
+    {
+      "id": "security",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Security",
+      "lines": [
+        "No moshing on the floor.",
+        "Tally strip is right outside."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_strip",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "tally_exterior",
+      "label": "Back to Strip"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

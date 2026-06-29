@@ -1,0 +1,90 @@
+{
+  "id": "tally_13rave_inside",
+  "name": "13Rave — Inside",
+  "backdrop": "venues/tally_13rave_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 100, "w": 840, "h": 400 },
+  "colliders": [
+    { "x": 60,  "y": 105, "w": 220, "h": 80, "label": "dj rig" },
+    { "x": 700, "y": 105, "w": 200, "h": 75, "label": "speaker stack" },
+    { "x": 360, "y": 110, "w": 240, "h": 65, "label": "dance floor center" }
+  ],
+  "npcs": [
+    {
+      "id": "dj_13",
+      "charId": 2,
+      "x": 160,
+      "y": 195,
+      "facing": "s",
+      "name": "DJ 13",
+      "lines": [
+        "13Rave runs the underground electronic scene.",
+        "The drop hits different in here — you'll feel it.",
+        "No requests. Only certified heat."
+      ]
+    },
+    {
+      "id": "raver",
+      "charId": 4,
+      "x": 480,
+      "y": 240,
+      "facing": "s",
+      "name": "Raver",
+      "lines": [
+        "13Rave been going every Friday since forever.",
+        "Lights in here go crazy during the drop.",
+        "Don't leave before the closing set — it's legendary."
+      ]
+    },
+    {
+      "id": "coat_check",
+      "charId": 11,
+      "x": 760,
+      "y": 220,
+      "facing": "w",
+      "name": "Coat Check",
+      "lines": [
+        "Bag check is two dollars. Worth it.",
+        "We hold everything — no drama about it.",
+        "Lockers are in the back if you need 'em."
+      ]
+    },
+    {
+      "id": "security",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Security",
+      "lines": [
+        "Dance floor rules: keep space, keep it moving.",
+        "Tally strip is right outside."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_strip",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "tally_exterior",
+      "label": "Back to Strip"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

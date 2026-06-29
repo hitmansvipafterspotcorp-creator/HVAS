@@ -17,6 +17,7 @@ import { StageLoader } from '../systems/StageLoader';
 import { PropDestructionSystem } from '../systems/PropDestructionSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { BossSystem } from '../systems/BossSystem';
+import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import type { StageData } from '../data/stageTypes';
@@ -38,6 +39,7 @@ export class BrawlerScene extends Phaser.Scene {
   private weapon!: WeaponSystem;
   private boss: BossSystem | null = null;
   private bossRevealTriggered = false;
+  private venueDoorSpawned = false;
 
   private hud!: Phaser.GameObjects.Text; // wave/enemies line (text)
   private banner!: Phaser.GameObjects.Text;
@@ -166,6 +168,7 @@ export class BrawlerScene extends Phaser.Scene {
     this.player.syncView();
     for (const e of this.waves.enemies) e.syncView();
     this.combat.decayCombo(this.player, delta);
+    this.checkVenueDoors();
     this.drawHud();
     this.drawDebug();
   }
@@ -237,18 +240,16 @@ export class BrawlerScene extends Phaser.Scene {
 
   private handleWaveFlow(): void {
     if (this.waves.cleared) {
-      // Boss stage: trigger reveal once, then watch for boss defeat.
       if (this.boss) {
         if (!this.bossRevealTriggered) {
           this.bossRevealTriggered = true;
           this.boss.reveal(() => {
-            this.flashBanner(`FIGHT ${this.def.name ?? this.stage.boss!.name}!`.trim());
+            this.flashBanner(`FIGHT ${this.stage.boss!.name}!`);
           });
         }
-        if (this.boss.defeated) {
-          this.banner.setText('STAGE CLEAR!');
-          this.banner.setVisible(true);
-          this.time.delayedCall(2000, () => this.scene.start(SCENE.MainMenu));
+        if (this.boss.defeated && !this.venueDoorSpawned) {
+          this.venueDoorSpawned = true;
+          this.onBossDefeated();
         }
         return;
       }
@@ -264,9 +265,92 @@ export class BrawlerScene extends Phaser.Scene {
     }
   }
 
-  // Convenience: boss def alias for the reveal callback label.
-  private get def(): { name: string } {
-    return this.stage.boss ?? { name: '' };
+  private onBossDefeated(): void {
+    this.flashBanner('STAGE CLEAR!');
+
+    // Persist progression.
+    const stageId = this.stage.id as Parameters<typeof ProgressionSystem.beatBoss>[0];
+    ProgressionSystem.beatBoss(stageId);
+
+    // Also unlock the above-venue if defined (e.g. success_rooftop via social_gaines_exterior).
+    if (this.stage.aboveVenueUnlocks) {
+      ProgressionSystem.unlockVenue(this.stage.aboveVenueUnlocks);
+    }
+    // Tally strip entrances are all unlocked together.
+    if (this.stage.stripEntrances) {
+      for (const ent of this.stage.stripEntrances) {
+        ProgressionSystem.unlockVenue(ent.venueId);
+      }
+    }
+
+    // Spawn venue entrance doors after a short pause.
+    this.time.delayedCall(1200, () => this.spawnVenueDoors());
+  }
+
+  private spawnVenueDoors(): void {
+    const s = this.stage;
+
+    // Tally strip: show all five sub-venue entrances along the strip.
+    if (s.stripEntrances?.length) {
+      for (const ent of s.stripEntrances) {
+        this.addVenueDoor(ent.x, FLOOR_BOTTOM - 40, ent.label, ent.venueId);
+      }
+      return;
+    }
+
+    // Standard single-venue unlock.
+    if (s.venueUnlocks) {
+      this.addVenueDoor(GAME_WIDTH - 120, FLOOR_BOTTOM - 40, 'Enter Venue', s.venueUnlocks);
+    }
+
+    // Above-venue (rooftop etc.) unlocked at the same time.
+    if (s.aboveVenueUnlocks) {
+      this.addVenueDoor(GAME_WIDTH - 240, FLOOR_BOTTOM - 80, 'Rooftop', s.aboveVenueUnlocks);
+    }
+  }
+
+  // Draw a glowing door trigger rectangle on the floor. Player walks into it.
+  private addVenueDoor(cx: number, cy: number, label: string, venueId: string): void {
+    const W = 110;
+    const H = 30;
+    const gfx = this.add.graphics().setDepth(cy);
+    gfx.lineStyle(2, 0xffd700, 0.9);
+    gfx.fillStyle(0x332200, 0.6);
+    gfx.fillRect(cx - W / 2, cy - H / 2, W, H);
+    gfx.strokeRect(cx - W / 2, cy - H / 2, W, H);
+
+    this.add
+      .text(cx, cy, label, { fontFamily: 'monospace', fontSize: '11px', color: '#ffd700' })
+      .setOrigin(0.5)
+      .setDepth(cy + 1)
+      .setScrollFactor(0);
+
+    // Simple proximity check each frame via a zone.
+    const zone = this.add.zone(cx, cy, W, H).setDepth(cy);
+    zone.setData('venueId', venueId);
+
+    // Watch player overlap with the door zone (checked in update via manual distance).
+    zone.setInteractive();
+    // We'll poll in update; store doors in array.
+    this.venueDoors.push({ cx, cy, W, H, venueId });
+  }
+
+  private venueDoors: Array<{ cx: number; cy: number; W: number; H: number; venueId: string }> = [];
+
+  private checkVenueDoors(): void {
+    if (!this.venueDoors.length) return;
+    const px = this.player.x;
+    const py = this.player.feetY;
+    for (const door of this.venueDoors) {
+      if (
+        Math.abs(px - door.cx) < door.W / 2 + 10 &&
+        Math.abs(py - door.cy) < door.H / 2 + 20
+      ) {
+        this.venueDoors = [];
+        this.scene.start(SCENE.Venue, { venueId: door.venueId });
+        return;
+      }
+    }
   }
 
   private flashBanner(text: string): void {

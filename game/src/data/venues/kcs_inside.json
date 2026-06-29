@@ -1,0 +1,92 @@
+{
+  "id": "kcs_inside",
+  "name": "Kingdom Come Saloon — Inside",
+  "backdrop": "venues/kingdom_come_saloon.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "colliders": [
+    { "x": 60,  "y": 115, "w": 220, "h": 80, "label": "service counter front" },
+    { "x": 700, "y": 115, "w": 200, "h": 75, "label": "bottle shelf wall" },
+    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "keg wall" },
+    { "x": 140, "y": 270, "w": 100, "h": 80, "label": "pool rack" },
+    { "x": 730, "y": 270, "w": 90,  "h": 85, "label": "dartboard set" }
+  ],
+  "npcs": [
+    {
+      "id": "bartender",
+      "charId": 9,
+      "x": 180,
+      "y": 220,
+      "facing": "s",
+      "name": "Bartender",
+      "lines": [
+        "Whiskey neat or you leavin'.",
+        "KCS been servin' the real ones since day one.",
+        "You want a tab or you payin' now?"
+      ]
+    },
+    {
+      "id": "regular",
+      "charId": 7,
+      "x": 480,
+      "y": 250,
+      "facing": "s",
+      "name": "Regular",
+      "lines": [
+        "KT runs this block, always has.",
+        "Best saloon in the whole city, no debate.",
+        "Stay for the live set — you won't regret it."
+      ]
+    },
+    {
+      "id": "pool_shark",
+      "charId": 11,
+      "x": 760,
+      "y": 310,
+      "facing": "w",
+      "name": "Pool Shark",
+      "lines": [
+        "Eight ball, corner pocket. You payin'?",
+        "I don't lose. Ask anybody in here.",
+        "Rack 'em up if you think you got it."
+      ]
+    },
+    {
+      "id": "bouncer",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Bouncer",
+      "lines": [
+        "Saloon rules: no drama inside.",
+        "Exit's behind you if you're done."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_street",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "kcs_exterior",
+      "label": "Back Outside"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

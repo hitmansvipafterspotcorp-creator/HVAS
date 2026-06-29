@@ -1,0 +1,90 @@
+{
+  "id": "outta_inside",
+  "name": "Outta Pocket — Inside",
+  "backdrop": "venues/outta_interior.png",
+  "width": 960,
+  "height": 540,
+  "spawn": { "x": 480, "y": 440 },
+  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "colliders": [
+    { "x": 60,  "y": 120, "w": 210, "h": 70, "label": "main bar" },
+    { "x": 700, "y": 120, "w": 200, "h": 70, "label": "back booth row" },
+    { "x": 380, "y": 125, "w": 200, "h": 60, "label": "center tables" }
+  ],
+  "npcs": [
+    {
+      "id": "barkeep",
+      "charId": 9,
+      "x": 160,
+      "y": 220,
+      "facing": "s",
+      "name": "Barkeep",
+      "lines": [
+        "Outta Pocket — we stay off the radar.",
+        "What you drinkin'? We got everything.",
+        "Don't bring that outside drama in here."
+      ]
+    },
+    {
+      "id": "dj",
+      "charId": 2,
+      "x": 760,
+      "y": 200,
+      "facing": "s",
+      "name": "DJ",
+      "lines": [
+        "Underground vibe only. No pop, ever.",
+        "This the set people travel for.",
+        "Plug in and zone out."
+      ]
+    },
+    {
+      "id": "host",
+      "charId": 11,
+      "x": 480,
+      "y": 240,
+      "facing": "s",
+      "name": "Host",
+      "lines": [
+        "Outta Pocket is invite-only on weekends.",
+        "You made it in — enjoy the vibe.",
+        "Pete built this spot from the ground up."
+      ]
+    },
+    {
+      "id": "door",
+      "charId": 10,
+      "x": 480,
+      "y": 475,
+      "facing": "n",
+      "name": "Door",
+      "lines": [
+        "Keep it clean in here.",
+        "Street entrance is right behind you."
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "door_street",
+      "x": 420,
+      "y": 505,
+      "w": 120,
+      "h": 28,
+      "type": "scene",
+      "target": "Brawler",
+      "targetStage": "outta_exterior",
+      "label": "Back Outside"
+    },
+    {
+      "id": "exit_menu",
+      "x": 60,
+      "y": 475,
+      "w": 80,
+      "h": 35,
+      "type": "scene",
+      "target": "MainMenu",
+      "label": "Leave"
+    }
+  ]
+}

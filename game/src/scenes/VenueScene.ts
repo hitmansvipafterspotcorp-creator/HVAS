@@ -4,19 +4,47 @@ import { InputSystem } from '../systems/InputSystem';
 import { DialogueSystem } from '../systems/DialogueSystem';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
+import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { PLAYER_ID } from '../data/roster';
 import type { VenueData, Facing } from '../data/venueTypes';
-import venueData from '../data/venues/hitmans_vip_inside.json';
 
-// ── VenueScene ──────────────────────────────────────────────────────────────
-// Pokémon-style top-down interior. Loaded from JSON (npcs + triggers +
-// colliders), so new venues are pure data. Player walks 8-way using the
-// character's td_ animations; talks to NPCs and uses doors via the interact
-// button. A door trigger routes to the brawler (street) or back to menu.
-const VENUE: VenueData = venueData as VenueData;
+// ── Venue JSON registry ──────────────────────────────────────────────────────
+import hitmansVip   from '../data/venues/hitmans_vip_inside.json';
+import dukesInside  from '../data/venues/dukes_inside.json';
+import kcsInside    from '../data/venues/kcs_inside.json';
+import outtaInside  from '../data/venues/outta_inside.json';
+import qhfInside    from '../data/venues/qhf_inside.json';
+import socialGaines from '../data/venues/social_gaines_inside.json';
+import successInside from '../data/venues/success_inside.json';
+import tallyPubHall from '../data/venues/tally_public_hall_inside.json';
+import tallySammys  from '../data/venues/tally_sammys_inside.json';
+import tally13rave  from '../data/venues/tally_13rave_inside.json';
+import tallyDen     from '../data/venues/tally_den_inside.json';
+import tallyItus    from '../data/venues/tally_itus_inside.json';
+
+const VENUE_REGISTRY: Record<string, VenueData> = {
+  hitmans_vip_inside:       hitmansVip    as VenueData,
+  dukes_inside:             dukesInside   as VenueData,
+  kcs_inside:               kcsInside     as VenueData,
+  outta_inside:             outtaInside   as VenueData,
+  qhf_inside:               qhfInside     as VenueData,
+  social_gaines_inside:     socialGaines  as VenueData,
+  success_inside:           successInside as VenueData,
+  tally_public_hall_inside: tallyPubHall  as VenueData,
+  tally_sammys_inside:      tallySammys   as VenueData,
+  tally_13rave_inside:      tally13rave   as VenueData,
+  tally_den_inside:         tallyDen      as VenueData,
+  tally_itus_inside:        tallyItus     as VenueData,
+};
+
+const DEFAULT_VENUE_ID = 'hitmans_vip_inside';
 const SPEED = 150;
 
+// ── VenueScene ──────────────────────────────────────────────────────────────
+// Generic top-down interior. Accepts { venueId } in scene init data;
+// falls back to hitmans_vip_inside if not provided or not found.
 export class VenueScene extends Phaser.Scene {
+  private venue!: VenueData;
   private controls!: InputSystem;
   private dialogue!: DialogueSystem;
   private interactions!: InteractionSystem;
@@ -31,10 +59,13 @@ export class VenueScene extends Phaser.Scene {
     super(SCENE.Venue);
   }
 
-  create(): void {
+  create(data?: { venueId?: string }): void {
+    const venueId = data?.venueId ?? DEFAULT_VENUE_ID;
+    this.venue = VENUE_REGISTRY[venueId] ?? VENUE_REGISTRY[DEFAULT_VENUE_ID];
+    const VENUE = this.venue;
+
     this.cameras.main.setBackgroundColor(0x120c1c);
 
-    // Floor + walkable region (graybox; a real venue backdrop drops in here).
     const wk = VENUE.walkable;
     this.add
       .rectangle(wk.x, wk.y, wk.w, wk.h, COLORS.floor)
@@ -48,7 +79,6 @@ export class VenueScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Colliders (bar / booth / stage) drawn as labeled blocks.
     for (const c of VENUE.colliders) {
       this.add
         .rectangle(c.x, c.y, c.w, c.h, 0x241a36)
@@ -71,7 +101,7 @@ export class VenueScene extends Phaser.Scene {
 
     // NPCs.
     for (const npc of VENUE.npcs) {
-      const shadow = this.add
+      this.add
         .ellipse(npc.x, npc.y, 40, 14, 0x000000, 0.3)
         .setDepth(npc.y - 1000);
       const idleKey = AnimationSystem.animKey(npc.charId, `td_idle_${npc.facing}`);
@@ -82,7 +112,6 @@ export class VenueScene extends Phaser.Scene {
       sprite.setScale(78 / 181);
       if (this.anims.exists(idleKey)) sprite.play(idleKey);
       else this.fallbackBlock(npc.x, npc.y, COLORS.enemy);
-      shadow.setData('npc', npc.id);
 
       this.add
         .text(npc.x, npc.y - 84, npc.name, {
@@ -102,27 +131,48 @@ export class VenueScene extends Phaser.Scene {
       });
     }
 
-    // Triggers (doors / talk hotspots).
+    // Triggers (doors / hotspots).
     for (const t of VENUE.triggers) {
+      const locked = t.requiresUnlock
+        ? !ProgressionSystem.isVenueUnlocked(t.requiresUnlock as Parameters<typeof ProgressionSystem.isVenueUnlocked>[0])
+        : false;
+
+      const tintColor = locked ? 0x221111 : 0x332211;
+      const strokeColor = locked ? 0x882222 : 0xffd700;
       this.add
-        .rectangle(t.x, t.y, t.w, t.h, 0x332211, 0.6)
+        .rectangle(t.x, t.y, t.w, t.h, tintColor, 0.6)
         .setOrigin(0, 0)
-        .setStrokeStyle(1, 0xffd700, 0.5);
+        .setStrokeStyle(1, strokeColor, 0.5);
       this.add
-        .text(t.x + t.w / 2, t.y + t.h / 2, t.label, {
+        .text(t.x + t.w / 2, t.y + t.h / 2, locked ? `🔒 ${t.label}` : t.label, {
           fontFamily: 'monospace',
           fontSize: '10px',
-          color: '#ffcc66',
+          color: locked ? '#aa4444' : '#ffcc66',
         })
         .setOrigin(0.5);
+
       this.interactions.register({
         x: t.x + t.w / 2,
         y: t.y + t.h / 2,
         radius: 60,
-        label: t.label,
+        label: locked ? `${t.label} (Locked)` : t.label,
         activate: () => {
-          if (t.type === 'scene' && t.target) this.scene.start(t.target);
-          else if (t.type === 'talk') this.dialogue.open(t.label, t.lines ?? []);
+          if (locked) {
+            this.dialogue.open('Locked', ['Clear the area outside to unlock this.']);
+            return;
+          }
+          if (t.type === 'talk') {
+            this.dialogue.open(t.label, t.lines ?? []);
+            return;
+          }
+          if (t.target === 'Brawler' && t.targetStage) {
+            // Load stage JSON dynamically and pass it to BrawlerScene.
+            this.loadStageAndGo(t.targetStage);
+          } else if (t.target === 'Venue' && t.targetVenue) {
+            this.scene.start(SCENE.Venue, { venueId: t.targetVenue });
+          } else if (t.target) {
+            this.scene.start(t.target as string);
+          }
         },
       });
     }
@@ -146,8 +196,17 @@ export class VenueScene extends Phaser.Scene {
       .setOrigin(1, 0);
     this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
 
-    // If a real backdrop image exists, layer it under everything.
     this.tryLoadBackdrop();
+  }
+
+  // Dynamically import the stage JSON so we never bundle unused stages.
+  private async loadStageAndGo(stageId: string): Promise<void> {
+    try {
+      const mod = await import(`../data/stages/${stageId}.json`);
+      this.scene.start(SCENE.Brawler, { stage: mod.default ?? mod });
+    } catch {
+      this.scene.start(SCENE.Brawler);
+    }
   }
 
   private fallbackBlock(x: number, y: number, color: number): void {
@@ -157,9 +216,8 @@ export class VenueScene extends Phaser.Scene {
       .setDepth(y);
   }
 
-  // Optional venue backdrop. Uses the explicit `backdrop` path from the venue
-  // JSON — probed via native Image so a missing file never spams the loader.
   private tryLoadBackdrop(): void {
+    const VENUE = this.venue;
     if (!VENUE.backdrop) return;
     const key = `venue_bg_${VENUE.id}`;
     if (this.textures.exists(key)) {
@@ -174,7 +232,7 @@ export class VenueScene extends Phaser.Scene {
       this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
         .setDisplaySize(VENUE.width, VENUE.height);
     };
-    probe.onerror = () => {}; // silent: graybox stays
+    probe.onerror = () => {};
     probe.src = `${ASSET_BASE}${VENUE.backdrop}`;
   }
 
@@ -189,10 +247,9 @@ export class VenueScene extends Phaser.Scene {
   override update(_t: number, delta: number): void {
     const b = this.controls.read();
 
-    // Dialogue mode locks movement; interact advances/closes it.
     if (this.dialogue.active) {
       if (b.interact) this.dialogue.advance();
-      this.interactions.update(-9999, -9999); // hide prompt while talking
+      this.interactions.update(-9999, -9999);
       return;
     }
 
@@ -204,7 +261,6 @@ export class VenueScene extends Phaser.Scene {
     if (b.up) vy -= 1;
     if (b.down) vy += 1;
 
-    // Facing priority: vertical sets n/s, horizontal sets e/w.
     if (vy < 0) this.facing = 'n';
     else if (vy > 0) this.facing = 's';
     if (vx < 0) this.facing = 'w';
@@ -226,19 +282,17 @@ export class VenueScene extends Phaser.Scene {
     if (b.interact) this.interactions.tryActivate();
   }
 
-  // Keep the player in the walkable box and out of solid colliders.
   private clampToVenue(): void {
-    const wk = VENUE.walkable;
+    const wk = this.venue.walkable;
     this.px = Phaser.Math.Clamp(this.px, wk.x + 10, wk.x + wk.w - 10);
     this.py = Phaser.Math.Clamp(this.py, wk.y + 30, wk.y + wk.h - 6);
-    for (const c of VENUE.colliders) {
+    for (const c of this.venue.colliders) {
       if (
         this.px > c.x - 6 &&
         this.px < c.x + c.w + 6 &&
         this.py > c.y + 20 &&
         this.py < c.y + c.h + 14
       ) {
-        // Push the player below the collider (simple wall stop).
         this.py = c.y + c.h + 14;
       }
     }
