@@ -72,6 +72,7 @@
       "h": 30,
       "type": "scene",
       "target": "Brawler",
+      "targetStage": "cafe8fifty",
       "label": "Cafe8Fifty Streets"
     },
     {

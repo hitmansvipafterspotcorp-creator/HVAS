@@ -3,6 +3,7 @@ import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { BRAWLER_ANIMS, VENUE_ANIMS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
+import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
 
 // PreloadScene: shows an animated HITGEAR-style logo pulse while assets load.
@@ -60,26 +61,22 @@ export class PreloadScene extends Phaser.Scene {
     // Queue the real UI art kit (logo, HUD, digit font).
     UISystem.queue(this);
 
-    // Queue the real character frames the brawler + venue actually use.
-    const chars = new Set<number>([
-      PLAYER_ID,
-      ...ENEMY_IDS,
-      ...VENUE_NPC_IDS,
-    ]);
-    for (const id of chars) {
+    // Queue all 19 characters — Arcade VS shows the full roster, and brawler
+    // stages use any charId as enemy/boss. Unknown sheets 404 silently.
+    const allChars = Object.keys(CHAR_FOLDERS).map(Number);
+    // Priority: player + current-mode enemies first so they animate fastest.
+    const priority = new Set<number>([PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS]);
+    const rest = allChars.filter(id => !priority.has(id));
+    for (const id of [...priority, ...rest]) {
       AnimationSystem.queue(this, id, BRAWLER_ANIMS);
       AnimationSystem.queue(this, id, VENUE_ANIMS);
     }
   }
 
   create(): void {
-    // All queued frames are now loaded — assemble animations once, globally.
-    const chars = new Set<number>([
-      PLAYER_ID,
-      ...ENEMY_IDS,
-      ...VENUE_NPC_IDS,
-    ]);
-    for (const id of chars) {
+    // Build animations for every queued character.
+    const allChars = Object.keys(CHAR_FOLDERS).map(Number);
+    for (const id of allChars) {
       AnimationSystem.build(this, id, BRAWLER_ANIMS);
       AnimationSystem.build(this, id, VENUE_ANIMS);
     }

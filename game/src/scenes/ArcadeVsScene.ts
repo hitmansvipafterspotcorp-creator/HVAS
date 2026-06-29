@@ -115,7 +115,7 @@ export class ArcadeVsScene extends Phaser.Scene {
 
       // Char portrait sprite (idle facing south if loaded, else colored block).
       const charId = ALL_CHARS[i];
-      const idleKey = AnimationSystem.animKey(charId, 'idle_s');
+      const idleKey = AnimationSystem.animKey(charId, 'idle');
       let portrait: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
       if (this.anims.exists(idleKey)) {
         portrait = this.add.sprite(cx, cy + 8, '__DEFAULT')
@@ -257,7 +257,7 @@ export class ArcadeVsScene extends Phaser.Scene {
     );
 
     // P1 portrait.
-    const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle_s');
+    const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle');
     if (this.anims.exists(p1Key)) {
       this.p1Portrait.play(p1Key, true);
     }
@@ -265,7 +265,7 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     // P2 portrait (only set once chosen).
     if (this.phase !== 'p1select') {
-      const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle_s');
+      const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle');
       if (this.anims.exists(p2Key)) this.p2Portrait.play(p2Key, true);
       this.p2NameTxt.setText(CHAR_NAMES[this.p2CharId] ?? `#${this.p2CharId}`);
     }
