@@ -1,15 +1,41 @@
 {
   "id": "tally_13rave_inside",
-  "name": "13Rave — Inside",
-  "backdrop": "venues/tally_13rave_interior.png",
+  "name": "13Rave \u2014 Inside",
+  "backdrop": "venues/tally_13rave.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 100, "w": 840, "h": 400 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 100,
+    "w": 840,
+    "h": 400
+  },
   "colliders": [
-    { "x": 60,  "y": 105, "w": 220, "h": 80, "label": "dj rig" },
-    { "x": 700, "y": 105, "w": 200, "h": 75, "label": "speaker stack" },
-    { "x": 360, "y": 110, "w": 240, "h": 65, "label": "dance floor center" }
+    {
+      "x": 60,
+      "y": 105,
+      "w": 220,
+      "h": 80,
+      "label": "dj rig"
+    },
+    {
+      "x": 700,
+      "y": 105,
+      "w": 200,
+      "h": 75,
+      "label": "speaker stack"
+    },
+    {
+      "x": 360,
+      "y": 110,
+      "w": 240,
+      "h": 65,
+      "label": "dance floor center"
+    }
   ],
   "npcs": [
     {
@@ -21,7 +47,7 @@
       "name": "DJ 13",
       "lines": [
         "13Rave runs the underground electronic scene.",
-        "The drop hits different in here — you'll feel it.",
+        "The drop hits different in here \u2014 you'll feel it.",
         "No requests. Only certified heat."
       ]
     },
@@ -35,7 +61,7 @@
       "lines": [
         "13Rave been going every Friday since forever.",
         "Lights in here go crazy during the drop.",
-        "Don't leave before the closing set — it's legendary."
+        "Don't leave before the closing set \u2014 it's legendary."
       ]
     },
     {
@@ -47,7 +73,7 @@
       "name": "Coat Check",
       "lines": [
         "Bag check is two dollars. Worth it.",
-        "We hold everything — no drama about it.",
+        "We hold everything \u2014 no drama about it.",
         "Lockers are in the back if you need 'em."
       ]
     },

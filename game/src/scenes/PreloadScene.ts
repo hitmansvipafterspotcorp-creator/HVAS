@@ -5,6 +5,7 @@ import { BRAWLER_ANIMS, VENUE_ANIMS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
 import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // PreloadScene: shows an animated HITGEAR-style logo pulse while assets load.
 // Right now the brawler runs on graybox primitives (no texture loads required),
@@ -61,6 +62,9 @@ export class PreloadScene extends Phaser.Scene {
     // Queue the real UI art kit (logo, HUD, digit font).
     UISystem.queue(this);
 
+    // Queue background music tracks.
+    AudioSystem.queue(this);
+
     // Queue all 19 characters — Arcade VS shows the full roster, and brawler
     // stages use any charId as enemy/boss. Unknown sheets 404 silently.
     const allChars = Object.keys(CHAR_FOLDERS).map(Number);
@@ -83,5 +87,6 @@ export class PreloadScene extends Phaser.Scene {
 
     // Brief hold so the splash reads, then into the menu.
     this.time.delayedCall(600, () => this.scene.start(SCENE.MainMenu));
+    AudioSystem.playForScene(this, 'MainMenu');
   }
 }

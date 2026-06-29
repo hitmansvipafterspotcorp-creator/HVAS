@@ -6,6 +6,7 @@ import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { CHAR_NAMES } from '../data/roster';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // ── Roster (all 19 characters, all always unlocked in Arcade VS) ─────────────
 const ALL_CHARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 30, 31];
@@ -70,6 +71,7 @@ export class ArcadeVsScene extends Phaser.Scene {
   // ── create ───────────────────────────────────────────────────────────────
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
+    AudioSystem.playForScene(this, 'ArcadeVs');
     this.buildSelectionScreen();
     this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
   }
@@ -368,7 +370,7 @@ export class ArcadeVsScene extends Phaser.Scene {
         p.attackActive = p.stateTimer > 120 && p.stateTimer < 240;
         if (p.attackActive) {
           const hit = this.combat.resolve(p, [this.p2], { damage: 9, knockback: 18, meterGain: 8 });
-          if (hit) p.attackActive = false;
+          if (hit) { AudioSystem.sfx(this, 'hit'); p.attackActive = false; }
         }
       }
       if (p.stateTimer <= 0) { p.state = 'idle'; p.attackActive = false; }
@@ -416,7 +418,7 @@ export class ArcadeVsScene extends Phaser.Scene {
         cpu.attackActive = cpu.stateTimer > 120 && cpu.stateTimer < 240;
         if (cpu.attackActive) {
           const hit = this.combat.resolve(cpu, [target], { damage: 9, knockback: 18, meterGain: 8 });
-          if (hit) cpu.attackActive = false;
+          if (hit) { AudioSystem.sfx(this, 'hit'); cpu.attackActive = false; }
         }
       }
       if (cpu.stateTimer <= 0) { cpu.state = 'idle'; cpu.attackActive = false; }

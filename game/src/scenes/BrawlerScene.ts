@@ -19,8 +19,10 @@ import { PropDestructionSystem } from '../systems/PropDestructionSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { BossSystem } from '../systems/BossSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { FloatingTextSystem } from '../systems/FloatingTextSystem';
 import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 import type { StageData } from '../data/stageTypes';
 import cafe8fiftyStage from '../data/stages/cafe8fifty.json';
 
@@ -38,6 +40,7 @@ export class BrawlerScene extends Phaser.Scene {
   private waves!: WaveSystem;
   private props!: PropDestructionSystem;
   private weapon!: WeaponSystem;
+  private floatingText!: FloatingTextSystem;
   private boss: BossSystem | null = null;
   private bossRevealTriggered = false;
   private venueDoorSpawned = false;
@@ -61,6 +64,7 @@ export class BrawlerScene extends Phaser.Scene {
 
   create(data?: { stage?: StageData }): void {
     this.stage = data?.stage ?? DEFAULT_STAGE;
+    AudioSystem.playForStage(this, this.stage.id);
 
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
@@ -80,6 +84,7 @@ export class BrawlerScene extends Phaser.Scene {
     // Systems.
     this.controls = new InputSystem(this);
     this.combat = new CombatSystem(this);
+    this.floatingText = new FloatingTextSystem(this);
     this.ai = new EnemyAISystem();
     this.waves = new WaveSystem(this, this.stage.waves, this.stage.enemies);
     this.weapon = new WeaponSystem();
@@ -186,13 +191,25 @@ export class BrawlerScene extends Phaser.Scene {
       this.props.checkHits(this.player); // props
       const opts = this.weapon.augmentOpts({ damage: 9, knockback: 18, meterGain: 8 });
       const hit = this.combat.resolve(this.player, [this.boss.boss], opts);
-      if (hit) this.weapon.use();
+      if (hit) {
+        this.weapon.use();
+        this.combat.triggerHitStop(120);
+        this.floatingText.damage(this.boss.boss.x, this.boss.boss.feetY - 30, opts.damage);
+        this.floatingText.comboFlash(this.player.x, this.player.feetY - 50, this.player.combo);
+      }
     }
 
     // Drop pickup checks every frame.
     this.props.checkPickup(this.player, (kind) => {
-      if (kind === 'health') this.player.hp = Math.min(this.player.hp + 30, this.player.maxHp);
-      else this.player.meter = Math.min(this.player.meter + 25, 100);
+      if (kind === 'health') {
+        this.player.hp = Math.min(this.player.hp + 30, this.player.maxHp);
+        this.floatingText.pickup(this.player.x, this.player.feetY, 'health');
+        AudioSystem.sfx(this, 'pickup_health');
+      } else {
+        this.player.meter = Math.min(this.player.meter + 25, 100);
+        this.floatingText.pickup(this.player.x, this.player.feetY, 'meter');
+        AudioSystem.sfx(this, 'pickup_meter');
+      }
     });
     this.weapon.checkPickup(this.player, this.props.weaponDrops);
 
@@ -221,7 +238,17 @@ export class BrawlerScene extends Phaser.Scene {
           const base = { damage: 9, knockback: 18, meterGain: 8 };
           const opts = this.weapon.augmentOpts(base);
           const hit = this.combat.resolve(p, this.waves.enemies, opts);
-          if (hit) this.weapon.use();
+          if (hit) {
+            AudioSystem.sfx(this, 'hit');
+            this.weapon.use();
+            this.combat.triggerHitStop(60);
+            for (const e of this.waves.enemies) {
+              if (e.state === 'hit' && e.alive) {
+                this.floatingText.damage(e.x, e.feetY - 30, opts.damage);
+              }
+            }
+            this.floatingText.comboFlash(p.x, p.feetY - 50, p.combo);
+          }
         }
       }
       if (p.stateTimer <= 0) {
@@ -234,6 +261,7 @@ export class BrawlerScene extends Phaser.Scene {
 
     // Super.
     if (b.superMove && this.combat.trySuper(p, this.waves.enemies)) {
+      AudioSystem.sfx(this, 'superhit');
       p.playOneShot('super1');
       this.flashBanner('SUPER!');
       return;
@@ -376,6 +404,7 @@ export class BrawlerScene extends Phaser.Scene {
         Math.abs(py - door.cy) < door.H / 2 + 20
       ) {
         this.venueDoors = [];
+        AudioSystem.sfx(this, 'door');
         this.scene.start(SCENE.Venue, { venueId: door.venueId });
         return;
       }
@@ -492,6 +521,7 @@ export class BrawlerScene extends Phaser.Scene {
   }
 
   private showKoScreen(): void {
+    AudioSystem.sfx(this, 'ko');
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 

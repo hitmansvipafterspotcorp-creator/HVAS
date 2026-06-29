@@ -1,15 +1,41 @@
 {
   "id": "success_inside",
-  "name": "Success — Rooftop Lounge",
-  "backdrop": "venues/success_interior.png",
+  "name": "Success \u2014 Rooftop Lounge",
+  "backdrop": "venues/success.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 110,
+    "w": 840,
+    "h": 390
+  },
   "colliders": [
-    { "x": 60,  "y": 115, "w": 220, "h": 75, "label": "skyline bar" },
-    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "vip cabana" },
-    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "rooftop stage" }
+    {
+      "x": 60,
+      "y": 115,
+      "w": 220,
+      "h": 75,
+      "label": "skyline bar"
+    },
+    {
+      "x": 700,
+      "y": 115,
+      "w": 200,
+      "h": 70,
+      "label": "vip cabana"
+    },
+    {
+      "x": 380,
+      "y": 120,
+      "w": 200,
+      "h": 65,
+      "label": "rooftop stage"
+    }
   ],
   "npcs": [
     {
@@ -20,7 +46,7 @@
       "facing": "s",
       "name": "Mixologist",
       "lines": [
-        "Success rooftop — the highest bar in the city.",
+        "Success rooftop \u2014 the highest bar in the city.",
         "Craft cocktails only up here.",
         "Every drink named after a song. Pick your vibe."
       ]
@@ -35,7 +61,7 @@
       "lines": [
         "The Influencer ran this rooftop for three seasons.",
         "Content creation capital of the whole scene.",
-        "You made it up here — respect."
+        "You made it up here \u2014 respect."
       ]
     },
     {
@@ -48,7 +74,7 @@
       "lines": [
         "Best lighting in the city right here at golden hour.",
         "I've shot every major event from this rooftop.",
-        "Don't block the skyline — it's the money shot."
+        "Don't block the skyline \u2014 it's the money shot."
       ]
     },
     {

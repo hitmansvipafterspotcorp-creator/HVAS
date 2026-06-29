@@ -50,4 +50,7 @@ export const SCENE = {
   ArcadeVs: 'ArcadeVs',
   StageSelect: 'StageSelect',
   VenueSelect: 'VenueSelect',
+  LipsyncBingo: 'LipsyncBingo',
+  TvMode: 'TvMode',
+  HostDj: 'HostDj',
 } as const;

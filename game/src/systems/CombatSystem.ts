@@ -64,6 +64,10 @@ export class CombatSystem {
     });
   }
 
+  triggerHitStop(ms: number): void {
+    this.hitStopMs = Math.max(this.hitStopMs, ms);
+  }
+
   // Decrement global hit-stop. Returns true if the world should run this frame.
   tick(deltaMs: number): boolean {
     if (this.hitStopMs > 0) {

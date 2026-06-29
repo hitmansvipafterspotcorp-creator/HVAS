@@ -1,15 +1,41 @@
 {
   "id": "tally_public_hall_inside",
-  "name": "Tally Row — Public Hall",
-  "backdrop": "venues/tally_public_hall_interior.png",
+  "name": "Tally Row \u2014 Public Hall",
+  "backdrop": "venues/tally_public_hall.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 100, "w": 840, "h": 400 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 100,
+    "w": 840,
+    "h": 400
+  },
   "colliders": [
-    { "x": 60,  "y": 105, "w": 240, "h": 80, "label": "main stage" },
-    { "x": 680, "y": 105, "w": 220, "h": 75, "label": "sound booth" },
-    { "x": 360, "y": 110, "w": 240, "h": 65, "label": "general admission floor" }
+    {
+      "x": 60,
+      "y": 105,
+      "w": 240,
+      "h": 80,
+      "label": "main stage"
+    },
+    {
+      "x": 680,
+      "y": 105,
+      "w": 220,
+      "h": 75,
+      "label": "sound booth"
+    },
+    {
+      "x": 360,
+      "y": 110,
+      "w": 240,
+      "h": 65,
+      "label": "general admission floor"
+    }
   ],
   "npcs": [
     {
@@ -35,7 +61,7 @@
       "lines": [
         "Sound system in here is world class.",
         "We do linecheck at six every show night.",
-        "Don't touch the board — I'm serious."
+        "Don't touch the board \u2014 I'm serious."
       ]
     },
     {

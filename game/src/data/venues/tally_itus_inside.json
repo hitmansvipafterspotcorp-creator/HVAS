@@ -1,15 +1,41 @@
 {
   "id": "tally_itus_inside",
-  "name": "Itus — Inside",
-  "backdrop": "venues/tally_itus_interior.png",
+  "name": "Itus \u2014 Inside",
+  "backdrop": "venues/tally_itus.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 110,
+    "w": 840,
+    "h": 390
+  },
   "colliders": [
-    { "x": 60,  "y": 115, "w": 220, "h": 75, "label": "bar counter" },
-    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "stage platform" },
-    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "standing area" }
+    {
+      "x": 60,
+      "y": 115,
+      "w": 220,
+      "h": 75,
+      "label": "bar counter"
+    },
+    {
+      "x": 700,
+      "y": 115,
+      "w": 200,
+      "h": 70,
+      "label": "stage platform"
+    },
+    {
+      "x": 380,
+      "y": 120,
+      "w": 200,
+      "h": 65,
+      "label": "standing area"
+    }
   ],
   "npcs": [
     {
@@ -20,7 +46,7 @@
       "facing": "s",
       "name": "Bartender",
       "lines": [
-        "Itus — the strip's hidden gem.",
+        "Itus \u2014 the strip's hidden gem.",
         "We book local talent mostly. Real ones.",
         "Happy hour runs till ten on weeknights."
       ]
@@ -35,7 +61,7 @@
       "lines": [
         "Itus gave me my first real booking.",
         "Stage in here is small but the crowd is locked in.",
-        "I perform here every other week — it's home."
+        "I perform here every other week \u2014 it's home."
       ]
     },
     {

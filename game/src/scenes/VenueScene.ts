@@ -7,6 +7,7 @@ import { AnimationSystem } from '../systems/AnimationSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { PLAYER_ID } from '../data/roster';
 import type { VenueData, Facing } from '../data/venueTypes';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // ── Venue JSON registry ──────────────────────────────────────────────────────
 import hitmansVip   from '../data/venues/hitmans_vip_inside.json';
@@ -61,6 +62,7 @@ export class VenueScene extends Phaser.Scene {
   }
 
   create(data?: { venueId?: string }): void {
+    AudioSystem.playForScene(this, 'Venue');
     this.npcPositions = [];
     const venueId = data?.venueId ?? DEFAULT_VENUE_ID;
     this.venue = VENUE_REGISTRY[venueId] ?? VENUE_REGISTRY[DEFAULT_VENUE_ID];

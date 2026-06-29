@@ -1,15 +1,41 @@
 {
   "id": "tally_sammys_inside",
-  "name": "Sammy's — Inside",
-  "backdrop": "venues/tally_sammys_interior.png",
+  "name": "Sammy's \u2014 Inside",
+  "backdrop": "venues/tally_sammys.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 110,
+    "w": 840,
+    "h": 390
+  },
   "colliders": [
-    { "x": 60,  "y": 115, "w": 220, "h": 75, "label": "main bar" },
-    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "kitchen window" },
-    { "x": 380, "y": 120, "w": 200, "h": 65, "label": "dining section" }
+    {
+      "x": 60,
+      "y": 115,
+      "w": 220,
+      "h": 75,
+      "label": "main bar"
+    },
+    {
+      "x": 700,
+      "y": 115,
+      "w": 200,
+      "h": 70,
+      "label": "kitchen window"
+    },
+    {
+      "x": 380,
+      "y": 120,
+      "w": 200,
+      "h": 65,
+      "label": "dining section"
+    }
   ],
   "npcs": [
     {
@@ -21,7 +47,7 @@
       "name": "Sammy",
       "lines": [
         "Sammy's been on the strip since '98.",
-        "Wings, drinks, good vibes — that's all we do.",
+        "Wings, drinks, good vibes \u2014 that's all we do.",
         "Late night spot for the whole city."
       ]
     },
@@ -48,7 +74,7 @@
       "lines": [
         "Every game night I'm posted right here.",
         "Sammy's never lets me down.",
-        "Try the loaded fries — trust me on that."
+        "Try the loaded fries \u2014 trust me on that."
       ]
     },
     {

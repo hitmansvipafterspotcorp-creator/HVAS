@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // MainMenuScene: the HITGEAR hub entry. Lists the playable modes; QUEST routes
 // into the brawler. Other modes are stubbed as "COMING SOON" so navigation is
@@ -13,9 +14,9 @@ const ITEMS: MenuItem[] = [
   { label: 'ARCADE VS', scene: SCENE.ArcadeVs },
   { label: 'VENUES', scene: SCENE.VenueSelect },
   { label: 'LEVEL EDITOR', scene: SCENE.LevelEditor },
-  { label: 'LIPSYNC BINGO', soon: true },
-  { label: 'TV MODE', soon: true },
-  { label: 'HOST / DJ', soon: true },
+  { label: 'LIPSYNC BINGO', scene: SCENE.LipsyncBingo },
+  { label: 'TV MODE', scene: SCENE.TvMode },
+  { label: 'HOST / DJ', scene: SCENE.HostDj },
 ];
 
 export class MainMenuScene extends Phaser.Scene {
@@ -27,6 +28,7 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    AudioSystem.playForScene(this, 'MainMenu');
     const cx = GAME_WIDTH / 2;
 
     // Real HITGEAR logo if loaded; text fallback otherwise.

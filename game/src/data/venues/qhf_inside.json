@@ -1,15 +1,41 @@
 {
   "id": "qhf_inside",
-  "name": "Quick Hit Fuel — Inside",
-  "backdrop": "venues/qhf_interior.png",
+  "name": "Quick Hit Fuel \u2014 Inside",
+  "backdrop": "venues/qhf_pack_03_store_interior.png",
   "width": 960,
   "height": 540,
-  "spawn": { "x": 480, "y": 440 },
-  "walkable": { "x": 60, "y": 110, "w": 840, "h": 390 },
+  "spawn": {
+    "x": 480,
+    "y": 440
+  },
+  "walkable": {
+    "x": 60,
+    "y": 110,
+    "w": 840,
+    "h": 390
+  },
   "colliders": [
-    { "x": 60,  "y": 115, "w": 230, "h": 75, "label": "fuel counter" },
-    { "x": 700, "y": 115, "w": 200, "h": 70, "label": "cooler wall" },
-    { "x": 380, "y": 125, "w": 200, "h": 60, "label": "center shelves" }
+    {
+      "x": 60,
+      "y": 115,
+      "w": 230,
+      "h": 75,
+      "label": "fuel counter"
+    },
+    {
+      "x": 700,
+      "y": 115,
+      "w": 200,
+      "h": 70,
+      "label": "cooler wall"
+    },
+    {
+      "x": 380,
+      "y": 125,
+      "w": 200,
+      "h": 60,
+      "label": "center shelves"
+    }
   ],
   "npcs": [
     {
@@ -20,7 +46,7 @@
       "facing": "s",
       "name": "Cashier",
       "lines": [
-        "QHF — fuel up and keep movin'.",
+        "QHF \u2014 fuel up and keep movin'.",
         "Energy drinks, snacks, whatever you need.",
         "Swipe or cash, we take both."
       ]
@@ -34,7 +60,7 @@
       "name": "Regular",
       "lines": [
         "The Dancer used to hold sessions right out front.",
-        "This spot stay open late — that's why I'm here.",
+        "This spot stay open late \u2014 that's why I'm here.",
         "Best energy drinks in the city, I'm tellin' you."
       ]
     },
