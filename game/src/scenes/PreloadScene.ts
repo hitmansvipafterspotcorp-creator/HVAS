@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { AnimationSystem } from '../systems/AnimationSystem';
-import { BRAWLER_ANIMS, VENUE_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
+import { BRAWLER_ANIMS, VENUE_ANIMS, VFX_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
 import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
@@ -74,6 +74,7 @@ export class PreloadScene extends Phaser.Scene {
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
     for (const id of [...priority, ...rest]) {
       AnimationSystem.queue(this, id, BRAWLER_ANIMS);
+      AnimationSystem.queue(this, id, VFX_ANIMS);
       if (topdownSet.has(id)) AnimationSystem.queue(this, id, VENUE_ANIMS);
     }
   }
@@ -84,6 +85,7 @@ export class PreloadScene extends Phaser.Scene {
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
     for (const id of allChars) {
       AnimationSystem.build(this, id, BRAWLER_ANIMS);
+      AnimationSystem.build(this, id, VFX_ANIMS);
       if (topdownSet.has(id)) AnimationSystem.build(this, id, VENUE_ANIMS);
     }
 

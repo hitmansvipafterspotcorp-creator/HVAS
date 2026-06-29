@@ -1,199 +1,243 @@
 import Phaser from 'phaser';
-import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS,
-         FLOOR_TOP, FLOOR_BOTTOM, PLAYER_SPEED, PLAYER_DEPTH_SPEED, LANE_TOLERANCE } from '../config';
+import {
+  SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS,
+  FLOOR_TOP, FLOOR_BOTTOM, PLAYER_SPEED, PLAYER_DEPTH_SPEED, LANE_TOLERANCE,
+} from '../config';
 import { Fighter } from '../entities/Fighter';
 import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
+import { VFXSystem } from '../systems/VFXSystem';
+import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import { CHAR_NAMES } from '../data/roster';
 import { AudioSystem } from '../systems/AudioSystem';
 
-// ── Roster (all 19 characters, all always unlocked in Arcade VS) ─────────────
+// ── Roster ────────────────────────────────────────────────────────────────────
 const ALL_CHARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 30, 31];
 
 const DIFFICULTIES = [
-  { label: 'EASY',   color: '#44dd88', aiSpeed: 0.35, aiReact: 900,  aiBravery: 0.25 },
-  { label: 'NORMAL', color: '#ffd700', aiSpeed: 0.55, aiReact: 600,  aiBravery: 0.50 },
-  { label: 'HARD',   color: '#ff8833', aiSpeed: 0.75, aiReact: 380,  aiBravery: 0.70 },
-  { label: 'INSANE', color: '#ff3355', aiSpeed: 1.00, aiReact: 180,  aiBravery: 0.90 },
+  { label: 'EASY',   color: '#44dd88', aiSpeed: 0.35, aiReact: 900,  aiBravery: 0.25, aiBlock: 0.10 },
+  { label: 'NORMAL', color: '#ffd700', aiSpeed: 0.55, aiReact: 600,  aiBravery: 0.50, aiBlock: 0.25 },
+  { label: 'HARD',   color: '#ff8833', aiSpeed: 0.75, aiReact: 380,  aiBravery: 0.70, aiBlock: 0.45 },
+  { label: 'INSANE', color: '#ff3355', aiSpeed: 1.00, aiReact: 180,  aiBravery: 0.90, aiBlock: 0.70 },
 ] as const;
-
 type Difficulty = typeof DIFFICULTIES[number];
 
-// ── Phase types ───────────────────────────────────────────────────────────────
-type Phase = 'p1select' | 'p2select' | 'diffselect' | 'fight' | 'result';
+type Phase = 'p1select' | 'p2select' | 'diffselect' | 'vs' | 'fight' | 'result';
 
 const COLS = 5;
 const ROWS = Math.ceil(ALL_CHARS.length / COLS);
-const CELL = 88; // px per grid cell
+const CELL = 86;
 const GRID_X = (GAME_WIDTH - COLS * CELL) / 2;
-const GRID_Y = 160;
+const GRID_Y = 148;
 
 // ── ArcadeVsScene ─────────────────────────────────────────────────────────────
-// Three-phase flow: P1 picks char → P2 picks char → pick difficulty → fight.
-// Both selections use the same character grid. All 19 chars are always shown
-// and selectable — no unlock gating in Arcade.
 export class ArcadeVsScene extends Phaser.Scene {
-  // ── selection state ──────────────────────────────────────────────────────
+  // Selection state
   private phase: Phase = 'p1select';
   private p1CharId = ALL_CHARS[0];
   private p2CharId = ALL_CHARS[1];
-  private diffIdx = 1; // default NORMAL
+  private diffIdx = 1;
   private cursorIdx = 0;
 
-  // ── fight state ──────────────────────────────────────────────────────────
+  // Fight state
   private p1!: Fighter;
   private p2!: Fighter;
   private controls!: InputSystem;
   private combat!: CombatSystem;
+  private vfx!: VFXSystem;
   private difficulty!: Difficulty;
   private aiTimer = 0;
+  private aiBlockTimer = 0;
+  private aiDodgeTimer = 0;
   private roundOver = false;
-  private winner = '';
+  private p1RoundWins = 0;
+  private p2RoundWins = 0;
+  private roundNum = 1;
 
-  // ── UI refs ──────────────────────────────────────────────────────────────
-  private selectionGroup!: Phaser.GameObjects.Container;
-  private fightGroup!: Phaser.GameObjects.Container;
+  // Dodge slide for P1
+  private dodgeVX = 0;
+  private dodgeVY = 0;
+
+  // HUD references
+  private selGroup!: Phaser.GameObjects.Container;
   private phaseLabel!: Phaser.GameObjects.Text;
   private cursorRect!: Phaser.GameObjects.Rectangle;
-  private p1Portrait!: Phaser.GameObjects.Sprite;
-  private p2Portrait!: Phaser.GameObjects.Sprite;
+  private p1PortraitSpr!: Phaser.GameObjects.Sprite;
+  private p2PortraitSpr!: Phaser.GameObjects.Sprite;
   private p1NameTxt!: Phaser.GameObjects.Text;
   private p2NameTxt!: Phaser.GameObjects.Text;
   private diffButtons: Phaser.GameObjects.Text[] = [];
-  private hudP1hp!: Phaser.GameObjects.Text;
-  private hudP2hp!: Phaser.GameObjects.Text;
-  private resultBanner!: Phaser.GameObjects.Text;
+
+  // Fight HUD
+  private p1HpBar!: Phaser.GameObjects.Rectangle;
+  private p2HpBar!: Phaser.GameObjects.Rectangle;
+  private p1HpNum?: NumberDisplay;
+  private p2HpNum?: NumberDisplay;
+  private roundPipsP1: Phaser.GameObjects.Rectangle[] = [];
+  private roundPipsP2: Phaser.GameObjects.Rectangle[] = [];
   private fightBanner!: Phaser.GameObjects.Text;
+  private stateLabel!: Phaser.GameObjects.Text;
+
+  private paused = false;
+  private pauseGroup?: Phaser.GameObjects.Container;
 
   constructor() { super(SCENE.ArcadeVs); }
 
-  // ── create ───────────────────────────────────────────────────────────────
+  // ── create ─────────────────────────────────────────────────────────────────
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
     AudioSystem.playForScene(this, 'ArcadeVs');
+    this.phase = 'p1select';
+    this.p1RoundWins = 0;
+    this.p2RoundWins = 0;
+    this.roundNum = 1;
     this.buildSelectionScreen();
-    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
+    this.input.keyboard!.on('keydown-ESC', () => {
+      if (this.phase === 'fight') { this.togglePause(); return; }
+      this.scene.start(SCENE.MainMenu);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // SELECTION SCREEN
   // ─────────────────────────────────────────────────────────────────────────
   private buildSelectionScreen(): void {
-    if (this.selectionGroup) this.selectionGroup.destroy(true);
-    this.fightGroup?.destroy(true);
+    this.selGroup?.destroy(true);
     this.roundOver = false;
 
     const grp = this.add.container(0, 0);
-    this.selectionGroup = grp;
+    this.selGroup = grp;
 
-    // Title bar.
-    grp.add(
-      this.add.text(GAME_WIDTH / 2, 30, 'ARCADE VS', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '32px',
-        color: '#ffd700',
-      }).setOrigin(0.5),
-    );
+    // Background sheet
+    if (UISystem.ready(this)) {
+      UISystem.backdrop(this, UI.sheetCharSelect, 0.88, -6000);
+    } else {
+      this.cameras.main.setBackgroundColor(0x0a0614);
+    }
 
-    this.phaseLabel = this.add.text(GAME_WIDTH / 2, 72, '', {
-      fontFamily: 'monospace',
-      fontSize: '16px',
-      color: '#ffffff',
+    // Title
+    grp.add(this.add.text(GAME_WIDTH / 2, 24, 'ARCADE VS', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '30px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5));
+
+    this.phaseLabel = this.add.text(GAME_WIDTH / 2, 60, '', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
     }).setOrigin(0.5);
     grp.add(this.phaseLabel);
 
-    // Character grid.
+    // Real character-select grid background
+    if (this.textures.exists(UI.csGrid)) {
+      const gw = COLS * CELL + 12;
+      const gh = ROWS * CELL + 12;
+      grp.add(this.add.image(GRID_X - 6, GRID_Y - 6, UI.csGrid)
+        .setOrigin(0, 0)
+        .setDisplaySize(gw, gh)
+        .setAlpha(0.5));
+    }
+
+    // Character grid cells
     for (let i = 0; i < ALL_CHARS.length; i++) {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
       const cx = GRID_X + col * CELL + CELL / 2;
       const cy = GRID_Y + row * CELL + CELL / 2;
+      const charId = ALL_CHARS[i];
 
-      // Cell bg.
-      const cell = this.add.rectangle(cx, cy, CELL - 6, CELL - 6, 0x1a1030)
-        .setStrokeStyle(1, 0x4a3a6a);
+      const cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820)
+        .setStrokeStyle(1, 0x3a2a5a);
       grp.add(cell);
 
-      // Char portrait sprite (idle facing south if loaded, else colored block).
-      const charId = ALL_CHARS[i];
       const idleKey = AnimationSystem.animKey(charId, 'idle');
-      let portrait: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
       if (this.anims.exists(idleKey)) {
-        portrait = this.add.sprite(cx, cy + 8, '__DEFAULT')
-          .setOrigin(0.5, 1)
-          .setScale(46 / 181)
-          .setDepth(1);
-        (portrait as Phaser.GameObjects.Sprite).play(idleKey);
+        const spr = this.add.sprite(cx, cy + 8, '__DEFAULT')
+          .setOrigin(0.5, 1).setScale(42 / 181).setDepth(1);
+        spr.play(idleKey);
+        grp.add(spr as Phaser.GameObjects.GameObject);
       } else {
-        portrait = this.add.rectangle(cx, cy, 34, 54, charId === 1 ? COLORS.player : COLORS.enemy);
+        grp.add(this.add.rectangle(cx, cy, 30, 48,
+          charId === 1 ? COLORS.player : COLORS.enemy));
       }
-      grp.add(portrait as Phaser.GameObjects.GameObject);
 
-      // Name label.
-      const name = this.add.text(cx, cy + CELL / 2 - 14, CHAR_NAMES[charId] ?? `#${charId}`, {
-        fontFamily: 'monospace',
-        fontSize: '9px',
-        color: '#ccbbee',
-      }).setOrigin(0.5);
-      grp.add(name);
+      grp.add(this.add.text(cx, cy + CELL / 2 - 12,
+        (CHAR_NAMES[charId] ?? `#${charId}`).split(' ').slice(-1)[0], {
+          fontFamily: 'monospace', fontSize: '8px', color: '#ccbbee',
+        }).setOrigin(0.5));
     }
 
-    // Cursor highlight.
-    this.cursorRect = this.add.rectangle(0, 0, CELL - 4, CELL - 4, 0xffd700, 0)
+    // Cursor
+    this.cursorRect = this.add.rectangle(0, 0, CELL - 2, CELL - 2, 0xffd700, 0)
       .setStrokeStyle(3, 0xffd700);
     grp.add(this.cursorRect);
 
-    // P1 / P2 selected portrait readouts (bottom strip).
-    const stripY = GRID_Y + ROWS * CELL + 18;
+    // Bottom strip — P1 and P2 portrait frames
+    const stripY = GRID_Y + ROWS * CELL + 14;
 
-    grp.add(this.add.text(80, stripY, 'P1', { fontFamily: 'monospace', fontSize: '14px', color: '#44aaff' }).setOrigin(0.5));
-    this.p1Portrait = this.add.sprite(80, stripY + 44, '__DEFAULT').setScale(50 / 181).setOrigin(0.5, 1);
-    grp.add(this.p1Portrait);
-    this.p1NameTxt = this.add.text(80, stripY + 52, '', { fontFamily: 'monospace', fontSize: '12px', color: '#44aaff' }).setOrigin(0.5);
+    // P1 side
+    if (this.textures.exists(UI.csFrameL)) {
+      grp.add(this.add.image(80, stripY + 44, UI.csFrameL)
+        .setDisplaySize(96, 130).setOrigin(0.5));
+    }
+    grp.add(this.add.text(80, stripY + 4, 'P1', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#44aaff',
+    }).setOrigin(0.5));
+    this.p1PortraitSpr = this.add.sprite(80, stripY + 64, '__DEFAULT').setScale(48 / 181).setOrigin(0.5, 1);
+    grp.add(this.p1PortraitSpr);
+    this.p1NameTxt = this.add.text(80, stripY + 72, '', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#44aaff',
+    }).setOrigin(0.5);
     grp.add(this.p1NameTxt);
 
-    grp.add(this.add.text(GAME_WIDTH - 80, stripY, 'P2', { fontFamily: 'monospace', fontSize: '14px', color: '#ff6644' }).setOrigin(0.5));
-    this.p2Portrait = this.add.sprite(GAME_WIDTH - 80, stripY + 44, '__DEFAULT').setScale(50 / 181).setOrigin(0.5, 1);
-    grp.add(this.p2Portrait);
-    this.p2NameTxt = this.add.text(GAME_WIDTH - 80, stripY + 52, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ff6644' }).setOrigin(0.5);
+    // P2 side
+    if (this.textures.exists(UI.csFrameR)) {
+      grp.add(this.add.image(GAME_WIDTH - 80, stripY + 44, UI.csFrameR)
+        .setDisplaySize(96, 130).setOrigin(0.5));
+    }
+    grp.add(this.add.text(GAME_WIDTH - 80, stripY + 4, 'CPU', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ff6644',
+    }).setOrigin(0.5));
+    this.p2PortraitSpr = this.add.sprite(GAME_WIDTH - 80, stripY + 64, '__DEFAULT').setScale(48 / 181).setOrigin(0.5, 1);
+    grp.add(this.p2PortraitSpr);
+    this.p2NameTxt = this.add.text(GAME_WIDTH - 80, stripY + 72, '', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ff6644',
+    }).setOrigin(0.5);
     grp.add(this.p2NameTxt);
 
-    // Difficulty row (shown only in diffselect phase).
-    const diffY = stripY + 80;
+    // VS graphic between portraits
+    if (this.textures.exists(UI.csVs)) {
+      grp.add(this.add.image(GAME_WIDTH / 2, stripY + 40, UI.csVs)
+        .setDisplaySize(120, 72).setOrigin(0.5));
+    } else {
+      grp.add(this.add.text(GAME_WIDTH / 2, stripY + 30, 'VS', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 6,
+      }).setOrigin(0.5));
+    }
+
+    // Difficulty buttons
+    const diffY = stripY + 108;
     this.diffButtons = [];
     for (let d = 0; d < DIFFICULTIES.length; d++) {
       const btn = this.add.text(
-        GAME_WIDTH / 2 + (d - 1.5) * 130,
-        diffY,
+        GAME_WIDTH / 2 + (d - 1.5) * 120, diffY,
         DIFFICULTIES[d].label,
-        { fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: DIFFICULTIES[d].color },
+        { fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: DIFFICULTIES[d].color },
       ).setOrigin(0.5).setAlpha(0.3).setVisible(false);
       grp.add(btn);
       this.diffButtons.push(btn);
     }
 
-    // Controls hint.
-    grp.add(
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 14, 'WASD move • SPACE/Enter confirm • ESC back to menu', {
-        fontFamily: 'monospace',
-        fontSize: '11px',
-        color: '#554466',
-      }).setOrigin(0.5),
-    );
+    // Controls hint
+    grp.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 10,
+      'WASD/Arrows navigate  ·  Space/Enter confirm  ·  ESC back', {
+        fontFamily: 'monospace', fontSize: '11px', color: '#554466',
+      }).setOrigin(0.5));
 
-    // Keyboard nav.
+    // Keyboard navigation
     const kb = this.input.keyboard!;
-    kb.removeAllListeners('keydown-LEFT');
-    kb.removeAllListeners('keydown-RIGHT');
-    kb.removeAllListeners('keydown-UP');
-    kb.removeAllListeners('keydown-DOWN');
-    kb.removeAllListeners('keydown-SPACE');
-    kb.removeAllListeners('keydown-ENTER');
-    kb.removeAllListeners('keydown-A');
-    kb.removeAllListeners('keydown-D');
-    kb.removeAllListeners('keydown-W');
-    kb.removeAllListeners('keydown-S');
+    ['LEFT','RIGHT','UP','DOWN','A','D','W','S','SPACE','ENTER'].forEach(k =>
+      kb.removeAllListeners(`keydown-${k}`));
 
     kb.on('keydown-LEFT',  () => this.moveCursor(-1, 0));
     kb.on('keydown-RIGHT', () => this.moveCursor(1, 0));
@@ -217,10 +261,10 @@ export class ArcadeVsScene extends Phaser.Scene {
     }
     const col = this.cursorIdx % COLS;
     const row = Math.floor(this.cursorIdx / COLS);
-    const newCol = Phaser.Math.Clamp(col + dx, 0, COLS - 1);
-    const newRow = Phaser.Math.Clamp(row + dy, 0, ROWS - 1);
-    const newIdx = newRow * COLS + newCol;
-    if (newIdx < ALL_CHARS.length) this.cursorIdx = newIdx;
+    const nc = Phaser.Math.Clamp(col + dx, 0, COLS - 1);
+    const nr = Phaser.Math.Clamp(row + dy, 0, ROWS - 1);
+    const ni = nr * COLS + nc;
+    if (ni < ALL_CHARS.length) this.cursorIdx = ni;
     this.refreshSelectionUI();
   }
 
@@ -228,7 +272,7 @@ export class ArcadeVsScene extends Phaser.Scene {
     if (this.phase === 'p1select') {
       this.p1CharId = ALL_CHARS[this.cursorIdx];
       this.phase = 'p2select';
-      this.cursorIdx = (this.cursorIdx + 1) % ALL_CHARS.length; // start P2 on next char
+      this.cursorIdx = (this.cursorIdx + 1) % ALL_CHARS.length;
       this.refreshSelectionUI();
     } else if (this.phase === 'p2select') {
       this.p2CharId = ALL_CHARS[this.cursorIdx];
@@ -236,21 +280,19 @@ export class ArcadeVsScene extends Phaser.Scene {
       this.refreshSelectionUI();
     } else if (this.phase === 'diffselect') {
       this.difficulty = DIFFICULTIES[this.diffIdx];
-      this.startFight();
+      this.showVsScreen();
     }
   }
 
   private refreshSelectionUI(): void {
     const phaseText: Record<Phase, string> = {
       p1select: '— PLAYER 1: CHOOSE YOUR FIGHTER —',
-      p2select: '— PLAYER 2: CHOOSE YOUR FIGHTER —',
+      p2select: '— CPU: CHOOSE YOUR FIGHTER —',
       diffselect: '— SELECT DIFFICULTY —',
-      fight: '',
-      result: '',
+      vs: '', fight: '', result: '',
     };
     this.phaseLabel.setText(phaseText[this.phase]);
 
-    // Move cursor.
     const col = this.cursorIdx % COLS;
     const row = Math.floor(this.cursorIdx / COLS);
     this.cursorRect.setPosition(
@@ -258,21 +300,16 @@ export class ArcadeVsScene extends Phaser.Scene {
       GRID_Y + row * CELL + CELL / 2,
     );
 
-    // P1 portrait.
     const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle');
-    if (this.anims.exists(p1Key)) {
-      this.p1Portrait.play(p1Key, true);
-    }
+    if (this.anims.exists(p1Key)) this.p1PortraitSpr.play(p1Key, true);
     this.p1NameTxt.setText(CHAR_NAMES[this.p1CharId] ?? `#${this.p1CharId}`);
 
-    // P2 portrait (only set once chosen).
     if (this.phase !== 'p1select') {
       const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle');
-      if (this.anims.exists(p2Key)) this.p2Portrait.play(p2Key, true);
+      if (this.anims.exists(p2Key)) this.p2PortraitSpr.play(p2Key, true);
       this.p2NameTxt.setText(CHAR_NAMES[this.p2CharId] ?? `#${this.p2CharId}`);
     }
 
-    // Difficulty buttons visibility.
     const showDiff = this.phase === 'diffselect';
     for (let d = 0; d < this.diffButtons.length; d++) {
       this.diffButtons[d].setVisible(showDiff).setAlpha(d === this.diffIdx ? 1 : 0.3);
@@ -280,69 +317,242 @@ export class ArcadeVsScene extends Phaser.Scene {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // VS INTRO SCREEN
+  // ─────────────────────────────────────────────────────────────────────────
+  private showVsScreen(): void {
+    this.phase = 'vs';
+    this.selGroup.destroy(true);
+    this.input.keyboard!.removeAllListeners('keydown-LEFT');
+    this.input.keyboard!.removeAllListeners('keydown-RIGHT');
+    this.input.keyboard!.removeAllListeners('keydown-UP');
+    this.input.keyboard!.removeAllListeners('keydown-DOWN');
+    this.input.keyboard!.removeAllListeners('keydown-SPACE');
+    this.input.keyboard!.removeAllListeners('keydown-ENTER');
+    this.input.keyboard!.removeAllListeners('keydown-A');
+    this.input.keyboard!.removeAllListeners('keydown-D');
+    this.input.keyboard!.removeAllListeners('keydown-W');
+    this.input.keyboard!.removeAllListeners('keydown-S');
+
+    this.cameras.main.setBackgroundColor(0x000000);
+
+    // Character name and VS splash
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+
+    const p1Name = CHAR_NAMES[this.p1CharId] ?? `Fighter ${this.p1CharId}`;
+    const p2Name = CHAR_NAMES[this.p2CharId] ?? `Fighter ${this.p2CharId}`;
+
+    // Left side: P1
+    const p1Block = this.add.rectangle(0, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x001133)
+      .setOrigin(0, 0).setDepth(-1);
+    const p2Block = this.add.rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x330011)
+      .setOrigin(0, 0).setDepth(-1);
+    this.tweens.add({ targets: p1Block, alpha: { from: 0, to: 1 }, duration: 200 });
+    this.tweens.add({ targets: p2Block, alpha: { from: 0, to: 1 }, duration: 200 });
+
+    // P1 big portrait (idle anim if available)
+    const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle');
+    if (this.anims.exists(p1Key)) {
+      this.add.sprite(cx / 2, cy + 30, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale(240 / 181).play(p1Key);
+    }
+
+    // P2 big portrait
+    const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle');
+    if (this.anims.exists(p2Key)) {
+      this.add.sprite(cx + cx / 2, cy + 30, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale(240 / 181).setFlipX(true).play(p2Key);
+    }
+
+    // Names
+    const n1 = this.add.text(cx / 2, 80, p1Name.toUpperCase(), {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#44aaff',
+      stroke: '#000000', strokeThickness: 5,
+    }).setOrigin(0.5).setAlpha(0);
+    const n2 = this.add.text(cx + cx / 2, 80, p2Name.toUpperCase(), {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ff6644',
+      stroke: '#000000', strokeThickness: 5,
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: [n1, n2], alpha: 1, duration: 300, delay: 150 });
+
+    // Round and difficulty
+    const roundLabel = this.add.text(cx, cy - 60,
+      `ROUND ${this.roundNum}  [${this.difficulty.label}]`, {
+        fontFamily: 'monospace', fontSize: '16px', color: this.difficulty.color,
+      }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: roundLabel, alpha: 1, duration: 300, delay: 200 });
+
+    // VS text — slam in
+    const vs = this.add.text(cx, cy, 'VS', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '88px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 10,
+    }).setOrigin(0.5).setScale(4).setAlpha(0);
+    this.tweens.add({
+      targets: vs, scale: 1, alpha: 1, duration: 350, delay: 100,
+      ease: 'Back.out',
+    });
+
+    // Diagonal slash decoration
+    const gfx = this.add.graphics().setDepth(-0.5);
+    gfx.fillStyle(0xffd700, 0.12);
+    gfx.fillTriangle(cx - 20, 0, cx + 20, 0, cx - 20, GAME_HEIGHT);
+    gfx.fillTriangle(cx + 20, 0, cx - 20, GAME_HEIGHT, cx + 20, GAME_HEIGHT);
+
+    // Countdown 3, 2, 1, FIGHT!
+    let count = 3;
+    const countTxt = this.add.text(cx, cy + 80, '', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '54px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 8,
+    }).setOrigin(0.5);
+
+    const tick = () => {
+      if (count > 0) {
+        countTxt.setText(String(count)).setAlpha(1).setScale(1.4);
+        this.tweens.add({
+          targets: countTxt, scale: 1, alpha: 0.3, duration: 850, ease: 'Quad.out',
+        });
+        count--;
+        this.time.delayedCall(900, tick);
+      } else {
+        countTxt.setText('FIGHT!').setAlpha(1).setScale(1).setStyle({ color: '#ffd700' });
+        this.tweens.add({
+          targets: countTxt, scale: 1.5, alpha: 0, duration: 600, ease: 'Quad.out',
+          onComplete: () => this.startFight(),
+        });
+      }
+    };
+    this.time.delayedCall(600, tick);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // FIGHT
   // ─────────────────────────────────────────────────────────────────────────
   private startFight(): void {
     this.phase = 'fight';
-    this.selectionGroup.destroy(true);
+    this.children.list.slice().forEach(c => c.destroy());
 
-    // Remove selection key listeners.
-    const kb = this.input.keyboard!;
-    ['LEFT','RIGHT','UP','DOWN','A','D','W','S','SPACE','ENTER'].forEach(k => {
-      kb.removeAllListeners(`keydown-${k}`);
-    });
+    this.cameras.main.setBackgroundColor(COLORS.bg);
+    this.roundOver = false;
+    this.dodgeVX = 0;
+    this.dodgeVY = 0;
 
-    // Build fight screen.
-    this.fightGroup = this.add.container(0, 0);
-
-    // Floor.
+    // Floor
     const g = this.add.graphics().setDepth(-1999);
     g.fillStyle(COLORS.floor, 0.55);
     g.fillRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
     g.lineStyle(2, COLORS.floorLine, 0.6);
     g.strokeRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
 
-    // Fighters.
+    // Fighters
     this.p1 = new Fighter(this, 'player', 220, FLOOR_BOTTOM - 20, 120, this.p1CharId);
     this.p2 = new Fighter(this, 'enemy', GAME_WIDTH - 220, FLOOR_BOTTOM - 20, 120, this.p2CharId);
-    this.p2.facing = -1; // face left
+    this.p2.facing = -1;
 
-    // Systems.
+    // Systems
     this.controls = new InputSystem(this);
     this.combat = new CombatSystem(this);
+    this.vfx = new VFXSystem(this);
     this.aiTimer = 0;
+    this.aiBlockTimer = 0;
+    this.aiDodgeTimer = 0;
 
-    // HUD.
-    this.hudP1hp = this.add.text(14, 14, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#44aaff',
-    }).setScrollFactor(0).setDepth(50000);
-    this.hudP2hp = this.add.text(GAME_WIDTH - 14, 14, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#ff6644',
-    }).setOrigin(1, 0).setScrollFactor(0).setDepth(50000);
+    // Build HUD
+    this.buildFightHUD();
 
-    // VS banner.
+    // ESC = pause
+    this.input.keyboard!.on('keydown-ESC', () => this.togglePause());
+
+    this.flashBanner(`ROUND ${this.roundNum}`);
+    this.vfx.screenShake(200, 0.005);
+  }
+
+  private buildFightHUD(): void {
+    const HUD_Y = 12;
+    const BAR_W = 300;
+    const BAR_H = 22;
+
+    // P1 HP bar (left)
+    this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0x110008)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(50000);
+    this.p1HpBar = this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0xff3344)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(50001);
+    this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0)
+      .setStrokeStyle(2, 0xffd700, 0.6)
+      .setOrigin(0, 0).setScrollFactor(0).setDepth(50002);
+
+    // P2 HP bar (right, right-aligned)
+    this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0x110008)
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(50000);
+    this.p2HpBar = this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0x4488ff)
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(50001);
+    this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0)
+      .setStrokeStyle(2, 0xffd700, 0.6)
+      .setOrigin(1, 0).setScrollFactor(0).setDepth(50002);
+
+    // Names
+    this.add.text(16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p1CharId] ?? 'P1').toUpperCase(), {
+      fontFamily: 'monospace', fontSize: '11px', color: '#44aaff',
+    }).setScrollFactor(0).setDepth(50003);
+    this.add.text(GAME_WIDTH - 16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p2CharId] ?? 'CPU').toUpperCase(), {
+      fontFamily: 'monospace', fontSize: '11px', color: '#ff6644',
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(50003);
+
+    // Digit HP readouts (if digits loaded)
+    if (this.textures.exists(UI.digit(0))) {
+      this.p1HpNum = new NumberDisplay(this, 20, HUD_Y + BAR_H + 18, 16).setDepth(50004);
+      this.p2HpNum = new NumberDisplay(this, GAME_WIDTH - 20, HUD_Y + BAR_H + 18, 16, 'right').setDepth(50004);
+    }
+
+    // Round label center
+    this.add.text(GAME_WIDTH / 2, HUD_Y + 2,
+      `ROUND ${this.roundNum}  [${this.difficulty.label}]`, {
+        fontFamily: 'monospace', fontSize: '12px', color: this.difficulty.color,
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(50003);
+
+    // Round win pips (3 pips per side)
+    this.roundPipsP1 = [];
+    this.roundPipsP2 = [];
+    for (let i = 0; i < 3; i++) {
+      const p1pip = this.add.rectangle(20 + i * 14, HUD_Y + BAR_H + 34, 10, 10, 0x333333)
+        .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
+      const p2pip = this.add.rectangle(GAME_WIDTH - 20 - i * 14, HUD_Y + BAR_H + 34, 10, 10, 0x333333)
+        .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
+      this.roundPipsP1.push(p1pip);
+      this.roundPipsP2.push(p2pip);
+    }
+    this.refreshRoundPips();
+
+    // Banners
     this.fightBanner = this.add.text(GAME_WIDTH / 2, 90, '', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '34px', color: '#ffd700',
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(50000);
+      fontFamily: 'Arial Black, sans-serif', fontSize: '38px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 6,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(50010).setVisible(false);
 
-    this.resultBanner = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, '', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '42px', color: '#ffd700',
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(50000).setVisible(false);
 
-    // Diff label.
-    this.add.text(GAME_WIDTH / 2, 14, `VS  [${this.difficulty.label}]`, {
-      fontFamily: 'monospace', fontSize: '13px', color: this.difficulty.color,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(50000);
+    // State label (block/dodge indicator)
+    this.stateLabel = this.add.text(220, FLOOR_TOP - 18, '', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#44ffdd',
+    }).setOrigin(0.5).setDepth(50010);
 
-    // "FIGHT!" flash.
-    this.flashBanner('FIGHT!');
+    // Controls hint
+    this.add.text(GAME_WIDTH - 10, 4,
+      'J attack  K super  SHIFT block  SHIFT+dir dodge  SHIFT+J grab  double-tap run  ESC pause', {
+        fontFamily: 'monospace', fontSize: '9px', color: '#443355',
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(50003);
+  }
+
+  private refreshRoundPips(): void {
+    for (let i = 0; i < 3; i++) {
+      this.roundPipsP1[i]?.setFillStyle(i < this.p1RoundWins ? 0x44aaff : 0x222233);
+      this.roundPipsP2[i]?.setFillStyle(i < this.p2RoundWins ? 0xff6644 : 0x221111);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // UPDATE
   // ─────────────────────────────────────────────────────────────────────────
   override update(_t: number, delta: number): void {
-    if (this.phase !== 'fight' || !this.p1 || !this.p2) return;
+    if (this.phase !== 'fight' || !this.p1 || !this.p2 || this.paused) return;
     if (!this.combat.tick(delta)) return;
     if (this.roundOver) return;
 
@@ -353,10 +563,23 @@ export class ArcadeVsScene extends Phaser.Scene {
     this.p2.syncView();
     this.combat.decayCombo(this.p1, delta);
     this.combat.decayCombo(this.p2, delta);
-    this.drawFightHud();
+
+    // Dodge ghost trail
+    if (this.p1.state === 'dodge' && this.p1.sprite) {
+      this.vfx.dodgeGhost(this.p1.sprite, delta);
+    }
+
+    this.drawFightHUD();
     this.checkRoundEnd();
+
+    // State label
+    const stMap: Partial<Record<string, string>> = {
+      block: '🛡 BLOCKING', dodge: '⚡ DODGE', run: '💨 RUN',
+    };
+    this.stateLabel?.setText(stMap[this.p1.state] ?? '').setX(this.p1.x);
   }
 
+  // ── P1 (player-controlled) ─────────────────────────────────────────────
   private updateP1(delta: number): void {
     const p = this.p1;
     const b = this.controls.read();
@@ -364,26 +587,73 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     if (p.invuln > 0) p.invuln -= delta;
 
+    // Locked: dodge slide
+    if (p.state === 'dodge') {
+      p.stateTimer -= delta;
+      p.x     += this.dodgeVX * PLAYER_SPEED * 2.8 * dt;
+      p.feetY += this.dodgeVY * PLAYER_DEPTH_SPEED * 2.8 * dt;
+      this.clamp(p);
+      if (p.stateTimer <= 0) { p.state = 'idle'; p.invuln = 0; }
+      return;
+    }
+
+    // Locked: attack / hit
     if (p.state === 'attack' || p.state === 'hit') {
       p.stateTimer -= delta;
       if (p.state === 'attack') {
         p.attackActive = p.stateTimer > 120 && p.stateTimer < 240;
         if (p.attackActive) {
-          const hit = this.combat.resolve(p, [this.p2], { damage: 9, knockback: 18, meterGain: 8 });
-          if (hit) { AudioSystem.sfx(this, 'hit'); p.attackActive = false; }
+          const opts = { damage: 9, knockback: 18, meterGain: 8 };
+          const hit = this.combat.resolve(p, [this.p2], opts);
+          if (hit) {
+            AudioSystem.sfx(this, 'hit');
+            this.vfx.hitSpark(this.p2.x, this.p2.feetY - 60, p.facing);
+            this.vfx.charVfx(this.p1CharId, this.p2.state === 'block' ? 'vfx_block' : 'vfx_hit', this.p2.x, this.p2.feetY - 60);
+            p.attackActive = false;
+          }
         }
       }
       if (p.stateTimer <= 0) { p.state = 'idle'; p.attackActive = false; }
-      this.clampFighter(p);
+      this.clamp(p);
       return;
     }
 
+    // Super
     if (b.superMove && this.combat.trySuper(p, [this.p2])) {
+      AudioSystem.sfx(this, 'superhit');
       p.playOneShot('super1');
       this.flashBanner('SUPER!');
+      this.vfx.screenFlash(0xffffff, 0.7, 280);
+      this.vfx.charVfx(this.p1CharId, 'vfx_super', this.p2.x, this.p2.feetY - 60, 2.0);
       return;
     }
 
+    // Grab = block + attack
+    if (b.block && b.attack) {
+      this.tryGrab(p, this.p2);
+      return;
+    }
+
+    // Dodge = block + direction just-pressed
+    if (b.dodge) {
+      p.state = 'dodge';
+      p.stateTimer = 220;
+      p.invuln = 260;
+      this.dodgeVX = b.dodgeX;
+      this.dodgeVY = b.dodgeY;
+      if (b.dodgeX !== 0) p.facing = b.dodgeX > 0 ? 1 : -1;
+      this.vfx.charVfx(this.p1CharId, 'vfx_dodge', p.x, p.feetY - 50, 1.2);
+      return;
+    }
+
+    // Block
+    if (b.block) {
+      p.state = 'block';
+      this.clamp(p);
+      return;
+    }
+
+    // Attack
     if (b.attack) {
       p.attackIndex = (p.attackIndex + 1) % 3;
       p.state = 'attack';
@@ -392,18 +662,24 @@ export class ArcadeVsScene extends Phaser.Scene {
       return;
     }
 
+    // Movement
     let vx = 0, vy = 0;
     if (b.left) vx -= 1;
     if (b.right) vx += 1;
     if (b.up) vy -= 1;
     if (b.down) vy += 1;
     if (vx !== 0) p.facing = vx > 0 ? 1 : -1;
-    p.x += vx * PLAYER_SPEED * dt;
-    p.feetY += vy * PLAYER_DEPTH_SPEED * dt;
-    p.state = (vx !== 0 || vy !== 0) ? 'walk' : 'idle';
-    this.clampFighter(p);
+
+    const isMoving = vx !== 0 || vy !== 0;
+    const spd = b.running ? 1.85 : 1.0;
+    p.x     += vx * PLAYER_SPEED       * spd * dt;
+    p.feetY += vy * PLAYER_DEPTH_SPEED * spd * dt;
+
+    p.state = !isMoving ? 'idle' : b.running ? 'run' : 'walk';
+    this.clamp(p);
   }
 
+  // ── CPU P2 ─────────────────────────────────────────────────────────────
   private updateCpuP2(delta: number): void {
     const cpu = this.p2;
     const target = this.p1;
@@ -412,37 +688,74 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     if (cpu.invuln > 0) cpu.invuln -= delta;
 
-    if (cpu.state === 'attack' || cpu.state === 'hit') {
+    // Locked states
+    if (cpu.state === 'attack' || cpu.state === 'hit' || cpu.state === 'dodge') {
       cpu.stateTimer -= delta;
       if (cpu.state === 'attack') {
         cpu.attackActive = cpu.stateTimer > 120 && cpu.stateTimer < 240;
         if (cpu.attackActive) {
           const hit = this.combat.resolve(cpu, [target], { damage: 9, knockback: 18, meterGain: 8 });
-          if (hit) { AudioSystem.sfx(this, 'hit'); cpu.attackActive = false; }
+          if (hit) {
+            AudioSystem.sfx(this, 'hit');
+            this.vfx.hitSpark(target.x, target.feetY - 60, cpu.facing);
+            this.vfx.charVfx(this.p2CharId, target.state === 'block' ? 'vfx_block' : 'vfx_hit', target.x, target.feetY - 60);
+            cpu.attackActive = false;
+          }
         }
       }
       if (cpu.stateTimer <= 0) { cpu.state = 'idle'; cpu.attackActive = false; }
-      this.clampFighter(cpu);
+      this.clamp(cpu);
       return;
     }
 
-    // Throttle decisions by reaction time.
-    this.aiTimer -= delta;
-    if (this.aiTimer > 0) {
-      this.clampFighter(cpu);
+    // While blocking, tick down a timer
+    this.aiBlockTimer -= delta;
+    if (cpu.state === 'block') {
+      if (this.aiBlockTimer <= 0) cpu.state = 'idle';
+      this.clamp(cpu);
       return;
     }
+
+    // AI decision (throttled by reaction time)
+    this.aiTimer -= delta;
+    if (this.aiTimer > 0) { this.clamp(cpu); return; }
     this.aiTimer = diff.aiReact + Math.random() * 200;
 
     const dx = target.x - cpu.x;
     const dy = target.feetY - cpu.feetY;
     const dist = Math.abs(dx);
-
     cpu.facing = dx < 0 ? -1 : 1;
 
     const attackRange = 80;
-    if (dist < attackRange && Math.abs(dy) < LANE_TOLERANCE + 10) {
-      // In range: attack with bravery probability.
+    const inRange = dist < attackRange && Math.abs(dy) < LANE_TOLERANCE + 10;
+
+    // Dodge away when hurt and low HP
+    this.aiDodgeTimer -= this.aiTimer;
+    if (cpu.hp < cpu.maxHp * 0.3 && Math.random() < 0.25 && this.aiDodgeTimer <= 0) {
+      cpu.state = 'dodge';
+      cpu.stateTimer = 200;
+      cpu.invuln = 240;
+      this.aiDodgeTimer = 1500;
+      return;
+    }
+
+    if (inRange) {
+      // Block if player is attacking
+      if (target.state === 'attack' && Math.random() < diff.aiBlock) {
+        cpu.state = 'block';
+        this.aiBlockTimer = 350 + Math.random() * 200;
+        return;
+      }
+      // Super if meter full
+      if (cpu.meter >= 100 && Math.random() < 0.4) {
+        const hit = this.combat.trySuper(cpu, [target]);
+        if (hit) {
+          cpu.playOneShot('super1');
+          AudioSystem.sfx(this, 'superhit');
+          return;
+        }
+      }
+      // Attack
       if (Math.random() < diff.aiBravery) {
         cpu.attackIndex = (cpu.attackIndex + 1) % 3;
         cpu.state = 'attack';
@@ -452,71 +765,228 @@ export class ArcadeVsScene extends Phaser.Scene {
       }
     }
 
-    // Move toward target at difficulty-scaled speed.
-    const speed = PLAYER_SPEED * diff.aiSpeed;
-    if (dist > attackRange * 0.6) cpu.x += Math.sign(dx) * speed * dt;
+    // Move toward target
+    const spd = PLAYER_SPEED * diff.aiSpeed;
+    if (dist > attackRange * 0.5) cpu.x += Math.sign(dx) * spd * dt;
     if (Math.abs(dy) > 10) cpu.feetY += Math.sign(dy) * PLAYER_DEPTH_SPEED * diff.aiSpeed * dt;
     cpu.state = 'walk';
-    this.clampFighter(cpu);
+    this.clamp(cpu);
   }
 
-  private clampFighter(f: Fighter): void {
+  private tryGrab(attacker: Fighter, target: Fighter): void {
+    if (Math.abs(target.x - attacker.x) > 80 || Math.abs(target.feetY - attacker.feetY) > 30) return;
+    const dmg = 22;
+    target.hp = Math.max(0, target.hp - dmg);
+    target.state = 'knockdown' as any;
+    target.stateTimer = 600;
+    attacker.meter = Math.min(100, attacker.meter + 18);
+    attacker.combo = (attacker.combo ?? 0) + 1;
+    AudioSystem.sfx(this, 'hit');
+    this.combat.triggerHitStop(80);
+    this.vfx.hitSpark(target.x, target.feetY - 50, attacker.facing);
+    const grabberCharId = attacker === this.p1 ? this.p1CharId : this.p2CharId;
+    this.vfx.charVfx(grabberCharId, 'vfx_grab', target.x, target.feetY - 50);
+    this.vfx.screenShake(100, 0.008);
+    attacker.playOneShot('special');
+    attacker.state = 'attack';
+    attacker.stateTimer = 420;
+    attacker.attackActive = false;
+  }
+
+  private clamp(f: Fighter): void {
     f.x = Phaser.Math.Clamp(f.x, 20, GAME_WIDTH - 20);
     f.feetY = Phaser.Math.Clamp(f.feetY, FLOOR_TOP + 10, FLOOR_BOTTOM - 5);
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ROUND MANAGEMENT
+  // ─────────────────────────────────────────────────────────────────────────
   private checkRoundEnd(): void {
     const p1dead = this.p1.hp <= 0;
     const p2dead = this.p2.hp <= 0;
     if (!p1dead && !p2dead) return;
-
     this.roundOver = true;
-    if (p1dead && p2dead) {
-      this.winner = 'DRAW!';
-    } else if (p2dead) {
-      this.winner = `${CHAR_NAMES[this.p1CharId] ?? 'P1'} WINS!`;
+
+    if (p2dead && !p1dead) {
+      this.p1RoundWins++;
+      this.flashBanner(`${(CHAR_NAMES[this.p1CharId] ?? 'P1').toUpperCase()} WINS!`);
+      this.vfx.koExplosion(this.p2.x, this.p2.feetY - 60);
+      this.vfx.charVfx(this.p1CharId, 'vfx_ko', this.p2.x, this.p2.feetY - 60, 2.0);
+    } else if (p1dead && !p2dead) {
+      this.p2RoundWins++;
+      this.flashBanner(`${(CHAR_NAMES[this.p2CharId] ?? 'CPU').toUpperCase()} WINS!`);
+      this.vfx.koExplosion(this.p1.x, this.p1.feetY - 60);
+      this.vfx.charVfx(this.p2CharId, 'vfx_ko', this.p1.x, this.p1.feetY - 60, 2.0);
     } else {
-      this.winner = `${CHAR_NAMES[this.p2CharId] ?? 'CPU'} WINS!`;
+      this.flashBanner('DRAW!');
     }
 
-    this.time.delayedCall(600, () => {
-      this.resultBanner.setText(this.winner).setVisible(true).setAlpha(1);
-      this.tweens.add({ targets: this.resultBanner, scaleX: 1.08, scaleY: 1.08, yoyo: true, duration: 300 });
+    this.refreshRoundPips();
 
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, 'SPACE — Rematch   R — Reselect   ESC — Menu', {
-        fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(50000);
-
-      const kb = this.input.keyboard!;
-      kb.once('keydown-SPACE', () => this.startFight());
-      kb.once('keydown-R',     () => this.buildSelectionScreen());
+    const matchOver = this.p1RoundWins >= 2 || this.p2RoundWins >= 2;
+    this.time.delayedCall(matchOver ? 1800 : 1400, () => {
+      if (matchOver) this.showMatchResult();
+      else this.nextRound();
     });
   }
 
-  private drawFightHud(): void {
-    const bar = (hp: number, max: number, filled: string, empty: string, len = 16) => {
-      const n = Math.max(0, Math.round((hp / max) * len));
-      return filled.repeat(n).padEnd(len, empty);
-    };
-    this.hudP1hp.setText(
-      `${CHAR_NAMES[this.p1CharId] ?? 'P1'}\n` +
-      `HP [${bar(this.p1.hp, this.p1.maxHp, '█', '·')}] ${Math.ceil(this.p1.hp)}`,
-    );
-    this.hudP2hp.setText(
-      `${CHAR_NAMES[this.p2CharId] ?? 'CPU'}  [CPU]\n` +
-      `[${bar(this.p2.hp, this.p2.maxHp, '█', '·')}] ${Math.ceil(this.p2.hp)}`,
-    );
+  private nextRound(): void {
+    this.roundNum++;
+    this.showVsScreen();
   }
 
+  private showMatchResult(): void {
+    this.phase = 'result';
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+
+    // Dark overlay
+    const overlay = this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
+      .setDepth(90000).setScrollFactor(0);
+    this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.72 }, duration: 350 });
+
+    const winner = this.p1RoundWins > this.p2RoundWins
+      ? (CHAR_NAMES[this.p1CharId] ?? 'P1')
+      : (CHAR_NAMES[this.p2CharId] ?? 'CPU');
+    const color = this.p1RoundWins > this.p2RoundWins ? '#44aaff' : '#ff6644';
+
+    this.add.text(cx, cy - 70, winner.toUpperCase(), {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '44px', color,
+      stroke: '#000000', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    this.add.text(cx, cy - 14, 'WINS THE MATCH!', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 5,
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    this.add.text(cx, cy + 26,
+      `${this.p1RoundWins} — ${this.p2RoundWins}`, {
+        fontFamily: 'monospace', fontSize: '28px', color: '#aaaaaa',
+      }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    this.add.text(cx, cy + 76, 'SPACE — Rematch  ·  R — Character Select  ·  ESC — Menu', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#998899',
+    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+
+    const kb = this.input.keyboard!;
+    kb.once('keydown-SPACE', () => {
+      this.p1RoundWins = 0;
+      this.p2RoundWins = 0;
+      this.roundNum = 1;
+      this.showVsScreen();
+    });
+    kb.once('keydown-R', () => {
+      this.p1RoundWins = 0;
+      this.p2RoundWins = 0;
+      this.roundNum = 1;
+      this.buildSelectionScreen();
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // HUD
+  // ─────────────────────────────────────────────────────────────────────────
+  private drawFightHUD(): void {
+    if (!this.p1 || !this.p2 || !this.p1HpBar || !this.p2HpBar) return;
+    const BAR_W = 300;
+
+    const p1f = Phaser.Math.Clamp(this.p1.hp / this.p1.maxHp, 0, 1);
+    const p2f = Phaser.Math.Clamp(this.p2.hp / this.p2.maxHp, 0, 1);
+
+    this.p1HpBar.width = BAR_W * p1f;
+    this.p1HpBar.setFillStyle(p1f > 0.5 ? 0xff3344 : p1f > 0.25 ? 0xff8833 : 0xffdd00);
+
+    this.p2HpBar.width = BAR_W * p2f;
+    this.p2HpBar.setFillStyle(p2f > 0.5 ? 0x4488ff : p2f > 0.25 ? 0x8844ff : 0xffdd00);
+
+    this.p1HpNum?.setValue(Math.ceil(this.p1.hp));
+    this.p2HpNum?.setValue(Math.ceil(this.p2.hp));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PAUSE
+  // ─────────────────────────────────────────────────────────────────────────
+  private togglePause(): void {
+    if (this.phase !== 'fight') return;
+    this.paused = !this.paused;
+    if (this.paused) this.showPauseOverlay();
+    else this.hidePauseOverlay();
+  }
+
+  private showPauseOverlay(): void {
+    this.pauseGroup = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    this.pauseGroup.setDepth(99000);
+
+    // Dim overlay
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65)
+      .setScrollFactor(0);
+    this.pauseGroup.add(dim);
+
+    // Panel from UI art
+    if (this.textures.exists(UI.pausePanel)) {
+      const panel = this.add.image(0, 0, UI.pausePanel)
+        .setDisplaySize(480, 300);
+      this.pauseGroup.add(panel);
+    } else {
+      const panel = this.add.rectangle(0, 0, 480, 300, 0x0d0818)
+        .setStrokeStyle(2, 0xffd700);
+      this.pauseGroup.add(panel);
+    }
+
+    // PAUSED title from art or text
+    if (this.textures.exists(UI.pauseTitle)) {
+      this.pauseGroup.add(this.add.image(0, -108, UI.pauseTitle).setDisplaySize(340, 60));
+    } else {
+      this.pauseGroup.add(this.add.text(0, -100, 'PAUSED', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 6,
+      }).setOrigin(0.5));
+    }
+
+    const items = [
+      { label: 'RESUME', key: 'keydown-SPACE', fn: () => this.togglePause() },
+      { label: 'RESTART ROUND', key: 'keydown-R', fn: () => { this.paused = false; this.hidePauseOverlay(); this.startFight(); } },
+      { label: 'CHARACTER SELECT', key: 'keydown-C', fn: () => { this.paused = false; this.hidePauseOverlay(); this.p1RoundWins = 0; this.p2RoundWins = 0; this.roundNum = 1; this.buildSelectionScreen(); } },
+      { label: 'MAIN MENU', key: 'keydown-M', fn: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
+    ];
+
+    items.forEach((item, i) => {
+      const y = -30 + i * 50;
+      const btn = this.add.text(0, y, item.label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffffff',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      btn.on('pointerover', () => btn.setColor('#ffd700'));
+      btn.on('pointerout', () => btn.setColor('#ffffff'));
+      btn.on('pointerdown', () => item.fn());
+      this.pauseGroup!.add(btn);
+      this.input.keyboard!.once(item.key, () => item.fn());
+    });
+
+    this.pauseGroup.add(this.add.text(0, 140, 'SPACE resume  R restart  C char select  M menu', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#665577',
+    }).setOrigin(0.5));
+  }
+
+  private hidePauseOverlay(): void {
+    this.pauseGroup?.destroy(true);
+    this.pauseGroup = undefined;
+    // Re-wire ESC to toggle pause
+    this.input.keyboard!.once('keydown-ESC', () => this.togglePause());
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // UTIL
+  // ─────────────────────────────────────────────────────────────────────────
   private flashBanner(text: string): void {
+    if (!this.fightBanner) return;
     this.fightBanner.setText(text).setVisible(true).setAlpha(1).setScale(1);
     this.tweens.add({
       targets: this.fightBanner,
-      alpha: 0,
-      scale: 1.3,
-      duration: 1100,
-      ease: 'Cubic.out',
-      onComplete: () => this.fightBanner.setVisible(false),
+      alpha: 0, scale: 1.3,
+      duration: 1200, ease: 'Cubic.out',
+      onComplete: () => this.fightBanner?.setVisible(false),
     });
   }
 }

@@ -22,21 +22,36 @@ export class CombatSystem {
     for (const t of targets) {
       if (t === attacker) continue;
       if (!DepthGateSystem.connects(attacker, t)) continue;
+      // Skip invulnerable targets (dodge i-frames etc.) but NOT blocking ones.
+      if (t.invuln > 0 && t.state !== 'block') continue;
 
-      // Apply damage.
+      // BLOCK: chip damage only — no knockdown, no hit state.
+      if (t.state === 'block') {
+        const chip = Math.max(1, Math.floor(opts.damage * 0.22));
+        t.hp = Math.max(0, t.hp - chip);
+        t.invuln = 120;
+        this.blockSpark(t.x, t.feetY - 55);
+        this.hitStopMs = Math.max(this.hitStopMs, 45);
+        this.scene.cameras.main.shake(60, 0.003);
+        // Small meter gain for attacker — blocked hits still build meter slowly.
+        attacker.meter = Math.min(100, attacker.meter + Math.floor(opts.meterGain * 0.4));
+        landed = true;
+        continue;
+      }
+
+      // NORMAL HIT.
       t.hp = Math.max(0, t.hp - opts.damage);
-      t.invuln = 220; // brief i-frames so one swing = one hit
+      t.invuln = 220;
       t.state = 'hit';
       t.stateTimer = 180;
 
-      // Knockback along attacker facing, clamped by the scene later.
+      // Knockback along attacker facing.
       t.x += attacker.facing * opts.knockback;
 
-      // Combo + meter for the attacker.
+      // Combo + meter for attacker.
       attacker.combo += 1;
       attacker.meter = Math.min(100, attacker.meter + opts.meterGain);
 
-      // Juice.
       this.spark(t.x, t.feetY - 60);
       this.hitStopMs = Math.max(this.hitStopMs, 70);
       this.scene.cameras.main.shake(90, 0.006);
@@ -48,6 +63,15 @@ export class CombatSystem {
       landed = true;
     }
     return landed;
+  }
+
+  private blockSpark(x: number, y: number): void {
+    // Gold ring + shield sparks for block
+    const ring = this.scene.add.circle(x, y, 8, 0xffd700, 0.9).setDepth(9999);
+    this.scene.tweens.add({
+      targets: ring, scaleX: 3, scaleY: 3, alpha: 0,
+      duration: 260, ease: 'Quad.out', onComplete: () => ring.destroy(),
+    });
   }
 
   private spark(x: number, y: number): void {

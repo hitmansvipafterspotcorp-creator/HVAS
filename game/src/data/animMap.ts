@@ -81,6 +81,17 @@ export const ANIMS: Record<string, AnimDef> = {
   td_walk_w: { type: 'topdown', row: 6, frames: 6, fps: 10, loop: true },
   // Row 7 = props/accessories for creator-type sheets; not an east walk.
   // East walking is handled by mirroring td_walk_w via setFlipX in VenueScene.
+
+  // ── Per-character VFX sheet (assets/characters/frames/{folder}/vfx/) ────────
+  // 8 rows × 8 frames each. Played on a separate sprite at hit/effect location.
+  vfx_hit:      { type: 'vfx', row: 0, frames: 8, fps: 24, loop: false },
+  vfx_block:    { type: 'vfx', row: 1, frames: 8, fps: 20, loop: false },
+  vfx_dodge:    { type: 'vfx', row: 2, frames: 8, fps: 20, loop: false },
+  vfx_super:    { type: 'vfx', row: 3, frames: 8, fps: 18, loop: false },
+  vfx_ko:       { type: 'vfx', row: 4, frames: 8, fps: 16, loop: false },
+  vfx_special:  { type: 'vfx', row: 5, frames: 8, fps: 18, loop: false },
+  vfx_grab:     { type: 'vfx', row: 6, frames: 8, fps: 20, loop: false },
+  vfx_finisher: { type: 'vfx', row: 7, frames: 8, fps: 14, loop: false },
 };
 
 // Which anims each mode needs (keeps loads small — we never preload all frames).
@@ -101,6 +112,17 @@ export const BRAWLER_ANIMS = [
   'super2',
   'super3',
   'finisher',
+];
+
+export const VFX_ANIMS = [
+  'vfx_hit',
+  'vfx_block',
+  'vfx_dodge',
+  'vfx_super',
+  'vfx_ko',
+  'vfx_special',
+  'vfx_grab',
+  'vfx_finisher',
 ];
 
 // Only loaded for chars listed in TOPDOWN_CHAR_IDS to avoid mass 404s.
