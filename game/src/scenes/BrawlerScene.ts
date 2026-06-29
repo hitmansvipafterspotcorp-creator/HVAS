@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   SCENE,
   GAME_WIDTH,
+  GAME_HEIGHT,
   FLOOR_TOP,
   FLOOR_BOTTOM,
   COLORS,
@@ -124,9 +125,39 @@ export class BrawlerScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(50000);
 
-    // Kick off wave 1.
-    this.waves.tryAdvance();
-    this.flashBanner('WAVE 1');
+    // Stage intro: name fades in then out before wave 1 starts.
+    const stageName = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, this.stage.name.toUpperCase(), {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '28px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(50001)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: stageName,
+      alpha: 1,
+      duration: 400,
+      ease: 'Quad.out',
+      onComplete: () => {
+        this.time.delayedCall(900, () => {
+          this.tweens.add({
+            targets: stageName,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => stageName.destroy(),
+          });
+          // Kick off wave 1 after name fades.
+          this.waves.tryAdvance();
+          this.flashBanner('WAVE 1');
+        });
+      },
+    });
   }
 
   override update(_time: number, delta: number): void {
@@ -272,15 +303,11 @@ export class BrawlerScene extends Phaser.Scene {
     const stageId = this.stage.id as Parameters<typeof ProgressionSystem.beatBoss>[0];
     ProgressionSystem.beatBoss(stageId);
 
-    // Also unlock the above-venue if defined (e.g. success_rooftop via social_gaines_exterior).
-    if (this.stage.aboveVenueUnlocks) {
-      ProgressionSystem.unlockVenue(this.stage.aboveVenueUnlocks);
-    }
-    // Tally strip entrances are all unlocked together.
+    // Persist every unlock declared on this stage JSON.
+    if (this.stage.venueUnlocks) ProgressionSystem.unlockVenue(this.stage.venueUnlocks);
+    if (this.stage.aboveVenueUnlocks) ProgressionSystem.unlockVenue(this.stage.aboveVenueUnlocks);
     if (this.stage.stripEntrances) {
-      for (const ent of this.stage.stripEntrances) {
-        ProgressionSystem.unlockVenue(ent.venueId);
-      }
+      for (const ent of this.stage.stripEntrances) ProgressionSystem.unlockVenue(ent.venueId);
     }
 
     // Spawn venue entrance doors after a short pause.

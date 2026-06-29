@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
+import { ProgressionSystem } from '../systems/ProgressionSystem';
 
 // MainMenuScene: the HITGEAR hub entry. Lists the playable modes; QUEST routes
 // into the brawler. Other modes are stubbed as "COMING SOON" so navigation is
@@ -10,7 +11,7 @@ type MenuItem = { label: string; scene?: string; soon?: boolean };
 const ITEMS: MenuItem[] = [
   { label: 'QUEST', scene: SCENE.StageSelect },
   { label: 'ARCADE VS', scene: SCENE.ArcadeVs },
-  { label: 'HITMANS VIP (Inside)', scene: SCENE.Venue },
+  { label: 'VENUES', scene: SCENE.VenueSelect },
   { label: 'LEVEL EDITOR', scene: SCENE.LevelEditor },
   { label: 'LIPSYNC BINGO', soon: true },
   { label: 'TV MODE', soon: true },
@@ -73,11 +74,27 @@ export class MainMenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // Progress readout.
+    const beaten = ProgressionSystem.getBeatenBosses().length;
+    const total = 7;
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 46,
+      beaten > 0 ? `Quest: ${beaten}/${total} bosses defeated` : '',
+      { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
+    ).setOrigin(0.5);
+
     const kb = this.input.keyboard!;
-    kb.on('keydown-UP', () => this.select(this.index - 1));
+    kb.on('keydown-UP',   () => this.select(this.index - 1));
     kb.on('keydown-DOWN', () => this.select(this.index + 1));
     kb.on('keydown-ENTER', () => this.activate(this.index));
     kb.on('keydown-SPACE', () => this.activate(this.index));
+
+    // Hidden dev shortcuts: Ctrl+Shift+U = unlock all, Ctrl+Shift+R = reset.
+    kb.on('keydown-U', (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey) { ProgressionSystem.unlockAll(); this.scene.restart(); }
+    });
+    kb.on('keydown-R', (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey) { ProgressionSystem.reset(); this.scene.restart(); }
+    });
 
     this.select(0);
   }

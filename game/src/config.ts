@@ -49,4 +49,5 @@ export const SCENE = {
   LevelEditor: 'LevelEditor',
   ArcadeVs: 'ArcadeVs',
   StageSelect: 'StageSelect',
+  VenueSelect: 'VenueSelect',
 } as const;

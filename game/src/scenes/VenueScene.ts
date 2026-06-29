@@ -166,10 +166,11 @@ export class VenueScene extends Phaser.Scene {
             return;
           }
           if (t.target === 'Brawler' && t.targetStage) {
-            // Load stage JSON dynamically and pass it to BrawlerScene.
             this.loadStageAndGo(t.targetStage);
           } else if (t.target === 'Venue' && t.targetVenue) {
             this.scene.start(SCENE.Venue, { venueId: t.targetVenue });
+          } else if (t.target === 'MainMenu') {
+            this.scene.start(SCENE.VenueSelect);
           } else if (t.target) {
             this.scene.start(t.target as string);
           }
@@ -194,7 +195,7 @@ export class VenueScene extends Phaser.Scene {
         color: '#8877aa',
       })
       .setOrigin(1, 0);
-    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
+    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.VenueSelect));
 
     this.tryLoadBackdrop();
   }
