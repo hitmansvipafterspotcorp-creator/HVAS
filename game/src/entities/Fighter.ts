@@ -5,6 +5,9 @@ import { AnimationSystem } from '../systems/AnimationSystem';
 export type FighterState =
   | 'idle'
   | 'walk'
+  | 'run'
+  | 'block'
+  | 'dodge'
   | 'attack'
   | 'hit'
   | 'knockdown'
@@ -105,18 +108,16 @@ export class Fighter {
   // Map logical state -> animation name.
   private stateAnim(): string {
     switch (this.state) {
-      case 'walk':
-        return 'walk';
+      case 'walk':  return 'walk';
+      case 'run':   return 'run';
+      case 'block': return 'block';
+      case 'dodge': return 'dodge';
       case 'attack':
         return ['combo1', 'combo2', 'combo3'][this.attackIndex % 3];
-      case 'hit':
-        return 'hurt';
-      case 'knockdown':
-        return 'knockdown';
-      case 'ko':
-        return 'defeated';
-      default:
-        return 'idle';
+      case 'hit':        return 'hurt';
+      case 'knockdown':  return 'knockdown';
+      case 'ko':         return 'defeated';
+      default:           return 'idle';
     }
   }
 

@@ -87,6 +87,9 @@ export const ANIMS: Record<string, AnimDef> = {
 export const BRAWLER_ANIMS = [
   'idle',
   'walk',
+  'run',
+  'dodge',
+  'block',
   'combo1',
   'combo2',
   'combo3',

@@ -228,7 +228,20 @@ export class BrawlerScene extends Phaser.Scene {
 
     if (p.invuln > 0) p.invuln -= delta;
 
-    // Locked states (attack/hit) play out before control returns.
+    // Locked states: dodge, attack, hit — play out before control returns.
+    if (p.state === 'dodge') {
+      p.stateTimer -= delta;
+      // Slide the character in the dodge direction at high speed.
+      p.x     += this.dodgeVX * PLAYER_SPEED * 2.8 * dt;
+      p.feetY += this.dodgeVY * PLAYER_DEPTH_SPEED * 2.8 * dt;
+      this.clampPlayer();
+      if (p.stateTimer <= 0) {
+        p.state = 'idle';
+        p.invuln = 0;
+      }
+      return;
+    }
+
     if (p.state === 'attack' || p.state === 'hit') {
       p.stateTimer -= delta;
       // Active hit frames sit in the middle of an attack.
@@ -259,11 +272,38 @@ export class BrawlerScene extends Phaser.Scene {
       return;
     }
 
-    // Super.
+    // Super (highest priority action).
     if (b.superMove && this.combat.trySuper(p, this.waves.enemies)) {
       AudioSystem.sfx(this, 'superhit');
       p.playOneShot('super1');
       this.flashBanner('SUPER!');
+      return;
+    }
+
+    // Dodge: block + direction just-pressed → short invulnerable burst.
+    // Interrupts blocking and normal movement but NOT attacks/supers.
+    if (b.dodge) {
+      p.state = 'dodge';
+      p.stateTimer = 220; // ms
+      p.invuln = 260;     // slightly longer than duration (i-frames)
+      this.dodgeVX = b.dodgeX;
+      this.dodgeVY = b.dodgeY;
+      // Snap facing to the horizontal component of the dodge direction.
+      if (b.dodgeX !== 0) p.facing = b.dodgeX > 0 ? 1 : -1;
+      // AudioSystem.sfx(this, 'dodge'); // add 'dodge' sfx key when audio asset exists
+      return;
+    }
+
+    // Grab: block HELD + attack just-pressed → grab/throw.
+    if (b.block && b.attack) {
+      this.tryGrab(p);
+      return;
+    }
+
+    // Block: SHIFT held with no other action → enter block stance.
+    if (b.block) {
+      p.state = 'block';
+      this.clampPlayer();
       return;
     }
 
@@ -276,19 +316,61 @@ export class BrawlerScene extends Phaser.Scene {
       return;
     }
 
-    // Movement (8-way: x + depth).
+    // Movement (8-way: x + depth). Double-tap = run at higher speed.
     let vx = 0;
     let vy = 0;
-    if (b.left) vx -= 1;
+    if (b.left)  vx -= 1;
     if (b.right) vx += 1;
-    if (b.up) vy -= 1;
-    if (b.down) vy += 1;
+    if (b.up)    vy -= 1;
+    if (b.down)  vy += 1;
+
     if (vx !== 0) p.facing = vx > 0 ? 1 : -1;
-    p.x += vx * PLAYER_SPEED * dt;
-    p.feetY += vy * PLAYER_DEPTH_SPEED * dt;
-    p.state = vx !== 0 || vy !== 0 ? 'walk' : 'idle';
+
+    const isMoving = vx !== 0 || vy !== 0;
+    const speedMul = b.running ? 1.85 : 1.0;
+
+    p.x     += vx * PLAYER_SPEED       * speedMul * dt;
+    p.feetY += vy * PLAYER_DEPTH_SPEED * speedMul * dt;
+
+    if (!isMoving)       p.state = 'idle';
+    else if (b.running)  p.state = 'run';
+    else                 p.state = 'walk';
 
     this.clampPlayer();
+  }
+
+  // Dodge direction (set when entering dodge state, consumed during the slide).
+  private dodgeVX = 0;
+  private dodgeVY = 0;
+
+  private tryGrab(p: Fighter): void {
+    const GRAB_RANGE = 70;
+    const target = this.waves.enemies.find(
+      (e) =>
+        e.alive &&
+        Math.abs(e.x - p.x) < GRAB_RANGE &&
+        Math.abs(e.feetY - p.feetY) < 30,
+    );
+    if (!target) return;
+
+    // Slam them with bonus unblockable damage and a meterGain burst.
+    const dmg = 22;
+    target.hp = Math.max(0, target.hp - dmg);
+    target.state = 'knockdown';
+    target.stateTimer = 600;
+    p.meter = Math.min(100, p.meter + 18);
+    p.combo = (p.combo ?? 0) + 1;
+
+    AudioSystem.sfx(this, 'hit');
+    this.combat.triggerHitStop(80);
+    this.floatingText.damage(target.x, target.feetY - 40, dmg);
+    this.floatingText.comboFlash(p.x, p.feetY - 50, p.combo);
+
+    // Play the special anim as the grab animation on the player sprite.
+    p.playOneShot('special');
+    p.state = 'attack';
+    p.stateTimer = 420;
+    p.attackActive = false;
   }
 
   private clampPlayer(): void {
