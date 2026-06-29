@@ -1,6 +1,6 @@
 {
   "id": "tally_exterior",
-  "name": "Tally Row — The Strip",
+  "name": "Tally Row",
   "backdrop": "venues/tally_exterior.png",
   "waves": [
     { "count": 5, "hp": 58 },
