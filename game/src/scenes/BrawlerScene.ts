@@ -14,6 +14,7 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { EnemyAISystem } from '../systems/EnemyAISystem';
 import { WaveSystem, type WaveDef } from '../systems/WaveSystem';
 import { PLAYER_ID, ENEMY_IDS } from '../data/roster';
+import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 
 // BrawlerScene: the playable Streets-of-Rage graybox. Boots with a player on a
 // floor, runs camera-locked waves, resolves combat through the depth gate, and
@@ -31,10 +32,18 @@ export class BrawlerScene extends Phaser.Scene {
   private ai!: EnemyAISystem;
   private waves!: WaveSystem;
 
-  private hud!: Phaser.GameObjects.Text;
+  private hud!: Phaser.GameObjects.Text; // wave/enemies line (text)
   private banner!: Phaser.GameObjects.Text;
   private debugGfx!: Phaser.GameObjects.Graphics;
   private debugOn = false;
+
+  // Real-art HUD pieces (populated when the UI kit is loaded).
+  private hpFill?: Phaser.GameObjects.Rectangle;
+  private hpInner = { x: 0, w: 0 };
+  private hpNum?: NumberDisplay;
+  private comboLabel?: Phaser.GameObjects.Image;
+  private comboNum?: NumberDisplay;
+  private meterPips: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super(SCENE.Brawler);
@@ -59,11 +68,12 @@ export class BrawlerScene extends Phaser.Scene {
     this.ai = new EnemyAISystem();
     this.waves = new WaveSystem(this, DEFAULT_WAVES, ENEMY_IDS);
 
-    // HUD.
+    // HUD — real art kit when available, text otherwise.
+    this.buildHud();
     this.hud = this.add
-      .text(12, 10, '', {
+      .text(12, 54, '', {
         fontFamily: 'monospace',
-        fontSize: '15px',
+        fontSize: '13px',
         color: '#ffffff',
       })
       .setScrollFactor(0)
@@ -209,16 +219,95 @@ export class BrawlerScene extends Phaser.Scene {
     });
   }
 
+  // Assemble the real HUD art: gold health-bar frame with a depletion mask,
+  // a digit-font HP readout, the combo label + count, and star meter pips.
+  private buildHud(): void {
+    if (!UISystem.ready(this)) return;
+
+    const frameX = 12;
+    const frameY = 12;
+    const frameW = 340;
+    const tex = this.textures.get(UI.healthBar).getSourceImage();
+    const frameH = (tex.height / tex.width) * frameW;
+
+    // The art's inner red channel sits between ~16.5% and ~86% of the width.
+    this.hpInner.x = frameX + frameW * 0.165;
+    this.hpInner.w = frameW * (0.86 - 0.165);
+    const innerY = frameY + frameH * 0.5;
+    const innerH = frameH * 0.42;
+
+    // Depletion mask: a dark rect that grows from the right as HP drops, drawn
+    // UNDER the frame so the gold border stays crisp.
+    this.hpFill = this.add
+      .rectangle(this.hpInner.x + this.hpInner.w, innerY, 0, innerH, 0x1a0608, 0.9)
+      .setOrigin(1, 0.5)
+      .setScrollFactor(0)
+      .setDepth(50000);
+
+    this.add
+      .image(frameX, frameY, UI.healthBar)
+      .setOrigin(0, 0)
+      .setDisplaySize(frameW, frameH)
+      .setScrollFactor(0)
+      .setDepth(50001);
+
+    // HP number in the gold digit font, right under the bar.
+    this.hpNum = new NumberDisplay(this, frameX + 18, frameY + frameH + 14, 20)
+      .setDepth(50002);
+
+    // Combo label + count (hidden until combo > 0).
+    this.comboLabel = this.add
+      .image(frameX + 150, frameY + frameH + 14, UI.comboLabel)
+      .setOrigin(0, 0.5)
+      .setDisplaySize(30, 28)
+      .setScrollFactor(0)
+      .setDepth(50002)
+      .setVisible(false);
+    this.comboNum = new NumberDisplay(this, frameX + 186, frameY + frameH + 14, 22)
+      .setDepth(50002);
+
+    // Meter: 10 star pips that light up with super meter.
+    for (let i = 0; i < 10; i++) {
+      const pip = this.add
+        .image(this.hpInner.x + i * 16, frameY + frameH + 40, UI.pipStar)
+        .setOrigin(0, 0.5)
+        .setDisplaySize(13, 15)
+        .setScrollFactor(0)
+        .setDepth(50002)
+        .setAlpha(0.25);
+      this.meterPips.push(pip);
+    }
+  }
+
   private drawHud(): void {
     const p = this.player;
     const alive = this.waves.enemies.filter((e) => e.alive).length;
-    const hpBars = '█'.repeat(Math.ceil((p.hp / p.maxHp) * 20)).padEnd(20, '·');
-    const meter = '▮'.repeat(Math.ceil((p.meter / 100) * 10)).padEnd(10, '·');
-    this.hud.setText(
-      `HP [${hpBars}] ${Math.ceil(p.hp)}/${p.maxHp}\n` +
-        `SUPER [${meter}] ${p.meter}%   COMBO x${p.combo}\n` +
+
+    if (this.hpFill) {
+      // Real-art HUD.
+      const frac = Phaser.Math.Clamp(p.hp / p.maxHp, 0, 1);
+      this.hpFill.width = this.hpInner.w * (1 - frac);
+      this.hpNum?.setValue(Math.ceil(p.hp));
+      const litPips = Math.round((p.meter / 100) * this.meterPips.length);
+      this.meterPips.forEach((pip, i) => pip.setAlpha(i < litPips ? 1 : 0.25));
+      const showCombo = p.combo > 1;
+      this.comboLabel?.setVisible(showCombo);
+      this.comboNum?.setVisible(showCombo);
+      if (showCombo) this.comboNum?.setValue(p.combo);
+      this.hud.setText(
         `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}`,
-    );
+      );
+    } else {
+      // Text fallback.
+      const hpBars = '█'.repeat(Math.ceil((p.hp / p.maxHp) * 20)).padEnd(20, '·');
+      const meter = '▮'.repeat(Math.ceil((p.meter / 100) * 10)).padEnd(10, '·');
+      this.hud.setText(
+        `HP [${hpBars}] ${Math.ceil(p.hp)}/${p.maxHp}\n` +
+          `SUPER [${meter}] ${p.meter}%   COMBO x${p.combo}\n` +
+          `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}`,
+      );
+    }
+
     if (p.hp <= 0 && p.state !== 'ko') {
       p.state = 'ko';
       this.flashBanner('K.O.');

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { UISystem, UI } from '../systems/UISystem';
 
 // MainMenuScene: the HITGEAR hub entry. Lists the playable modes; QUEST routes
 // into the brawler. Other modes are stubbed as "COMING SOON" so navigation is
@@ -25,20 +26,27 @@ export class MainMenuScene extends Phaser.Scene {
   create(): void {
     const cx = GAME_WIDTH / 2;
 
-    this.add
-      .text(cx, 70, 'HITMANS VIP AFTER SPOT', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '34px',
-        color: '#ffd700',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(cx, 108, 'MAIN MENU', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '16px',
-        color: '#c100ff',
-      })
-      .setOrigin(0.5);
+    // Real HITGEAR logo if loaded; text fallback otherwise.
+    if (UISystem.ready(this)) {
+      const logo = this.add.image(cx, 96, UI.logo).setOrigin(0.5);
+      logo.setDisplaySize(150, 150);
+      this.tweens.add({
+        targets: logo,
+        scale: logo.scale * 1.04,
+        duration: 1600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut',
+      });
+    } else {
+      this.add
+        .text(cx, 70, 'HITMANS VIP AFTER SPOT', {
+          fontFamily: 'Arial Black, sans-serif',
+          fontSize: '34px',
+          color: '#ffd700',
+        })
+        .setOrigin(0.5);
+    }
 
     ITEMS.forEach((item, i) => {
       const y = 180 + i * 54;
