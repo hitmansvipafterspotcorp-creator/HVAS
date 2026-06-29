@@ -8,7 +8,7 @@ import { UISystem, UI } from '../systems/UISystem';
 type MenuItem = { label: string; scene?: string; soon?: boolean };
 
 const ITEMS: MenuItem[] = [
-  { label: 'QUEST (Brawler)', scene: SCENE.Brawler },
+  { label: 'QUEST', scene: SCENE.StageSelect },
   { label: 'ARCADE VS', scene: SCENE.ArcadeVs },
   { label: 'HITMANS VIP (Inside)', scene: SCENE.Venue },
   { label: 'LEVEL EDITOR', scene: SCENE.LevelEditor },

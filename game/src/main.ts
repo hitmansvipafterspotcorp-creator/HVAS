@@ -7,6 +7,7 @@ import { BrawlerScene } from './scenes/BrawlerScene';
 import { VenueScene } from './scenes/VenueScene';
 import { LevelEditorScene } from './scenes/LevelEditorScene';
 import { ArcadeVsScene } from './scenes/ArcadeVsScene';
+import { StageSelectScene } from './scenes/StageSelectScene';
 
 // Android landscape-first, desktop playable. Phaser.Scale.FIT keeps the 16:9
 // stage centered and unstretched on any device — no stretched assets/QR codes.
@@ -25,7 +26,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 0 }, debug: false },
   },
-  scene: [BootScene, PreloadScene, MainMenuScene, BrawlerScene, VenueScene, LevelEditorScene, ArcadeVsScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, BrawlerScene, VenueScene, LevelEditorScene, ArcadeVsScene, StageSelectScene],
 };
 
 const game = new Phaser.Game(config);

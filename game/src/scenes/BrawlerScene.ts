@@ -112,7 +112,7 @@ export class BrawlerScene extends Phaser.Scene {
     // Toggles.
     const kb = this.input.keyboard!;
     kb.on('keydown-F1', () => (this.debugOn = !this.debugOn));
-    kb.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
+    kb.on('keydown-ESC', () => this.scene.start(SCENE.StageSelect));
 
     this.add
       .text(GAME_WIDTH - 12, 10, 'F1 debug • ESC menu', {
@@ -256,7 +256,7 @@ export class BrawlerScene extends Phaser.Scene {
       // No boss — immediate clear.
       this.banner.setText('STAGE CLEAR!');
       this.banner.setVisible(true);
-      this.time.delayedCall(2000, () => this.scene.start(SCENE.MainMenu));
+      this.time.delayedCall(2000, () => this.scene.start(SCENE.StageSelect));
       return;
     }
     if (!this.waves.locked) {
@@ -458,7 +458,7 @@ export class BrawlerScene extends Phaser.Scene {
     if (p.hp <= 0 && p.state !== 'ko') {
       p.state = 'ko';
       this.flashBanner('K.O.');
-      this.time.delayedCall(1500, () => this.scene.start(SCENE.MainMenu));
+      this.time.delayedCall(1500, () => this.scene.start(SCENE.StageSelect));
     }
   }
 
