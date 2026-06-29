@@ -1,0 +1,24 @@
+{
+  "id": "outta_exterior",
+  "name": "Outta Pocket — Outside",
+  "backdrop": "venues/outta_exterior.png",
+  "waves": [
+    { "count": 4, "hp": 50 },
+    { "count": 5, "hp": 58 },
+    { "count": 6, "hp": 68 }
+  ],
+  "enemies": [8, 10, 11, 2],
+  "props": [
+    { "type": "10", "x": 190, "feetY": 428, "drop": "health" },
+    { "type": "12", "x": 400, "feetY": 442, "drop": "weapon" },
+    { "type": "15", "x": 630, "feetY": 433, "drop": "meter" },
+    { "type": "17", "x": 810, "feetY": 448, "drop": "none" }
+  ],
+  "boss": {
+    "charId": 30,
+    "name": "Predator Pete",
+    "hp": 230,
+    "revealLabel": "PREDATOR PETE"
+  },
+  "venueUnlocks": "outta_inside"
+}

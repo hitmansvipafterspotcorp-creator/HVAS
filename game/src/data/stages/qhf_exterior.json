@@ -1,0 +1,24 @@
+{
+  "id": "qhf_exterior",
+  "name": "Quick Hit Fuel — Outside",
+  "backdrop": "venues/qhf_exterior.png",
+  "waves": [
+    { "count": 4, "hp": 52 },
+    { "count": 5, "hp": 60 },
+    { "count": 6, "hp": 70 }
+  ],
+  "enemies": [10, 8, 2, 11],
+  "props": [
+    { "type": "11", "x": 200, "feetY": 430, "drop": "health" },
+    { "type": "13", "x": 410, "feetY": 443, "drop": "weapon" },
+    { "type": "15", "x": 640, "feetY": 432, "drop": "meter" },
+    { "type": "18", "x": 820, "feetY": 447, "drop": "none" }
+  ],
+  "boss": {
+    "charId": 8,
+    "name": "Dancer",
+    "hp": 235,
+    "revealLabel": "THE DANCER"
+  },
+  "venueUnlocks": "qhf_inside"
+}

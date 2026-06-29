@@ -1,0 +1,24 @@
+{
+  "id": "success_rooftop",
+  "name": "Success — Rooftop",
+  "backdrop": "venues/success.png",
+  "waves": [
+    { "count": 4, "hp": 60 },
+    { "count": 5, "hp": 70 },
+    { "count": 6, "hp": 80 }
+  ],
+  "enemies": [10, 8, 2, 11],
+  "props": [
+    { "type": "08", "x": 200, "feetY": 425, "drop": "health" },
+    { "type": "10", "x": 430, "feetY": 440, "drop": "weapon" },
+    { "type": "12", "x": 660, "feetY": 430, "drop": "meter" }
+  ],
+  "boss": {
+    "charId": 5,
+    "name": "Influencer",
+    "hp": 250,
+    "revealLabel": "THE INFLUENCER"
+  },
+  "venueUnlocks": "success_inside",
+  "note": "Rooftop above Social Gaines. Unlocked after Social Gaines exterior boss."
+}

@@ -7,5 +7,18 @@
     { "count": 4, "hp": 50 },
     { "count": 6, "hp": 60 }
   ],
-  "enemies": [10, 11, 8, 2]
+  "enemies": [10, 11, 8, 2],
+  "props": [
+    { "type": "12", "x": 200, "feetY": 430, "drop": "health" },
+    { "type": "13", "x": 420, "feetY": 445, "drop": "weapon" },
+    { "type": "14", "x": 650, "feetY": 435, "drop": "meter" },
+    { "type": "15", "x": 820, "feetY": 450, "drop": "none" }
+  ],
+  "boss": {
+    "charId": 22,
+    "name": "ELD",
+    "hp": 210,
+    "revealLabel": "ELD"
+  },
+  "venueUnlocks": "dukes_inside"
 }
