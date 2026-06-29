@@ -9,6 +9,7 @@ type MenuItem = { label: string; scene?: string; soon?: boolean };
 
 const ITEMS: MenuItem[] = [
   { label: 'QUEST (Brawler)', scene: SCENE.Brawler },
+  { label: 'ARCADE VS', scene: SCENE.ArcadeVs },
   { label: 'HITMANS VIP (Inside)', scene: SCENE.Venue },
   { label: 'LEVEL EDITOR', scene: SCENE.LevelEditor },
   { label: 'LIPSYNC BINGO', soon: true },
