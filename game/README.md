@@ -48,13 +48,27 @@ src/
   (idle/walk/combo1-3/hurt/knockdown/defeated/supers).
 - **Depth gate verified**: in-lane attacks connect, wrong-lane attacks miss.
 - Two-way combat: enemies rush/circle and damage the player.
-- Camera-locked waves (3 waves) with HUD (HP / SUPER / COMBO / WAVE).
+- Camera-locked waves (3 waves) with real-art HUD (gold bar frame / digit font
+  / star meter pips / combo counter). Text fallback when UI kit absent.
 - MvC-style super at full meter (screen flash + lane-wide hit).
 - F1 debug overlay: floor band, feet contact points, hurt spans, attack reach.
 - **Top-down VenueScene** (Hitmans VIP After Spot interior), JSON-authored:
   player walks 8-way with td_ sprites, talks to NPCs (DialogueSystem), uses
   doors/hotspots (InteractionSystem). A door routes to the Cafe8Fifty streets
   (Brawler). New venues are pure data (`src/data/venues/*.json`).
+- **G. StageLoader + JSON stage schema**: BrawlerScene is data-driven from
+  `src/data/stages/cafe8fifty.json`; `StageLoader` probes real backdrop PNGs
+  silently; `AssetManifestLoader` queues only the cast a stage needs.
+- **I. WeaponSystem + PropDestructionSystem**: 4 breakable props (trashcan,
+  chair, cone) defined in stage JSON; smash drops health/meter/weapon circles;
+  bat pickup boosts damage +14 and reach +40; weapon drains over 4 hits.
+- **J. BossSystem**: Big Soulja spawns after wave 3 behind a garage-door reveal
+  cutscene (warning flash → door slides up → boss walks in → name label);
+  approach/charge/recover AI loop; right-side boss HP bar.
+- **K. LevelEditorScene**: 5-tool in-engine layout editor (spawn/npc/collider/
+  trigger/prop), 16px grid snap, drag-to-size rects, Delete to undo, E to
+  export JSON console drop (VenueData + StageData compatible). Accessible from
+  main menu → LEVEL EDITOR.
 
 ## Asset pipeline
 
@@ -63,14 +77,15 @@ src/
   anims globally (reused across scenes). Missing frames are skipped so a
   partially-sliced character (e.g. pete/snow top-down) still gets a playable
   fallback instead of breaking the build.
-- Venue interior backdrop is probed optionally — drop
-  `assets/venues/hitmans_vip_inside.png` and it appears automatically.
+- Stage/venue backdrops probed via native `Image` — drop any PNG listed in the
+  JSON `backdrop` field and it appears automatically; graybox if missing.
+- Prop PNGs probed per-venue: `venues/props/{venue}/{side}/{prefix}{type}.png`.
 
 ## Next passes (priority order from the master prompt)
 
-- G. StageLoader + JSON stage schema + AssetManifestLoader (extends venue JSON)
-- I. WeaponSystem (bat pickup) + PropDestructionSystem + drops
-- J. BossSystem + garage-door reveal cutscene
-- K. LevelEditorScene
 - Bingo / TV / Host scenes ported from the existing vanilla-JS modules
-- Polish: top-down sprite scale/label spacing, real venue backdrops
+- More brawler stages as JSON (dukes_exterior, kingdom_come_exterior)
+- More venue JSONs (Dukes inside, Kingdom Come Saloon inside, Outta Pocket)
+- Polish: top-down sprite scale/label spacing, real venue backdrop placement
+- StageSelect scene so the main menu can list and launch multiple brawler stages
+- BossSystem: more boss types (one per venue)
