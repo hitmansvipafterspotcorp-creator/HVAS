@@ -32,6 +32,8 @@ export const UI = {
   csLabelP1:       'ui_cs_label_p1',      // character_select_005  274×50
   csLabelP2:       'ui_cs_label_p2',      // character_select_006  276×52
   csVs:            'ui_cs_vs',            // character_select_008  268×174
+  // Dialogue panel
+  dialoguePanel:   'ui_dialogue_panel',   // dialogue_mission_001  413×317
 } as const;
 
 // ─── Named element load manifest ─────────────────────────────────────────────
@@ -60,6 +62,7 @@ const FILES: Array<[string, string]> = [
   [UI.csLabelP1,       'ui/elements/character_select/character_select_005.png'],
   [UI.csLabelP2,       'ui/elements/character_select/character_select_006.png'],
   [UI.csVs,            'ui/elements/character_select/character_select_008.png'],
+  [UI.dialoguePanel,   'ui/elements/dialogue_mission/dialogue_mission_001.png'],
 ];
 
 export const UISystem = {
