@@ -31,6 +31,9 @@ export class MainMenuScene extends Phaser.Scene {
     AudioSystem.playForScene(this, 'MainMenu');
     const cx = GAME_WIDTH / 2;
 
+    // Title sheet backdrop — real art when loaded.
+    UISystem.backdrop(this, UI.sheetTitle, 1, -5000);
+
     // Real HITGEAR logo if loaded; text fallback otherwise.
     if (UISystem.ready(this)) {
       const logo = this.add.image(cx, 96, UI.logo).setOrigin(0.5);

@@ -22,6 +22,7 @@ import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { FloatingTextSystem } from '../systems/FloatingTextSystem';
 import { PLAYER_ID } from '../data/roster';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
+import { VFXSystem } from '../systems/VFXSystem';
 import { AudioSystem } from '../systems/AudioSystem';
 import type { StageData } from '../data/stageTypes';
 import cafe8fiftyStage from '../data/stages/cafe8fifty.json';
@@ -45,10 +46,13 @@ export class BrawlerScene extends Phaser.Scene {
   private bossRevealTriggered = false;
   private venueDoorSpawned = false;
 
-  private hud!: Phaser.GameObjects.Text; // wave/enemies line (text)
+  private hud!: Phaser.GameObjects.Text;
   private banner!: Phaser.GameObjects.Text;
   private debugGfx!: Phaser.GameObjects.Graphics;
   private debugOn = false;
+  private vfx!: VFXSystem;
+  private paused = false;
+  private pauseGroup?: Phaser.GameObjects.Container;
 
   // Real-art HUD pieces (populated when the UI kit is loaded).
   private hpFill?: Phaser.GameObjects.Rectangle;
@@ -84,6 +88,7 @@ export class BrawlerScene extends Phaser.Scene {
     // Systems.
     this.controls = new InputSystem(this);
     this.combat = new CombatSystem(this);
+    this.vfx = new VFXSystem(this);
     this.floatingText = new FloatingTextSystem(this);
     this.ai = new EnemyAISystem();
     this.waves = new WaveSystem(this, this.stage.waves, this.stage.enemies);
@@ -118,7 +123,7 @@ export class BrawlerScene extends Phaser.Scene {
     // Toggles.
     const kb = this.input.keyboard!;
     kb.on('keydown-F1', () => (this.debugOn = !this.debugOn));
-    kb.on('keydown-ESC', () => this.scene.start(SCENE.StageSelect));
+    kb.on('keydown-ESC', () => this.togglePause());
 
     this.add
       .text(GAME_WIDTH - 12, 10, 'F1 debug • ESC menu', {
@@ -166,6 +171,7 @@ export class BrawlerScene extends Phaser.Scene {
   }
 
   override update(_time: number, delta: number): void {
+    if (this.paused) return;
     // Cutscene: freeze player and AI but keep rendering.
     const inCutscene = this.boss?.cutsceneRunning ?? false;
     const run = this.combat.tick(delta);
@@ -234,6 +240,7 @@ export class BrawlerScene extends Phaser.Scene {
       // Slide the character in the dodge direction at high speed.
       p.x     += this.dodgeVX * PLAYER_SPEED * 2.8 * dt;
       p.feetY += this.dodgeVY * PLAYER_DEPTH_SPEED * 2.8 * dt;
+      if (p.sprite) this.vfx.dodgeGhost(p.sprite, delta);
       this.clampPlayer();
       if (p.stateTimer <= 0) {
         p.state = 'idle';
@@ -256,8 +263,10 @@ export class BrawlerScene extends Phaser.Scene {
             this.weapon.use();
             this.combat.triggerHitStop(60);
             for (const e of this.waves.enemies) {
-              if (e.state === 'hit' && e.alive) {
+              if ((e.state === 'hit' || e.state === 'block') && e.alive) {
                 this.floatingText.damage(e.x, e.feetY - 30, opts.damage);
+                this.vfx.hitSpark(e.x, e.feetY - 60, p.facing);
+                if (e.state === 'block') this.vfx.parryFlash(e.x, e.feetY - 55);
               }
             }
             this.floatingText.comboFlash(p.x, p.feetY - 50, p.combo);
@@ -619,13 +628,77 @@ export class BrawlerScene extends Phaser.Scene {
       fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
 
-    this.add.text(cx, cy + 50, 'SPACE — Retry     ESC — Stage Select', {
+    this.add.text(cx, cy + 50, 'SPACE — Retry     M — Main Menu', {
       fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
     }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
 
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => this.scene.restart());
-    kb.once('keydown-ESC',   () => this.scene.start(SCENE.StageSelect));
+    kb.once('keydown-M',     () => this.scene.start(SCENE.MainMenu));
+  }
+
+  private togglePause(): void {
+    this.paused = !this.paused;
+    if (this.paused) {
+      this.showPauseOverlay();
+    } else {
+      this.pauseGroup?.destroy(true);
+      this.pauseGroup = undefined;
+    }
+  }
+
+  private showPauseOverlay(): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const g = this.add.container(0, 0).setDepth(95000).setScrollFactor(0);
+    this.pauseGroup = g;
+
+    // Dim backdrop
+    g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setScrollFactor(0));
+
+    // Panel art (pausePanel 607×385) or fallback rectangle
+    if (this.textures.exists(UI.pausePanel)) {
+      const panel = this.add.image(cx, cy, UI.pausePanel).setOrigin(0.5).setScrollFactor(0);
+      const panelScale = Math.min(560 / panel.width, 340 / panel.height);
+      panel.setScale(panelScale);
+      g.add(panel);
+    } else {
+      g.add(this.add.rectangle(cx, cy, 560, 340, 0x110022, 0.95).setScrollFactor(0));
+    }
+
+    // Title art (pauseTitle 578×111) or fallback text
+    if (this.textures.exists(UI.pauseTitle)) {
+      const title = this.add.image(cx, cy - 130, UI.pauseTitle).setOrigin(0.5).setScrollFactor(0);
+      title.setScale(Math.min(340 / title.width, 70 / title.height));
+      g.add(title);
+    } else {
+      g.add(this.add.text(cx, cy - 130, 'PAUSED', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 6,
+      }).setOrigin(0.5).setScrollFactor(0));
+    }
+
+    // Menu options
+    const OPTIONS = [
+      { label: 'RESUME',      action: () => this.togglePause() },
+      { label: 'RESTART',     action: () => { this.paused = false; this.scene.restart(); } },
+      { label: 'STAGE SELECT',action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
+      { label: 'MAIN MENU',   action: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
+    ];
+    OPTIONS.forEach((opt, i) => {
+      const y = cy - 50 + i * 52;
+      const btn = this.add.text(cx, y, opt.label, {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '22px',
+        color: i === 0 ? '#ffd700' : '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+      btn.on('pointerover', () => btn.setColor('#ffd700').setScale(1.08));
+      btn.on('pointerout',  () => btn.setColor(i === 0 ? '#ffd700' : '#ffffff').setScale(1));
+      btn.on('pointerdown', () => opt.action());
+      g.add(btn);
+    });
   }
 
   // Debug overlay: floor contact points, depth bands, attack reach + hurt spans.
