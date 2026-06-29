@@ -46,4 +46,5 @@ export const SCENE = {
   MainMenu: 'MainMenu',
   Brawler: 'Brawler',
   Venue: 'Venue',
+  LevelEditor: 'LevelEditor',
 } as const;
