@@ -14,6 +14,13 @@ export const UI = {
   comboLabel:      'ui_combo_label',
   pipStar:         'ui_pip_star',
   digit:           (d: number | string) => `ui_digit_${d}`,
+  hudPortrait:     'ui_hud_portrait',       // hud_001  portrait frame
+  hudTimer:        'ui_hud_timer',          // hud_002  timer badge
+  hudSuperBar:     'ui_hud_super_bar',      // hud_003  super bar
+  hudGuardBar:     'ui_hud_guard_bar',      // hud_004  guard/block bar
+  hudBossBar:      'ui_hud_boss_bar',       // hud_005  boss HP bar
+  hudCombo:        'ui_hud_combo',          // hud_006  "10 COMBO" graphic
+  hudDanger:       'ui_hud_danger',         // hud_015  "DANGER LOW HEALTH" badge
   // Full backdrop sheets (used as scene backgrounds)
   sheetTitle:      'ui_sheet_title',
   sheetCharSelect: 'ui_sheet_charselect',
@@ -44,6 +51,13 @@ const FILES: Array<[string, string]> = [
   [UI.healthBar,       'ui/elements/hud/hud_health_bar.png'],
   [UI.comboLabel,      'ui/elements/hud/hud_combo_label.png'],
   [UI.pipStar,         'ui/elements/hud/hud_pip_star.png'],
+  [UI.hudPortrait,     'ui/elements/hud/hud_001.png'],
+  [UI.hudTimer,        'ui/elements/hud/hud_002.png'],
+  [UI.hudSuperBar,     'ui/elements/hud/hud_003.png'],
+  [UI.hudGuardBar,     'ui/elements/hud/hud_004.png'],
+  [UI.hudBossBar,      'ui/elements/hud/hud_005.png'],
+  [UI.hudCombo,        'ui/elements/hud/hud_006.png'],
+  [UI.hudDanger,       'ui/elements/hud/hud_015.png'],
   // Full sheets
   [UI.sheetTitle,      'ui/ui_sheet_01_title_main_menu.png'],
   [UI.sheetCharSelect, 'ui/ui_sheet_04_character_select.png'],

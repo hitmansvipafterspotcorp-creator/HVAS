@@ -8,7 +8,7 @@ import { InputSystem } from '../systems/InputSystem';
 import { CombatSystem } from '../systems/CombatSystem';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { VFXSystem } from '../systems/VFXSystem';
-import { UI, NumberDisplay } from '../systems/UISystem';
+import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import { CHAR_NAMES } from '../data/roster';
 import { AudioSystem } from '../systems/AudioSystem';
 
@@ -70,8 +70,10 @@ export class ArcadeVsScene extends Phaser.Scene {
   private diffButtons: Phaser.GameObjects.Text[] = [];
 
   // Fight HUD
-  private p1HpBar!: Phaser.GameObjects.Rectangle;
-  private p2HpBar!: Phaser.GameObjects.Rectangle;
+  private p1HpBar!: Phaser.GameObjects.Rectangle;   // depletion mask
+  private p2HpBar!: Phaser.GameObjects.Rectangle;   // depletion mask
+  private p1HpInner = { x: 0, w: 0, y: 0, h: 0 };
+  private p2HpInner = { x: 0, w: 0, y: 0, h: 0 };
   private p1HpNum?: NumberDisplay;
   private p2HpNum?: NumberDisplay;
   private roundPipsP1: Phaser.GameObjects.Rectangle[] = [];
@@ -464,38 +466,83 @@ export class ArcadeVsScene extends Phaser.Scene {
   private buildFightHUD(): void {
     const HUD_Y = 12;
     const BAR_W = 300;
-    const BAR_H = 22;
 
-    // P1 HP bar (left)
-    this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0x110008)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(50000);
-    this.p1HpBar = this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0xff3344)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(50001);
-    this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0)
-      .setStrokeStyle(2, 0xffd700, 0.6)
-      .setOrigin(0, 0).setScrollFactor(0).setDepth(50002);
+    const useArt = UISystem.ready(this) && this.textures.exists(UI.healthBar);
 
-    // P2 HP bar (right, right-aligned)
-    this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0x110008)
-      .setOrigin(1, 0).setScrollFactor(0).setDepth(50000);
-    this.p2HpBar = this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0x4488ff)
-      .setOrigin(1, 0).setScrollFactor(0).setDepth(50001);
-    this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0)
-      .setStrokeStyle(2, 0xffd700, 0.6)
-      .setOrigin(1, 0).setScrollFactor(0).setDepth(50002);
+    if (useArt) {
+      const tex = this.textures.get(UI.healthBar).getSourceImage() as HTMLImageElement;
+      const frameH = (tex.height / tex.width) * BAR_W;
+      const innerW = BAR_W * (0.86 - 0.165);
+      const innerH = frameH * 0.42;
+      const cy = HUD_Y + frameH * 0.5;
 
-    // Names
-    this.add.text(16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p1CharId] ?? 'P1').toUpperCase(), {
-      fontFamily: 'monospace', fontSize: '11px', color: '#44aaff',
-    }).setScrollFactor(0).setDepth(50003);
-    this.add.text(GAME_WIDTH - 16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p2CharId] ?? 'CPU').toUpperCase(), {
-      fontFamily: 'monospace', fontSize: '11px', color: '#ff6644',
-    }).setOrigin(1, 0).setScrollFactor(0).setDepth(50003);
+      // ── P1 HP bar (left) ──
+      const p1InnerX = 14 + BAR_W * 0.165;
+      this.p1HpInner = { x: p1InnerX, w: innerW, y: cy, h: innerH };
+      // Fill (full) behind depletion mask
+      this.add.rectangle(p1InnerX, cy, innerW, innerH, 0xcc2233, 0.9)
+        .setOrigin(0, 0.5).setScrollFactor(0).setDepth(50000);
+      // Depletion mask (dark, grows from right)
+      this.p1HpBar = this.add.rectangle(p1InnerX + innerW, cy, 0, innerH, 0x0a0008, 0.95)
+        .setOrigin(1, 0.5).setScrollFactor(0).setDepth(50001);
+      // Art frame overlay
+      this.add.image(14 + BAR_W / 2, HUD_Y + frameH / 2, UI.healthBar)
+        .setDisplaySize(BAR_W, frameH).setScrollFactor(0).setDepth(50002);
 
-    // Digit HP readouts (if digits loaded)
-    if (this.textures.exists(UI.digit(0))) {
-      this.p1HpNum = new NumberDisplay(this, 20, HUD_Y + BAR_H + 18, 16).setDepth(50004);
-      this.p2HpNum = new NumberDisplay(this, GAME_WIDTH - 20, HUD_Y + BAR_H + 18, 16, 'right').setDepth(50004);
+      // ── P2 HP bar (right, horizontally flipped) ──
+      const p2RightX = GAME_WIDTH - 14;
+      const p2LeftEdge = p2RightX - BAR_W * 0.86;
+      this.p2HpInner = { x: p2LeftEdge, w: innerW, y: cy, h: innerH };
+      this.add.rectangle(p2LeftEdge, cy, innerW, innerH, 0x2244cc, 0.9)
+        .setOrigin(0, 0.5).setScrollFactor(0).setDepth(50000);
+      this.p2HpBar = this.add.rectangle(p2LeftEdge, cy, 0, innerH, 0x0a0008, 0.95)
+        .setOrigin(0, 0.5).setScrollFactor(0).setDepth(50001);
+      this.add.image(p2RightX - BAR_W / 2, HUD_Y + frameH / 2, UI.healthBar)
+        .setDisplaySize(BAR_W, frameH).setFlipX(true).setScrollFactor(0).setDepth(50002);
+
+      // Names
+      this.add.text(16, HUD_Y + frameH + 2, (CHAR_NAMES[this.p1CharId] ?? 'P1').toUpperCase(), {
+        fontFamily: 'monospace', fontSize: '11px', color: '#44aaff',
+      }).setScrollFactor(0).setDepth(50003);
+      this.add.text(GAME_WIDTH - 16, HUD_Y + frameH + 2, (CHAR_NAMES[this.p2CharId] ?? 'CPU').toUpperCase(), {
+        fontFamily: 'monospace', fontSize: '11px', color: '#ff6644',
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(50003);
+
+      // Digit HP readouts
+      if (this.textures.exists(UI.digit(0))) {
+        this.p1HpNum = new NumberDisplay(this, 20, HUD_Y + frameH + 18, 16).setDepth(50004);
+        this.p2HpNum = new NumberDisplay(this, GAME_WIDTH - 20, HUD_Y + frameH + 18, 16, 'right').setDepth(50004);
+      }
+    } else {
+      // Fallback plain rectangles
+      const BAR_H = 22;
+      this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0x110008)
+        .setOrigin(0, 0).setScrollFactor(0).setDepth(50000);
+      this.p1HpBar = this.add.rectangle(14 + BAR_W, HUD_Y + BAR_H / 2, 0, BAR_H, 0x0a0008)
+        .setOrigin(1, 0.5).setScrollFactor(0).setDepth(50001);
+      this.add.rectangle(14, HUD_Y, BAR_W, BAR_H, 0)
+        .setStrokeStyle(2, 0xffd700, 0.6).setOrigin(0, 0).setScrollFactor(0).setDepth(50002);
+      this.p1HpInner = { x: 14, w: BAR_W, y: HUD_Y + BAR_H / 2, h: BAR_H };
+
+      this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0x110008)
+        .setOrigin(1, 0).setScrollFactor(0).setDepth(50000);
+      this.p2HpBar = this.add.rectangle(GAME_WIDTH - 14 - BAR_W, HUD_Y + BAR_H / 2, 0, BAR_H, 0x0a0008)
+        .setOrigin(0, 0.5).setScrollFactor(0).setDepth(50001);
+      this.add.rectangle(GAME_WIDTH - 14, HUD_Y, BAR_W, BAR_H, 0)
+        .setStrokeStyle(2, 0xffd700, 0.6).setOrigin(1, 0).setScrollFactor(0).setDepth(50002);
+      this.p2HpInner = { x: GAME_WIDTH - 14 - BAR_W, w: BAR_W, y: HUD_Y + BAR_H / 2, h: BAR_H };
+
+      this.add.text(16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p1CharId] ?? 'P1').toUpperCase(), {
+        fontFamily: 'monospace', fontSize: '11px', color: '#44aaff',
+      }).setScrollFactor(0).setDepth(50003);
+      this.add.text(GAME_WIDTH - 16, HUD_Y + BAR_H + 2, (CHAR_NAMES[this.p2CharId] ?? 'CPU').toUpperCase(), {
+        fontFamily: 'monospace', fontSize: '11px', color: '#ff6644',
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(50003);
+
+      if (this.textures.exists(UI.digit(0))) {
+        this.p1HpNum = new NumberDisplay(this, 20, HUD_Y + BAR_H + 18, 16).setDepth(50004);
+        this.p2HpNum = new NumberDisplay(this, GAME_WIDTH - 20, HUD_Y + BAR_H + 18, 16, 'right').setDepth(50004);
+      }
     }
 
     // Round label center
@@ -508,9 +555,9 @@ export class ArcadeVsScene extends Phaser.Scene {
     this.roundPipsP1 = [];
     this.roundPipsP2 = [];
     for (let i = 0; i < 3; i++) {
-      const p1pip = this.add.rectangle(20 + i * 14, HUD_Y + BAR_H + 34, 10, 10, 0x333333)
+      const p1pip = this.add.rectangle(20 + i * 14, HUD_Y + 56, 10, 10, 0x333333)
         .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
-      const p2pip = this.add.rectangle(GAME_WIDTH - 20 - i * 14, HUD_Y + BAR_H + 34, 10, 10, 0x333333)
+      const p2pip = this.add.rectangle(GAME_WIDTH - 20 - i * 14, HUD_Y + 56, 10, 10, 0x333333)
         .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
       this.roundPipsP1.push(p1pip);
       this.roundPipsP2.push(p2pip);
@@ -884,16 +931,12 @@ export class ArcadeVsScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────────────────────
   private drawFightHUD(): void {
     if (!this.p1 || !this.p2 || !this.p1HpBar || !this.p2HpBar) return;
-    const BAR_W = 300;
-
     const p1f = Phaser.Math.Clamp(this.p1.hp / this.p1.maxHp, 0, 1);
     const p2f = Phaser.Math.Clamp(this.p2.hp / this.p2.maxHp, 0, 1);
 
-    this.p1HpBar.width = BAR_W * p1f;
-    this.p1HpBar.setFillStyle(p1f > 0.5 ? 0xff3344 : p1f > 0.25 ? 0xff8833 : 0xffdd00);
-
-    this.p2HpBar.width = BAR_W * p2f;
-    this.p2HpBar.setFillStyle(p2f > 0.5 ? 0x4488ff : p2f > 0.25 ? 0x8844ff : 0xffdd00);
+    // Depletion masks: grow from the dead side as HP falls
+    this.p1HpBar.width = this.p1HpInner.w * (1 - p1f);
+    this.p2HpBar.width = this.p2HpInner.w * (1 - p2f);
 
     this.p1HpNum?.setValue(Math.ceil(this.p1.hp));
     this.p2HpNum?.setValue(Math.ceil(this.p2.hp));
