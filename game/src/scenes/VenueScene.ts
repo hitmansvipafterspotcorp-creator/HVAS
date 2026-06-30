@@ -245,20 +245,18 @@ export class VenueScene extends Phaser.Scene {
     const VENUE = this.venue;
     if (!VENUE.backdrop) return;
     const key = `venue_bg_${VENUE.id}`;
-    if (this.textures.exists(key)) {
-      this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
-        .setDisplaySize(VENUE.width, VENUE.height);
-      return;
-    }
-    const probe = new Image();
-    probe.onload = () => {
+    const place = () => {
       if (!this.scene.isActive()) return;
-      if (!this.textures.exists(key)) this.textures.addImage(key, probe);
       this.add.image(0, 0, key).setOrigin(0, 0).setDepth(-5000)
         .setDisplaySize(VENUE.width, VENUE.height);
     };
-    probe.onerror = () => {};
-    probe.src = `${ASSET_BASE}${VENUE.backdrop}`;
+    if (this.textures.exists(key)) { place(); return; }
+    // Use Phaser's loader so the texture is registered correctly and tied to
+    // the scene lifecycle (the prior Image() probe path didn't reliably fire
+    // in some HMR/reload conditions, leaving the venue with no backdrop).
+    this.load.image(key, `${ASSET_BASE}${VENUE.backdrop}`);
+    this.load.once(`filecomplete-image-${key}`, place);
+    this.load.start();
   }
 
   private playAnim(name: string): void {

@@ -887,87 +887,59 @@ export class BrawlerScene extends Phaser.Scene {
     const g = this.add.container(0, 0).setDepth(95000).setScrollFactor(0);
     this.pauseGroup = g;
 
+    // Most pm_* exports include design-guide annotation text ("PM_PANEL_LEFT_01",
+    // "PM_BTN_RESTART_DEFAULT") baked in. Use clean rendered panel + buttons.
+
     // Dim backdrop
-    g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65).setScrollFactor(0));
+    g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75).setScrollFactor(0));
 
-    // Large panel frame — prefer pmxPanelLarge > pmPanelWide > rectangle
-    if (this.textures.exists(UI.pmxPanelLarge)) {
-      g.add(this.add.image(cx, cy, UI.pmxPanelLarge)
-        .setDisplaySize(480, 380).setScrollFactor(0));
-    } else if (this.textures.exists(UI.pmPanelWide)) {
-      g.add(this.add.image(cx, cy, UI.pmPanelWide)
-        .setDisplaySize(460, 360).setScrollFactor(0));
-    } else {
-      g.add(this.add.rectangle(cx, cy, 440, 340, 0x0a0614, 0.97)
-        .setStrokeStyle(2, 0xffd700, 0.9).setScrollFactor(0));
-    }
+    // Main panel
+    g.add(this.add.rectangle(cx, cy, 380, 320, 0x0a0420, 0.96)
+      .setStrokeStyle(3, 0xffd700, 0.9).setScrollFactor(0));
 
-    // 4-button panel inside the large frame
-    if (this.textures.exists(UI.pmxBtnPanel)) {
-      g.add(this.add.image(cx, cy + 30, UI.pmxBtnPanel)
-        .setDisplaySize(320, 260).setScrollFactor(0).setAlpha(0.65));
-    }
+    // Title banner
+    g.add(this.add.rectangle(cx, cy - 130, 320, 44, 0x1a0a3a, 0.96)
+      .setStrokeStyle(2, 0xffd700, 0.8).setScrollFactor(0));
+    g.add(this.add.text(cx, cy - 130, '★ PAUSE MENU ★', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0));
 
-    // Title banner — prefer pmxTitle > pmTitleBanner > text
-    const bannerY = cy - 150;
-    if (this.textures.exists(UI.pmxTitle)) {
-      g.add(this.add.image(cx, bannerY, UI.pmxTitle)
-        .setDisplaySize(400, 72).setScrollFactor(0));
-    } else if (this.textures.exists(UI.pmTitleBanner)) {
-      g.add(this.add.image(cx, bannerY, UI.pmTitleBanner)
-        .setDisplaySize(380, 76).setScrollFactor(0));
-    } else {
-      g.add(this.add.text(cx, bannerY, '★ PAUSE ★', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 5,
-      }).setOrigin(0.5).setScrollFactor(0));
-    }
-
-    // Pause buttons with hover art
-    const BTNS: Array<{ label: string; key: string; hov: string; action: () => void }> = [
-      { label: 'RESUME',       key: UI.pmBtnContinue, hov: UI.pmBtnContinueHov, action: () => this.togglePause() },
-      { label: 'RESTART',      key: UI.pmBtnRestart,  hov: UI.pmBtnRestartHov,  action: () => { this.paused = false; this.scene.restart(); } },
-      { label: 'STAGE SELECT', key: UI.pmBtnRetry,    hov: UI.pmBtnRetryHov,    action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
-      { label: 'SETTINGS',     key: UI.pmBtnSettings, hov: UI.pmBtnSettingsHov, action: () => { this.paused = false; this.scene.start(SCENE.Options); } },
-      { label: 'MAIN MENU',    key: UI.pmBtnQuit,     hov: UI.pmBtnQuitHov,     action: () => this.showConfirmQuit() },
+    // Buttons
+    const BTNS: Array<{ label: string; action: () => void }> = [
+      { label: 'RESUME',       action: () => this.togglePause() },
+      { label: 'RESTART',      action: () => { this.paused = false; this.scene.restart(); } },
+      { label: 'STAGE SELECT', action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
+      { label: 'SETTINGS',     action: () => { this.paused = false; this.scene.start(SCENE.Options); } },
+      { label: 'MAIN MENU',    action: () => this.showConfirmQuit() },
     ];
 
-    const btnH = 46;
+    const btnH = 38;
     const btnW = 260;
-    const startY = cy - 70;
+    const startY = cy - 80;
 
     BTNS.forEach((opt, i) => {
-      const y = startY + i * (btnH + 6);
-      if (this.textures.exists(opt.key)) {
-        const img = this.add.image(cx, y, opt.key)
-          .setDisplaySize(btnW, btnH).setScrollFactor(0)
-          .setInteractive({ useHandCursor: true });
-        img.on('pointerover', () => {
-          if (this.textures.exists(opt.hov)) img.setTexture(opt.hov);
-          img.setDisplaySize(btnW * 1.05, btnH * 1.05);
-        });
-        img.on('pointerout',  () => { img.setTexture(opt.key); img.setDisplaySize(btnW, btnH); });
-        img.on('pointerdown', () => opt.action());
-        g.add(img);
-      } else {
-        // Text fallback for missing button art
-        const btn = this.add.text(cx, y, opt.label, {
-          fontFamily: 'Arial Black, sans-serif', fontSize: '20px',
-          color: i === 0 ? '#ffd700' : '#ffffff',
-          stroke: '#000000', strokeThickness: 4,
-        }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
-        btn.on('pointerover', () => btn.setColor('#ffd700').setScale(1.08));
-        btn.on('pointerout',  () => btn.setColor(i === 0 ? '#ffd700' : '#ffffff').setScale(1.0));
-        btn.on('pointerdown', () => opt.action());
-        g.add(btn);
-      }
+      const y = startY + i * (btnH + 4);
+      const rect = this.add.rectangle(cx, y, btnW, btnH, 0x12082c, 0.96)
+        .setStrokeStyle(2, 0x6644aa, 0.9)
+        .setScrollFactor(0)
+        .setInteractive({ useHandCursor: true });
+      const txt = this.add.text(cx, y, opt.label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#ffffff',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0);
+      rect.on('pointerover', () => {
+        rect.setStrokeStyle(2, 0xffd700, 1).setFillStyle(0x2a124a, 0.96);
+        txt.setColor('#ffd700');
+      });
+      rect.on('pointerout', () => {
+        rect.setStrokeStyle(2, 0x6644aa, 0.9).setFillStyle(0x12082c, 0.96);
+        txt.setColor('#ffffff');
+      });
+      rect.on('pointerdown', () => opt.action());
+      g.add(rect);
+      g.add(txt);
     });
-
-    // Save badge top-right of panel
-    if (this.textures.exists(UI.pmSaveBadge)) {
-      g.add(this.add.image(cx + 200, cy - 160, UI.pmSaveBadge)
-        .setDisplaySize(60, 24).setOrigin(1, 0).setScrollFactor(0));
-    }
   }
 
   private showConfirmQuit(): void {
