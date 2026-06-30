@@ -10,14 +10,9 @@ const CX = GAME_WIDTH / 2;
 // Top bar
 const LOGO_X = 10;
 const LOGO_Y = 8;
-const LOGO_W = 220;
-const LOGO_H = 62;
 
 const PROFILE_X = GAME_WIDTH - 8;
 const PROFILE_Y = 8;
-
-const DECOR_X = CX;
-const DECOR_Y = 72;
 
 // Left column (taglines → mode badges → rank chips)
 const LEFT_X = 8;
@@ -35,12 +30,12 @@ const PROMPT_Y     = 392;
 const PROMPT_W     = 196;
 const PROMPT_H     = 56;
 
-// Center buttons column
+// Center buttons column — asset is 232×56, keep that aspect.
 const BTN_X   = 490;
-const BTN_W   = 252;
-const BTN_H   = 42;
-const BTN_Y0  = 84;
-const BTN_GAP = 52;
+const BTN_W   = 232;
+const BTN_H   = 50;
+const BTN_Y0  = 130;
+const BTN_GAP = 54;
 
 // Right panels (News & Events, Daily Quests)
 const RIGHT_X  = GAME_WIDTH - 8;
@@ -110,14 +105,15 @@ export class MainMenuScene extends Phaser.Scene {
     };
 
     // ── TOP BAR ─────────────────────────────────────────────────────────────
-    // Logo — top-left
-    img(UI.mmLogo, LOGO_X, LOGO_Y, LOGO_W, LOGO_H, 0, 0, 150);
+    // Logo — keep 2:1 aspect (asset is 439×230). 220×115 fits the top-left area.
+    img(UI.mmLogo, LOGO_X, LOGO_Y, 220, 115, 0, 0, 150);
 
     // Profile/Status bar — top-right
     img(UI.mmProfileBar, PROFILE_X, PROFILE_Y, 370, 46, 1, 0, 150);
 
-    // Decorative dividers — centered below top bar
-    img(UI.mmDecorative, DECOR_X, DECOR_Y, 520, 18, 0.5, 0.5, 120);
+    // (mm_decorative is a SHEET of small ornaments, not a single bar — omit
+    //  rather than stretch it across the screen which produced the "ASSEMBLY
+    //  GUIDE" overlay artifact in the previous render.)
 
     // ── LEFT COLUMN ─────────────────────────────────────────────────────────
     // Taglines (THE ULTIMATE VIP EXPERIENCE / FAME. FORTUNE. LEGEND. etc.)

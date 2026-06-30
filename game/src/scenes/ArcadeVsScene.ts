@@ -11,6 +11,7 @@ import { VFXSystem } from '../systems/VFXSystem';
 import { UISystem, UI, NumberDisplay } from '../systems/UISystem';
 import { CHAR_NAMES } from '../data/roster';
 import { AudioSystem } from '../systems/AudioSystem';
+import { BRAWLER_ANIMS, VFX_ANIMS } from '../data/animMap';
 
 // ── Roster ────────────────────────────────────────────────────────────────────
 const ALL_CHARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 30, 31];
@@ -480,11 +481,11 @@ export class ArcadeVsScene extends Phaser.Scene {
       this.add.image(p2X, chipY + 78, UI.vsReadyMarkers).setOrigin(0.5, 0).setDisplaySize(140, 28).setDepth(15).setFlipX(true);
     }
 
-    // ── 9. CENTER VS EMBLEM ────────────────────────────────────────────────────
+    // ── 9. CENTER VS EMBLEM (asset is 2:1 — don't square-stretch) ───────────
     if (tex(UI.vsEmblem)) {
       const emblem = this.add.image(cx, cy - 20, UI.vsEmblem)
-        .setOrigin(0.5).setDisplaySize(140, 140).setDepth(22).setScale(3).setAlpha(0);
-      this.tweens.add({ targets: emblem, scale: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
+        .setOrigin(0.5).setDisplaySize(160, 80).setDepth(22).setScale(3).setAlpha(0);
+      this.tweens.add({ targets: emblem, scaleX: 1, scaleY: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
     } else {
       const vs = this.add.text(cx, cy - 20, 'VS', {
         fontFamily: 'Arial Black, sans-serif', fontSize: '72px', color: '#ffd700',
@@ -538,7 +539,20 @@ export class ArcadeVsScene extends Phaser.Scene {
         countTxt.setText('FIGHT!').setAlpha(1).setScale(1).setStyle({ color: '#ffd700' });
         this.tweens.add({
           targets: countTxt, scale: 1.5, alpha: 0, duration: 600, ease: 'Quad.out',
-          onComplete: () => this.startFight(),
+          onComplete: () => {
+            // Lazy-load BOTH fighters' anims before entering the fight so the
+            // CPU side doesn't render as a red placeholder rectangle.
+            AnimationSystem.loadOnDemand(this,
+              [this.p1CharId, this.p2CharId],
+              [...BRAWLER_ANIMS, ...VFX_ANIMS],
+            ).then(() => {
+              for (const id of [this.p1CharId, this.p2CharId]) {
+                AnimationSystem.build(this, id, BRAWLER_ANIMS);
+                AnimationSystem.build(this, id, VFX_ANIMS);
+              }
+              this.startFight();
+            }).catch(() => this.startFight());
+          },
         });
       }
     };

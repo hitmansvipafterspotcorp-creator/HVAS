@@ -42,6 +42,7 @@ const STRIP_Y       = GAME_HEIGHT - 2;
 export class CharacterSelectScene extends Phaser.Scene {
   private cursor = 0;
   private cells: (Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] = [];
+  private cellSprites: Phaser.GameObjects.Sprite[] = [];
   private previewSpr!: Phaser.GameObjects.Sprite;
   private nameTxt!: Phaser.GameObjects.Text;
 
@@ -50,6 +51,13 @@ export class CharacterSelectScene extends Phaser.Scene {
   create(): void {
     AudioSystem.playForScene(this, 'ArcadeVs');
     this.cameras.main.setBackgroundColor(COLORS.bg);
+
+    // Lazy-load idle frames for every roster char so the grid renders sprites,
+    // not red placeholder rectangles, for chars that weren't preloaded.
+    AnimationSystem.loadOnDemand(this, ALL_CHARS, ['idle']).then(() => {
+      for (const id of ALL_CHARS) AnimationSystem.build(this, id, ['idle']);
+      this.refreshGrid();
+    }).catch(() => {});
 
     const tex = (k: string) => this.textures.exists(k);
     const hasUI = UISystem.ready(this);
@@ -74,28 +82,29 @@ export class CharacterSelectScene extends Phaser.Scene {
       0, 0, 8, 0.6);
 
     this.cells = [];
+    this.cellSprites = [];
     ALL_CHARS.forEach((charId, i) => {
       const col = i % GRID_COLS;
       const row = Math.floor(i / GRID_COLS);
       const cx = GRID_LEFT + col * CELL + CELL / 2;
       const cy = GRID_TOP  + row * CELL + CELL / 2;
 
+      // Slot frame — respect actual texture aspect (~68×104) so it doesn't squish
       let cell: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
       if (hasUI && tex(UI.csSlotIdle)) {
-        cell = this.add.image(cx, cy, UI.csSlotIdle).setDisplaySize(CELL - 4, CELL - 4).setDepth(9);
+        cell = this.add.image(cx, cy, UI.csSlotIdle)
+          .setDisplaySize(CELL - 6, CELL + 8).setDepth(9);
       } else {
         cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820).setStrokeStyle(1, 0x3a2a5a).setDepth(9);
       }
       this.cells.push(cell);
 
-      // Character idle sprite
+      // Character sprite slot (texture set later when idle anim loads)
+      const spr = this.add.sprite(cx, cy + CELL * 0.46, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale((CELL - 18) / 181).setDepth(11).setVisible(false);
+      this.cellSprites.push(spr);
       const idleKey = AnimationSystem.animKey(charId, 'idle');
-      if (this.anims.exists(idleKey)) {
-        this.add.sprite(cx, cy + CELL * 0.46, '__DEFAULT')
-          .setOrigin(0.5, 1).setScale((CELL - 16) / 181).setDepth(11).play(idleKey);
-      } else {
-        this.add.rectangle(cx, cy, 22, 42, charId === 1 ? COLORS.player : COLORS.enemy).setDepth(11);
-      }
+      if (this.anims.exists(idleKey)) spr.setVisible(true).play(idleKey);
 
       // Short name
       const short = (CHAR_NAMES[charId] ?? `#${charId}`).split(' ').pop()!;
@@ -211,6 +220,14 @@ export class CharacterSelectScene extends Phaser.Scene {
           i === this.cursor ? 3 : 1,
           i === this.cursor ? 0xffd700 : 0x3a2a5a,
         );
+      }
+    });
+
+    // Bring any newly-built idle anims onto the grid sprites
+    this.cellSprites.forEach((spr, i) => {
+      if (!spr.visible) {
+        const k = AnimationSystem.animKey(ALL_CHARS[i], 'idle');
+        if (this.anims.exists(k)) spr.setVisible(true).play(k);
       }
     });
 
