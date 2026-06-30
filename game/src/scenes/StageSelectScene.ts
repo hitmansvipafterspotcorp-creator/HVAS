@@ -4,6 +4,14 @@ import { ProgressionSystem, STAGE_SEQUENCE, STAGE_UNLOCKS } from '../systems/Pro
 import { UISystem, UI } from '../systems/UISystem';
 import type { StageId } from '../systems/ProgressionSystem';
 
+// Map stage index (0-based) to vmStageBadge key.
+const STAGE_BADGE_KEYS: string[] = [
+  UI.vmStageBadge1, UI.vmStageBadge2, UI.vmStageBadge3, UI.vmStageBadge4,
+  UI.vmStageBadge5, UI.vmStageBadge6, UI.vmStageBadge7,
+];
+// Venue interior thumbnail keys cycle for card backgrounds.
+const THUMB_KEYS: string[] = [UI.vmThumb2, UI.vmThumb0, UI.vmThumb1, UI.vmThumb3];
+
 // Stage display metadata — name, boss name, boss charId, backdrop hint.
 const STAGE_META: Record<StageId, { name: string; boss: string; bossCharId: number }> = {
   cafe8fifty:             { name: 'Cafe8Fifty Streets',        boss: 'Big Soulja',    bossCharId: 21 },
@@ -48,8 +56,12 @@ export class StageSelectScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    // Map frame art (background panel)
-    if (UISystem.ready(this) && this.textures.exists(UI.ssMapFrame)) {
+    // District map frame background — prefer the full city map art
+    if (UISystem.ready(this) && this.textures.exists(UI.vmMapFrame)) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.vmMapFrame)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 20, GAME_HEIGHT - 20)
+        .setAlpha(0.22).setDepth(-100);
+    } else if (UISystem.ready(this) && this.textures.exists(UI.ssMapFrame)) {
       this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.ssMapFrame)
         .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 20, GAME_HEIGHT - 20)
         .setAlpha(0.18).setDepth(-100);
@@ -140,7 +152,18 @@ export class StageSelectScene extends Phaser.Scene {
       .setStrokeStyle(2, strokeColor);
     grp.add(bg);
 
-    // Backdrop thumbnail — probe silently like StageLoader.
+    // Venue thumbnail background inside card (from vmThumb set).
+    const thumbKey = THUMB_KEYS[i % THUMB_KEYS.length];
+    if (!locked && this.textures.exists(thumbKey)) {
+      grp.add(
+        this.add.image(0, -10, thumbKey)
+          .setDisplaySize(CARD_W - 8, CARD_H - 50)
+          .setAlpha(beaten ? 0.45 : 0.6)
+          .setDepth(-1),
+      );
+    }
+
+    // Probe for real stage backdrop as an upgrade (async, uses world coords).
     const backdropKey = `stage_thumb_${stageId}`;
     if (!locked) {
       this.probeThumb(stageId, backdropKey, cx, cy - 10);
@@ -179,12 +202,20 @@ export class StageSelectScene extends Phaser.Scene {
       }
     }
 
-    // Stage number badge.
-    grp.add(
-      this.add.text(-CARD_W / 2 + 8, -CARD_H / 2 + 8, `${i + 1}`, {
-        fontFamily: 'monospace', fontSize: '11px', color: '#887799',
-      }).setOrigin(0, 0),
-    );
+    // Stage number badge — real art if available, plain text fallback.
+    const badgeKey = STAGE_BADGE_KEYS[i];
+    if (badgeKey && this.textures.exists(badgeKey)) {
+      grp.add(
+        this.add.image(-CARD_W / 2 + 20, -CARD_H / 2 + 22, badgeKey)
+          .setOrigin(0.5).setDisplaySize(38, 38),
+      );
+    } else {
+      grp.add(
+        this.add.text(-CARD_W / 2 + 8, -CARD_H / 2 + 8, `${i + 1}`, {
+          fontFamily: 'monospace', fontSize: '11px', color: '#887799',
+        }).setOrigin(0, 0),
+      );
+    }
 
     // Click support.
     bg.setInteractive({ useHandCursor: !locked });

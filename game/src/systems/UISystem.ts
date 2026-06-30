@@ -186,6 +186,46 @@ export const UI = {
   dlgMission014:     'dialogue_mission_014',
   dlgMission015:     'dialogue_mission_015',
 
+  // ── Frames & Emblems sheet crops ─────────────────────────────────────────
+  feGameLogo:        'frames_emblems_005',   // full HITMANS VIP AFTER SPOT logo
+  feMainMenuBanner:  'frames_emblems_000',   // MAIN MENU marquee banner
+  feCrown:           'frames_emblems_001',   // gold crown icon
+  fePortraitFrame:   'frames_emblems_002',   // tall portrait frame (crown top)
+  feCardFrame:       'frames_emblems_003',   // wide card frame (crown top)
+  feShieldEmblem:    'frames_emblems_004',   // shield with diamond
+  feCornerBR:        'frames_emblems_006',   // corner bracket (bottom-right style)
+  feCornerTL:        'frames_emblems_010',   // corner bracket (top-left style)
+  feLabelOptions:    'frames_emblems_020',   // OPTIONS label chip
+
+  // ── Title Menu panel crops ────────────────────────────────────────────────
+  tmTitleBar:        'title_menu_000',       // wide gold/purple title bar
+  tmShieldFrame:     'title_menu_001',       // shield/portrait frame
+  tmPanelTall:       'title_menu_002',       // tall side panel (left)
+  tmPanelFull:       'title_menu_003',       // full panel frame
+  tmCorner:          'title_menu_010',       // corner ornament (gold/purple)
+
+  // ── Venue Map sheet crops ─────────────────────────────────────────────────
+  vmMapFrame:        'venue_map_000',        // district map full background
+  vmVenueCardPair:   'venue_map_001',        // pair of venue cards (template reference)
+  vmVenueCardOpen:   'venue_map_002',        // unlocked venue card template
+  vmVenueCardLocked: 'venue_map_003',        // locked venue card template
+  vmStageBadge4:     'venue_map_004',        // STAGE 04 badge
+  vmStageBadge1:     'venue_map_005',        // STAGE 01 badge
+  vmStageBadge2:     'venue_map_006',        // STAGE 02 badge
+  vmStageBadge3:     'venue_map_007',        // STAGE 03 badge
+  vmStageBadge7:     'venue_map_008',        // STAGE 07 badge (locked)
+  vmStageBadge5:     'venue_map_009',        // STAGE 05 badge
+  vmStageBadge6:     'venue_map_010',        // STAGE 06 badge (locked)
+  vmStageBadge8:     'venue_map_011',        // STAGE 08 badge (locked)
+  vmThumb0:          'venue_map_012',        // venue interior thumbnail (purple club)
+  vmThumb1:          'venue_map_013',        // venue interior thumbnail (red club)
+  vmThumb2:          'venue_map_014',        // venue exterior thumbnail (city skyline)
+  vmThumb3:          'venue_map_015',        // venue interior thumbnail (VIP lounge)
+  vmInfoPanel:       'venue_map_016',        // info panel bar (horizontal)
+  vmMapPin:          'venue_map_020',        // map location pin
+  vmCrownPin:        'venue_map_021',        // crown map pin
+  vmStarBadge:       'venue_map_030',        // star rating badge
+
   // ── Legacy aliases (kept so old code doesn't break) ───────────────────────
   healthBar:         'hud_health_bar',
   comboLabel:        'hud_combo_label',
@@ -411,6 +451,46 @@ const FILES: Array<[string, string]> = [
   [UI.dlgMission013, 'ui/elements/dialogue_mission/dialogue_mission_013.png'],
   [UI.dlgMission014, 'ui/elements/dialogue_mission/dialogue_mission_014.png'],
   [UI.dlgMission015, 'ui/elements/dialogue_mission/dialogue_mission_015.png'],
+
+  // ── Frames & Emblems ──────────────────────────────────────────────────────
+  [UI.feGameLogo,       'ui/elements/frames_emblems/frames_emblems_005.png'],
+  [UI.feMainMenuBanner, 'ui/elements/frames_emblems/frames_emblems_000.png'],
+  [UI.feCrown,          'ui/elements/frames_emblems/frames_emblems_001.png'],
+  [UI.fePortraitFrame,  'ui/elements/frames_emblems/frames_emblems_002.png'],
+  [UI.feCardFrame,      'ui/elements/frames_emblems/frames_emblems_003.png'],
+  [UI.feShieldEmblem,   'ui/elements/frames_emblems/frames_emblems_004.png'],
+  [UI.feCornerBR,       'ui/elements/frames_emblems/frames_emblems_006.png'],
+  [UI.feCornerTL,       'ui/elements/frames_emblems/frames_emblems_010.png'],
+  [UI.feLabelOptions,   'ui/elements/frames_emblems/frames_emblems_020.png'],
+
+  // ── Title Menu panels ─────────────────────────────────────────────────────
+  [UI.tmTitleBar,    'ui/elements/title_menu/title_menu_000.png'],
+  [UI.tmShieldFrame, 'ui/elements/title_menu/title_menu_001.png'],
+  [UI.tmPanelTall,   'ui/elements/title_menu/title_menu_002.png'],
+  [UI.tmPanelFull,   'ui/elements/title_menu/title_menu_003.png'],
+  [UI.tmCorner,      'ui/elements/title_menu/title_menu_010.png'],
+
+  // ── Venue Map elements ────────────────────────────────────────────────────
+  [UI.vmMapFrame,        'ui/elements/venue_map/venue_map_000.png'],
+  [UI.vmVenueCardPair,   'ui/elements/venue_map/venue_map_001.png'],
+  [UI.vmVenueCardOpen,   'ui/elements/venue_map/venue_map_002.png'],
+  [UI.vmVenueCardLocked, 'ui/elements/venue_map/venue_map_003.png'],
+  [UI.vmStageBadge4,     'ui/elements/venue_map/venue_map_004.png'],
+  [UI.vmStageBadge1,     'ui/elements/venue_map/venue_map_005.png'],
+  [UI.vmStageBadge2,     'ui/elements/venue_map/venue_map_006.png'],
+  [UI.vmStageBadge3,     'ui/elements/venue_map/venue_map_007.png'],
+  [UI.vmStageBadge7,     'ui/elements/venue_map/venue_map_008.png'],
+  [UI.vmStageBadge5,     'ui/elements/venue_map/venue_map_009.png'],
+  [UI.vmStageBadge6,     'ui/elements/venue_map/venue_map_010.png'],
+  [UI.vmStageBadge8,     'ui/elements/venue_map/venue_map_011.png'],
+  [UI.vmThumb0,          'ui/elements/venue_map/venue_map_012.png'],
+  [UI.vmThumb1,          'ui/elements/venue_map/venue_map_013.png'],
+  [UI.vmThumb2,          'ui/elements/venue_map/venue_map_014.png'],
+  [UI.vmThumb3,          'ui/elements/venue_map/venue_map_015.png'],
+  [UI.vmInfoPanel,       'ui/elements/venue_map/venue_map_016.png'],
+  [UI.vmMapPin,          'ui/elements/venue_map/venue_map_020.png'],
+  [UI.vmCrownPin,        'ui/elements/venue_map/venue_map_021.png'],
+  [UI.vmStarBadge,       'ui/elements/venue_map/venue_map_030.png'],
 ];
 
 export const UISystem = {

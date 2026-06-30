@@ -66,8 +66,28 @@ export class MainMenuScene extends Phaser.Scene {
   private buildWithArt(): void {
     const cx = GAME_WIDTH / 2;
 
-    // ── Top-left: HITMANS VIP QUEST logo ─────────────────────────────────
-    UISystem.place(this, UI.mmLogo, 22, 18, { originX: 0, originY: 0, depth: 100 });
+    // ── Center top: full game logo (feGameLogo = HITMANS VIP AFTER SPOT) ──
+    if (this.textures.exists(UI.feGameLogo)) {
+      const logo = this.add.image(cx, 120, UI.feGameLogo)
+        .setOrigin(0.5).setDisplaySize(480, 200).setDepth(150).setScrollFactor(0);
+      this.tweens.add({
+        targets: logo,
+        scaleX: logo.scaleX * 1.035, scaleY: logo.scaleY * 1.035,
+        duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    } else if (this.textures.exists(UI.mmLogo)) {
+      // Fallback to smaller logo art
+      UISystem.place(this, UI.mmLogo, cx, 90, { originX: 0.5, originY: 0.5, depth: 150 });
+    }
+
+    // ── Top-left: MAIN MENU banner strip ──────────────────────────────────
+    if (this.textures.exists(UI.feMainMenuBanner)) {
+      this.add.image(cx, 232, UI.feMainMenuBanner)
+        .setOrigin(0.5).setDisplaySize(320, 52).setDepth(120).setScrollFactor(0).setAlpha(0.85);
+    }
+
+    // ── Top-left: profile bar ─────────────────────────────────────────────
+    UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });
 
     // ── Top-right: profile bar ────────────────────────────────────────────
     UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });

@@ -19,8 +19,9 @@ const ALL_VENUES = [
   { id: 'tally_itus_inside',        name: 'Itus',                    area: 'Tally Row',       always: false },
 ];
 
-// Venue card art keys cycle across the 4 available card textures.
-const CARD_KEYS = [UI.ssVenueCard1, UI.ssVenueCard2, UI.ssVenueCard3, UI.ssVenueCard4];
+// Venue card art keys — prefer the dedicated unlocked/locked card templates.
+// Interior thumbnail keys cycle for unlocked card backgrounds.
+const THUMB_KEYS = [UI.vmThumb0, UI.vmThumb1, UI.vmThumb2, UI.vmThumb3];
 
 const ROW_W = 380;
 const ROW_H = 42;
@@ -42,9 +43,12 @@ export class VenueSelectScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.bg);
     this.hasArt = UISystem.ready(this);
 
-    // ── Map frame background ─────────────────────────────────────────────
-    if (this.hasArt && this.textures.exists(UI.ssMapFrame)) {
-      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.ssMapFrame)
+    // ── District map background ──────────────────────────────────────────
+    const mapKey = (this.hasArt && this.textures.exists(UI.vmMapFrame))
+      ? UI.vmMapFrame
+      : (this.hasArt && this.textures.exists(UI.ssMapFrame) ? UI.ssMapFrame : null);
+    if (mapKey) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, mapKey)
         .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 20, GAME_HEIGHT - 20)
         .setAlpha(0.15).setDepth(-100);
     }
@@ -84,16 +88,27 @@ export class VenueSelectScene extends Phaser.Scene {
 
       const grp = this.add.container(col, y);
 
-      // Art row background (venue card texture)
+      // Art row background — use unlocked/locked card template, with interior thumb overlay.
       let bgImg: Phaser.GameObjects.Image | null = null;
       if (this.hasArt) {
-        const cardKey = CARD_KEYS[i % CARD_KEYS.length];
+        // Card template (unlocked or locked art)
+        const cardKey = isUnlocked ? UI.vmVenueCardOpen : UI.vmVenueCardLocked;
         if (this.textures.exists(cardKey)) {
           bgImg = this.add.image(ROW_W / 2, 0, cardKey)
             .setOrigin(0.5).setDisplaySize(ROW_W, ROW_H)
-            .setAlpha(isUnlocked ? 0.55 : 0.18);
+            .setAlpha(isUnlocked ? 0.60 : 0.28);
           grp.add(bgImg);
           this.rowBgs.push(bgImg);
+        } else {
+          // Fallback to cycling thumbnails
+          const thumbKey = THUMB_KEYS[i % THUMB_KEYS.length];
+          if (this.textures.exists(thumbKey)) {
+            bgImg = this.add.image(ROW_W / 2, 0, thumbKey)
+              .setOrigin(0.5).setDisplaySize(ROW_W, ROW_H)
+              .setAlpha(isUnlocked ? 0.50 : 0.15);
+            grp.add(bgImg);
+            this.rowBgs.push(bgImg);
+          }
         }
       }
 
