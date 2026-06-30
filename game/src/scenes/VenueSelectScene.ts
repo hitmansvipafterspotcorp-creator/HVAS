@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { UISystem, UI } from '../systems/UISystem';
 
 // All venues with display metadata. Order mirrors the quest flow.
 const ALL_VENUES = [
@@ -18,16 +19,37 @@ const ALL_VENUES = [
   { id: 'tally_itus_inside',        name: 'Itus',                    area: 'Tally Row',       always: false },
 ];
 
+// Venue card art keys cycle across the 4 available card textures.
+const CARD_KEYS = [UI.ssVenueCard1, UI.ssVenueCard2, UI.ssVenueCard3, UI.ssVenueCard4];
+
+const ROW_W = 380;
+const ROW_H = 42;
+const COL1_X = GAME_WIDTH / 2 - 240;
+const COL2_X = GAME_WIDTH / 2 + 60;
+const ROW_Y0 = 96;
+const ROW_GAP = 48;
+
 export class VenueSelectScene extends Phaser.Scene {
   private cursor = 0;
   private rows: Phaser.GameObjects.Container[] = [];
+  private rowBgs: Phaser.GameObjects.Image[] = [];
   private hintText!: Phaser.GameObjects.Text;
+  private hasArt = false;
 
   constructor() { super(SCENE.VenueSelect); }
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
+    this.hasArt = UISystem.ready(this);
 
+    // ── Map frame background ─────────────────────────────────────────────
+    if (this.hasArt && this.textures.exists(UI.ssMapFrame)) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.ssMapFrame)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 20, GAME_HEIGHT - 20)
+        .setAlpha(0.15).setDepth(-100);
+    }
+
+    // ── Title ────────────────────────────────────────────────────────────
     this.add.text(GAME_WIDTH / 2, 28, 'VENUES', {
       fontFamily: 'Arial Black, sans-serif',
       fontSize: '28px',
@@ -40,45 +62,65 @@ export class VenueSelectScene extends Phaser.Scene {
       color: '#554466',
     }).setOrigin(0.5);
 
-    const unlocked = new Set(ProgressionSystem.getUnlockedVenues());
-    // hitmans_vip_inside is always accessible (starting venue).
-    unlocked.add('hitmans_vip_inside' as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
+    // ── Column headers ───────────────────────────────────────────────────
+    this.add.text(COL1_X + ROW_W / 2, ROW_Y0 - 18, 'MAIN STRIP', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#887799',
+    }).setOrigin(0.5);
+    this.add.text(COL2_X + ROW_W / 2, ROW_Y0 - 18, 'TALLY ROW', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#887799',
+    }).setOrigin(0.5);
 
-    const COL1 = GAME_WIDTH / 2 - 240;
-    const COL2 = GAME_WIDTH / 2 + 60;
+    const unlocked = this.getUnlocked();
+
     let col1Count = 0;
     let col2Count = 0;
 
     for (let i = 0; i < ALL_VENUES.length; i++) {
       const v = ALL_VENUES[i];
-      const isUnlocked = v.always || unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
-      const col = i < 7 ? COL1 : COL2;
-      const row = i < 7 ? col1Count++ : col2Count++;
-      const y = 96 + row * 46;
+      const isUnlocked = v.always || unlocked.has(v.id);
+      const col = i < 7 ? COL1_X : COL2_X;
+      const rowIdx = i < 7 ? col1Count++ : col2Count++;
+      const y = ROW_Y0 + rowIdx * ROW_GAP;
 
       const grp = this.add.container(col, y);
 
-      const bgW = 380;
-      const bgH = 38;
-      const bg = this.add.rectangle(bgW / 2, 0, bgW, bgH,
-        isUnlocked ? 0x1a1030 : 0x0d0b16,
-      ).setStrokeStyle(1, isUnlocked ? 0x6644aa : 0x2a2040).setOrigin(0, 0.5);
+      // Art row background (venue card texture)
+      let bgImg: Phaser.GameObjects.Image | null = null;
+      if (this.hasArt) {
+        const cardKey = CARD_KEYS[i % CARD_KEYS.length];
+        if (this.textures.exists(cardKey)) {
+          bgImg = this.add.image(ROW_W / 2, 0, cardKey)
+            .setOrigin(0.5).setDisplaySize(ROW_W, ROW_H)
+            .setAlpha(isUnlocked ? 0.55 : 0.18);
+          grp.add(bgImg);
+          this.rowBgs.push(bgImg);
+        }
+      }
+
+      // Fallback plain rectangle (always added for interaction + stroke)
+      const bg = this.add.rectangle(ROW_W / 2, 0, ROW_W, ROW_H,
+        isUnlocked ? 0x1a1030 : 0x0d0b16, bgImg ? 0 : 1,
+      ).setStrokeStyle(1, isUnlocked ? 0x6644aa : 0x2a2040).setOrigin(0.5, 0.5);
       grp.add(bg);
 
-      grp.add(this.add.text(12, 0,
+      grp.add(this.add.text(10, 0,
         isUnlocked ? v.name : '???',
         {
           fontFamily: 'monospace',
           fontSize: '14px',
           color: isUnlocked ? '#ffffff' : '#332244',
+          stroke: isUnlocked ? '#000000' : undefined,
+          strokeThickness: isUnlocked ? 2 : 0,
         },
       ).setOrigin(0, 0.5));
 
       if (isUnlocked) {
-        grp.add(this.add.text(bgW - 10, 0, v.area, {
+        grp.add(this.add.text(ROW_W - 10, 0, v.area, {
           fontFamily: 'monospace',
           fontSize: '11px',
-          color: '#887799',
+          color: '#ccbbee',
+          stroke: '#000000',
+          strokeThickness: 2,
         }).setOrigin(1, 0.5));
       }
 
@@ -86,11 +128,17 @@ export class VenueSelectScene extends Phaser.Scene {
         bg.setInteractive({ useHandCursor: true });
         bg.on('pointerover', () => { this.cursor = i; this.refresh(); });
         bg.on('pointerdown', () => { this.cursor = i; this.enter(); });
+        if (bgImg) {
+          bgImg.setInteractive({ useHandCursor: true });
+          bgImg.on('pointerover', () => { this.cursor = i; this.refresh(); });
+          bgImg.on('pointerdown', () => { this.cursor = i; this.enter(); });
+        }
       }
 
       this.rows.push(grp);
     }
 
+    // ── Hint bar (bottom) ────────────────────────────────────────────────
     this.hintText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 20,
       '↑↓ navigate • Enter / Space enter venue • ESC back', {
         fontFamily: 'monospace',
@@ -98,10 +146,14 @@ export class VenueSelectScene extends Phaser.Scene {
         color: '#554466',
       }).setOrigin(0.5);
 
+    // ── Legend panel (bottom-left) ────────────────────────────────────────
+    if (this.hasArt && this.textures.exists(UI.ssLegendPanel)) {
+      this.add.image(8, GAME_HEIGHT - 8, UI.ssLegendPanel)
+        .setOrigin(0, 1).setDisplaySize(200, 60).setAlpha(0.6);
+    }
+
     // Start cursor on first unlocked.
-    this.cursor = ALL_VENUES.findIndex(v =>
-      v.always || unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number])
-    );
+    this.cursor = ALL_VENUES.findIndex(v => v.always || unlocked.has(v.id));
     if (this.cursor < 0) this.cursor = 0;
 
     const kb = this.input.keyboard!;
@@ -116,14 +168,18 @@ export class VenueSelectScene extends Phaser.Scene {
     this.refresh();
   }
 
+  private getUnlocked(): Set<string> {
+    const s = new Set(ProgressionSystem.getUnlockedVenues() as string[]);
+    s.add('hitmans_vip_inside');
+    return s;
+  }
+
   private move(dir: number): void {
-    const unlocked = new Set(ProgressionSystem.getUnlockedVenues());
-    unlocked.add('hitmans_vip_inside' as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
+    const unlocked = this.getUnlocked();
     let next = this.cursor + dir;
-    // Skip locked entries.
     while (next >= 0 && next < ALL_VENUES.length) {
       const v = ALL_VENUES[next];
-      if (v.always || unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number])) break;
+      if (v.always || unlocked.has(v.id)) break;
       next += dir;
     }
     if (next >= 0 && next < ALL_VENUES.length) this.cursor = next;
@@ -131,28 +187,36 @@ export class VenueSelectScene extends Phaser.Scene {
   }
 
   private refresh(): void {
-    const unlocked = new Set(ProgressionSystem.getUnlockedVenues());
-    unlocked.add('hitmans_vip_inside' as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
+    const unlocked = this.getUnlocked();
 
     for (let i = 0; i < this.rows.length; i++) {
       const grp = this.rows[i];
-      const bg = grp.list[0] as Phaser.GameObjects.Rectangle;
       const v = ALL_VENUES[i];
-      const isUnlocked = v.always || unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
+      const isUnlocked = v.always || unlocked.has(v.id);
       const selected = i === this.cursor && isUnlocked;
 
+      // The bg rect is always the second child (after optional art image)
+      const bgIdx = this.rowBgs.length > 0 ? 1 : 0;
+      const bg = grp.list[bgIdx] as Phaser.GameObjects.Rectangle;
+
+      // Art image (first child when present)
+      if (this.rowBgs.length > 0) {
+        const artImg = grp.list[0] as Phaser.GameObjects.Image;
+        artImg.setAlpha(selected ? 0.85 : isUnlocked ? 0.55 : 0.18);
+      }
+
       if (selected) {
-        bg.setFillStyle(0x2a1a4a);
         bg.setStrokeStyle(2, 0xffd700);
+        this.tweens.add({ targets: grp, scaleX: 1.03, scaleY: 1.03, duration: 90, ease: 'Quad.out' });
       } else {
-        bg.setFillStyle(isUnlocked ? 0x1a1030 : 0x0d0b16);
         bg.setStrokeStyle(1, isUnlocked ? 0x6644aa : 0x2a2040);
+        this.tweens.add({ targets: grp, scaleX: 1, scaleY: 1, duration: 90, ease: 'Quad.out' });
       }
     }
 
     const v = ALL_VENUES[this.cursor];
     const unlockStatus = v.always ? 'Starting venue — always open'
-      : unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number])
+      : unlocked.has(v.id)
         ? `Unlocked  ·  ${v.area}`
         : 'Locked — beat the area boss to unlock';
     this.hintText.setText(
@@ -162,9 +226,8 @@ export class VenueSelectScene extends Phaser.Scene {
 
   private enter(): void {
     const v = ALL_VENUES[this.cursor];
-    const unlocked = new Set(ProgressionSystem.getUnlockedVenues());
-    unlocked.add('hitmans_vip_inside' as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number]);
-    if (!v.always && !unlocked.has(v.id as ReturnType<typeof ProgressionSystem.getUnlockedVenues>[number])) return;
+    const unlocked = this.getUnlocked();
+    if (!v.always && !unlocked.has(v.id)) return;
     this.scene.start(SCENE.Venue, { venueId: v.id });
   }
 }
