@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { BRAWLER_ANIMS, VENUE_ANIMS, VFX_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
@@ -7,68 +7,121 @@ import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
-// PreloadScene: shows an animated HITGEAR-style logo pulse while assets load.
-// Right now the brawler runs on graybox primitives (no texture loads required),
-// so this scene also doubles as the animated-logo splash. Real sprite-sheet
-// loads get wired here once the asset manifest lands.
+const TIPS = [
+  'BLOCK (Shift) then ATTACK to grab an enemy.',
+  'Double-tap a direction to RUN — faster but no block.',
+  'Fill your SUPER meter and press Q to unleash a super move.',
+  'Pick up dropped weapons — they deal extra damage.',
+  'DODGE (Shift + direction) makes you briefly invulnerable.',
+  'Clear all waves to unlock the venue entrance.',
+  'VIP members get access to the inner lounge — check in at the door.',
+];
+
 export class PreloadScene extends Phaser.Scene {
+  private bar!: Phaser.GameObjects.Rectangle;
+  private barW = 500;
+  private spinnerImg?: Phaser.GameObjects.Image;
+  private pct!: Phaser.GameObjects.Text;
+
   constructor() {
     super(SCENE.Preload);
   }
 
   preload(): void {
-    // Loading bar — proves the pipeline even before real assets exist.
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
+    this.cameras.main.setBackgroundColor(0x080512);
 
-    const title = this.add
-      .text(cx, cy - 40, 'HITMANS VIP', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '44px',
-        color: '#ffd700',
-      })
-      .setOrigin(0.5);
-    this.add
-      .text(cx, cy + 6, 'AFTER SPOT', {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '22px',
-        color: '#c100ff',
-      })
-      .setOrigin(0.5);
+    const hasLd = (key: string) => this.textures.exists(key);
 
-    // Animated logo pulse.
-    this.tweens.add({
-      targets: title,
-      scale: 1.06,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut',
-    });
+    // ── Skyline background strip ────────────────────────────────────────────
+    if (hasLd('ld_skyline_strip')) {
+      this.add.image(cx, GAME_HEIGHT - 1, 'ld_skyline_strip')
+        .setOrigin(0.5, 1).setDisplaySize(GAME_WIDTH, 180).setAlpha(0.35);
+    }
 
-    const barW = 280;
-    const barBg = this.add
-      .rectangle(cx, cy + 60, barW, 10, COLORS.floorLine)
-      .setOrigin(0.5);
-    const bar = this.add
-      .rectangle(cx - barW / 2, cy + 60, 1, 10, COLORS.meter)
-      .setOrigin(0, 0.5);
+    // ── Logo ────────────────────────────────────────────────────────────────
+    if (hasLd('ld_logo_large')) {
+      const logo = this.add.image(cx, cy - 130, 'ld_logo_large')
+        .setOrigin(0.5).setDisplaySize(340, 178);
+      this.tweens.add({
+        targets: logo, scaleX: logo.scaleX * 1.04, scaleY: logo.scaleY * 1.04,
+        duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut',
+      });
+    } else {
+      this.add.text(cx, cy - 90, 'HITMANS VIP', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '44px', color: '#ffd700',
+      }).setOrigin(0.5);
+      this.add.text(cx, cy - 40, 'AFTER SPOT', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#c100ff',
+      }).setOrigin(0.5);
+    }
 
+    // ── "NOW LOADING" text art ──────────────────────────────────────────────
+    if (hasLd('ld_now_loading')) {
+      this.add.image(cx, cy + 28, 'ld_now_loading')
+        .setOrigin(0.5).setDisplaySize(220, 28);
+    } else {
+      this.add.text(cx, cy + 20, 'LOADING...', {
+        fontFamily: 'monospace', fontSize: '14px', color: '#888899',
+      }).setOrigin(0.5);
+    }
+
+    // ── Loading bar ─────────────────────────────────────────────────────────
+    const barH = 14;
+    const barY = cy + 64;
+    this.barW = 500;
+
+    // Dark trough
+    this.add.rectangle(cx, barY, this.barW, barH, 0x1a0f2e).setOrigin(0.5);
+
+    // Fill rectangle (grows with progress)
+    this.bar = this.add.rectangle(cx - this.barW / 2, barY, 1, barH, 0xffd700).setOrigin(0, 0.5);
+
+    // Gold bar art overlay (stretched across the full trough width)
+    if (hasLd('ld_bar_gold')) {
+      this.add.image(cx, barY, 'ld_bar_gold')
+        .setOrigin(0.5).setDisplaySize(this.barW, barH + 4).setAlpha(0.35);
+    }
+
+    // Percentage text
+    this.pct = this.add.text(cx, barY + 20, '0%', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#aa99cc',
+    }).setOrigin(0.5);
+
+    // ── Spinner ─────────────────────────────────────────────────────────────
+    if (hasLd('ld_spinner')) {
+      this.spinnerImg = this.add.image(cx + this.barW / 2 + 28, barY, 'ld_spinner')
+        .setOrigin(0.5).setDisplaySize(22, 22);
+    }
+
+    // ── Tip panel ───────────────────────────────────────────────────────────
+    const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    if (hasLd('ld_tip_panel')) {
+      this.add.image(cx, GAME_HEIGHT - 24, 'ld_tip_panel')
+        .setOrigin(0.5, 1).setDisplaySize(700, 54);
+      this.add.text(cx, GAME_HEIGHT - 24, `TIP: ${tip}`, {
+        fontFamily: 'monospace', fontSize: '12px', color: '#ffd700',
+        wordWrap: { width: 640 },
+      }).setOrigin(0.5, 1);
+    } else {
+      this.add.text(cx, GAME_HEIGHT - 14, `TIP: ${tip}`, {
+        fontFamily: 'monospace', fontSize: '12px', color: '#8877aa',
+        wordWrap: { width: 640 },
+      }).setOrigin(0.5, 1);
+    }
+
+    // ── Wire progress ────────────────────────────────────────────────────────
     this.load.on('progress', (p: number) => {
-      bar.width = Math.max(1, barW * p);
+      this.bar.width = Math.max(1, this.barW * p);
+      this.pct.setText(`${Math.round(p * 100)}%`);
     });
-    barBg.setData('noop', true); // referenced so it isn't tree-shaken visually
 
-    // Queue the real UI art kit (logo, HUD, digit font).
+    // ── Queue everything ─────────────────────────────────────────────────────
     UISystem.queue(this);
-
-    // Queue background music tracks.
     AudioSystem.queue(this);
 
-    // Queue all 19 characters — Arcade VS shows the full roster, and brawler
-    // stages use any charId as enemy/boss. Unknown sheets 404 silently.
     const allChars = Object.keys(CHAR_FOLDERS).map(Number);
-    // Priority: player + current-mode enemies first so they animate fastest.
     const priority = new Set<number>([PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS]);
     const rest = allChars.filter(id => !priority.has(id));
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
@@ -79,8 +132,13 @@ export class PreloadScene extends Phaser.Scene {
     }
   }
 
+  override update(): void {
+    if (this.spinnerImg) {
+      this.spinnerImg.angle += 3;
+    }
+  }
+
   create(): void {
-    // Build animations for every queued character.
     const allChars = Object.keys(CHAR_FOLDERS).map(Number);
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
     for (const id of allChars) {
@@ -89,8 +147,7 @@ export class PreloadScene extends Phaser.Scene {
       if (topdownSet.has(id)) AnimationSystem.build(this, id, VENUE_ANIMS);
     }
 
-    // Brief hold so the splash reads, then into the menu.
-    this.time.delayedCall(600, () => this.scene.start(SCENE.MainMenu));
+    this.time.delayedCall(400, () => this.scene.start(SCENE.MainMenu));
     AudioSystem.playForScene(this, 'MainMenu');
   }
 }
