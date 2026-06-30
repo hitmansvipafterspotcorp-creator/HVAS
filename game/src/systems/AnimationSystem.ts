@@ -85,7 +85,10 @@ export const AnimationSystem = {
   ): Promise<void> {
     for (const id of charIds) this.queue(scene, id, animNames);
     return new Promise(resolve => {
-      if (!scene.load.isLoading() && scene.load.totalToLoad === 0) {
+      // Phaser's totalToLoad only updates after start() — use the pending
+      // file list size to detect "nothing queued".
+      const pending = (scene.load as unknown as { list: { size: number } }).list?.size ?? 0;
+      if (!scene.load.isLoading() && pending === 0) {
         resolve();
         return;
       }
