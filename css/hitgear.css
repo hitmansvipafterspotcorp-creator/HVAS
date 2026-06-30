@@ -761,12 +761,14 @@ button.art-btn:disabled img, button.art-btn[style*="display:none"] { }
   user-select: none;
   -webkit-user-select: none;
   display: block;
+  z-index: 10;
 }
 
 /* ── Screen area — JS positions this precisely over the screen cutout ── */
 #screen-area {
   position: absolute;
-  /* Default fallback: centered 56% wide 72% tall — JS overrides with precise pixels */
+  /* Default fallback — JS overrides with precise pixels after shell image loads */
+  left: 20.5%; top: 14.0%; width: 58.3%; height: 62.0%;
   overflow: hidden;
   background: #000;
   /* subtle inner glow to blend with bezel */
