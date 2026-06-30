@@ -14,45 +14,12 @@ const LOGO_Y = 8;
 const PROFILE_X = GAME_WIDTH - 8;
 const PROFILE_Y = 8;
 
-// Left column (taglines → mode badges → rank chips)
-const LEFT_X = 8;
-const TAGLINES_Y   = 82;
-const TAGLINES_W   = 196;
-const TAGLINES_H   = 108;
-const BADGES_Y     = 200;
-const BADGES_W     = 196;
-const BADGES_H     = 88;
-const RANK_Y       = 302;
-const RANK_W       = 196;
-const RANK_H       = 78;
-const PROMPT_X     = 8;
-const PROMPT_Y     = 392;
-const PROMPT_W     = 196;
-const PROMPT_H     = 56;
-
 // Center buttons column — asset is 232×56, keep that aspect.
 const BTN_X   = 490;
 const BTN_W   = 232;
 const BTN_H   = 50;
 const BTN_Y0  = 130;
 const BTN_GAP = 54;
-
-// Right panels (News & Events, Daily Quests)
-const RIGHT_X  = GAME_WIDTH - 8;
-const NEWS_Y   = 82;
-const NEWS_W   = 196;
-const NEWS_H   = 152;
-const QUEST_Y  = 248;
-const QUEST_W  = 196;
-const QUEST_H  = 132;
-const BOTTOM_ICONS_Y = 394;
-const BOTTOM_ICONS_W = 196;
-const BOTTOM_ICONS_H = 56;
-
-// Bottom strip
-const REWARD_Y  = GAME_HEIGHT - 2;
-const FOOTER_X  = GAME_WIDTH - 4;
-const FOOTER_Y  = GAME_HEIGHT - 2;
 
 // ── Menu items (map to real button textures) ──────────────────────────────────
 type MenuItem = { label: string; btnKey: string; btnSelKey: string; scene: string };
@@ -95,48 +62,117 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   // ── Art build ─────────────────────────────────────────────────────────────
+  // Most exported UI panel assets are design-guide fragments that include
+  // annotation text and adjacent ornaments. We use only the confirmed-clean
+  // assets (logo, profile bar, default button textures) and render every
+  // other panel/strip ourselves so nothing looks broken.
   private buildWithArt(): void {
     const tex = (k: string) => this.textures.exists(k);
-    const img = (key: string, x: number, y: number, w: number, h: number,
-                 ox = 0, oy = 0, depth = 100, alpha = 1) => {
-      if (!tex(key)) return;
-      this.add.image(x, y, key)
-        .setOrigin(ox, oy).setDisplaySize(w, h).setDepth(depth).setAlpha(alpha).setScrollFactor(0);
-    };
+
+    // ── BACKDROP TINT ───────────────────────────────────────────────────────
+    this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x080318, 1)
+      .setOrigin(0, 0).setDepth(0);
 
     // ── TOP BAR ─────────────────────────────────────────────────────────────
-    // Logo — keep 2:1 aspect (asset is 439×230). 220×115 fits the top-left area.
-    img(UI.mmLogo, LOGO_X, LOGO_Y, 220, 115, 0, 0, 150);
+    if (tex(UI.mmLogo)) {
+      this.add.image(LOGO_X, LOGO_Y, UI.mmLogo)
+        .setOrigin(0, 0).setDisplaySize(220, 115).setDepth(150);
+    }
+    if (tex(UI.mmProfileBar)) {
+      this.add.image(PROFILE_X, PROFILE_Y, UI.mmProfileBar)
+        .setOrigin(1, 0).setDisplaySize(320, 42).setDepth(150);
+    }
 
-    // Profile/Status bar — top-right
-    img(UI.mmProfileBar, PROFILE_X, PROFILE_Y, 370, 46, 1, 0, 150);
+    // Decorative divider under top bar
+    this.add.rectangle(GAME_WIDTH / 2, 76, GAME_WIDTH - 40, 1, 0xffd700, 0.45)
+      .setOrigin(0.5).setDepth(120);
 
-    // (mm_decorative is a SHEET of small ornaments, not a single bar — omit
-    //  rather than stretch it across the screen which produced the "ASSEMBLY
-    //  GUIDE" overlay artifact in the previous render.)
+    // ── LEFT COLUMN: tagline / mode badges ──────────────────────────────────
+    const drawPanel = (x: number, y: number, w: number, h: number, title: string) => {
+      this.add.rectangle(x, y, w, h, 0x140628, 0.9).setOrigin(0, 0)
+        .setStrokeStyle(2, 0xffd700, 0.6).setDepth(100);
+      this.add.text(x + 8, y + 4, title, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffd700',
+      }).setOrigin(0, 0).setDepth(101);
+    };
 
-    // ── LEFT COLUMN ─────────────────────────────────────────────────────────
-    // Taglines (THE ULTIMATE VIP EXPERIENCE / FAME. FORTUNE. LEGEND. etc.)
-    img(UI.mmTaglines,   LEFT_X, TAGLINES_Y, TAGLINES_W, TAGLINES_H, 0, 0, 100);
+    drawPanel(8, 90, 200, 130, '★ THE VIP EXPERIENCE');
+    this.add.text(20, 112, 'FAME · FORTUNE · LEGEND', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#c0a0ff',
+    }).setDepth(102);
+    this.add.text(20, 128, 'Complete missions to', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#aaaacc',
+    }).setDepth(102);
+    this.add.text(20, 142, 'unlock VIP venues.', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#aaaacc',
+    }).setDepth(102);
+    this.add.text(20, 168, 'STORY · PVP · CO-OP', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#88aadd',
+    }).setDepth(102);
+    this.add.text(20, 184, 'TIME TRIAL · EVENTS', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#88aadd',
+    }).setDepth(102);
 
-    // Mode badges (STORY / VS / CO-OP / TIME TRIAL / EVENT)
-    img(UI.mmModeBadges, LEFT_X, BADGES_Y, BADGES_W, BADGES_H, 0, 0, 100);
+    drawPanel(8, 232, 200, 80, '★ RANK · GOLD');
+    this.add.text(20, 254, 'XP   12,450 / 25,000', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffd700',
+    }).setDepth(102);
+    this.add.text(20, 270, 'BRONZE · SILVER · GOLD', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#c0a0ff',
+    }).setDepth(102);
+    this.add.text(20, 284, 'PLATINUM · DIAMOND', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#c0a0ff',
+    }).setDepth(102);
 
-    // Rank chips (BRONZE / SILVER / GOLD / PLATINUM / DIAMOND)
-    img(UI.mmRankChips,  LEFT_X, RANK_Y, RANK_W, RANK_H, 0, 0, 100);
+    drawPanel(8, 324, 200, 100, '★ CONTROLS');
+    this.add.text(20, 346, 'Arrow keys / Mouse', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(20, 362, 'Enter — Select', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(20, 378, 'ESC — Back', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(20, 394, 'Ctrl+Shift+U: unlock', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#664488',
+    }).setDepth(102);
 
-    // Prompt chips (A SELECT / B BACK / navigate / LT RT)
-    img(UI.mmPromptChips, PROMPT_X, PROMPT_Y, PROMPT_W, PROMPT_H, 0, 0, 100);
+    // ── RIGHT COLUMN: news / daily quests ────────────────────────────────────
+    drawPanel(GAME_WIDTH - 208, 90, 200, 160, '★ NEWS & EVENTS');
+    this.add.text(GAME_WIDTH - 196, 112, '• VIP Tournament now live', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 126, '• New venue: Tally Den', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 140, '• Double XP weekend', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 168, 'VIP REWARDS', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffd700',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 184, 'Double rewards', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#c0a0ff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 200, 'this weekend!', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#c0a0ff',
+    }).setDepth(102);
 
-    // ── RIGHT PANELS ────────────────────────────────────────────────────────
-    // News & Events panel — top-right
-    img(UI.mmNewsPanel,   RIGHT_X, NEWS_Y,   NEWS_W,   NEWS_H,   1, 0, 100);
-
-    // Daily Quests panel — below news
-    img(UI.mmQuestsPanel, RIGHT_X, QUEST_Y,  QUEST_W,  QUEST_H,  1, 0, 100);
-
-    // Bottom icons (VIP promo / double rewards)
-    img(UI.mmBottomIcons, RIGHT_X, BOTTOM_ICONS_Y, BOTTOM_ICONS_W, BOTTOM_ICONS_H, 1, 0, 100);
+    drawPanel(GAME_WIDTH - 208, 262, 200, 130, '★ DAILY QUESTS');
+    const beaten = ProgressionSystem.getBeatenBosses().length;
+    this.add.text(GAME_WIDTH - 196, 284, `Complete missions  ${beaten}/7`, {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 300, 'Win 3 VS matches    0/3', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 316, 'Visit 5 venues      0/5', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffffff',
+    }).setDepth(102);
+    this.add.text(GAME_WIDTH - 196, 344, 'Weekly Bonus: 2× XP', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffd700',
+    }).setDepth(102);
 
     // ── CENTER: MENU BUTTONS ─────────────────────────────────────────────────
     this.btnImages = [];
@@ -155,20 +191,12 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     // ── BOTTOM STRIP ────────────────────────────────────────────────────────
-    // Reward strip — full width at bottom
-    img(UI.mmRewardStrip, CX, REWARD_Y, GAME_WIDTH, 46, 0.5, 1, 110);
-
-    // Footer ornament — bottom-right
-    img(UI.mmFooterOrnament, FOOTER_X, FOOTER_Y, 180, 44, 1, 1, 111);
-
-    // Progress readout
-    const beaten = ProgressionSystem.getBeatenBosses().length;
-    if (beaten > 0) {
-      this.add.text(BTN_X, BTN_Y0 + ITEMS.length * BTN_GAP + 14,
-        `Quest: ${beaten}/7 bosses defeated`,
-        { fontFamily: 'monospace', fontSize: '11px', color: '#44dd88' },
-      ).setOrigin(0.5, 0).setDepth(110).setScrollFactor(0);
-    }
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 1, GAME_WIDTH, 28, 0x0a0220, 0.95)
+      .setOrigin(0.5, 1).setStrokeStyle(1, 0xffd700, 0.5).setDepth(110);
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8,
+      '★ COMPLETE MISSIONS TO UNLOCK VIP REWARDS  ★  WEEKLY BONUS  ★',
+      { fontFamily: 'monospace', fontSize: '10px', color: '#ffd700' },
+    ).setOrigin(0.5, 1).setDepth(111);
   }
 
   // ── Fallback ──────────────────────────────────────────────────────────────
@@ -198,10 +226,13 @@ export class MainMenuScene extends Phaser.Scene {
     const hasUI = UISystem.ready(this);
     this.btnImages.forEach((btn, ri) => {
       if (hasUI) {
-        const key = ri === this.index ? ITEMS[ri].btnSelKey : ITEMS[ri].btnKey;
-        (btn as Phaser.GameObjects.Image).setTexture(key);
-        const scale = ri === this.index ? 1.06 : 1.0;
-        btn.setDisplaySize(BTN_W * scale, BTN_H * scale);
+        // The exported _sel button variants contain stray design-guide
+        // annotation text ("SELECTED (HOVER/FOCUS)"), so we ignore them and
+        // indicate selection via scale + tint on the clean default texture.
+        (btn as Phaser.GameObjects.Image).setTexture(ITEMS[ri].btnKey);
+        const sel = ri === this.index;
+        btn.setDisplaySize(BTN_W * (sel ? 1.08 : 1.0), BTN_H * (sel ? 1.08 : 1.0));
+        (btn as Phaser.GameObjects.Image).setTint(sel ? 0xffffff : 0xb8a0d4);
       } else {
         const txt = btn as unknown as Phaser.GameObjects.Text;
         if (txt.setColor) txt.setColor(ri === this.index ? '#ffd700' : '#ffffff');

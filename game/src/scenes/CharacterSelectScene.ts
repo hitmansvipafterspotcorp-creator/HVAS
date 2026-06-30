@@ -69,7 +69,10 @@ export class CharacterSelectScene extends Phaser.Scene {
     };
 
     // ── 1. TITLE BANNER ──────────────────────────────────────────────────────
-    img(UI.csTitleBanner, GAME_WIDTH / 2, 0, GAME_WIDTH, TITLE_H, 0.5, 0, 50);
+    // Don't stretch cs_title_banner (586x127, contains guide annotation).
+    // Draw a clean strip instead.
+    this.add.rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH, TITLE_H, 0x0a0420, 0.92)
+      .setOrigin(0.5, 0).setStrokeStyle(2, 0xffd700, 0.6).setDepth(50);
     this.add.text(GAME_WIDTH / 2, TITLE_H / 2, 'CHARACTER SELECT', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffd700',
       stroke: '#000000', strokeThickness: 4,
@@ -89,14 +92,10 @@ export class CharacterSelectScene extends Phaser.Scene {
       const cx = GRID_LEFT + col * CELL + CELL / 2;
       const cy = GRID_TOP  + row * CELL + CELL / 2;
 
-      // Slot frame — respect actual texture aspect (~68×104) so it doesn't squish
-      let cell: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
-      if (hasUI && tex(UI.csSlotIdle)) {
-        cell = this.add.image(cx, cy, UI.csSlotIdle)
-          .setDisplaySize(CELL - 6, CELL + 8).setDepth(9);
-      } else {
-        cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820).setStrokeStyle(1, 0x3a2a5a).setDepth(9);
-      }
+      // The exported cs_slot_idle has design-guide "02. CHARA" annotation
+      // text baked in; use a clean rectangle frame instead.
+      const cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x12082c)
+        .setStrokeStyle(2, 0x4a2080).setDepth(9);
       this.cells.push(cell);
 
       // Character sprite slot (texture set later when idle anim loads)
@@ -157,29 +156,18 @@ export class CharacterSelectScene extends Phaser.Scene {
     img(UI.csStyleTags, RPANEL_X + PANEL_W / 2, STAT_Y + STAT_H + 2, PORT_W, 42, 0.5, 0, 15);
 
     // ── 5. BOTTOM AREA ───────────────────────────────────────────────────────
-    // Instruction strip / divider
-    img(UI.csDivider, GAME_WIDTH / 2, BOTTOM_Y - 2, GAME_WIDTH - PANEL_W * 2 - 16, 10, 0.5, 0.5, 20);
+    // cs_category_tabs / cs_color_tabs / cs_action_btns / cs_instruction_strip
+    // / cs_divider are all guide-export crops with annotation labels. Render
+    // clean alternatives in code.
+    void [STAGE_PREV_Y, STAGE_PREV_H, STAGE_PREV_W, CAT_TABS_Y, ACTION_Y, BOTTOM_Y];
 
-    // Stage preview frame (bottom center)
-    img(UI.csSlotGrid, GAME_WIDTH / 2, STAGE_PREV_Y, STAGE_PREV_W, STAGE_PREV_H, 0.5, 0, 12, 0.5);
-
-    // Category tabs (ALL / ASSASSINS / ENFORCERS / TECH / WILDCARDS)
-    img(UI.csCategoryTabs, GAME_WIDTH / 2, CAT_TABS_Y, STAGE_PREV_W, 32, 0.5, 0, 20);
-
-    // Color / skin tabs (left of action buttons)
-    img(UI.csColorTabs, GAME_WIDTH / 2 - 90, ACTION_Y, 160, 32, 0.5, 0, 20);
-
-    // Action buttons: RANDOM / BACK / CONFIRM (bottom right)
-    img(UI.csActionBtns, GAME_WIDTH - PANEL_W - 4, ACTION_Y, 196, 32, 1, 0, 20);
-
-    // ── 6. INSTRUCTION STRIP (bottom) ─────────────────────────────────────────
-    img(UI.csInstructionStrip, GAME_WIDTH / 2, STRIP_Y, GAME_WIDTH, 36, 0.5, 1, 30);
-    if (!hasUI || !tex(UI.csInstructionStrip)) {
-      this.add.text(GAME_WIDTH / 2, STRIP_Y - 2,
-        'Arrow keys · Enter to confirm · ESC back',
-        { fontFamily: 'monospace', fontSize: '11px', color: '#8877aa' },
-      ).setOrigin(0.5, 1).setDepth(31);
-    }
+    // Bottom instruction strip
+    this.add.rectangle(GAME_WIDTH / 2, STRIP_Y, GAME_WIDTH, 30, 0x0a0220, 0.95)
+      .setOrigin(0.5, 1).setStrokeStyle(1, 0xffd700, 0.5).setDepth(30);
+    this.add.text(GAME_WIDTH / 2, STRIP_Y - 8,
+      '◀ ▶ ▲ ▼ NAVIGATE   [ENTER] CONFIRM   [ESC] BACK',
+      { fontFamily: 'monospace', fontSize: '11px', color: '#ffd700' },
+    ).setOrigin(0.5, 1).setDepth(31);
 
     // ── 7. INPUT ─────────────────────────────────────────────────────────────
     const kb = this.input.keyboard!;
@@ -205,22 +193,12 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private refreshGrid(): void {
     const charId = ALL_CHARS[this.cursor];
-    const tex = (k: string) => this.textures.exists(k);
-    const hasUI = UISystem.ready(this);
 
     this.cells.forEach((cell, i) => {
-      if (cell instanceof Phaser.GameObjects.Image) {
-        const key = i === this.cursor
-          ? (hasUI && tex(UI.csSlotSelected) ? UI.csSlotSelected : UI.csSlotIdle)
-          : UI.csSlotIdle;
-        cell.setTexture(key);
-        cell.setScale(i === this.cursor ? 1.08 : 1.0);
-      } else {
-        (cell as Phaser.GameObjects.Rectangle).setStrokeStyle(
-          i === this.cursor ? 3 : 1,
-          i === this.cursor ? 0xffd700 : 0x3a2a5a,
-        );
-      }
+      (cell as Phaser.GameObjects.Rectangle).setStrokeStyle(
+        i === this.cursor ? 3 : 2,
+        i === this.cursor ? 0xffd700 : 0x4a2080,
+      );
     });
 
     // Bring any newly-built idle anims onto the grid sprites

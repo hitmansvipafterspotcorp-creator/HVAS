@@ -367,15 +367,10 @@ export class ArcadeVsScene extends Phaser.Scene {
     const p1Name = CHAR_NAMES[this.p1CharId] ?? `Fighter ${this.p1CharId}`;
     const p2Name = CHAR_NAMES[this.p2CharId] ?? `Fighter ${this.p2CharId}`;
 
-    // ── 1. STAGE BANNER (full-screen background) ─────────────────────────────
-    if (tex(UI.vsStageBanners)) {
-      this.add.image(cx, cy, UI.vsStageBanners)
-        .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(0).setAlpha(0.55);
-    } else {
-      // Colored halves fallback
-      this.add.rectangle(0, 0, cx, GAME_HEIGHT, 0x001133).setOrigin(0, 0).setDepth(0);
-      this.add.rectangle(cx, 0, cx, GAME_HEIGHT, 0x330011).setOrigin(0, 0).setDepth(0);
-    }
+    // ── 1. STAGE BANNER ──────────────────────────────────────────────────────
+    // vs_stage_banners.png is an almost-empty 32x32 export fragment — skip it.
+    this.add.rectangle(0, 0, cx, GAME_HEIGHT, 0x001a3a).setOrigin(0, 0).setDepth(0);
+    this.add.rectangle(cx, 0, cx, GAME_HEIGHT, 0x3a0011).setOrigin(0, 0).setDepth(0);
 
     // Diagonal center slash
     const gfx = this.add.graphics().setDepth(1);
@@ -384,9 +379,11 @@ export class ArcadeVsScene extends Phaser.Scene {
     gfx.fillTriangle(cx + 20, 0, cx - 20, GAME_HEIGHT, cx + 20, GAME_HEIGHT);
 
     // ── 2. TOP TITLE BANNER ──────────────────────────────────────────────────
+    // vs_title_logo is 442x225 (~2:1) — keep aspect at 200x100 so it sits
+    // cleanly above the portraits instead of being width-stretched and clipped.
     if (tex(UI.vsTitleLogo)) {
       this.add.image(cx, 2, UI.vsTitleLogo)
-        .setOrigin(0.5, 0).setDisplaySize(480, 52).setDepth(20);
+        .setOrigin(0.5, 0).setDisplaySize(200, 100).setDepth(20);
     } else {
       this.add.text(cx, 18, 'HITMANS VIP QUEST', {
         fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
@@ -407,20 +404,12 @@ export class ArcadeVsScene extends Phaser.Scene {
     const p1X   = cx / 2;   // ~240
     const p2X   = cx + cx / 2; // ~720
 
-    if (tex(UI.vsPortraitLargeL)) {
-      this.add.image(p1X, portY, UI.vsPortraitLargeL)
-        .setOrigin(0.5, 0).setDisplaySize(portW, portH).setDepth(5);
-    } else {
-      this.add.rectangle(p1X, portY, portW, portH, 0x0a0330).setOrigin(0.5, 0)
-        .setStrokeStyle(2, 0x5522aa).setDepth(5);
-    }
-    if (tex(UI.vsPortraitLargeR)) {
-      this.add.image(p2X, portY, UI.vsPortraitLargeR)
-        .setOrigin(0.5, 0).setDisplaySize(portW, portH).setDepth(5);
-    } else {
-      this.add.rectangle(p2X, portY, portW, portH, 0x1a0010).setOrigin(0.5, 0)
-        .setStrokeStyle(2, 0xaa2255).setDepth(5);
-    }
+    // vs_portrait_large_l/r exports include "PORTRAIT FRAMES — LARGE" guide
+    // annotation text at the top edge — bypass with clean rectangles.
+    this.add.rectangle(p1X, portY, portW, portH, 0x0a0330, 0.96).setOrigin(0.5, 0)
+      .setStrokeStyle(3, 0x5522aa).setDepth(5);
+    this.add.rectangle(p2X, portY, portW, portH, 0x1a0010, 0.96).setOrigin(0.5, 0)
+      .setStrokeStyle(3, 0xaa2255).setDepth(5);
 
     // ── 4. CHARACTER SPRITES ──────────────────────────────────────────────────
     const sprScale = 200 / 181;
@@ -436,88 +425,73 @@ export class ArcadeVsScene extends Phaser.Scene {
     }
 
     // ── 5. PLAYER NAMEPLATES ──────────────────────────────────────────────────
+    // vs_nameplate_p1/p2 exports are blank — draw the plates ourselves.
     const nameY = portY + portH + 4;
-
-    if (tex(UI.vsNameplateP1)) {
-      const np1 = this.add.image(p1X, nameY, UI.vsNameplateP1)
-        .setOrigin(0.5, 0).setDisplaySize(portW, 36).setDepth(15).setAlpha(0);
-      this.tweens.add({ targets: np1, alpha: 1, duration: 250, delay: 120 });
-    }
+    const drawPlate = (x: number, color: number) => {
+      this.add.rectangle(x, nameY, portW, 36, 0x0a0220, 0.92).setOrigin(0.5, 0)
+        .setStrokeStyle(2, color).setDepth(15);
+    };
+    drawPlate(p1X, 0x44aaff);
     this.add.text(p1X, nameY + 18, `★ ${p1Name.toUpperCase()} ★`, {
       fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffffff',
       stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(16);
 
-    if (tex(UI.vsNameplateP2)) {
-      const np2 = this.add.image(p2X, nameY, UI.vsNameplateP2)
-        .setOrigin(0.5, 0).setDisplaySize(portW, 36).setDepth(15).setAlpha(0);
-      this.tweens.add({ targets: np2, alpha: 1, duration: 250, delay: 120 });
-    }
+    drawPlate(p2X, 0xff6644);
     this.add.text(p2X, nameY + 18, `★ ${p2Name.toUpperCase()} ★`, {
       fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffffff',
       stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(16);
 
-    // ── 6. LEVEL CHIPS & RANK BADGES ─────────────────────────────────────────
+    // ── 6/7/8. LEVEL / RANK / WIN / READY ─────────────────────────────────────
+    // vs_level_chips / vs_rank_badges / vs_win_dots / vs_ready_markers /
+    // vs_match_rules are all guide-export crops that include "RANK BADGES",
+    // "MATCH RULES PANEL" header text from the design guide. Skip them all
+    // and render clean replacements.
     const chipY = nameY + 40;
-    if (tex(UI.vsLevelChips)) {
-      this.add.image(p1X, chipY, UI.vsLevelChips).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
-      this.add.image(p2X, chipY, UI.vsLevelChips).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
-    }
-    if (tex(UI.vsRankBadges)) {
-      this.add.image(p1X, chipY + 28, UI.vsRankBadges).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
-      this.add.image(p2X, chipY + 28, UI.vsRankBadges).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
-    }
+    [p1X, p2X].forEach((x, idx) => {
+      this.add.text(x, chipY + 4, `LV ${20 + idx * 3}   ★★★★`, {
+        fontFamily: 'monospace', fontSize: '10px', color: '#ffd700',
+      }).setOrigin(0.5).setDepth(16);
+      this.add.text(x, chipY + 22, '● ● ○ ○ ○', {
+        fontFamily: 'monospace', fontSize: '11px', color: '#ff8866',
+      }).setOrigin(0.5).setDepth(16);
+      this.add.text(x, chipY + 42, 'READY', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#44dd88',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(16);
+    });
 
-    // ── 7. WIN DOTS (round history) ───────────────────────────────────────────
-    if (tex(UI.vsWinDots)) {
-      this.add.image(p1X, chipY + 56, UI.vsWinDots).setOrigin(0.5, 0).setDisplaySize(portW - 20, 18).setDepth(15);
-      this.add.image(p2X, chipY + 56, UI.vsWinDots).setOrigin(0.5, 0).setDisplaySize(portW - 20, 18).setDepth(15);
-    }
-
-    // ── 8. READY MARKERS ─────────────────────────────────────────────────────
-    if (tex(UI.vsReadyMarkers)) {
-      this.add.image(p1X, chipY + 78, UI.vsReadyMarkers).setOrigin(0.5, 0).setDisplaySize(140, 28).setDepth(15);
-      this.add.image(p2X, chipY + 78, UI.vsReadyMarkers).setOrigin(0.5, 0).setDisplaySize(140, 28).setDepth(15).setFlipX(true);
-    }
-
-    // ── 9. CENTER VS EMBLEM (asset is 2:1 — don't square-stretch) ───────────
-    if (tex(UI.vsEmblem)) {
-      const emblem = this.add.image(cx, cy - 20, UI.vsEmblem)
-        .setOrigin(0.5).setDisplaySize(160, 80).setDepth(22).setScale(3).setAlpha(0);
-      this.tweens.add({ targets: emblem, scaleX: 1, scaleY: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
-    } else {
+    // ── 9. CENTER VS EMBLEM ──────────────────────────────────────────────────
+    // The exported vs_emblem.png is a cropped section of the design guide that
+    // includes a stray VIP shield; rendering it shows a giant "VIP" badge over
+    // the center. Always use clean rendered "VS" text instead.
+    {
       const vs = this.add.text(cx, cy - 20, 'VS', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '72px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 10,
+        fontFamily: 'Arial Black, sans-serif', fontSize: '88px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 12,
       }).setOrigin(0.5).setScale(3).setAlpha(0).setDepth(22);
       this.tweens.add({ targets: vs, scale: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
     }
 
-    // ── 10. MATCH RULES (center bottom) ──────────────────────────────────────
-    const rulesY = GAME_HEIGHT - 78;
-    if (tex(UI.vsMatchRules)) {
-      this.add.image(cx, rulesY, UI.vsMatchRules).setOrigin(0.5, 0).setDisplaySize(200, 64).setDepth(18);
-    }
-    // Round + difficulty label
-    const roundLabel = this.add.text(cx, rulesY - 16,
+    // ── 10. MATCH RULES + ROUND LABEL ────────────────────────────────────────
+    const rulesY = GAME_HEIGHT - 60;
+    this.add.rectangle(cx, rulesY, 320, 44, 0x0a0220, 0.92)
+      .setOrigin(0.5, 0).setStrokeStyle(2, 0xffd700, 0.7).setDepth(18);
+    this.add.text(cx, rulesY + 8, 'BEST OF 3  ·  NO CONTINUES', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#ffd700',
+    }).setOrigin(0.5, 0).setDepth(20);
+    const roundLabel = this.add.text(cx, rulesY + 26,
       `ROUND ${this.roundNum}  ·  ${this.difficulty.label}`, {
-        fontFamily: 'monospace', fontSize: '13px', color: this.difficulty.color,
+        fontFamily: 'monospace', fontSize: '12px', color: this.difficulty.color,
         stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5, 1).setAlpha(0).setDepth(20);
+      }).setOrigin(0.5, 0).setAlpha(0).setDepth(20);
     this.tweens.add({ targets: roundLabel, alpha: 1, duration: 300, delay: 180 });
 
-    // ── 11. BUTTON PROMPT CHIPS (bottom) ─────────────────────────────────────
-    if (tex(UI.vsBtnChips)) {
-      this.add.image(cx, GAME_HEIGHT - 4, UI.vsBtnChips)
-        .setOrigin(0.5, 1).setDisplaySize(440, 28).setDepth(18);
-    }
-
-    // ── 12. PROGRESS BAR (loading indicator) ─────────────────────────────────
-    if (tex(UI.vsProgressBar)) {
-      this.add.image(cx, rulesY + 68, UI.vsProgressBar)
-        .setOrigin(0.5, 0).setDisplaySize(240, 12).setDepth(18);
-    }
+    // ── 11. BUTTON PROMPTS (bottom strip) ────────────────────────────────────
+    this.add.text(cx, GAME_HEIGHT - 6, '[Z] ATTACK   [SHIFT] BLOCK   [SHIFT+DIR] DODGE   [ESC] PAUSE', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#aa99cc',
+    }).setOrigin(0.5, 1).setDepth(20);
 
     // ── COUNTDOWN ────────────────────────────────────────────────────────────
     // Countdown 3, 2, 1, FIGHT!
