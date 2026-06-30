@@ -824,7 +824,7 @@ export class BrawlerScene extends Phaser.Scene {
       { label: 'RESTART',      key: UI.pmBtnRestart,  hov: UI.pmBtnRestartHov,  action: () => { this.paused = false; this.scene.restart(); } },
       { label: 'STAGE SELECT', key: UI.pmBtnRetry,    hov: UI.pmBtnRetryHov,    action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
       { label: 'SETTINGS',     key: UI.pmBtnSettings, hov: UI.pmBtnSettingsHov, action: () => { this.paused = false; this.scene.start(SCENE.Options); } },
-      { label: 'MAIN MENU',    key: UI.pmBtnQuit,     hov: UI.pmBtnQuitHov,     action: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
+      { label: 'MAIN MENU',    key: UI.pmBtnQuit,     hov: UI.pmBtnQuitHov,     action: () => this.showConfirmQuit() },
     ];
 
     const btnH = 46;
@@ -863,6 +863,53 @@ export class BrawlerScene extends Phaser.Scene {
       g.add(this.add.image(cx + 200, cy - 160, UI.pmSaveBadge)
         .setDisplaySize(60, 24).setOrigin(1, 0).setScrollFactor(0));
     }
+  }
+
+  private showConfirmQuit(): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const dlgW = 340, dlgH = 160;
+
+    // Overlay container at depth above pause overlay
+    const dc = this.add.container(0, 0).setDepth(96000).setScrollFactor(0);
+
+    // Panel art or rect
+    if (this.textures.exists(UI.pmxConfirmDialog)) {
+      dc.add(this.add.image(cx, cy, UI.pmxConfirmDialog)
+        .setDisplaySize(dlgW, dlgH).setScrollFactor(0));
+    } else {
+      dc.add(this.add.rectangle(cx, cy, dlgW, dlgH, 0x0a0614)
+        .setStrokeStyle(2, 0xffd700).setScrollFactor(0));
+    }
+
+    dc.add(this.add.text(cx, cy - 46, 'QUIT TO MAIN MENU?', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    dc.add(this.add.text(cx, cy - 16, 'All unsaved progress will be lost.', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#ccbbee',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    const mkDlgBtn = (bx: number, label: string, color: string, action: () => void) => {
+      const artKey = label === 'YES' ? UI.u1BtnDanger : UI.u1BtnGhost;
+      const btn = this.textures.exists(artKey)
+        ? this.add.image(bx, cy + 38, artKey).setDisplaySize(120, 38).setScrollFactor(0)
+            .setInteractive({ useHandCursor: true })
+        : this.add.rectangle(bx, cy + 38, 120, 38, 0x220011).setScrollFactor(0)
+            .setInteractive({ useHandCursor: true }) as unknown as Phaser.GameObjects.Image;
+      dc.add(btn);
+      const txt = this.add.text(bx, cy + 38, label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '15px', color,
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+      txt.on('pointerdown', action);
+      btn.on('pointerdown', action);
+      dc.add(txt);
+    };
+
+    mkDlgBtn(cx - 72, 'YES', '#ff4444', () => { this.paused = false; this.scene.start(SCENE.MainMenu); });
+    mkDlgBtn(cx + 72, 'NO',  '#ccbbee', () => dc.destroy(true));
   }
 
   // Debug overlay: floor contact points, depth bands, attack reach + hurt spans.
