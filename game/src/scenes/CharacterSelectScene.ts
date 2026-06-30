@@ -28,13 +28,23 @@ export class CharacterSelectScene extends Phaser.Scene {
     const hasUI = UISystem.ready(this);
 
     // ── Title banner ───────────────────────────────────────────────────────
-    if (hasUI && this.textures.exists(UI.csTitleBanner)) {
-      this.add.image(GAME_WIDTH / 2, 20, UI.csTitleBanner)
-        .setOrigin(0.5, 0).setDisplaySize(640, 54).setScrollFactor(0);
-    } else {
-      this.add.text(GAME_WIDTH / 2, 22, 'CHARACTER SELECT', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
-      }).setOrigin(0.5, 0);
+    const titleBannerKey = [UI.csTitleBanner, UI.u1TitleBar2, UI.u1TitleBar1]
+      .find(k => hasUI && this.textures.exists(k));
+    if (titleBannerKey) {
+      this.add.image(GAME_WIDTH / 2, 26, titleBannerKey)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 44).setDepth(5);
+    }
+    this.add.text(GAME_WIDTH / 2, 26, 'CHARACTER SELECT', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(6);
+
+    // ── Corner bracket art ─────────────────────────────────────────────────
+    if (hasUI && this.textures.exists(UI.u1CornerBrackets)) {
+      this.add.image(4, 4, UI.u1CornerBrackets)
+        .setOrigin(0, 0).setDisplaySize(60, 60).setDepth(4).setAlpha(0.7);
+      this.add.image(GAME_WIDTH - 4, 4, UI.u1CornerBrackets)
+        .setOrigin(1, 0).setDisplaySize(60, 60).setDepth(4).setAlpha(0.7).setFlipX(true);
     }
 
     // ── Slot grid background ───────────────────────────────────────────────

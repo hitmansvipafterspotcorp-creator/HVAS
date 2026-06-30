@@ -114,6 +114,20 @@ export class MainMenuScene extends Phaser.Scene {
       ).setOrigin(0.5).setDepth(110).setScrollFactor(0);
     }
 
+    // ── Center: title menu full panel behind the buttons ─────────────────
+    if (this.textures.exists(UI.tmPanelFull)) {
+      this.add.image(cx, 390, UI.tmPanelFull)
+        .setOrigin(0.5).setDisplaySize(300, 280).setDepth(90).setAlpha(0.45).setScrollFactor(0);
+    }
+
+    // ── Crown and shield emblems flanking the logo ────────────────────────
+    if (this.textures.exists(UI.feCrown)) {
+      this.add.image(cx - 240, 120, UI.feCrown)
+        .setOrigin(0.5).setDisplaySize(44, 44).setDepth(140).setAlpha(0.7).setScrollFactor(0);
+      this.add.image(cx + 240, 120, UI.feCrown)
+        .setOrigin(0.5).setDisplaySize(44, 44).setDepth(140).setAlpha(0.7).setScrollFactor(0);
+    }
+
     // ── Center buttons ────────────────────────────────────────────────────
     this.btnImages = [];
     ITEMS.forEach((item, i) => {

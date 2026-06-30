@@ -819,21 +819,52 @@ export class BrawlerScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
-    const overlay = this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
+    const overlay = this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.78)
       .setDepth(90000).setScrollFactor(0);
-    this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.72 }, duration: 300 });
+    this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.78 }, duration: 300 });
 
-    this.add.text(cx, cy - 50, 'K.O.', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '64px', color: '#ff2244',
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    // Panel art or fallback
+    if (this.textures.exists(UI.pmxPanelSmall)) {
+      this.add.image(cx, cy + 10, UI.pmxPanelSmall)
+        .setDisplaySize(380, 200).setDepth(90001).setScrollFactor(0);
+    } else {
+      this.add.rectangle(cx, cy + 10, 380, 200, 0x0a0614)
+        .setStrokeStyle(2, 0xff2244).setDepth(90001).setScrollFactor(0);
+    }
+
+    // Title bar behind K.O. text
+    if (this.textures.exists(UI.u1TitleBar4)) {
+      this.add.image(cx, cy - 52, UI.u1TitleBar4)
+        .setDisplaySize(340, 52).setDepth(90002).setScrollFactor(0).setAlpha(0.8);
+    }
+
+    this.add.text(cx, cy - 52, 'K.O.', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '56px', color: '#ff2244',
+      stroke: '#000000', strokeThickness: 8,
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
     this.add.text(cx, cy + 14, 'RETRY STAGE?', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffffff',
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
-    this.add.text(cx, cy + 50, 'SPACE — Retry     M — Main Menu', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    // Retry / Menu buttons
+    const mkKoBtn = (bx: number, label: string, artKey: string, color: string, action: () => void) => {
+      if (this.textures.exists(artKey)) {
+        const btn = this.add.image(bx, cy + 60, artKey)
+          .setDisplaySize(140, 38).setDepth(90003).setScrollFactor(0)
+          .setInteractive({ useHandCursor: true });
+        btn.on('pointerdown', action);
+      }
+      this.add.text(bx, cy + 60, label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color,
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(90004).setScrollFactor(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', action);
+    };
+    mkKoBtn(cx - 80, 'RETRY', UI.u1BtnConfirm,  '#ffd700', () => this.scene.restart());
+    mkKoBtn(cx + 80, 'MENU',  UI.u1BtnBack,     '#ccbbee', () => this.scene.start(SCENE.MainMenu));
 
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => this.scene.restart());

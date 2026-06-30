@@ -53,12 +53,27 @@ export class VenueSelectScene extends Phaser.Scene {
         .setAlpha(0.15).setDepth(-100);
     }
 
+    // ── Title bar art ────────────────────────────────────────────────────
+    if (this.hasArt && this.textures.exists(UI.u1TitleBar1)) {
+      this.add.image(GAME_WIDTH / 2, 28, UI.u1TitleBar1)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 46).setDepth(5).setAlpha(0.9);
+    }
+
+    // ── Crown motif left/right of title ──────────────────────────────────
+    if (this.hasArt && this.textures.exists(UI.u1MotifCrown)) {
+      this.add.image(GAME_WIDTH / 2 - 110, 28, UI.u1MotifCrown)
+        .setOrigin(0.5).setDisplaySize(28, 28).setDepth(6).setAlpha(0.8);
+      this.add.image(GAME_WIDTH / 2 + 110, 28, UI.u1MotifCrown)
+        .setOrigin(0.5).setDisplaySize(28, 28).setDepth(6).setAlpha(0.8);
+    }
+
     // ── Title ────────────────────────────────────────────────────────────
     this.add.text(GAME_WIDTH / 2, 28, 'VENUES', {
       fontFamily: 'Arial Black, sans-serif',
-      fontSize: '28px',
+      fontSize: '24px',
       color: '#ffd700',
-    }).setOrigin(0.5);
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(7);
 
     this.add.text(GAME_WIDTH / 2, 58, 'Beat bosses on the streets to unlock more venues', {
       fontFamily: 'monospace',

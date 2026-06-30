@@ -79,12 +79,19 @@ export class StageSelectScene extends Phaser.Scene {
         .setOrigin(0, 1).setDisplaySize(200, 80).setAlpha(0.65);
     }
 
+    // Title bar art strip
+    if (UISystem.ready(this) && this.textures.exists(UI.u1TitleBar1)) {
+      this.add.image(GAME_WIDTH / 2, 28, UI.u1TitleBar1)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 46).setDepth(5).setAlpha(0.9);
+    }
+
     // Title.
     this.add.text(GAME_WIDTH / 2, 28, 'QUEST — STAGE SELECT', {
       fontFamily: 'Arial Black, sans-serif',
-      fontSize: '26px',
+      fontSize: '22px',
       color: '#ffd700',
-    }).setOrigin(0.5);
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(6);
 
     this.add.text(GAME_WIDTH / 2, 60, 'Arrow keys / A·D to choose • Enter / Space to fight • ESC back', {
       fontFamily: 'monospace',
@@ -104,6 +111,12 @@ export class StageSelectScene extends Phaser.Scene {
     // Stage cards.
     for (let i = 0; i < STAGE_SEQUENCE.length; i++) {
       this.cards.push(this.buildCard(i));
+    }
+
+    // Bottom info panel art
+    if (UISystem.ready(this) && this.textures.exists(UI.vmInfoPanel)) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 48, UI.vmInfoPanel)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 60, 72).setAlpha(0.7).setDepth(1);
     }
 
     // Detail strip at bottom.

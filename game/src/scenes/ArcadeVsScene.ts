@@ -113,11 +113,24 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(0x0a0614);
 
+    // Title bar art
+    if (this.textures.exists(UI.u1TitleBar3)) {
+      grp.add(this.add.image(GAME_WIDTH / 2, 26, UI.u1TitleBar3)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 44).setDepth(5).setAlpha(0.9));
+    }
+    // Corner brackets
+    if (this.textures.exists(UI.u1CornerBrackets)) {
+      grp.add(this.add.image(4, 4, UI.u1CornerBrackets)
+        .setOrigin(0, 0).setDisplaySize(56, 56).setDepth(4).setAlpha(0.7));
+      grp.add(this.add.image(GAME_WIDTH - 4, 4, UI.u1CornerBrackets)
+        .setOrigin(1, 0).setDisplaySize(56, 56).setDepth(4).setAlpha(0.7).setFlipX(true));
+    }
+
     // Title
-    grp.add(this.add.text(GAME_WIDTH / 2, 24, 'ARCADE VS', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '30px', color: '#ffd700',
+    grp.add(this.add.text(GAME_WIDTH / 2, 26, 'ARCADE VS', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '26px', color: '#ffd700',
       stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5));
+    }).setOrigin(0.5).setDepth(6));
 
     this.phaseLabel = this.add.text(GAME_WIDTH / 2, 60, '', {
       fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
@@ -592,16 +605,29 @@ export class ArcadeVsScene extends Phaser.Scene {
         fontFamily: 'monospace', fontSize: '12px', color: this.difficulty.color,
       }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(50003);
 
-    // Round win pips (3 pips per side)
+    // Round win pips (3 pips per side) — use vsWinDots strip art if available
     this.roundPipsP1 = [];
     this.roundPipsP2 = [];
-    for (let i = 0; i < 3; i++) {
-      const p1pip = this.add.rectangle(20 + i * 14, HUD_Y + 56, 10, 10, 0x333333)
-        .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
-      const p2pip = this.add.rectangle(GAME_WIDTH - 20 - i * 14, HUD_Y + 56, 10, 10, 0x333333)
-        .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
-      this.roundPipsP1.push(p1pip);
-      this.roundPipsP2.push(p2pip);
+    if (this.textures.exists(UI.vsWinDots)) {
+      // vsWinDots strip: place 3 copies (inactive alpha 0.3, active 1.0)
+      for (let i = 0; i < 3; i++) {
+        const p1img = this.add.image(20 + i * 18, HUD_Y + 58, UI.vsWinDots)
+          .setDisplaySize(14, 14).setScrollFactor(0).setDepth(50003).setAlpha(0.25);
+        const p2img = this.add.image(GAME_WIDTH - 20 - i * 18, HUD_Y + 58, UI.vsWinDots)
+          .setDisplaySize(14, 14).setScrollFactor(0).setDepth(50003).setAlpha(0.25);
+        // Store as rects (type mismatch OK — we only use setFillStyle in refreshRoundPips)
+        this.roundPipsP1.push(p1img as unknown as Phaser.GameObjects.Rectangle);
+        this.roundPipsP2.push(p2img as unknown as Phaser.GameObjects.Rectangle);
+      }
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const p1pip = this.add.rectangle(20 + i * 14, HUD_Y + 56, 10, 10, 0x333333)
+          .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
+        const p2pip = this.add.rectangle(GAME_WIDTH - 20 - i * 14, HUD_Y + 56, 10, 10, 0x333333)
+          .setStrokeStyle(1, 0x666666).setScrollFactor(0).setDepth(50003);
+        this.roundPipsP1.push(p1pip);
+        this.roundPipsP2.push(p2pip);
+      }
     }
     this.refreshRoundPips();
 
@@ -625,9 +651,18 @@ export class ArcadeVsScene extends Phaser.Scene {
   }
 
   private refreshRoundPips(): void {
+    const useImgPips = this.textures.exists(UI.vsWinDots);
     for (let i = 0; i < 3; i++) {
-      this.roundPipsP1[i]?.setFillStyle(i < this.p1RoundWins ? 0x44aaff : 0x222233);
-      this.roundPipsP2[i]?.setFillStyle(i < this.p2RoundWins ? 0xff6644 : 0x221111);
+      const p1 = this.roundPipsP1[i];
+      const p2 = this.roundPipsP2[i];
+      if (useImgPips) {
+        // Image-based pips: use alpha to show earned vs not
+        (p1 as unknown as Phaser.GameObjects.Image).setAlpha(i < this.p1RoundWins ? 1.0 : 0.25);
+        (p2 as unknown as Phaser.GameObjects.Image).setAlpha(i < this.p2RoundWins ? 1.0 : 0.25);
+      } else {
+        p1?.setFillStyle(i < this.p1RoundWins ? 0x44aaff : 0x222233);
+        p2?.setFillStyle(i < this.p2RoundWins ? 0xff6644 : 0x221111);
+      }
     }
   }
 
