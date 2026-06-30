@@ -90,22 +90,39 @@ export class CharacterSelectScene extends Phaser.Scene {
     const panelX = GAME_WIDTH - 10;
     const panelY = GRID_Y;
     const panelW = GAME_WIDTH - (GRID_X + COLS * CELL + 20);
+    const portraitH = panelW * 1.25;
 
-    if (hasUI && this.textures.exists(UI.csPortraitFrameLarge)) {
-      this.add.image(panelX, panelY, UI.csPortraitFrameLarge)
-        .setOrigin(1, 0).setDisplaySize(panelW, panelW * 1.4);
+    // Portrait frame — prefer new csxPortraitGold crop, fall back to old art
+    const portraitFrameKey = [UI.csxPortraitGold, UI.csPortraitFrameLarge]
+      .find(k => hasUI && this.textures.exists(k));
+    if (portraitFrameKey) {
+      this.add.image(panelX, panelY, portraitFrameKey)
+        .setOrigin(1, 0).setDisplaySize(panelW, portraitH);
     }
 
-    this.previewSpr = this.add.sprite(panelX - panelW / 2, panelY + panelW * 0.7, '__DEFAULT')
-      .setOrigin(0.5, 1).setScale((panelW - 20) / 181);
+    this.previewSpr = this.add.sprite(panelX - panelW / 2, panelY + portraitH * 0.88, '__DEFAULT')
+      .setOrigin(0.5, 1).setScale((panelW - 24) / 181);
 
-    if (hasUI && this.textures.exists(UI.csStatPanel)) {
-      this.add.image(panelX, panelY + panelW * 1.45, UI.csStatPanel)
-        .setOrigin(1, 0).setDisplaySize(panelW, 120);
+    // Name bar — csxNameBar crop sits between portrait and stat panel
+    const nameBarY = panelY + portraitH + 2;
+    const nameBarKey = hasUI && this.textures.exists(UI.csxNameBar) ? UI.csxNameBar : null;
+    if (nameBarKey) {
+      this.add.image(panelX - panelW / 2, nameBarY, nameBarKey)
+        .setOrigin(0.5, 0).setDisplaySize(panelW, 28);
     }
 
-    this.nameTxt = this.add.text(panelX - panelW / 2, panelY + panelW * 1.5 + 6,
-      '', { fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffd700' },
+    // Stat panel — prefer csxStatPanel crop, fall back to old art
+    const statPanelKey = [UI.csxStatPanel, UI.csStatPanel]
+      .find(k => hasUI && this.textures.exists(k));
+    const statY = nameBarY + 30;
+    if (statPanelKey) {
+      this.add.image(panelX, statY, statPanelKey)
+        .setOrigin(1, 0).setDisplaySize(panelW, 110);
+    }
+
+    this.nameTxt = this.add.text(panelX - panelW / 2, nameBarY + 14,
+      '', { fontFamily: 'Arial Black, sans-serif', fontSize: '12px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 3 },
     ).setOrigin(0.5);
 
     // ── Bottom strip ───────────────────────────────────────────────────────
