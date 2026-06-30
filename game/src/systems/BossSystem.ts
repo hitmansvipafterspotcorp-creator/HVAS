@@ -6,6 +6,7 @@ import { Fighter } from '../entities/Fighter';
 import { GAME_WIDTH, GAME_HEIGHT, FLOOR_TOP, FLOOR_BOTTOM } from '../config';
 import type { BossDef } from '../data/stageTypes';
 import type { CombatSystem } from './CombatSystem';
+import { UISystem, UI } from './UISystem';
 
 // How long the full reveal cutscene takes (ms).
 const REVEAL_DURATION = 2800;
@@ -30,6 +31,7 @@ export class BossSystem {
   // Boss health bar (top of screen, enemy-side).
   private bossBarBg?: Phaser.GameObjects.Rectangle;
   private bossBarFill?: Phaser.GameObjects.Rectangle;
+  private bossBarArt?: Phaser.GameObjects.Image;
   private bossLabel?: Phaser.GameObjects.Text;
   private bossBarW = 340;
 
@@ -142,30 +144,45 @@ export class BossSystem {
   }
 
   private buildBossBar(): void {
+    const barH = 26;
     const bx = GAME_WIDTH - 12 - this.bossBarW;
     const by = 12;
 
+    // Dark trough background
     this.bossBarBg = this.scene.add
-      .rectangle(bx, by, this.bossBarW, 22, 0x1a0608)
+      .rectangle(bx, by, this.bossBarW, barH, 0x1a0608)
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(50003);
 
+    // Red fill (depletes from right)
     this.bossBarFill = this.scene.add
-      .rectangle(bx, by, this.bossBarW, 22, 0xcc2211)
-      .setOrigin(0, 0)
+      .rectangle(bx + this.bossBarW, by + barH / 2, 0, barH * 0.6, 0xcc2211)
+      .setOrigin(1, 0.5)
       .setScrollFactor(0)
       .setDepth(50004);
 
+    // Art overlay on top of fill (if available)
+    if (UISystem.ready(this.scene) && this.scene.textures.exists(UI.hudBossBar)) {
+      this.bossBarArt = this.scene.add
+        .image(bx, by, UI.hudBossBar)
+        .setOrigin(0, 0)
+        .setDisplaySize(this.bossBarW, barH + 4)
+        .setScrollFactor(0)
+        .setDepth(50005);
+    }
+
     this.bossLabel = this.scene.add
-      .text(bx + this.bossBarW / 2, by + 11, this.def.name.toUpperCase(), {
+      .text(bx + this.bossBarW / 2, by + barH / 2, this.def.name.toUpperCase(), {
         fontFamily: 'Arial Black, sans-serif',
-        fontSize: '13px',
+        fontSize: '12px',
         color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(50005);
+      .setDepth(50006);
   }
 
   // Call every frame while active. Returns true if the boss is still alive.
@@ -182,7 +199,7 @@ export class BossSystem {
     this.phaseTimer -= delta;
     b.syncView();
 
-    // Update boss HP bar.
+    // Update boss HP bar (fill depletes from right using origin-1 pattern).
     if (this.bossBarFill) {
       this.bossBarFill.width = this.bossBarW * Math.max(0, b.hp / b.maxHp);
     }
@@ -259,6 +276,7 @@ export class BossSystem {
   private teardownBar(): void {
     this.bossBarBg?.destroy();
     this.bossBarFill?.destroy();
+    this.bossBarArt?.destroy();
     this.bossLabel?.destroy();
   }
 }

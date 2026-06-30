@@ -70,6 +70,10 @@ export class BrawlerScene extends Phaser.Scene {
   private comboLabel?: Phaser.GameObjects.Image;
   private comboNum?: NumberDisplay;
   private meterPips: Phaser.GameObjects.Image[] = [];
+  private dangerOverlay?: Phaser.GameObjects.Image;
+  private hitFlashOverlay?: Phaser.GameObjects.Image;
+  private hitFlashTimer = 0;
+  private prevPlayerHp = 0;
 
   constructor() {
     super(SCENE.Brawler);
@@ -104,6 +108,7 @@ export class BrawlerScene extends Phaser.Scene {
 
     // Player — uses real sprite art if its anims are built, else graybox.
     this.player = new Fighter(this, 'player', 180, FLOOR_BOTTOM - 20, 120, PLAYER_ID);
+    this.prevPlayerHp = this.player.maxHp;
 
     // Systems.
     this.controls = new InputSystem(this);
@@ -247,6 +252,11 @@ export class BrawlerScene extends Phaser.Scene {
     for (const e of this.waves.enemies) e.syncView();
     this.combat.decayCombo(this.player, delta);
     this.checkVenueDoors();
+
+    // Trigger hit-flash when player HP drops
+    if (this.player.hp < this.prevPlayerHp) this.triggerHitFlash();
+    this.prevPlayerHp = this.player.hp;
+
     this.drawHud();
     this.drawDebug();
   }
@@ -557,6 +567,13 @@ export class BrawlerScene extends Phaser.Scene {
     }
   }
 
+  triggerHitFlash(): void {
+    if (this.hitFlashOverlay) {
+      this.hitFlashTimer = 120;
+      this.hitFlashOverlay.setVisible(true).setAlpha(1);
+    }
+  }
+
   private flashBanner(text: string): void {
     this.banner.setText(text).setVisible(true).setAlpha(1).setScale(1);
     this.tweens.add({
@@ -655,6 +672,18 @@ export class BrawlerScene extends Phaser.Scene {
         this.meterPips.push(pip);
       }
     }
+
+    // ── Screen-edge overlays (depth above everything) ─────────────────────
+    if (this.textures.exists(UI.hudDanger)) {
+      this.dangerOverlay = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.hudDanger)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+        .setScrollFactor(0).setDepth(60000).setAlpha(0).setVisible(false);
+    }
+    if (this.textures.exists(UI.hudHitFlash)) {
+      this.hitFlashOverlay = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.hudHitFlash)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+        .setScrollFactor(0).setDepth(60001).setAlpha(0).setVisible(false);
+    }
   }
 
   private drawHud(): void {
@@ -676,6 +705,23 @@ export class BrawlerScene extends Phaser.Scene {
       this.hud.setText(
         `WAVE ${this.waves.current + 1}/${this.waves.total}   ENEMIES ${alive}${weaponTag}`,
       );
+
+      // Danger vignette: pulse when HP < 25%
+      if (this.dangerOverlay) {
+        const danger = frac < 0.25;
+        this.dangerOverlay.setVisible(danger);
+        if (danger) {
+          const pulse = 0.35 + 0.25 * Math.sin(this.time.now / 220);
+          this.dangerOverlay.setAlpha(pulse);
+        }
+      }
+
+      // Hit flash: triggered externally via triggerHitFlash(), fades on its own
+      if (this.hitFlashOverlay && this.hitFlashTimer > 0) {
+        this.hitFlashTimer = Math.max(0, this.hitFlashTimer - 16);
+        const a = this.hitFlashTimer / 120;
+        this.hitFlashOverlay.setVisible(a > 0).setAlpha(a);
+      }
     } else {
       // Text fallback.
       const hpBars = '█'.repeat(Math.ceil((p.hp / p.maxHp) * 20)).padEnd(20, '·');
