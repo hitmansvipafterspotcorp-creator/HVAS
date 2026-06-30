@@ -4,26 +4,32 @@ import { UISystem, UI } from '../systems/UISystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
-// MainMenuScene: the HITGEAR hub entry. Lists the playable modes; QUEST routes
-// into the brawler. Other modes are stubbed as "COMING SOON" so navigation is
-// never broken / never blank.
-type MenuItem = { label: string; scene?: string; soon?: boolean };
+// Menu entries wired to real mm_btn_* textures
+type MenuItem = {
+  label: string;
+  btnKey: string;
+  btnSelKey: string;
+  scene?: string;
+};
 
 const ITEMS: MenuItem[] = [
-  { label: 'QUEST', scene: SCENE.StageSelect },
-  { label: 'ARCADE VS', scene: SCENE.ArcadeVs },
-  { label: 'VENUES', scene: SCENE.VenueSelect },
-  { label: 'LEVEL EDITOR', scene: SCENE.LevelEditor },
-  { label: 'LIPSYNC BINGO', scene: SCENE.LipsyncBingo },
-  { label: 'TV MODE', scene: SCENE.TvMode },
-  { label: 'HOST / DJ', scene: SCENE.HostDj },
-  { label: 'MEMBER CHECK-IN', scene: SCENE.MemberCheckIn },
-  { label: 'MEMBERSHIP', scene: SCENE.Membership },
+  { label: 'QUEST',          btnKey: UI.mmBtnNewGame,    btnSelKey: UI.mmBtnNewGameSel,    scene: SCENE.StageSelect },
+  { label: 'ARCADE VS',      btnKey: UI.mmBtnVsMode,     btnSelKey: UI.mmBtnVsModeSel,     scene: SCENE.ArcadeVs },
+  { label: 'CHAR SELECT',    btnKey: UI.mmBtnCharSelect, btnSelKey: UI.mmBtnCharSelectSel, scene: SCENE.CharacterSelect },
+  { label: 'VENUES',         btnKey: UI.mmBtnVenueMap,   btnSelKey: UI.mmBtnVenueMapSel,   scene: SCENE.VenueSelect },
+  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,    btnSelKey: UI.mmBtnOptionsSel },
+  { label: 'EXIT / MAIN',    btnKey: UI.mmBtnExit,       btnSelKey: UI.mmBtnExitSel,       scene: SCENE.MainMenu },
 ];
+
+const BTN_W  = 220;
+const BTN_H  = 44;
+const BTN_X  = 480;    // center x of button column
+const BTN_Y0 = 268;    // top of first button
+const BTN_GAP = 54;    // spacing between buttons
 
 export class MainMenuScene extends Phaser.Scene {
   private index = 0;
-  private rows: Phaser.GameObjects.Text[] = [];
+  private btnImages: Phaser.GameObjects.Image[] = [];
 
   constructor() {
     super(SCENE.MainMenu);
@@ -31,70 +37,21 @@ export class MainMenuScene extends Phaser.Scene {
 
   create(): void {
     AudioSystem.playForScene(this, 'MainMenu');
-    const cx = GAME_WIDTH / 2;
-
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    // Real HITGEAR logo if loaded; text fallback otherwise.
-    if (UISystem.ready(this)) {
-      const logo = this.add.image(cx, 96, UI.logo).setOrigin(0.5);
-      logo.setDisplaySize(150, 150);
-      this.tweens.add({
-        targets: logo,
-        scale: logo.scale * 1.04,
-        duration: 1600,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
+    const hasUI = UISystem.ready(this);
+
+    if (hasUI) {
+      this.buildWithArt();
     } else {
-      this.add
-        .text(cx, 70, 'HITMANS VIP AFTER SPOT', {
-          fontFamily: 'Arial Black, sans-serif',
-          fontSize: '34px',
-          color: '#ffd700',
-        })
-        .setOrigin(0.5);
+      this.buildFallback();
     }
 
-    ITEMS.forEach((item, i) => {
-      const y = 180 + i * 54;
-      const txt = this.add
-        .text(cx, y, item.label + (item.soon ? '  (COMING SOON)' : ''), {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '24px',
-          color: item.soon ? '#776688' : '#ffffff',
-        })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true });
-      txt.on('pointerover', () => this.select(i));
-      txt.on('pointerdown', () => this.activate(i));
-      this.rows.push(txt);
-    });
-
-    this.add
-      .text(cx, GAME_HEIGHT - 30, 'Arrow keys / mouse • Enter to select', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        color: '#8877aa',
-      })
-      .setOrigin(0.5);
-
-    // Progress readout.
-    const beaten = ProgressionSystem.getBeatenBosses().length;
-    const total = 7;
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 46,
-      beaten > 0 ? `Quest: ${beaten}/${total} bosses defeated` : '',
-      { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
-    ).setOrigin(0.5);
-
     const kb = this.input.keyboard!;
-    kb.on('keydown-UP',   () => this.select(this.index - 1));
-    kb.on('keydown-DOWN', () => this.select(this.index + 1));
+    kb.on('keydown-UP',    () => this.select(this.index - 1));
+    kb.on('keydown-DOWN',  () => this.select(this.index + 1));
     kb.on('keydown-ENTER', () => this.activate(this.index));
     kb.on('keydown-SPACE', () => this.activate(this.index));
-
-    // Hidden dev shortcuts: Ctrl+Shift+U = unlock all, Ctrl+Shift+R = reset.
     kb.on('keydown-U', (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey) { ProgressionSystem.unlockAll(); this.scene.restart(); }
     });
@@ -105,18 +62,123 @@ export class MainMenuScene extends Phaser.Scene {
     this.select(0);
   }
 
+  // ── Art build ─────────────────────────────────────────────────────────────
+  private buildWithArt(): void {
+    const cx = GAME_WIDTH / 2;
+
+    // ── Top-left: HITMANS VIP QUEST logo ─────────────────────────────────
+    UISystem.place(this, UI.mmLogo, 22, 18, { originX: 0, originY: 0, depth: 100 });
+
+    // ── Top-right: profile bar ────────────────────────────────────────────
+    UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });
+
+    // ── Left column: taglines + mode badges + rank chips ──────────────────
+    UISystem.place(this, UI.mmTaglines,   22, 178, { originX: 0, originY: 0, depth: 100 });
+    UISystem.place(this, UI.mmModeBadges, 22, 362, { originX: 0, originY: 0, depth: 100 });
+    UISystem.place(this, UI.mmRankChips,  22, 498, { originX: 0, originY: 0, depth: 100 });
+
+    // ── Right column: news + quests panels ───────────────────────────────
+    UISystem.place(this, UI.mmNewsPanel,   GAME_WIDTH - 22, 160, { originX: 1, originY: 0, depth: 100 });
+    UISystem.place(this, UI.mmQuestsPanel, GAME_WIDTH - 22, 440, { originX: 1, originY: 0, depth: 100 });
+
+    // ── Bottom: reward strip + footer ornament ────────────────────────────
+    UISystem.place(this, UI.mmRewardStrip,    cx, GAME_HEIGHT - 4, { originX: 0.5, originY: 1, depth: 100 });
+    UISystem.place(this, UI.mmFooterOrnament, GAME_WIDTH - 6, GAME_HEIGHT - 2, { originX: 1, originY: 1, depth: 100 });
+
+    // ── Progress readout ──────────────────────────────────────────────────
+    const beaten = ProgressionSystem.getBeatenBosses().length;
+    if (beaten > 0) {
+      this.add.text(cx, GAME_HEIGHT - 70,
+        `Quest: ${beaten}/7 bosses defeated`,
+        { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
+      ).setOrigin(0.5).setDepth(110).setScrollFactor(0);
+    }
+
+    // ── Center buttons ────────────────────────────────────────────────────
+    this.btnImages = [];
+    ITEMS.forEach((item, i) => {
+      const y = BTN_Y0 + i * BTN_GAP;
+      const img = this.add.image(BTN_X, y, item.btnKey)
+        .setDisplaySize(BTN_W, BTN_H)
+        .setOrigin(0.5)
+        .setDepth(200)
+        .setScrollFactor(0)
+        .setInteractive({ useHandCursor: true });
+
+      img.on('pointerover', () => this.select(i));
+      img.on('pointerdown', () => this.activate(i));
+      this.btnImages.push(img);
+    });
+
+    // Hint text
+    this.add.text(BTN_X, BTN_Y0 + ITEMS.length * BTN_GAP + 18,
+      'Arrow keys or mouse • Enter/Space to select',
+      { fontFamily: 'monospace', fontSize: '11px', color: '#8877aa' },
+    ).setOrigin(0.5).setDepth(110).setScrollFactor(0);
+  }
+
+  // ── Fallback (art not loaded yet) ─────────────────────────────────────────
+  private buildFallback(): void {
+    const cx = GAME_WIDTH / 2;
+    this.add.text(cx, 70, 'HITMANS VIP AFTER SPOT', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '32px',
+      color: '#ffd700',
+    }).setOrigin(0.5);
+
+    ITEMS.forEach((item, i) => {
+      const y = 200 + i * 54;
+      const txt = this.add.text(cx, y, item.label, {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      txt.on('pointerover', () => this.select(i));
+      txt.on('pointerdown', () => this.activate(i));
+      this.btnImages.push(txt as unknown as Phaser.GameObjects.Image);
+    });
+
+    this.add.text(cx, GAME_HEIGHT - 30, 'Arrow keys / mouse • Enter to select', {
+      fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#8877aa',
+    }).setOrigin(0.5);
+
+    const beaten = ProgressionSystem.getBeatenBosses().length;
+    if (beaten > 0) {
+      this.add.text(cx, GAME_HEIGHT - 46,
+        `Quest: ${beaten}/7 bosses defeated`,
+        { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
+      ).setOrigin(0.5);
+    }
+  }
+
+  // ── Selection ─────────────────────────────────────────────────────────────
   private select(i: number): void {
     this.index = Phaser.Math.Wrap(i, 0, ITEMS.length);
-    this.rows.forEach((r, ri) => {
-      const soon = ITEMS[ri].soon;
-      r.setColor(ri === this.index ? '#ffd700' : soon ? '#776688' : '#ffffff');
-      r.setScale(ri === this.index ? 1.1 : 1.0);
+    const hasUI = UISystem.ready(this);
+    this.btnImages.forEach((btn, ri) => {
+      if (hasUI) {
+        const item = ITEMS[ri];
+        const key = ri === this.index ? item.btnSelKey : item.btnKey;
+        (btn as Phaser.GameObjects.Image).setTexture(key);
+        const scale = ri === this.index ? 1.08 : 1.0;
+        btn.setDisplaySize(BTN_W * scale, BTN_H * scale);
+      } else {
+        const txt = btn as unknown as Phaser.GameObjects.Text;
+        if (txt.setColor) {
+          txt.setColor(ri === this.index ? '#ffd700' : '#ffffff');
+          txt.setScale(ri === this.index ? 1.1 : 1.0);
+        }
+      }
     });
   }
 
   private activate(i: number): void {
     const item = ITEMS[i];
-    if (item.soon || !item.scene) return;
+    if (!item.scene) return;
+    if (item.scene === SCENE.MainMenu) {
+      this.scene.start(SCENE.VenueSelect);
+      return;
+    }
     this.scene.start(item.scene);
   }
 }

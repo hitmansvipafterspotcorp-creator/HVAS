@@ -2,115 +2,379 @@ import Phaser from 'phaser';
 import { ASSET_BASE } from '../config';
 
 // ── UISystem ────────────────────────────────────────────────────────────────
-// Loads every named UI element from assets/ui/. Full sheets serve as scene
-// backdrops; named element slices are wired into specific HUD / menu slots.
+// Loads every named UI element from assets/ui/elements/.
 
 export const UI = {
-  // Core
-  logo:            'ui_logo',
-  shell:           'ui_shell',
-  // HUD named pieces
-  healthBar:       'ui_health_bar',
-  comboLabel:      'ui_combo_label',
-  pipStar:         'ui_pip_star',
-  digit:           (d: number | string) => `ui_digit_${d}`,
-  hudPortrait:     'ui_hud_portrait',       // hud_001  portrait frame
-  hudTimer:        'ui_hud_timer',          // hud_002  timer badge
-  hudSuperBar:     'ui_hud_super_bar',      // hud_003  super bar
-  hudGuardBar:     'ui_hud_guard_bar',      // hud_004  guard/block bar
-  hudBossBar:      'ui_hud_boss_bar',       // hud_005  boss HP bar
-  hudCombo:        'ui_hud_combo',          // hud_006  "10 COMBO" graphic
-  hudDanger:       'ui_hud_danger',         // hud_015  "DANGER LOW HEALTH" badge
-  // Full backdrop sheets (used as scene backgrounds)
-  sheetTitle:      'ui_sheet_title',
-  sheetCharSelect: 'ui_sheet_charselect',
-  sheetPause:      'ui_sheet_pause',
-  sheetVenueMap:   'ui_sheet_venuemap',
-  sheetHud:        'ui_sheet_hud',
-  sheetDialogue:   'ui_sheet_dialogue',
-  sheetOptions:    'ui_sheet_options',
-  // LSB kit sheets
-  lsbMaster:       'ui_lsb_master',
-  lsbLobby:        'ui_lsb_lobby',
-  lsbBingoCard:    'ui_lsb_bingo_card',
-  lsbHostDj:       'ui_lsb_host_dj',
-  lsbVerification: 'ui_lsb_verification',
-  lsbSongQueue:    'ui_lsb_song_queue',
-  lsbWinner:       'ui_lsb_winner',
-  lsbMembership:   'ui_lsb_membership',
-  lsbPartyMode:    'ui_lsb_party_mode',
-  lsbTvDisplay:    'ui_lsb_tv_display',
-  // VIP Quest kit sheets
-  vipMainMenu:     'ui_vip_main_menu',
-  vipVsScreen:     'ui_vip_vs_screen',
-  vipCharSelect:   'ui_vip_char_select',
-  vipLoading:      'ui_vip_loading',
-  hitkoinLogo:     'ui_hitkoin_logo',
-  // Pause menu slices
-  pauseTitle:      'ui_pause_title',      // pause_menu_000  578×111
-  pausePanel:      'ui_pause_panel',      // pause_menu_001  607×385
-  // Character-select slices
-  csFrameL:        'ui_cs_frame_l',       // character_select_000  205×331 (P1 portrait frame)
-  csFrameR:        'ui_cs_frame_r',       // character_select_001  204×324 (P2 portrait frame)
-  csGrid:          'ui_cs_grid',          // character_select_027  474×352 (grid background)
-  csLabelP1:       'ui_cs_label_p1',      // character_select_005  274×50
-  csLabelP2:       'ui_cs_label_p2',      // character_select_006  276×52
-  csVs:            'ui_cs_vs',            // character_select_008  268×174
-  // Dialogue panel
-  dialoguePanel:   'ui_dialogue_panel',   // dialogue_mission_001  413×317
+  // ── Core ──────────────────────────────────────────────────────────────────
+  logo:              'ui_logo',
+
+  // ── Main Menu ─────────────────────────────────────────────────────────────
+  mmLogo:            'mm_logo',
+  mmProfileBar:      'mm_profile_bar',
+  mmTaglines:        'mm_taglines',
+  mmModeBadges:      'mm_mode_badges',
+  mmRankChips:       'mm_rank_chips',
+  mmPromptChips:     'mm_prompt_chips',
+  mmNewsPanel:       'mm_news_panel',
+  mmQuestsPanel:     'mm_quests_panel',
+  mmRewardStrip:     'mm_reward_strip',
+  mmFooterOrnament:  'mm_footer_ornament',
+  mmDecorative:      'mm_decorative',
+  mmBottomIcons:     'mm_bottom_icons',
+  // buttons (7 × default + 7 × selected)
+  mmBtnContinue:     'mm_btn_continue',
+  mmBtnContinueSel:  'mm_btn_continue_sel',
+  mmBtnNewGame:      'mm_btn_newgame',
+  mmBtnNewGameSel:   'mm_btn_newgame_sel',
+  mmBtnVsMode:       'mm_btn_vsmode',
+  mmBtnVsModeSel:    'mm_btn_vsmode_sel',
+  mmBtnCharSelect:   'mm_btn_charselect',
+  mmBtnCharSelectSel:'mm_btn_charselect_sel',
+  mmBtnVenueMap:     'mm_btn_venuemap',
+  mmBtnVenueMapSel:  'mm_btn_venuemap_sel',
+  mmBtnOptions:      'mm_btn_options',
+  mmBtnOptionsSel:   'mm_btn_options_sel',
+  mmBtnExit:         'mm_btn_exit',
+  mmBtnExitSel:      'mm_btn_exit_sel',
+
+  // ── HUD ───────────────────────────────────────────────────────────────────
+  hudPortraitFrame:  'hud_portrait_frame',
+  hudHealthBar:      'hud_health_bar',
+  hudSuperBar:       'hud_super_bar',
+  hudGuardBar:       'hud_guard_bar',
+  hudBossBar:        'hud_boss_bar',
+  hudTimer:          'hud_timer',
+  hudComboCounter:   'hud_combo_counter',
+  hudComboLabel:     'hud_combo_label',
+  hudScoreChip:      'hud_score_chip',
+  hudDanger:         'hud_danger',
+  hudHitFlash:       'hud_hit_flash',
+  hudObjective:      'hud_objective',
+  hudShieldLogo:     'hud_shield_logo',
+  hudIconCrown:      'hud_icon_crown',
+  hudIconLightning:  'hud_icon_lightning',
+  hudIconShield:     'hud_icon_shield',
+  hudIconSkull:      'hud_icon_skull',
+  hudIconStar:       'hud_icon_star',
+  hudPipStar:        'hud_pip_star',
+  hudControls:       'hud_controls',
+  hudBtnLight:       'hud_btn_light',
+  hudBtnHeavy:       'hud_btn_heavy',
+  hudBtnBlock:       'hud_btn_block',
+  hudBtnSpecial:     'hud_btn_special',
+  digit:             (d: number | string) => `ui_digit_${d}`,
+
+  // ── Pause Menu ────────────────────────────────────────────────────────────
+  pmTitleBanner:     'pm_title_banner',
+  pmPanelLeft:       'pm_panel_left',
+  pmPanelRight:      'pm_panel_right',
+  pmPanelWide:       'pm_panel_wide',
+  pmOverlayMd:       'pm_overlay_md',
+  pmOverlaySm:       'pm_overlay_sm',
+  pmBtnContinue:     'pm_btn_continue_default',
+  pmBtnContinueHov:  'pm_btn_continue_hover',
+  pmBtnRestart:      'pm_btn_restart_default',
+  pmBtnRestartHov:   'pm_btn_restart_hover',
+  pmBtnRetry:        'pm_btn_retry_default',
+  pmBtnRetryHov:     'pm_btn_retry_hover',
+  pmBtnSettings:     'pm_btn_settings_default',
+  pmBtnSettingsHov:  'pm_btn_settings_hover',
+  pmBtnQuit:         'pm_btn_quit_default',
+  pmBtnQuitHov:      'pm_btn_quit_hover',
+  pmTabMission:      'pm_tab_mission',
+  pmTabSettings:     'pm_tab_settings',
+  pmTabStats:        'pm_tab_stats',
+  pmRowDefault:      'pm_row_default',
+  pmRowHighlight1:   'pm_row_highlight_01',
+  pmRowHighlight2:   'pm_row_highlight_02',
+  pmSaveBadge:       'pm_save_badge',
+  pmDialogConfirm:   'pm_dialog_confirm',
+  pmPromptA:         'pm_prompt_a',
+  pmPromptB:         'pm_prompt_b',
+  pmPromptX:         'pm_prompt_x',
+  pmPromptY:         'pm_prompt_y',
+  pmPromptMenu:      'pm_prompt_menu',
+
+  // ── Stage Select ──────────────────────────────────────────────────────────
+  ssMapFrame:        'ss_map_frame',
+  ssStageInfoPanel:  'ss_stage_info_panel',
+  ssRouteNodes:      'ss_route_nodes',
+  ssRouteArrows:     'ss_route_arrows',
+  ssStageBadgesUnlocked: 'ss_stage_badges_unlocked',
+  ssStageBadgesLocked:   'ss_stage_badges_locked',
+  ssVenueCard1:      'ss_venue_card_1',
+  ssVenueCard2:      'ss_venue_card_2',
+  ssVenueCard3:      'ss_venue_card_3',
+  ssVenueCard4:      'ss_venue_card_4',
+  ssVenueCards:      'ss_venue_cards',
+  ssObjectiveChip:   'ss_objective_chip',
+  ssCheckpointIcons: 'ss_checkpoint_icons',
+  ssLegendPanel:     'ss_legend_panel',
+  ssFastTravelBtn:   'ss_fast_travel_btn',
+  ssPreviewFrames:   'ss_preview_frames',
+
+  // ── VS Screen ─────────────────────────────────────────────────────────────
+  vsTitleLogo:       'vs_title_logo',
+  vsEmblem:          'vs_emblem',
+  vsNameplateP1:     'vs_nameplate_p1',
+  vsNameplateP2:     'vs_nameplate_p2',
+  vsPortraitLargeL:  'vs_portrait_large_l',
+  vsPortraitLargeR:  'vs_portrait_large_r',
+  vsPortraitMed:     'vs_portrait_med',
+  vsPortraitSmall:   'vs_portrait_small',
+  vsRoundIndicators: 'vs_round_indicators',
+  vsWinDots:         'vs_win_dots',
+  vsRankBadges:      'vs_rank_badges',
+  vsLevelChips:      'vs_level_chips',
+  vsMatchRules:      'vs_match_rules',
+  vsProgressBar:     'vs_progress_bar',
+  vsBtnChips:        'vs_btn_chips',
+  vsReadyMarkers:    'vs_ready_markers',
+  vsWinnerMarkers:   'vs_winner_markers',
+  vsStageBanners:    'vs_stage_banners',
+
+  // ── Character Select ──────────────────────────────────────────────────────
+  csTitleBanner:     'cs_title_banner',
+  csPortraitFrameLarge: 'cs_portrait_frame_large',
+  csSlotGrid:        'cs_slot_grid',
+  csSlotIdle:        'cs_slot_idle',
+  csSlotSelected:    'cs_slot_selected',
+  csStatPanel:       'cs_stat_panel',
+  csCategoryTabs:    'cs_category_tabs',
+  csColorTabs:       'cs_color_tabs',
+  csDivider:         'cs_divider',
+  csStyleTags:       'cs_style_tags',
+  csActionBtns:      'cs_action_btns',
+  csPromptChips:     'cs_prompt_chips',
+  csReadyCpu:        'cs_ready_cpu',
+  csInstructionStrip:'cs_instruction_strip',
+  csBottomIcons:     'cs_bottom_icons',
+
+  // ── Dialogue ──────────────────────────────────────────────────────────────
+  dlgFrameLarge:     'dlg_frame_large',
+  dlgFrameMedium:    'dlg_frame_medium',
+  dlgFrameSmall:     'dlg_frame_small',
+  dlgSpeakerPlate:   'dlg_speaker_plate',
+  dlgMissionStart:   'dlg_mission_start',
+  dlgMissionUpdate:  'dlg_mission_update',
+  dlgObjectiveComplete: 'dlg_objective_complete',
+  dlgRewardPopup:    'dlg_reward_popup',
+  dlgItemChip:       'dlg_item_chip',
+  dlgSuccessAlert:   'dlg_success_alert',
+  dlgWarningAlert:   'dlg_warning_alert',
+  dlgXpPopup:        'dlg_xp_popup',
+  dlgToastMission:   'dlg_toast_mission',
+  dlgToastObjective: 'dlg_toast_objective',
+  dlgToastComplete:  'dlg_toast_complete',
+  dlgToastReward:    'dlg_toast_reward',
+
+  // ── Legacy aliases (kept so old code doesn't break) ───────────────────────
+  healthBar:         'hud_health_bar',
+  comboLabel:        'hud_combo_label',
+  pipStar:           'hud_pip_star',
+  hudPortrait:       'hud_portrait_frame',
+  hudSuperBarOld:    'hud_super_bar',
+  hudGuardBarOld:    'hud_guard_bar',
+  hudBossBarOld:     'hud_boss_bar',
+  hudCombo:          'hud_combo_counter',
+  hudDangerOld:      'hud_danger',
+  dialoguePanel:     'dlg_frame_large',
+  pauseTitle:        'pm_title_banner',
+  pausePanel:        'pm_panel_wide',
+  // char-select aliases for ArcadeVsScene
+  csGrid:            'cs_slot_grid',
+  csFrameL:          'cs_portrait_frame_large',
+  csFrameR:          'cs_portrait_frame_large',
+  csLabelP1:         'cs_title_banner',
+  csLabelP2:         'cs_title_banner',
+  csVs:              'vs_emblem',
+  // LSB kit sheet aliases
+  lsbMaster:         'ui_lsb_master',
+  lsbLobby:          'ui_lsb_lobby',
+  lsbBingoCard:      'ui_lsb_bingo_card',
+  lsbHostDj:         'ui_lsb_host_dj',
+  lsbVerification:   'ui_lsb_verification',
+  lsbSongQueue:      'ui_lsb_song_queue',
+  lsbWinner:         'ui_lsb_winner',
+  lsbMembership:     'ui_lsb_membership',
+  lsbPartyMode:      'ui_lsb_party_mode',
+  lsbTvDisplay:      'ui_lsb_tv_display',
 } as const;
 
-// ─── Named element load manifest ─────────────────────────────────────────────
+// ─── Load manifest ───────────────────────────────────────────────────────────
 const FILES: Array<[string, string]> = [
-  [UI.logo,            'ui/hvas_logo.png'],
-  [UI.shell,           'ui/hitgear_shell.png'],
-  // HUD
-  [UI.healthBar,       'ui/elements/hud/hud_health_bar.png'],
-  [UI.comboLabel,      'ui/elements/hud/hud_combo_label.png'],
-  [UI.pipStar,         'ui/elements/hud/hud_pip_star.png'],
-  [UI.hudPortrait,     'ui/elements/hud/hud_001.png'],
-  [UI.hudTimer,        'ui/elements/hud/hud_002.png'],
-  [UI.hudSuperBar,     'ui/elements/hud/hud_003.png'],
-  [UI.hudGuardBar,     'ui/elements/hud/hud_004.png'],
-  [UI.hudBossBar,      'ui/elements/hud/hud_005.png'],
-  [UI.hudCombo,        'ui/elements/hud/hud_006.png'],
-  [UI.hudDanger,       'ui/elements/hud/hud_015.png'],
-  // Full sheets
-  [UI.sheetTitle,      'ui/ui_sheet_01_title_main_menu.png'],
-  [UI.sheetCharSelect, 'ui/ui_sheet_04_character_select.png'],
-  [UI.sheetPause,      'ui/ui_sheet_03_pause_menu.png'],
-  [UI.sheetVenueMap,   'ui/ui_sheet_06_venue_map_stage_select.png'],
-  [UI.sheetHud,        'ui/ui_sheet_05_hud.png'],
-  [UI.sheetDialogue,   'ui/ui_sheet_07_dialogue_mission_reward.png'],
-  [UI.sheetOptions,    'ui/ui_sheet_09_options_settings.png'],
-  // LSB kit sheets
-  [UI.lsbMaster,       'ui/lsb_sheet_01_master_style.png'],
-  [UI.lsbLobby,        'ui/lsb_sheet_02_lobby.png'],
-  [UI.lsbBingoCard,    'ui/lsb_sheet_03_bingo_card.png'],
-  [UI.lsbHostDj,       'ui/lsb_sheet_04_host_dj.png'],
-  [UI.lsbVerification, 'ui/lsb_sheet_05_card_verification.png'],
-  [UI.lsbSongQueue,    'ui/lsb_sheet_06_song_queue.png'],
-  [UI.lsbWinner,       'ui/lsb_sheet_07_winner_payout.png'],
-  [UI.lsbMembership,   'ui/lsb_sheet_08_membership.png'],
-  [UI.lsbPartyMode,    'ui/lsb_sheet_09_party_battlerz.png'],
-  [UI.lsbTvDisplay,    'ui/lsb_sheet_10_tv_display.png'],
-  // VIP Quest kit sheets
-  [UI.vipMainMenu,     'ui/vip_sheet_01_main_menu.png'],
-  [UI.vipVsScreen,     'ui/vip_sheet_02_vs_screen.png'],
-  [UI.vipCharSelect,   'ui/vip_sheet_03_char_select.png'],
-  [UI.vipLoading,      'ui/vip_sheet_04_loading.png'],
-  [UI.hitkoinLogo,     'ui/hitkoin_logo.png'],
-  // Pause menu pieces
-  [UI.pauseTitle,      'ui/elements/pause_menu/pause_menu_000.png'],
-  [UI.pausePanel,      'ui/elements/pause_menu/pause_menu_001.png'],
-  // Character-select pieces
-  [UI.csFrameL,        'ui/elements/character_select/character_select_000.png'],
-  [UI.csFrameR,        'ui/elements/character_select/character_select_001.png'],
-  [UI.csGrid,          'ui/elements/character_select/character_select_027.png'],
-  [UI.csLabelP1,       'ui/elements/character_select/character_select_005.png'],
-  [UI.csLabelP2,       'ui/elements/character_select/character_select_006.png'],
-  [UI.csVs,            'ui/elements/character_select/character_select_008.png'],
-  [UI.dialoguePanel,   'ui/elements/dialogue_mission/dialogue_mission_001.png'],
+  // Core logo
+  [UI.logo,              'ui/hvas_logo.png'],
+
+  // ── Main Menu ────────────────────────────────────────────────────────────
+  [UI.mmLogo,            'ui/elements/main_menu/mm_logo.png'],
+  [UI.mmProfileBar,      'ui/elements/main_menu/mm_profile_bar.png'],
+  [UI.mmTaglines,        'ui/elements/main_menu/mm_taglines.png'],
+  [UI.mmModeBadges,      'ui/elements/main_menu/mm_mode_badges.png'],
+  [UI.mmRankChips,       'ui/elements/main_menu/mm_rank_chips.png'],
+  [UI.mmPromptChips,     'ui/elements/main_menu/mm_prompt_chips.png'],
+  [UI.mmNewsPanel,       'ui/elements/main_menu/mm_news_panel.png'],
+  [UI.mmQuestsPanel,     'ui/elements/main_menu/mm_quests_panel.png'],
+  [UI.mmRewardStrip,     'ui/elements/main_menu/mm_reward_strip.png'],
+  [UI.mmFooterOrnament,  'ui/elements/main_menu/mm_footer_ornament.png'],
+  [UI.mmDecorative,      'ui/elements/main_menu/mm_decorative.png'],
+  [UI.mmBottomIcons,     'ui/elements/main_menu/mm_bottom_icons.png'],
+  [UI.mmBtnContinue,     'ui/elements/main_menu/mm_btn_continue.png'],
+  [UI.mmBtnContinueSel,  'ui/elements/main_menu/mm_btn_continue_sel.png'],
+  [UI.mmBtnNewGame,      'ui/elements/main_menu/mm_btn_newgame.png'],
+  [UI.mmBtnNewGameSel,   'ui/elements/main_menu/mm_btn_newgame_sel.png'],
+  [UI.mmBtnVsMode,       'ui/elements/main_menu/mm_btn_vsmode.png'],
+  [UI.mmBtnVsModeSel,    'ui/elements/main_menu/mm_btn_vsmode_sel.png'],
+  [UI.mmBtnCharSelect,   'ui/elements/main_menu/mm_btn_charselect.png'],
+  [UI.mmBtnCharSelectSel,'ui/elements/main_menu/mm_btn_charselect_sel.png'],
+  [UI.mmBtnVenueMap,     'ui/elements/main_menu/mm_btn_venuemap.png'],
+  [UI.mmBtnVenueMapSel,  'ui/elements/main_menu/mm_btn_venuemap_sel.png'],
+  [UI.mmBtnOptions,      'ui/elements/main_menu/mm_btn_options.png'],
+  [UI.mmBtnOptionsSel,   'ui/elements/main_menu/mm_btn_options_sel.png'],
+  [UI.mmBtnExit,         'ui/elements/main_menu/mm_btn_exit.png'],
+  [UI.mmBtnExitSel,      'ui/elements/main_menu/mm_btn_exit_sel.png'],
+
+  // ── HUD ──────────────────────────────────────────────────────────────────
+  [UI.hudPortraitFrame,  'ui/elements/hud/hud_portrait_frame.png'],
+  [UI.hudHealthBar,      'ui/elements/hud/hud_health_bar.png'],
+  [UI.hudSuperBar,       'ui/elements/hud/hud_super_bar.png'],
+  [UI.hudGuardBar,       'ui/elements/hud/hud_guard_bar.png'],
+  [UI.hudBossBar,        'ui/elements/hud/hud_boss_bar.png'],
+  [UI.hudTimer,          'ui/elements/hud/hud_timer.png'],
+  [UI.hudComboCounter,   'ui/elements/hud/hud_combo_counter.png'],
+  [UI.hudComboLabel,     'ui/elements/hud/hud_combo_label.png'],
+  [UI.hudScoreChip,      'ui/elements/hud/hud_score_chip.png'],
+  [UI.hudDanger,         'ui/elements/hud/hud_danger.png'],
+  [UI.hudHitFlash,       'ui/elements/hud/hud_hit_flash.png'],
+  [UI.hudObjective,      'ui/elements/hud/hud_objective.png'],
+  [UI.hudShieldLogo,     'ui/elements/hud/hud_shield_logo.png'],
+  [UI.hudIconCrown,      'ui/elements/hud/hud_icon_crown.png'],
+  [UI.hudIconLightning,  'ui/elements/hud/hud_icon_lightning.png'],
+  [UI.hudIconShield,     'ui/elements/hud/hud_icon_shield.png'],
+  [UI.hudIconSkull,      'ui/elements/hud/hud_icon_skull.png'],
+  [UI.hudIconStar,       'ui/elements/hud/hud_icon_star.png'],
+  [UI.hudPipStar,        'ui/elements/hud/hud_pip_star.png'],
+  [UI.hudControls,       'ui/elements/hud/hud_controls.png'],
+  [UI.hudBtnLight,       'ui/elements/hud/hud_btn_light.png'],
+  [UI.hudBtnHeavy,       'ui/elements/hud/hud_btn_heavy.png'],
+  [UI.hudBtnBlock,       'ui/elements/hud/hud_btn_block.png'],
+  [UI.hudBtnSpecial,     'ui/elements/hud/hud_btn_special.png'],
+
+  // ── Pause Menu ───────────────────────────────────────────────────────────
+  [UI.pmTitleBanner,     'ui/elements/pause/pm_title_banner.png'],
+  [UI.pmPanelLeft,       'ui/elements/pause/pm_panel_left.png'],
+  [UI.pmPanelRight,      'ui/elements/pause/pm_panel_right.png'],
+  [UI.pmPanelWide,       'ui/elements/pause/pm_panel_wide.png'],
+  [UI.pmOverlayMd,       'ui/elements/pause/pm_overlay_md.png'],
+  [UI.pmOverlaySm,       'ui/elements/pause/pm_overlay_sm.png'],
+  [UI.pmBtnContinue,     'ui/elements/pause/pm_btn_continue_default.png'],
+  [UI.pmBtnContinueHov,  'ui/elements/pause/pm_btn_continue_hover.png'],
+  [UI.pmBtnRestart,      'ui/elements/pause/pm_btn_restart_default.png'],
+  [UI.pmBtnRestartHov,   'ui/elements/pause/pm_btn_restart_hover.png'],
+  [UI.pmBtnRetry,        'ui/elements/pause/pm_btn_retry_default.png'],
+  [UI.pmBtnRetryHov,     'ui/elements/pause/pm_btn_retry_hover.png'],
+  [UI.pmBtnSettings,     'ui/elements/pause/pm_btn_settings_default.png'],
+  [UI.pmBtnSettingsHov,  'ui/elements/pause/pm_btn_settings_hover.png'],
+  [UI.pmBtnQuit,         'ui/elements/pause/pm_btn_quit_default.png'],
+  [UI.pmBtnQuitHov,      'ui/elements/pause/pm_btn_quit_hover.png'],
+  [UI.pmTabMission,      'ui/elements/pause/pm_tab_mission.png'],
+  [UI.pmTabSettings,     'ui/elements/pause/pm_tab_settings.png'],
+  [UI.pmTabStats,        'ui/elements/pause/pm_tab_stats.png'],
+  [UI.pmRowDefault,      'ui/elements/pause/pm_row_default.png'],
+  [UI.pmRowHighlight1,   'ui/elements/pause/pm_row_highlight_01.png'],
+  [UI.pmRowHighlight2,   'ui/elements/pause/pm_row_highlight_02.png'],
+  [UI.pmSaveBadge,       'ui/elements/pause/pm_save_badge.png'],
+  [UI.pmDialogConfirm,   'ui/elements/pause/pm_dialog_confirm.png'],
+  [UI.pmPromptA,         'ui/elements/pause/pm_prompt_a.png'],
+  [UI.pmPromptB,         'ui/elements/pause/pm_prompt_b.png'],
+  [UI.pmPromptX,         'ui/elements/pause/pm_prompt_x.png'],
+  [UI.pmPromptY,         'ui/elements/pause/pm_prompt_y.png'],
+  [UI.pmPromptMenu,      'ui/elements/pause/pm_prompt_menu.png'],
+
+  // ── Stage Select ─────────────────────────────────────────────────────────
+  [UI.ssMapFrame,        'ui/elements/stage_select/ss_map_frame.png'],
+  [UI.ssStageInfoPanel,  'ui/elements/stage_select/ss_stage_info_panel.png'],
+  [UI.ssRouteNodes,      'ui/elements/stage_select/ss_route_nodes.png'],
+  [UI.ssRouteArrows,     'ui/elements/stage_select/ss_route_arrows.png'],
+  [UI.ssStageBadgesUnlocked, 'ui/elements/stage_select/ss_stage_badges_unlocked.png'],
+  [UI.ssStageBadgesLocked,   'ui/elements/stage_select/ss_stage_badges_locked.png'],
+  [UI.ssVenueCard1,      'ui/elements/stage_select/ss_venue_card_1.png'],
+  [UI.ssVenueCard2,      'ui/elements/stage_select/ss_venue_card_2.png'],
+  [UI.ssVenueCard3,      'ui/elements/stage_select/ss_venue_card_3.png'],
+  [UI.ssVenueCard4,      'ui/elements/stage_select/ss_venue_card_4.png'],
+  [UI.ssVenueCards,      'ui/elements/stage_select/ss_venue_cards.png'],
+  [UI.ssObjectiveChip,   'ui/elements/stage_select/ss_objective_chip.png'],
+  [UI.ssCheckpointIcons, 'ui/elements/stage_select/ss_checkpoint_icons.png'],
+  [UI.ssLegendPanel,     'ui/elements/stage_select/ss_legend_panel.png'],
+  [UI.ssFastTravelBtn,   'ui/elements/stage_select/ss_fast_travel_btn.png'],
+  [UI.ssPreviewFrames,   'ui/elements/stage_select/ss_preview_frames.png'],
+
+  // ── VS Screen ────────────────────────────────────────────────────────────
+  [UI.vsTitleLogo,       'ui/elements/vs_screen/vs_title_logo.png'],
+  [UI.vsEmblem,          'ui/elements/vs_screen/vs_emblem.png'],
+  [UI.vsNameplateP1,     'ui/elements/vs_screen/vs_nameplate_p1.png'],
+  [UI.vsNameplateP2,     'ui/elements/vs_screen/vs_nameplate_p2.png'],
+  [UI.vsPortraitLargeL,  'ui/elements/vs_screen/vs_portrait_large_l.png'],
+  [UI.vsPortraitLargeR,  'ui/elements/vs_screen/vs_portrait_large_r.png'],
+  [UI.vsPortraitMed,     'ui/elements/vs_screen/vs_portrait_med.png'],
+  [UI.vsPortraitSmall,   'ui/elements/vs_screen/vs_portrait_small.png'],
+  [UI.vsRoundIndicators, 'ui/elements/vs_screen/vs_round_indicators.png'],
+  [UI.vsWinDots,         'ui/elements/vs_screen/vs_win_dots.png'],
+  [UI.vsRankBadges,      'ui/elements/vs_screen/vs_rank_badges.png'],
+  [UI.vsLevelChips,      'ui/elements/vs_screen/vs_level_chips.png'],
+  [UI.vsMatchRules,      'ui/elements/vs_screen/vs_match_rules.png'],
+  [UI.vsProgressBar,     'ui/elements/vs_screen/vs_progress_bar.png'],
+  [UI.vsBtnChips,        'ui/elements/vs_screen/vs_btn_chips.png'],
+  [UI.vsReadyMarkers,    'ui/elements/vs_screen/vs_ready_markers.png'],
+  [UI.vsWinnerMarkers,   'ui/elements/vs_screen/vs_winner_markers.png'],
+  [UI.vsStageBanners,    'ui/elements/vs_screen/vs_stage_banners.png'],
+
+  // ── Character Select ─────────────────────────────────────────────────────
+  [UI.csTitleBanner,     'ui/elements/char_select/cs_title_banner.png'],
+  [UI.csPortraitFrameLarge, 'ui/elements/char_select/cs_portrait_frame_large.png'],
+  [UI.csSlotGrid,        'ui/elements/char_select/cs_slot_grid.png'],
+  [UI.csSlotIdle,        'ui/elements/char_select/cs_slot_idle.png'],
+  [UI.csSlotSelected,    'ui/elements/char_select/cs_slot_selected.png'],
+  [UI.csStatPanel,       'ui/elements/char_select/cs_stat_panel.png'],
+  [UI.csCategoryTabs,    'ui/elements/char_select/cs_category_tabs.png'],
+  [UI.csColorTabs,       'ui/elements/char_select/cs_color_tabs.png'],
+  [UI.csDivider,         'ui/elements/char_select/cs_divider.png'],
+  [UI.csStyleTags,       'ui/elements/char_select/cs_style_tags.png'],
+  [UI.csActionBtns,      'ui/elements/char_select/cs_action_btns.png'],
+  [UI.csPromptChips,     'ui/elements/char_select/cs_prompt_chips.png'],
+  [UI.csReadyCpu,        'ui/elements/char_select/cs_ready_cpu.png'],
+  [UI.csInstructionStrip,'ui/elements/char_select/cs_instruction_strip.png'],
+  [UI.csBottomIcons,     'ui/elements/char_select/cs_bottom_icons.png'],
+
+  // ── LSB kit full sheets (used as scene backdrops) ─────────────────────────
+  ['ui_lsb_master',       'ui/lsb_sheet_01_master_style.png'],
+  ['ui_lsb_lobby',        'ui/lsb_sheet_02_lobby.png'],
+  ['ui_lsb_bingo_card',   'ui/lsb_sheet_03_bingo_card.png'],
+  ['ui_lsb_host_dj',      'ui/lsb_sheet_04_host_dj.png'],
+  ['ui_lsb_verification', 'ui/lsb_sheet_05_card_verification.png'],
+  ['ui_lsb_song_queue',   'ui/lsb_sheet_06_song_queue.png'],
+  ['ui_lsb_winner',       'ui/lsb_sheet_07_winner_payout.png'],
+  ['ui_lsb_membership',   'ui/lsb_sheet_08_membership.png'],
+  ['ui_lsb_party_mode',   'ui/lsb_sheet_09_party_battlerz.png'],
+  ['ui_lsb_tv_display',   'ui/lsb_sheet_10_tv_display.png'],
+
+  // ── Dialogue ─────────────────────────────────────────────────────────────
+  [UI.dlgFrameLarge,     'ui/elements/dialogue/dlg_frame_large.png'],
+  [UI.dlgFrameMedium,    'ui/elements/dialogue/dlg_frame_medium.png'],
+  [UI.dlgFrameSmall,     'ui/elements/dialogue/dlg_frame_small.png'],
+  [UI.dlgSpeakerPlate,   'ui/elements/dialogue/dlg_speaker_plate.png'],
+  [UI.dlgMissionStart,   'ui/elements/dialogue/dlg_mission_start.png'],
+  [UI.dlgMissionUpdate,  'ui/elements/dialogue/dlg_mission_update.png'],
+  [UI.dlgObjectiveComplete, 'ui/elements/dialogue/dlg_objective_complete.png'],
+  [UI.dlgRewardPopup,    'ui/elements/dialogue/dlg_reward_popup.png'],
+  [UI.dlgItemChip,       'ui/elements/dialogue/dlg_item_chip.png'],
+  [UI.dlgSuccessAlert,   'ui/elements/dialogue/dlg_success_alert.png'],
+  [UI.dlgWarningAlert,   'ui/elements/dialogue/dlg_warning_alert.png'],
+  [UI.dlgXpPopup,        'ui/elements/dialogue/dlg_xp_popup.png'],
+  [UI.dlgToastMission,   'ui/elements/dialogue/dlg_toast_mission.png'],
+  [UI.dlgToastObjective, 'ui/elements/dialogue/dlg_toast_objective.png'],
+  [UI.dlgToastComplete,  'ui/elements/dialogue/dlg_toast_complete.png'],
+  [UI.dlgToastReward,    'ui/elements/dialogue/dlg_toast_reward.png'],
 ];
 
 export const UISystem = {
@@ -129,10 +393,9 @@ export const UISystem = {
   },
 
   ready(scene: Phaser.Scene): boolean {
-    return scene.textures.exists(UI.logo);
+    return scene.textures.exists(UI.mmLogo);
   },
 
-  // Place a full-sheet backdrop scaled to fit the game canvas.
   backdrop(scene: Phaser.Scene, key: string, alpha = 1, depth = -5000): Phaser.GameObjects.Image | null {
     if (!scene.textures.exists(key)) return null;
     const { width, height } = scene.scale;
@@ -143,10 +406,26 @@ export const UISystem = {
       .setDepth(depth)
       .setScrollFactor(0);
   },
+
+  // Place an element image; returns null if texture not loaded.
+  place(
+    scene: Phaser.Scene,
+    key: string,
+    x: number,
+    y: number,
+    opts: { originX?: number; originY?: number; scale?: number; depth?: number; alpha?: number } = {},
+  ): Phaser.GameObjects.Image | null {
+    if (!scene.textures.exists(key)) return null;
+    return scene.add.image(x, y, key)
+      .setOrigin(opts.originX ?? 0.5, opts.originY ?? 0.5)
+      .setScale(opts.scale ?? 1)
+      .setDepth(opts.depth ?? 0)
+      .setAlpha(opts.alpha ?? 1)
+      .setScrollFactor(0);
+  },
 };
 
 // ── NumberDisplay ─────────────────────────────────────────────────────────────
-// Gold-digit readout that swaps textures — zero per-frame allocations.
 export class NumberDisplay {
   private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container;

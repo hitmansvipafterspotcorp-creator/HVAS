@@ -55,4 +55,5 @@ export const SCENE = {
   HostDj: 'HostDj',
   MemberCheckIn: 'MemberCheckIn',
   Membership: 'Membership',
+  CharacterSelect: 'CharacterSelect',
 } as const;

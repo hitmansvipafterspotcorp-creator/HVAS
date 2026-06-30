@@ -569,63 +569,91 @@ export class BrawlerScene extends Phaser.Scene {
     });
   }
 
-  // Assemble the real HUD art: gold health-bar frame with a depletion mask,
-  // a digit-font HP readout, the combo label + count, and star meter pips.
+  // Assemble the real HUD art: portrait frame, health/super/guard bars,
+  // timer badge, combo counter, score chip.
   private buildHud(): void {
     if (!UISystem.ready(this)) return;
 
-    const frameX = 12;
-    const frameY = 12;
-    const frameW = 340;
-    const tex = this.textures.get(UI.healthBar).getSourceImage();
-    const frameH = (tex.height / tex.width) * frameW;
+    const DEPTH = 50001;
 
-    // The art's inner red channel sits between ~16.5% and ~86% of the width.
-    this.hpInner.x = frameX + frameW * 0.165;
-    this.hpInner.w = frameW * (0.86 - 0.165);
-    const innerY = frameY + frameH * 0.5;
-    const innerH = frameH * 0.42;
+    // ── Player-side HUD (top-left) ────────────────────────────────────────
+    // Portrait frame
+    if (this.textures.exists(UI.hudPortraitFrame)) {
+      this.add.image(8, 8, UI.hudPortraitFrame)
+        .setOrigin(0, 0).setDisplaySize(90, 112)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
 
-    // Depletion mask: a dark rect that grows from the right as HP drops, drawn
-    // UNDER the frame so the gold border stays crisp.
-    this.hpFill = this.add
-      .rectangle(this.hpInner.x + this.hpInner.w, innerY, 0, innerH, 0x1a0608, 0.9)
-      .setOrigin(1, 0.5)
-      .setScrollFactor(0)
-      .setDepth(50000);
+    // Health bar — full-width art, dark mask depletes from right
+    const hpTex = this.textures.exists(UI.hudHealthBar)
+      ? this.textures.get(UI.hudHealthBar).getSourceImage() : null;
+    const hpW = 280, hpH = hpTex ? Math.round((hpTex.height / hpTex.width) * hpW) : 22;
+    const hpX = 104, hpY = 14;
+    this.hpInner.x = hpX + hpW * 0.04;
+    this.hpInner.w = hpW * 0.89;
+    const innerY = hpY + hpH * 0.5;
+    this.hpFill = this.add.rectangle(
+      this.hpInner.x + this.hpInner.w, innerY, 0, hpH * 0.55, 0x1a0608, 0.92,
+    ).setOrigin(1, 0.5).setScrollFactor(0).setDepth(DEPTH - 1);
+    if (hpTex) {
+      this.add.image(hpX, hpY, UI.hudHealthBar)
+        .setOrigin(0, 0).setDisplaySize(hpW, hpH)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
 
-    this.add
-      .image(frameX, frameY, UI.healthBar)
-      .setOrigin(0, 0)
-      .setDisplaySize(frameW, frameH)
-      .setScrollFactor(0)
-      .setDepth(50001);
+    // Super bar below health
+    if (this.textures.exists(UI.hudSuperBar)) {
+      this.add.image(hpX, hpY + hpH + 4, UI.hudSuperBar)
+        .setOrigin(0, 0).setDisplaySize(hpW, 20)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
+    // Guard bar below super
+    if (this.textures.exists(UI.hudGuardBar)) {
+      this.add.image(hpX, hpY + hpH + 28, UI.hudGuardBar)
+        .setOrigin(0, 0).setDisplaySize(hpW, 20)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
 
-    // HP number in the gold digit font, right under the bar.
-    this.hpNum = new NumberDisplay(this, frameX + 18, frameY + frameH + 14, 20)
-      .setDepth(50002);
+    // HP digit readout
+    this.hpNum = new NumberDisplay(this, hpX + 6, hpY + hpH + 58, 18).setDepth(DEPTH + 1);
 
-    // Combo label + count (hidden until combo > 0).
-    this.comboLabel = this.add
-      .image(frameX + 150, frameY + frameH + 14, UI.comboLabel)
-      .setOrigin(0, 0.5)
-      .setDisplaySize(30, 28)
-      .setScrollFactor(0)
-      .setDepth(50002)
-      .setVisible(false);
-    this.comboNum = new NumberDisplay(this, frameX + 186, frameY + frameH + 14, 22)
-      .setDepth(50002);
+    // Combo counter (hidden until combo > 1)
+    if (this.textures.exists(UI.hudComboCounter)) {
+      this.comboLabel = this.add.image(hpX + 130, hpY + hpH + 58, UI.hudComboCounter)
+        .setOrigin(0, 0.5).setDisplaySize(56, 22)
+        .setScrollFactor(0).setDepth(DEPTH).setVisible(false);
+    }
+    this.comboNum = new NumberDisplay(this, hpX + 192, hpY + hpH + 58, 20).setDepth(DEPTH + 1);
 
-    // Meter: 10 star pips that light up with super meter.
-    for (let i = 0; i < 10; i++) {
-      const pip = this.add
-        .image(this.hpInner.x + i * 16, frameY + frameH + 40, UI.pipStar)
-        .setOrigin(0, 0.5)
-        .setDisplaySize(13, 15)
-        .setScrollFactor(0)
-        .setDepth(50002)
-        .setAlpha(0.25);
-      this.meterPips.push(pip);
+    // ── Center top: timer badge ───────────────────────────────────────────
+    if (this.textures.exists(UI.hudTimer)) {
+      this.add.image(GAME_WIDTH / 2, 10, UI.hudTimer)
+        .setOrigin(0.5, 0).setDisplaySize(70, 72)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
+
+    // ── Score chip (top-right) ────────────────────────────────────────────
+    if (this.textures.exists(UI.hudScoreChip)) {
+      this.add.image(GAME_WIDTH - 8, 14, UI.hudScoreChip)
+        .setOrigin(1, 0).setDisplaySize(120, 38)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
+
+    // ── Controls strip (bottom-center) ───────────────────────────────────
+    if (this.textures.exists(UI.hudControls)) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 4, UI.hudControls)
+        .setOrigin(0.5, 1).setDisplaySize(400, 36)
+        .setScrollFactor(0).setDepth(DEPTH);
+    }
+
+    // Meter pips (star icons below guard bar)
+    if (this.textures.exists(UI.hudPipStar)) {
+      for (let i = 0; i < 10; i++) {
+        const pip = this.add.image(hpX + i * 26, hpY + hpH + 82, UI.hudPipStar)
+          .setOrigin(0, 0.5).setDisplaySize(20, 22)
+          .setScrollFactor(0).setDepth(DEPTH).setAlpha(0.25);
+        this.meterPips.push(pip);
+      }
     }
   }
 
@@ -709,47 +737,76 @@ export class BrawlerScene extends Phaser.Scene {
     this.pauseGroup = g;
 
     // Dim backdrop
-    g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setScrollFactor(0));
+    g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65).setScrollFactor(0));
 
-    // Menu panel — clean dark rectangle with gold border
-    g.add(this.add
-      .rectangle(cx, cy, 400, 320, 0x0a0614, 0.97)
-      .setStrokeStyle(2, 0xffd700, 0.9)
-      .setScrollFactor(0));
+    // Pause panel art (wide overlay or dark rectangle fallback)
+    if (this.textures.exists(UI.pmPanelWide)) {
+      const panel = this.add.image(cx, cy, UI.pmPanelWide)
+        .setDisplaySize(460, 360).setScrollFactor(0);
+      g.add(panel);
+    } else {
+      g.add(this.add.rectangle(cx, cy, 440, 340, 0x0a0614, 0.97)
+        .setStrokeStyle(2, 0xffd700, 0.9).setScrollFactor(0));
+    }
 
-    // Title banner art (pause_menu_000.png) or fallback text
-    if (this.textures.exists(UI.pauseTitle)) {
-      const title = this.add.image(cx, cy - 130, UI.pauseTitle).setOrigin(0.5).setScrollFactor(0);
-      title.setScale(Math.min(380 / title.width, 70 / title.height));
+    // Title banner art
+    const bannerY = cy - 148;
+    if (this.textures.exists(UI.pmTitleBanner)) {
+      const title = this.add.image(cx, bannerY, UI.pmTitleBanner)
+        .setDisplaySize(380, 76).setScrollFactor(0);
       g.add(title);
     } else {
-      g.add(this.add.text(cx, cy - 130, '★ PAUSE MENU ★', {
+      g.add(this.add.text(cx, bannerY, '★ PAUSE ★', {
         fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
         stroke: '#000000', strokeThickness: 5,
       }).setOrigin(0.5).setScrollFactor(0));
     }
 
-    // Menu options
-    const OPTIONS = [
-      { label: 'RESUME',      action: () => this.togglePause() },
-      { label: 'RESTART',     action: () => { this.paused = false; this.scene.restart(); } },
-      { label: 'STAGE SELECT',action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
-      { label: 'MAIN MENU',   action: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
+    // Pause buttons with hover art
+    const BTNS: Array<{ label: string; key: string; hov: string; action: () => void }> = [
+      { label: 'RESUME',       key: UI.pmBtnContinue, hov: UI.pmBtnContinueHov, action: () => this.togglePause() },
+      { label: 'RESTART',      key: UI.pmBtnRestart,  hov: UI.pmBtnRestartHov,  action: () => { this.paused = false; this.scene.restart(); } },
+      { label: 'STAGE SELECT', key: UI.pmBtnRetry,    hov: UI.pmBtnRetryHov,    action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
+      { label: 'SETTINGS',     key: UI.pmBtnSettings, hov: UI.pmBtnSettingsHov, action: () => {} },
+      { label: 'MAIN MENU',    key: UI.pmBtnQuit,     hov: UI.pmBtnQuitHov,     action: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
     ];
-    OPTIONS.forEach((opt, i) => {
-      const y = cy - 50 + i * 52;
-      const btn = this.add.text(cx, y, opt.label, {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '22px',
-        color: i === 0 ? '#ffd700' : '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 4,
-      }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
-      btn.on('pointerover', () => btn.setColor('#ffd700').setScale(1.08));
-      btn.on('pointerout',  () => btn.setColor(i === 0 ? '#ffd700' : '#ffffff').setScale(1));
-      btn.on('pointerdown', () => opt.action());
-      g.add(btn);
+
+    const btnH = 46;
+    const btnW = 260;
+    const startY = cy - 70;
+
+    BTNS.forEach((opt, i) => {
+      const y = startY + i * (btnH + 6);
+      if (this.textures.exists(opt.key)) {
+        const img = this.add.image(cx, y, opt.key)
+          .setDisplaySize(btnW, btnH).setScrollFactor(0)
+          .setInteractive({ useHandCursor: true });
+        img.on('pointerover', () => {
+          if (this.textures.exists(opt.hov)) img.setTexture(opt.hov);
+          img.setDisplaySize(btnW * 1.05, btnH * 1.05);
+        });
+        img.on('pointerout',  () => { img.setTexture(opt.key); img.setDisplaySize(btnW, btnH); });
+        img.on('pointerdown', () => opt.action());
+        g.add(img);
+      } else {
+        // Text fallback for missing button art
+        const btn = this.add.text(cx, y, opt.label, {
+          fontFamily: 'Arial Black, sans-serif', fontSize: '20px',
+          color: i === 0 ? '#ffd700' : '#ffffff',
+          stroke: '#000000', strokeThickness: 4,
+        }).setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+        btn.on('pointerover', () => btn.setColor('#ffd700').setScale(1.08));
+        btn.on('pointerout',  () => btn.setColor(i === 0 ? '#ffd700' : '#ffffff').setScale(1.0));
+        btn.on('pointerdown', () => opt.action());
+        g.add(btn);
+      }
     });
+
+    // Save badge top-right of panel
+    if (this.textures.exists(UI.pmSaveBadge)) {
+      g.add(this.add.image(cx + 200, cy - 160, UI.pmSaveBadge)
+        .setDisplaySize(60, 24).setOrigin(1, 0).setScrollFactor(0));
+    }
   }
 
   // Debug overlay: floor contact points, depth bands, attack reach + hurt spans.
