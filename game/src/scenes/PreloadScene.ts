@@ -3,7 +3,6 @@ import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AnimationSystem } from '../systems/AnimationSystem';
 import { BRAWLER_ANIMS, VENUE_ANIMS, VFX_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
 import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
-import { CHAR_FOLDERS } from '../data/animMap';
 import { UISystem } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
@@ -121,11 +120,12 @@ export class PreloadScene extends Phaser.Scene {
     UISystem.queue(this);
     AudioSystem.queue(this);
 
-    const allChars = Object.keys(CHAR_FOLDERS).map(Number);
-    const priority = new Set<number>([PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS]);
-    const rest = allChars.filter(id => !priority.has(id));
+    // Only preload the most-used characters — other chars are lazy-loaded
+    // by each scene when needed. This cuts preload from ~5000 to ~600 requests.
+    const priorityIds = [PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS];
+    const prioritySet = new Set<number>(priorityIds);
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
-    for (const id of [...priority, ...rest]) {
+    for (const id of prioritySet) {
       AnimationSystem.queue(this, id, BRAWLER_ANIMS);
       AnimationSystem.queue(this, id, VFX_ANIMS);
       if (topdownSet.has(id)) AnimationSystem.queue(this, id, VENUE_ANIMS);
@@ -139,9 +139,9 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    const allChars = Object.keys(CHAR_FOLDERS).map(Number);
+    const priorityIds = [PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS];
     const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
-    for (const id of allChars) {
+    for (const id of priorityIds) {
       AnimationSystem.build(this, id, BRAWLER_ANIMS);
       AnimationSystem.build(this, id, VFX_ANIMS);
       if (topdownSet.has(id)) AnimationSystem.build(this, id, VENUE_ANIMS);
