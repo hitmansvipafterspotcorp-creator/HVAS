@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // ── MembershipScene ─────────────────────────────────────────────────────────
 // Layout from LSB Sheet 8 (lsb_sheet_08_membership.png):
@@ -79,6 +80,7 @@ export class MembershipScene extends Phaser.Scene {
   constructor() { super('Membership'); }
 
   create(): void {
+    AudioSystem.playForScene(this, 'Venue');
     this.member = loadMember();
     this.selectedTier = null;
     this.selectedCards = 0;

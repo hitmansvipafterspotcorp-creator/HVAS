@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // HVAS-themed call phrases for the bingo card.
 const PHRASES = [
@@ -36,6 +37,7 @@ export class LipsyncBingoScene extends Phaser.Scene {
 
   create(): void {
     this.won = false;
+    AudioSystem.playForScene(this, 'MainMenu');
     this.cameras.main.setBackgroundColor(0x08040e);
 
     // Header

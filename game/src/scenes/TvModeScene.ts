@@ -3,6 +3,7 @@ import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS, FLOOR_TOP, FLOOR_BOTTOM, PLAYER
 import { Fighter } from '../entities/Fighter';
 import { CombatSystem } from '../systems/CombatSystem';
 import { CHAR_FOLDERS } from '../data/animMap';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // HVAS TV — a self-running spectator channel. Two AI fighters battle on a
 // random stage backdrop; a scrolling ticker carries venue news at the bottom.
@@ -47,6 +48,7 @@ export class TvModeScene extends Phaser.Scene {
   constructor() { super(SCENE.TvMode); }
 
   create(): void {
+    AudioSystem.playForScene(this, 'ArcadeVs');
     this.cameras.main.setBackgroundColor(0x050308);
 
     // Channel header

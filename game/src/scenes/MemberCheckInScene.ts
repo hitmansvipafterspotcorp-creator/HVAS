@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // ── MemberCheckInScene ───────────────────────────────────────────────────────
 // Layout from LSB Sheet 5 (lsb_sheet_05_card_verification.png):
@@ -68,6 +69,7 @@ export class MemberCheckInScene extends Phaser.Scene {
   constructor() { super(SCENE.MemberCheckIn); }
 
   create(): void {
+    AudioSystem.playForScene(this, 'Venue');
     this.enteredDigits = '';
     this.selectedPayment = 0;
     this.seedDemoMembers();

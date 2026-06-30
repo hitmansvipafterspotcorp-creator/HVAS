@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // Host/DJ mode — manage a night at Hitmans VIP After Spot.
 // Three tabs: HOST (crowd energy via shoutouts/moments), DJ (pick tracks &
@@ -66,6 +67,7 @@ export class HostDjScene extends Phaser.Scene {
     this.vpPerSec = 1;
     this.feedLines = [];
 
+    AudioSystem.playForScene(this, 'Venue');
     this.cameras.main.setBackgroundColor(0x06040c);
 
     // Header bar

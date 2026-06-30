@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { UISystem, UI } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // All venues with display metadata. Order mirrors the quest flow.
 const ALL_VENUES = [
@@ -40,6 +41,7 @@ export class VenueSelectScene extends Phaser.Scene {
   constructor() { super(SCENE.VenueSelect); }
 
   create(): void {
+    AudioSystem.playForScene(this, 'MainMenu');
     this.cameras.main.setBackgroundColor(COLORS.bg);
     this.hasArt = UISystem.ready(this);
 

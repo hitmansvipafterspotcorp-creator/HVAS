@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS, ASSET_BASE } from '../config';
 import { ProgressionSystem, STAGE_SEQUENCE, STAGE_UNLOCKS } from '../systems/ProgressionSystem';
 import { UISystem, UI } from '../systems/UISystem';
+import { AudioSystem } from '../systems/AudioSystem';
 import type { StageId } from '../systems/ProgressionSystem';
 
 // Map stage index (0-based) to vmStageBadge key.
@@ -54,6 +55,7 @@ export class StageSelectScene extends Phaser.Scene {
   constructor() { super(SCENE.StageSelect); }
 
   create(): void {
+    AudioSystem.playForScene(this, 'MainMenu');
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
     // District map frame background — prefer the full city map art
