@@ -17,6 +17,8 @@ const ITEMS: MenuItem[] = [
   { label: 'LIPSYNC BINGO', scene: SCENE.LipsyncBingo },
   { label: 'TV MODE', scene: SCENE.TvMode },
   { label: 'HOST / DJ', scene: SCENE.HostDj },
+  { label: 'MEMBER CHECK-IN', scene: SCENE.MemberCheckIn },
+  { label: 'MEMBERSHIP', scene: SCENE.Membership },
 ];
 
 export class MainMenuScene extends Phaser.Scene {

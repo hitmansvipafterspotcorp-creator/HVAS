@@ -29,6 +29,23 @@ export const UI = {
   sheetHud:        'ui_sheet_hud',
   sheetDialogue:   'ui_sheet_dialogue',
   sheetOptions:    'ui_sheet_options',
+  // LSB kit sheets
+  lsbMaster:       'ui_lsb_master',
+  lsbLobby:        'ui_lsb_lobby',
+  lsbBingoCard:    'ui_lsb_bingo_card',
+  lsbHostDj:       'ui_lsb_host_dj',
+  lsbVerification: 'ui_lsb_verification',
+  lsbSongQueue:    'ui_lsb_song_queue',
+  lsbWinner:       'ui_lsb_winner',
+  lsbMembership:   'ui_lsb_membership',
+  lsbPartyMode:    'ui_lsb_party_mode',
+  lsbTvDisplay:    'ui_lsb_tv_display',
+  // VIP Quest kit sheets
+  vipMainMenu:     'ui_vip_main_menu',
+  vipVsScreen:     'ui_vip_vs_screen',
+  vipCharSelect:   'ui_vip_char_select',
+  vipLoading:      'ui_vip_loading',
+  hitkoinLogo:     'ui_hitkoin_logo',
   // Pause menu slices
   pauseTitle:      'ui_pause_title',      // pause_menu_000  578×111
   pausePanel:      'ui_pause_panel',      // pause_menu_001  607×385
@@ -66,6 +83,23 @@ const FILES: Array<[string, string]> = [
   [UI.sheetHud,        'ui/ui_sheet_05_hud.png'],
   [UI.sheetDialogue,   'ui/ui_sheet_07_dialogue_mission_reward.png'],
   [UI.sheetOptions,    'ui/ui_sheet_09_options_settings.png'],
+  // LSB kit sheets
+  [UI.lsbMaster,       'ui/lsb_sheet_01_master_style.png'],
+  [UI.lsbLobby,        'ui/lsb_sheet_02_lobby.png'],
+  [UI.lsbBingoCard,    'ui/lsb_sheet_03_bingo_card.png'],
+  [UI.lsbHostDj,       'ui/lsb_sheet_04_host_dj.png'],
+  [UI.lsbVerification, 'ui/lsb_sheet_05_card_verification.png'],
+  [UI.lsbSongQueue,    'ui/lsb_sheet_06_song_queue.png'],
+  [UI.lsbWinner,       'ui/lsb_sheet_07_winner_payout.png'],
+  [UI.lsbMembership,   'ui/lsb_sheet_08_membership.png'],
+  [UI.lsbPartyMode,    'ui/lsb_sheet_09_party_battlerz.png'],
+  [UI.lsbTvDisplay,    'ui/lsb_sheet_10_tv_display.png'],
+  // VIP Quest kit sheets
+  [UI.vipMainMenu,     'ui/vip_sheet_01_main_menu.png'],
+  [UI.vipVsScreen,     'ui/vip_sheet_02_vs_screen.png'],
+  [UI.vipCharSelect,   'ui/vip_sheet_03_char_select.png'],
+  [UI.vipLoading,      'ui/vip_sheet_04_loading.png'],
+  [UI.hitkoinLogo,     'ui/hitkoin_logo.png'],
   // Pause menu pieces
   [UI.pauseTitle,      'ui/elements/pause_menu/pause_menu_000.png'],
   [UI.pausePanel,      'ui/elements/pause_menu/pause_menu_001.png'],

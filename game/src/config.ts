@@ -53,4 +53,6 @@ export const SCENE = {
   LipsyncBingo: 'LipsyncBingo',
   TvMode: 'TvMode',
   HostDj: 'HostDj',
+  MemberCheckIn: 'MemberCheckIn',
+  Membership: 'Membership',
 } as const;
