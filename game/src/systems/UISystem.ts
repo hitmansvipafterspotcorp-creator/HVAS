@@ -114,6 +114,7 @@ export const UI = {
   ssPreviewFrames:   'ss_preview_frames',
 
   // ── VS Screen ─────────────────────────────────────────────────────────────
+  vsAssembledPreview: 'vs_assembled_preview',
   vsTitleLogo:       'vs_title_logo',
   vsEmblem:          'vs_emblem',
   vsNameplateP1:     'vs_nameplate_p1',
@@ -596,6 +597,7 @@ const FILES: Array<[string, string]> = [
   [UI.ssPreviewFrames,   'ui/elements/stage_select/ss_preview_frames.png'],
 
   // ── VS Screen ────────────────────────────────────────────────────────────
+  [UI.vsAssembledPreview, 'ui/elements/vs_screen/vs_assembled_preview.png'],
   [UI.vsTitleLogo,       'ui/elements/vs_screen/vs_title_logo.png'],
   [UI.vsEmblem,          'ui/elements/vs_screen/vs_emblem.png'],
   [UI.vsNameplateP1,     'ui/elements/vs_screen/vs_nameplate_p1.png'],

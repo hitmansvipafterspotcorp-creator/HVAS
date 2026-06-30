@@ -928,29 +928,51 @@ export class ArcadeVsScene extends Phaser.Scene {
       .setDepth(90000).setScrollFactor(0);
     this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.72 }, duration: 350 });
 
-    const winner = this.p1RoundWins > this.p2RoundWins
+    const p1Wins = this.p1RoundWins > this.p2RoundWins;
+    const winner = p1Wins
       ? (CHAR_NAMES[this.p1CharId] ?? 'P1')
       : (CHAR_NAMES[this.p2CharId] ?? 'CPU');
-    const color = this.p1RoundWins > this.p2RoundWins ? '#44aaff' : '#ff6644';
+    const winnerCharId = p1Wins ? this.p1CharId : this.p2CharId;
+    const color = p1Wins ? '#44aaff' : '#ff6644';
 
-    this.add.text(cx, cy - 70, winner.toUpperCase(), {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '44px', color,
+    // Stage banner art behind result text
+    if (this.textures.exists(UI.vsStageBanners)) {
+      this.add.image(cx, cy - 50, UI.vsStageBanners)
+        .setDisplaySize(500, 140).setDepth(90001).setAlpha(0.55).setScrollFactor(0);
+    }
+
+    // Winner marker art (crown / trophy icon strip)
+    if (this.textures.exists(UI.vsWinnerMarkers)) {
+      this.add.image(cx, cy - 110, UI.vsWinnerMarkers)
+        .setDisplaySize(160, 44).setDepth(90002).setScrollFactor(0);
+    }
+
+    // Winner character sprite
+    const winKey = AnimationSystem.animKey(winnerCharId, 'idle');
+    if (this.anims.exists(winKey)) {
+      this.add.sprite(cx, cy + 20, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale(1.6).play(winKey)
+        .setDepth(90002).setScrollFactor(0)
+        .setFlipX(!p1Wins);
+    }
+
+    this.add.text(cx, cy - 75, winner.toUpperCase(), {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '38px', color,
       stroke: '#000000', strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
-    this.add.text(cx, cy - 14, 'WINS THE MATCH!', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
-      stroke: '#000000', strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    this.add.text(cx, cy - 36, 'WINS THE MATCH!', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
-    this.add.text(cx, cy + 26,
-      `${this.p1RoundWins} — ${this.p2RoundWins}`, {
-        fontFamily: 'monospace', fontSize: '28px', color: '#aaaaaa',
-      }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    this.add.text(cx, cy + 74, `${this.p1RoundWins} — ${this.p2RoundWins}`, {
+      fontFamily: 'monospace', fontSize: '22px', color: '#aaaaaa',
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
-    this.add.text(cx, cy + 76, 'SPACE — Rematch  ·  R — Character Select  ·  ESC — Menu', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#998899',
-    }).setOrigin(0.5).setDepth(90001).setScrollFactor(0);
+    this.add.text(cx, cy + 104, 'SPACE — Rematch  ·  R — Character Select  ·  ESC — Menu', {
+      fontFamily: 'monospace', fontSize: '12px', color: '#998899',
+    }).setOrigin(0.5).setDepth(90003).setScrollFactor(0);
 
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => {

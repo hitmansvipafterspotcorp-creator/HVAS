@@ -74,6 +74,8 @@ export class BrawlerScene extends Phaser.Scene {
   private hitFlashOverlay?: Phaser.GameObjects.Image;
   private hitFlashTimer = 0;
   private prevPlayerHp = 0;
+  private _stageStartTime = 0;
+  private _enemiesDefeated = 0;
 
   constructor() {
     super(SCENE.Brawler);
@@ -81,6 +83,8 @@ export class BrawlerScene extends Phaser.Scene {
 
   create(data?: { stage?: StageData }): void {
     this.stage = data?.stage ?? DEFAULT_STAGE;
+    this._stageStartTime = this.time.now;
+    this._enemiesDefeated = 0;
     AudioSystem.playForStage(this, this.stage.id);
 
     this.cameras.main.setBackgroundColor(COLORS.bg);
@@ -207,6 +211,8 @@ export class BrawlerScene extends Phaser.Scene {
     if (run && !inCutscene) {
       this.updatePlayer(delta);
       this.ai.update(this.waves.enemies, this.player, this.combat, delta);
+      // Count fresh KOs before reap removes them.
+      this._enemiesDefeated += this.waves.enemies.filter(e => !e.alive && (e.sprite ?? e.body).alpha > 0.98).length;
       this.waves.reap();
       this.handleWaveFlow();
     }
@@ -497,8 +503,76 @@ export class BrawlerScene extends Phaser.Scene {
       for (const ent of this.stage.stripEntrances) ProgressionSystem.unlockVenue(ent.venueId);
     }
 
-    // Spawn venue entrance doors after a short pause.
-    this.time.delayedCall(1200, () => this.spawnVenueDoors());
+    // Show mission summary overlay, then spawn venue doors.
+    this.time.delayedCall(1200, () => this.showMissionSummary());
+  }
+
+  private showMissionSummary(): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    const panelW = 420, panelH = 240;
+
+    const dc = this.add.container(0, 0).setDepth(91000).setScrollFactor(0);
+
+    // Dim backdrop
+    dc.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6).setScrollFactor(0));
+
+    // Panel art or fallback rect
+    if (this.textures.exists(UI.pmxMissionSummary)) {
+      dc.add(this.add.image(cx, cy, UI.pmxMissionSummary)
+        .setDisplaySize(panelW, panelH).setScrollFactor(0));
+    } else {
+      dc.add(this.add.rectangle(cx, cy, panelW, panelH, 0x0a0614)
+        .setStrokeStyle(2, 0xffd700).setScrollFactor(0));
+    }
+
+    // Title
+    dc.add(this.add.text(cx, cy - panelH / 2 + 24, 'MISSION COMPLETE', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 5,
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Stage name
+    dc.add(this.add.text(cx, cy - panelH / 2 + 52, this.stage.name ?? this.stage.id, {
+      fontFamily: 'monospace', fontSize: '13px', color: '#ccbbee',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Stats rows
+    const elapsed = Math.floor((this.time.now - (this._stageStartTime ?? this.time.now)) / 1000);
+    const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const ss = String(elapsed % 60).padStart(2, '0');
+    const statRows = [
+      ['TIME',    `${mm}:${ss}`],
+      ['ENEMIES', String(this._enemiesDefeated ?? 0)],
+    ];
+    statRows.forEach(([lbl, val], i) => {
+      const ry = cy - 14 + i * 28;
+      dc.add(this.add.text(cx - 80, ry, lbl, {
+        fontFamily: 'monospace', fontSize: '13px', color: '#887799',
+      }).setOrigin(0, 0.5).setScrollFactor(0));
+      dc.add(this.add.text(cx + 80, ry, val, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ffffff',
+      }).setOrigin(1, 0.5).setScrollFactor(0));
+    });
+
+    // Rank star strip
+    if (this.textures.exists(UI.vmStarBadge)) {
+      for (let s = 0; s < 3; s++) {
+        dc.add(this.add.image(cx - 28 + s * 28, cy + 68, UI.vmStarBadge)
+          .setDisplaySize(24, 24).setScrollFactor(0));
+      }
+    }
+
+    dc.add(this.add.text(cx, cy + panelH / 2 - 18, 'TAP TO CONTINUE', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#665577',
+    }).setOrigin(0.5).setScrollFactor(0));
+
+    // Dismiss on click or 4 seconds
+    const dismiss = () => { dc.destroy(true); this.spawnVenueDoors(); };
+    this.time.delayedCall(4000, dismiss);
+    this.input.once('pointerdown', dismiss);
+    this.input.keyboard!.once('keydown-SPACE', dismiss);
+    this.input.keyboard!.once('keydown-ENTER', dismiss);
   }
 
   private spawnVenueDoors(): void {
