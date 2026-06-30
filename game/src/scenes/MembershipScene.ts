@@ -2,309 +2,522 @@ import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { UISystem, UI } from '../systems/UISystem';
 
-// ── MembershipScene ──────────────────────────────────────────────────────────
-// Two views controlled by M key or toggle button:
-//   MEMBER VIEW  — shows own pass, QR code, wallet strip
-//   STAFF VIEW   — shows 5 tier cards with pricing + manage buttons
-
-const TIERS = [
-  { id: 'DAILY',   label: 'DAILY',   price: '$9.99',    color: 0x1a3a1a, border: 0x44cc44, ribbon: 'EVENT ACCESS'  },
-  { id: 'WEEKLY',  label: 'WEEKLY',  price: '$24.99',   color: 0x1a1a3a, border: 0x4444ee, ribbon: 'VENUE ACCESS'  },
-  { id: 'MONTHLY', label: 'MONTHLY', price: '$79.99',   color: 0x3a1a1a, border: 0xee4444, ribbon: 'ACTIVE PLAN'   },
-  { id: 'YEARLY',  label: 'YEARLY',  price: '$799.99',  color: 0x2a1a00, border: 0xffd700, ribbon: 'VIP VERIFIED'  },
-  { id: 'VIP',     label: 'VIP',     price: '$1,999.99',color: 0x1a0030, border: 0xc100ff, ribbon: 'STAFF ACCESS'  },
-] as const;
-
-type TierId = typeof TIERS[number]['id'];
+// ── MembershipScene ─────────────────────────────────────────────────────────
+// Layout from LSB Sheet 8 (lsb_sheet_08_membership.png):
+//   Header:  MEMBERSHIP • DUES • CARD PACKS • QR JOIN
+//   Top chips: PRIVATE MEMBERS ONLY | ENTRY DUES | UNLOCK 2-3 CARDS | JOIN LIVE BY QR
+//   Left:    DUES OPTIONS — $20 WEEKLY / $50 MONTHLY / $100 YEARLY
+//   Center:  CARD PACKS — BUY 2 CARDS / BUY 3 CARDS
+//   Right:   QR JOIN CARD + PAYMENT METHODS
+//   Bottom:  MEMBERSHIP STATUS BAR + PRIVATE MEMBER RULES
+//   Footer:  SECURE & ENCRYPTED | NO REFUNDS | QUESTIONS? CONTACT HOST | THANK YOU
 
 interface MemberRecord {
-  name: string;
-  id: string;
-  tier: TierId;
-  expiry: string;
-  status: 'ACTIVE' | 'EXPIRES SOON' | 'EXPIRED';
+  tier: 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'VIP';
+  cardCount: number;
+  cardNumber: string;
+  renewsAt: number; // timestamp ms
+  badge: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'VIP';
+  active: boolean;
 }
 
-function loadMember(): MemberRecord {
+function loadMember(): MemberRecord | null {
   try {
-    const raw = localStorage.getItem('hvas_member');
+    const raw = localStorage.getItem('hvas_lsb_member');
     if (raw) return JSON.parse(raw) as MemberRecord;
   } catch { /* ignore */ }
-  return {
-    name: 'GUEST',
-    id: 'HMVIP-00000000',
-    tier: 'DAILY',
-    expiry: '31 DEC 2025',
-    status: 'ACTIVE',
-  };
+  return null;
 }
 
 function saveMember(m: MemberRecord): void {
-  localStorage.setItem('hvas_member', JSON.stringify(m));
+  localStorage.setItem('hvas_lsb_member', JSON.stringify(m));
 }
 
+function generateCardNumber(): string {
+  const seg = () => String(Math.floor(1000 + Math.random() * 9000));
+  return `${seg()} ${seg()} ${seg()} ${seg()}`;
+}
+
+function renewMs(tier: MemberRecord['tier']): number {
+  const days: Record<MemberRecord['tier'], number> = { WEEKLY: 7, MONTHLY: 30, YEARLY: 365, VIP: 365 };
+  return Date.now() + days[tier] * 24 * 60 * 60 * 1000;
+}
+
+function countdownStr(ms: number): string {
+  const diff = Math.max(0, ms - Date.now());
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor((diff % 86400000) / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  return `${String(d).padStart(2, '0')}D : ${String(h).padStart(2, '0')}H : ${String(m).padStart(2, '0')}M`;
+}
+
+const DUES = [
+  { tier: 'WEEKLY'  as const, price: '$20',  label: 'WEEKLY',  badge: 'SILVER'   as const },
+  { tier: 'MONTHLY' as const, price: '$50',  label: 'MONTHLY', badge: 'GOLD'     as const },
+  { tier: 'YEARLY'  as const, price: '$100', label: 'YEARLY',  badge: 'PLATINUM' as const },
+];
+
+const PAYMENT_METHODS = [
+  { icon: '💳', label: 'CREDIT / DEBIT' },
+  { icon: '🍎', label: 'APPLE PAY'      },
+  { icon: 'G',  label: 'GOOGLE PAY'    },
+  { icon: '🅿', label: 'PAYPAL'        },
+  { icon: '$',  label: 'CASH APP'      },
+];
+
 export class MembershipScene extends Phaser.Scene {
-  private mode: 'member' | 'staff' = 'member';
-  private memberView!: Phaser.GameObjects.Container;
-  private staffView!: Phaser.GameObjects.Container;
-  private member: MemberRecord = loadMember();
+  private member: MemberRecord | null = null;
+  private statusText!: Phaser.GameObjects.Text;
+  private countdownText!: Phaser.GameObjects.Text;
+  private selectedTier: MemberRecord['tier'] | null = null;
+  private selectedCards = 0;
 
   constructor() { super('Membership'); }
 
   create(): void {
     this.member = loadMember();
+    this.selectedTier = null;
+    this.selectedCards = 0;
 
     // Background
     if (UISystem.ready(this)) {
       UISystem.backdrop(this, UI.lsbMembership, 1, -5000);
     } else {
-      this.cameras.main.setBackgroundColor(0x080412);
+      this.cameras.main.setBackgroundColor(0x06030e);
     }
 
-    // Header
-    this.add.rectangle(GAME_WIDTH / 2, 28, GAME_WIDTH, 56, 0x08020f, 0.92).setDepth(100);
-    this.add.text(GAME_WIDTH / 2, 18, 'HITMANS VIP AFTER SPOT', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#c100ff',
-    }).setOrigin(0.5, 0).setDepth(101);
-    this.add.text(GAME_WIDTH / 2, 38, 'MEMBERSHIP PORTAL', {
-      fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#ffd700',
-    }).setOrigin(0.5, 0).setDepth(101);
+    this.buildHeader();
+    this.buildTopChips();
+    this.buildDuesSection();
+    this.buildCardPacksSection();
+    this.buildQrSection();
+    this.buildStatusBar();
+    this.buildPrivateRules();
+    this.buildFooter();
 
-    // Toggle button
-    const toggleBg = this.add.rectangle(GAME_WIDTH - 120, 28, 190, 36, 0x1a0030)
-      .setStrokeStyle(1, 0xc100ff).setDepth(200).setInteractive({ useHandCursor: true });
-    const toggleLbl = this.add.text(GAME_WIDTH - 120, 28, '[ MEMBER VIEW ]', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffd700',
-    }).setOrigin(0.5).setDepth(201);
-    toggleBg.on('pointerdown', () => {
-      this.mode = this.mode === 'member' ? 'staff' : 'member';
-      toggleLbl.setText(this.mode === 'member' ? '[ MEMBER VIEW ]' : '[ STAFF VIEW ]');
-      this.memberView.setVisible(this.mode === 'member');
-      this.staffView.setVisible(this.mode === 'staff');
-    });
-
-    // Build both views
-    this.memberView = this.buildMemberView();
-    this.staffView = this.buildStaffView();
-    this.staffView.setVisible(false);
-
-    // Footer
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 14, 'ESC — Back   M — Toggle View', {
-      fontFamily: 'monospace', fontSize: '12px', color: '#554466',
-    }).setOrigin(0.5).setDepth(200);
-
-    const kb = this.input.keyboard!;
-    kb.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
-    kb.on('keydown-M', () => toggleBg.emit('pointerdown'));
+    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
   }
 
-  private buildMemberView(): Phaser.GameObjects.Container {
-    const grp = this.add.container(0, 0).setDepth(50);
+  // ── Header ────────────────────────────────────────────────────────────────
+  private buildHeader(): void {
     const cx = GAME_WIDTH / 2;
+    this.add.rectangle(cx, 36, GAME_WIDTH, 72, 0x08020e, 0.95).setDepth(100);
 
-    const tier = TIERS.find(t => t.id === this.member.tier) ?? TIERS[0];
+    // Crown ornament (geometric)
+    const g = this.add.graphics().setDepth(101);
+    g.fillStyle(0xffd700, 1);
+    g.fillTriangle(cx - 30, 10, cx, 2, cx + 30, 10);
+    g.fillRect(cx - 35, 10, 70, 8);
 
-    // Main pass card
-    const cardW = 480, cardH = 280, cardY = 260;
-    const card = this.add.rectangle(cx, cardY, cardW, cardH, tier.color)
-      .setStrokeStyle(3, tier.border);
-    grp.add(card);
+    this.add.text(cx, 28, 'MEMBERSHIP', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '26px', color: '#ffd700',
+      stroke: '#3d1a00', strokeThickness: 3,
+    }).setOrigin(0.5, 0).setDepth(101);
 
-    // Shield emblem (geometric stand-in)
-    const shield = this.add.graphics();
-    shield.fillStyle(tier.border, 0.25);
-    shield.fillRoundedRect(cx - cardW / 2 + 20, cardY - cardH / 2 + 20, 80, 80, 8);
-    shield.lineStyle(2, tier.border, 0.9);
-    shield.strokeRoundedRect(cx - cardW / 2 + 20, cardY - cardH / 2 + 20, 80, 80, 8);
-    shield.fillStyle(0xffffff, 0.08);
-    shield.fillTriangle(
-      cx - cardW / 2 + 60, cardY - cardH / 2 + 28,
-      cx - cardW / 2 + 28, cardY - cardH / 2 + 72,
-      cx - cardW / 2 + 92, cardY - cardH / 2 + 72,
-    );
-    grp.add(shield);
+    this.add.text(cx, 58, '✦ DUES  ✦  CARD PACKS  ✦  QR JOIN ✦', {
+      fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#c100ff',
+    }).setOrigin(0.5, 0).setDepth(101);
 
-    // Tier badge
-    const tierBg = this.add.rectangle(cx + cardW / 2 - 60, cardY - cardH / 2 + 24, 100, 28, tier.border)
-      .setOrigin(0.5);
-    grp.add(tierBg);
-    const tierLbl = this.add.text(cx + cardW / 2 - 60, cardY - cardH / 2 + 24, tier.label, {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#000000',
-    }).setOrigin(0.5);
-    grp.add(tierLbl);
-
-    // Member name & ID
-    const nameT = this.add.text(cx - cardW / 2 + 120, cardY - cardH / 2 + 30, this.member.name, {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffffff',
-    }).setOrigin(0, 0);
-    grp.add(nameT);
-
-    const idT = this.add.text(cx - cardW / 2 + 120, cardY - cardH / 2 + 58, this.member.id, {
-      fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
-    }).setOrigin(0, 0);
-    grp.add(idT);
-
-    // Expiry
-    const expT = this.add.text(cx - cardW / 2 + 120, cardY - cardH / 2 + 78, `EXPIRES: ${this.member.expiry}`, {
-      fontFamily: 'monospace', fontSize: '11px', color: '#888888',
-    }).setOrigin(0, 0);
-    grp.add(expT);
-
-    // Status ribbon
-    const statusColor = this.member.status === 'ACTIVE' ? 0x44cc44
-      : this.member.status === 'EXPIRES SOON' ? 0xffaa00 : 0xee4444;
-    const ribbonBg = this.add.rectangle(cx - cardW / 2 + 20, cardY + cardH / 2 - 28, 160, 28, statusColor, 0.18)
-      .setStrokeStyle(1, statusColor).setOrigin(0, 0.5);
-    grp.add(ribbonBg);
-    const ribbonT = this.add.text(cx - cardW / 2 + 100, cardY + cardH / 2 - 28, this.member.status, {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: `#${statusColor.toString(16).padStart(6, '0')}`,
-    }).setOrigin(0.5);
-    grp.add(ribbonT);
-
-    // Ribbon label from tier
-    const tierRibbonBg = this.add.rectangle(cx - cardW / 2 + 200, cardY + cardH / 2 - 28, 140, 28, tier.border, 0.12)
-      .setStrokeStyle(1, tier.border).setOrigin(0, 0.5);
-    grp.add(tierRibbonBg);
-    const tierRibbonT = this.add.text(cx - cardW / 2 + 270, cardY + cardH / 2 - 28, tier.ribbon, {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: `#${tier.border.toString(16).padStart(6, '0')}`,
-    }).setOrigin(0.5);
-    grp.add(tierRibbonT);
-
-    // QR placeholder
-    const qrX = cx + cardW / 2 - 80, qrY = cardY + 20;
-    const qr = this.add.rectangle(qrX, qrY, 110, 110, 0x111111).setStrokeStyle(2, 0x444444);
-    grp.add(qr);
-    const qrT = this.add.text(qrX, qrY, 'QR', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '24px', color: '#ffffff',
-    }).setOrigin(0.5);
-    grp.add(qrT);
-    const qrSub = this.add.text(qrX, qrY + 30, 'SHOW TO STAFF', {
-      fontFamily: 'monospace', fontSize: '9px', color: '#555555',
-    }).setOrigin(0.5);
-    grp.add(qrSub);
-
-    // Pass wallet strip (scrollable)
-    const walletY = GAME_HEIGHT - 90;
-    this.add.text(cx - cardW / 2, walletY - 28, 'MY PASSES', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#8877aa',
-    }).setDepth(51);
-
-    const walletBg = this.add.rectangle(cx, walletY, GAME_WIDTH - 40, 70, 0x0a0718)
-      .setStrokeStyle(1, 0x2a1a44).setDepth(50);
-    grp.add(walletBg);
-
-    TIERS.forEach((t, i) => {
-      const wx = cx - (TIERS.length * 140) / 2 + i * 140 + 70;
-      const isOwned = t.id === this.member.tier;
-      const passCard = this.add.rectangle(wx, walletY, 130, 58, isOwned ? t.color : 0x0a0614)
-        .setStrokeStyle(2, isOwned ? t.border : 0x2a1a44).setDepth(52);
-      grp.add(passCard);
-      const passT = this.add.text(wx, walletY - 10, t.label, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '12px',
-        color: isOwned ? `#${t.border.toString(16).padStart(6,'0')}` : '#333333',
-      }).setOrigin(0.5).setDepth(53);
-      grp.add(passT);
-      const priceT = this.add.text(wx, walletY + 10, t.price, {
-        fontFamily: 'monospace', fontSize: '11px', color: isOwned ? '#ffd700' : '#333333',
-      }).setOrigin(0.5).setDepth(53);
-      grp.add(priceT);
-    });
-
-    return grp;
+    // Back button
+    this.makeChip(60, 36, 'ESC — BACK', 0x1a0030, 0xc100ff, 12)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.scene.start(SCENE.MainMenu));
   }
 
-  private buildStaffView(): Phaser.GameObjects.Container {
-    const grp = this.add.container(0, 0).setDepth(50);
-    const CARD_W = 210, CARD_H = 300;
-    const startX = (GAME_WIDTH - TIERS.length * (CARD_W + 16)) / 2 + CARD_W / 2;
+  // ── Top chips: PRIVATE MEMBERS ONLY | ENTRY DUES | UNLOCK 2-3 CARDS | JOIN LIVE BY QR
+  private buildTopChips(): void {
+    const labels = ['🔒 PRIVATE MEMBERS ONLY', '👑 ENTRY DUES', '🎴 UNLOCK 2-3 CARDS', '📷 JOIN LIVE BY QR'];
+    const colors = [0x1a0030, 0x1a1000, 0x0a1a00, 0x001020];
+    const borders = [0xc100ff, 0xffd700, 0x44cc44, 0x00aaff];
+    const totalW = labels.length * 240 + (labels.length - 1) * 8;
+    let x = (GAME_WIDTH - totalW) / 2;
+    labels.forEach((lbl, i) => {
+      const chip = this.add.rectangle(x + 120, 92, 238, 28, colors[i])
+        .setStrokeStyle(1, borders[i]).setOrigin(0.5).setDepth(50);
+      this.add.text(x + 120, 92, lbl, {
+        fontFamily: 'Arial, sans-serif', fontSize: '10px',
+        color: `#${borders[i].toString(16).padStart(6, '0')}`,
+      }).setOrigin(0.5).setDepth(51);
+      chip; x += 248;
+    });
+  }
 
-    TIERS.forEach((tier, i) => {
-      const cx = startX + i * (CARD_W + 16);
-      const cy = GAME_HEIGHT / 2 - 20;
+  // ── DUES OPTIONS: $20 WEEKLY / $50 MONTHLY / $100 YEARLY ─────────────────
+  private buildDuesSection(): void {
+    const secX = 40, secY = 118;
+    this.add.rectangle(secX + 190, secY + 155, 400, 320, 0x08020e, 0.7)
+      .setStrokeStyle(1, 0xffd700, 0.4).setOrigin(0.5).setDepth(40);
 
-      const card = this.add.rectangle(cx, cy, CARD_W, CARD_H, tier.color)
-        .setStrokeStyle(3, tier.border);
-      grp.add(card);
+    this.makeChip(secX + 190, secY + 12, '✦ DUES OPTIONS ✦', 0x0a0500, 0xffd700, 11);
 
-      // Shield
-      const sg = this.add.graphics();
-      sg.fillStyle(tier.border, 0.2);
-      sg.fillRoundedRect(cx - 30, cy - CARD_H / 2 + 16, 60, 60, 6);
-      sg.lineStyle(2, tier.border, 0.9);
-      sg.strokeRoundedRect(cx - 30, cy - CARD_H / 2 + 16, 60, 60, 6);
-      sg.fillStyle(0xffffff, 0.1);
-      sg.fillTriangle(cx, cy - CARD_H / 2 + 22, cx - 22, cy - CARD_H / 2 + 70, cx + 22, cy - CARD_H / 2 + 70);
-      grp.add(sg);
+    DUES.forEach((due, i) => {
+      const cx = secX + 70 + i * 126;
+      const cy = secY + 130;
+      // Badge card
+      const bg = this.add.rectangle(cx, cy, 110, 170, 0x0a0200)
+        .setStrokeStyle(2, 0xffd700).setOrigin(0.5).setDepth(50)
+        .setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => this.selectTier(due.tier, i));
+      bg.on('pointerover', () => bg.setStrokeStyle(3, 0xffd700));
+      bg.on('pointerout',  () => bg.setStrokeStyle(
+        this.selectedTier === due.tier ? 3 : 2,
+        this.selectedTier === due.tier ? 0xc100ff : 0xffd700,
+      ));
 
-      const nameT = this.add.text(cx, cy - CARD_H / 2 + 88, tier.label, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '16px',
-        color: `#${tier.border.toString(16).padStart(6, '0')}`,
-      }).setOrigin(0.5, 0);
-      grp.add(nameT);
+      this.add.text(cx, cy - 58, due.price, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '32px', color: '#ffd700',
+        stroke: '#3d1a00', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(51).setName(`price_${i}`);
 
-      const priceT = this.add.text(cx, cy - CARD_H / 2 + 112, tier.price, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
-      }).setOrigin(0.5, 0);
-      grp.add(priceT);
+      this.add.text(cx, cy - 22, due.label, {
+        fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#c100ff',
+      }).setOrigin(0.5).setDepth(51);
 
-      // Ribbon
-      const ribbonBg = this.add.rectangle(cx, cy - CARD_H / 2 + 148, CARD_W - 20, 24, tier.border, 0.18)
-        .setStrokeStyle(1, tier.border);
-      grp.add(ribbonBg);
-      const ribbonT = this.add.text(cx, cy - CARD_H / 2 + 148, tier.ribbon, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '10px',
-        color: `#${tier.border.toString(16).padStart(6, '0')}`,
-      }).setOrigin(0.5);
-      grp.add(ribbonT);
+      // Calendar icon (geometric)
+      const g = this.add.graphics().setDepth(51);
+      g.lineStyle(1, 0x8844cc, 1);
+      g.strokeRect(cx - 18, cy + 5, 36, 28);
+      g.fillStyle(0xc100ff, 0.3);
+      g.fillRect(cx - 18, cy + 5, 36, 8);
+      for (let col = 0; col < 3; col++) {
+        for (let row = 0; row < 2; row++) {
+          g.fillStyle(0xffd700, 0.5);
+          g.fillRect(cx - 12 + col * 13, cy + 18 + row * 9, 8, 6);
+        }
+      }
 
-      // Price digits display (gold-style)
-      const digitsT = this.add.text(cx, cy - CARD_H / 2 + 180, `PER ${tier.label}`, {
-        fontFamily: 'monospace', fontSize: '10px', color: '#555555',
-      }).setOrigin(0.5);
-      grp.add(digitsT);
-
-      // SELECT / UPGRADE / RENEW button
-      const isOwned = tier.id === this.member.tier;
-      const btnLabel = isOwned
-        ? 'RENEW PLAN'
-        : (TIERS.indexOf(tier) > TIERS.findIndex(t => t.id === this.member.tier)
-            ? 'UPGRADE' : 'SELECT PLAN');
-      const btnBg = this.add.rectangle(cx, cy + CARD_H / 2 - 28, CARD_W - 20, 34, 0x000000, 0)
-        .setStrokeStyle(2, tier.border).setInteractive({ useHandCursor: true });
-      btnBg.on('pointerdown', () => this.selectTier(tier.id));
-      btnBg.on('pointerover', () => btnBg.setFillStyle(tier.border, 0.15));
-      btnBg.on('pointerout',  () => btnBg.setFillStyle(0x000000, 0));
-      grp.add(btnBg);
-      const btnT = this.add.text(cx, cy + CARD_H / 2 - 28, btnLabel, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '11px',
-        color: `#${tier.border.toString(16).padStart(6, '0')}`,
-      }).setOrigin(0.5);
-      grp.add(btnT);
-
-      if (isOwned) {
-        const ownedChip = this.add.rectangle(cx, cy + CARD_H / 2 - 66, CARD_W - 20, 24, tier.border, 0.25);
-        grp.add(ownedChip);
-        const ownedT = this.add.text(cx, cy + CARD_H / 2 - 66, '✓ CURRENT PLAN', {
-          fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffffff',
-        }).setOrigin(0.5);
-        grp.add(ownedT);
+      if (due.tier === 'YEARLY') {
+        this.add.text(cx, cy + 50, '👑', { fontSize: '18px' }).setOrigin(0.5).setDepth(52);
       }
     });
 
-    return grp;
+    // SELECT button
+    const selBtn = this.add.rectangle(secX + 190, secY + 228, 200, 38, 0x1a1000)
+      .setStrokeStyle(2, 0xffd700).setOrigin(0.5).setDepth(55).setInteractive({ useHandCursor: true });
+    const selLbl = this.add.text(secX + 190, secY + 228, 'SELECT DUES', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '12px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(56).setName('sel_dues_lbl');
+    selBtn.on('pointerdown', () => this.confirmDues(selLbl));
   }
 
-  private selectTier(tier: TierId): void {
-    this.member.tier = tier;
-    this.member.status = 'ACTIVE';
+  // ── CARD PACKS: BUY 2 CARDS / BUY 3 CARDS ────────────────────────────────
+  private buildCardPacksSection(): void {
+    const secX = GAME_WIDTH / 2 - 120, secY = 118;
+    this.add.rectangle(secX + 120, secY + 155, 260, 320, 0x08020e, 0.7)
+      .setStrokeStyle(1, 0xc100ff, 0.4).setOrigin(0.5).setDepth(40);
+
+    this.makeChip(secX + 120, secY + 12, '✦ CARD PACKS ✦', 0x0a0020, 0xc100ff, 11);
+
+    const packs = [{ n: 2, label: '2\nCARDS' }, { n: 3, label: '3\nCARDS' }];
+    packs.forEach((pack, i) => {
+      const cx = secX + 60 + i * 120;
+      const cy = secY + 125;
+      const bg = this.add.rectangle(cx, cy, 100, 150, 0x060018)
+        .setStrokeStyle(2, 0xc100ff).setOrigin(0.5).setDepth(50)
+        .setInteractive({ useHandCursor: true });
+      bg.on('pointerdown', () => this.selectCards(pack.n, bg));
+
+      this.add.text(cx, cy - 20, String(pack.n), {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '38px', color: '#c100ff',
+      }).setOrigin(0.5).setDepth(51);
+      this.add.text(cx, cy + 22, 'CARDS', {
+        fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#ffd700',
+      }).setOrigin(0.5).setDepth(51);
+
+      // Card icons (stacked)
+      const g = this.add.graphics().setDepth(51);
+      for (let c = pack.n - 1; c >= 0; c--) {
+        g.lineStyle(1, 0xffd700, 0.7);
+        g.fillStyle(0x1a0040, 1);
+        g.fillRoundedRect(cx - 18 + c * 6, cy + 34 + c * (-4), 30, 24, 3);
+        g.strokeRoundedRect(cx - 18 + c * 6, cy + 34 + c * (-4), 30, 24, 3);
+        g.fillStyle(0xc100ff, 0.5);
+        g.fillRect(cx - 5 + c * 6, cy + 44 + c * (-4), 6, 6);
+      }
+    });
+
+    // BUY buttons
+    const buyColors = [0x4400aa, 0x880000];
+    const buyBorders = [0xc100ff, 0xff4444];
+    packs.forEach((pack, i) => {
+      const bx = secX + 60 + i * 120;
+      const btn = this.add.rectangle(bx, secY + 238, 94, 36, buyColors[i])
+        .setStrokeStyle(2, buyBorders[i]).setOrigin(0.5).setDepth(55)
+        .setInteractive({ useHandCursor: true });
+      const icon = i === 0 ? '♦' : '♦';
+      this.add.text(bx, secY + 229, `${icon} BUY ${pack.n}`, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffffff',
+      }).setOrigin(0.5).setDepth(56);
+      this.add.text(bx, secY + 243, 'CARDS $', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffd700',
+      }).setOrigin(0.5).setDepth(56);
+      btn.on('pointerdown', () => this.buyCards(pack.n));
+      btn; icon;
+    });
+  }
+
+  // ── QR JOIN CARD + PAYMENT METHODS ───────────────────────────────────────
+  private buildQrSection(): void {
+    const secX = GAME_WIDTH - 280, secY = 118;
+    this.add.rectangle(secX + 120, secY + 155, 248, 320, 0x08020e, 0.7)
+      .setStrokeStyle(1, 0x00aaff, 0.4).setOrigin(0.5).setDepth(40);
+
+    this.makeChip(secX + 120, secY + 12, '✦ QR JOIN CARD ✦', 0x00061a, 0x00aaff, 11);
+
+    // QR card
+    const qrBg = this.add.rectangle(secX + 120, secY + 100, 160, 150, 0x060010)
+      .setStrokeStyle(2, 0x00aaff).setOrigin(0.5).setDepth(50);
+    this.add.text(secX + 120, secY + 46, 'JOIN THE GAME', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(51);
+
+    // QR pattern (geometric grid)
+    const g = this.add.graphics().setDepth(51);
+    const qx = secX + 50, qy = secY + 60;
+    g.fillStyle(0xffffff, 1);
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if ((r + c) % 2 === 0 || (r < 2 && c < 2) || (r < 2 && c > 5) || (r > 5 && c < 2)) {
+          g.fillRect(qx + c * 10, qy + r * 10, 9, 9);
+        }
+      }
+    }
+    g.lineStyle(2, 0x00aaff, 1);
+    g.strokeRect(qx - 2, qy - 2, 84, 84);
+
+    this.add.text(secX + 120, secY + 148, 'SCAN TO JOIN', {
+      fontFamily: 'Arial, sans-serif', fontSize: '10px', color: '#00aaff',
+    }).setOrigin(0.5).setDepth(51);
+    this.add.text(secX + 120, secY + 162, '★ ★ ★', {
+      fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(51);
+
+    qrBg; // referenced
+
+    // PAYMENT METHODS
+    this.makeChip(secX + 120, secY + 182, '✦ PAYMENT METHODS ✦', 0x00061a, 0x00aaff, 10);
+
+    PAYMENT_METHODS.forEach((pm, i) => {
+      const py = secY + 200 + i * 24;
+      this.add.rectangle(secX + 120, py, 200, 20, 0x060010)
+        .setStrokeStyle(1, 0x004466).setOrigin(0.5).setDepth(50);
+      this.add.text(secX + 44, py, pm.icon, { fontSize: '12px' }).setOrigin(0, 0.5).setDepth(51);
+      this.add.text(secX + 64, py, pm.label, {
+        fontFamily: 'Arial, sans-serif', fontSize: '10px', color: '#aaaaaa',
+      }).setOrigin(0, 0.5).setDepth(51);
+    });
+  }
+
+  // ── MEMBERSHIP STATUS BAR ─────────────────────────────────────────────────
+  private buildStatusBar(): void {
+    const barY = GAME_HEIGHT - 100;
+    this.add.rectangle(GAME_WIDTH / 2, barY, GAME_WIDTH - 40, 44, 0x08020e)
+      .setStrokeStyle(1, 0xffd700).setOrigin(0.5).setDepth(60);
+
+    this.makeChip(140, barY, '★ MEMBERSHIP STATUS BAR ★', 0x080010, 0xffd700, 10)
+      .setDepth(61);
+
+    // Avatar icon
+    const g = this.add.graphics().setDepth(61);
+    g.fillStyle(0xc100ff, 1);
+    g.fillCircle(32, barY, 12);
+    g.fillStyle(0x440088, 1);
+    g.fillCircle(32, barY, 8);
+
+    const m = this.member;
+    const tierLabel = m ? `${m.badge} MEMBER` : 'GUEST';
+    const statusLabel = m ? (m.active ? '★ ACTIVE • THANK YOU!' : '⚠ INACTIVE') : 'NOT ENROLLED';
+    const renewLabel = m ? `RENEWS IN  ${countdownStr(m.renewsAt)}` : '';
+
+    this.statusText = this.add.text(200, barY - 8, tierLabel, {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffd700',
+    }).setOrigin(0, 0.5).setDepth(61);
+
+    this.add.text(200, barY + 8, statusLabel, {
+      fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#c100ff',
+    }).setOrigin(0, 0.5).setDepth(61);
+
+    this.countdownText = this.add.text(GAME_WIDTH - 40, barY, renewLabel, {
+      fontFamily: 'monospace', fontSize: '13px', color: '#ffd700',
+    }).setOrigin(1, 0.5).setDepth(61);
+
+    // Countdown tick
+    this.time.addEvent({
+      delay: 30000,
+      callback: () => {
+        if (this.member) this.countdownText.setText(`RENEWS IN  ${countdownStr(this.member.renewsAt)}`);
+      },
+      loop: true,
+    });
+
+    // Upgrade badges
+    const badges = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'VIP'];
+    const badgeColors = [0x8B4513, 0xC0C0C0, 0xFFD700, 0xE5E4E2, 0xC100FF];
+    badges.forEach((b, i) => {
+      const bx = GAME_WIDTH / 2 + 60 + i * 60;
+      const isOwned = m?.badge === b;
+      const bg = this.add.graphics().setDepth(61);
+      bg.fillStyle(isOwned ? badgeColors[i] : 0x111111, isOwned ? 0.9 : 0.4);
+      bg.fillRoundedRect(bx - 22, barY - 16, 44, 32, 4);
+      bg.lineStyle(1, isOwned ? badgeColors[i] : 0x333333, 1);
+      bg.strokeRoundedRect(bx - 22, barY - 16, 44, 32, 4);
+      this.add.text(bx, barY, b, {
+        fontFamily: 'monospace', fontSize: '7px',
+        color: isOwned ? '#000000' : '#333333',
+      }).setOrigin(0.5).setDepth(62);
+    });
+  }
+
+  // ── PRIVATE MEMBER RULES ──────────────────────────────────────────────────
+  private buildPrivateRules(): void {
+    const rx = GAME_WIDTH / 2, ry = GAME_HEIGHT - 174;
+    this.makeChip(rx, ry - 10, '✦ PRIVATE MEMBER RULES ✦', 0x080010, 0xffd700, 10).setDepth(55);
+
+    const rules = [
+      { icon: '🔒', rule: 'MEMBERS ONLY: This game is for active members only.' },
+      { icon: '$',  rule: 'ENTRY DUES: Dues must be paid to participate.'       },
+      { icon: '🎴', rule: 'CARD PACKS: Unlock 2 or 3 cards per round.'          },
+      { icon: '♥',  rule: 'RESPECT: Be respectful and follow host rules.'       },
+      { icon: '🚫', rule: 'NO REFUNDS: All dues and purchases are final.'       },
+    ];
+    rules.forEach((r, i) => {
+      const lx = GAME_WIDTH / 2 - 240;
+      const ly = ry + 6 + i * 16;
+      this.add.text(lx, ly, r.icon, { fontSize: '11px' }).setOrigin(0, 0.5).setDepth(55);
+      this.add.text(lx + 22, ly, r.rule, {
+        fontFamily: 'Arial, sans-serif', fontSize: '10px', color: '#888888',
+      }).setOrigin(0, 0.5).setDepth(55);
+    });
+    this.add.text(rx, ry + 88, '★ ★ ★', {
+      fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(55);
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  private buildFooter(): void {
+    const y = GAME_HEIGHT - 18;
+    const items = [
+      { icon: '🔒', label: 'SECURE & ENCRYPTED' },
+      { icon: '🚫', label: 'NO REFUNDS'          },
+      { icon: '💬', label: 'QUESTIONS? CONTACT HOST' },
+      { icon: '♥',  label: 'THANK YOU FOR SUPPORTING!' },
+    ];
+    const totalW = items.length * 280;
+    let x = (GAME_WIDTH - totalW) / 2 + 140;
+    items.forEach(item => {
+      this.add.text(x, y, `${item.icon} ${item.label}`, {
+        fontFamily: 'Arial, sans-serif', fontSize: '10px', color: '#444444',
+      }).setOrigin(0.5).setDepth(55);
+      x += 280;
+    });
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  private makeChip(x: number, y: number, label: string, fill: number, border: number, fontSize: number): Phaser.GameObjects.Text {
+    const t = this.add.text(x, y, label, {
+      fontFamily: 'Arial, sans-serif', fontSize: `${fontSize}px`,
+      color: `#${border.toString(16).padStart(6, '0')}`,
+      backgroundColor: `#${fill.toString(16).padStart(6, '0')}`,
+      padding: { x: 10, y: 4 },
+    }).setOrigin(0.5).setDepth(52);
+    return t;
+  }
+
+  private selectTier(tier: MemberRecord['tier'], idx: number): void {
+    this.selectedTier = tier;
+    const lbl = this.children.getByName('sel_dues_lbl') as Phaser.GameObjects.Text | null;
+    if (lbl) lbl.setText(`SELECT: ${DUES[idx].price} ${tier}`);
+  }
+
+  private selectCards(n: number, _bg: Phaser.GameObjects.Rectangle): void {
+    this.selectedCards = n;
+  }
+
+  private confirmDues(btn: Phaser.GameObjects.Text): void {
+    if (!this.selectedTier) {
+      btn.setText('PICK A TIER FIRST!');
+      this.time.delayedCall(1500, () => btn.setText('SELECT DUES'));
+      return;
+    }
+    const due = DUES.find(d => d.tier === this.selectedTier)!;
+    const m: MemberRecord = {
+      tier: this.selectedTier,
+      cardCount: this.selectedCards || 2,
+      cardNumber: generateCardNumber(),
+      renewsAt: renewMs(this.selectedTier),
+      badge: due.badge,
+      active: true,
+    };
+    saveMember(m);
+    this.member = m;
+    this.showConfirmation(m);
+  }
+
+  private buyCards(n: number): void {
+    if (!this.member) {
+      this.showToast('PICK A DUES TIER FIRST!');
+      return;
+    }
+    this.member.cardCount += n;
     saveMember(this.member);
-    // Rebuild views
-    this.memberView.destroy();
-    this.staffView.destroy();
-    this.memberView = this.buildMemberView();
-    this.staffView = this.buildStaffView();
-    const isStaff = this.mode === 'staff';
-    this.memberView.setVisible(!isStaff);
-    this.staffView.setVisible(isStaff);
+    this.showToast(`✔ ${n} CARDS ADDED — TOTAL: ${this.member.cardCount}`);
+  }
+
+  private showConfirmation(m: MemberRecord): void {
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.8).setDepth(9000);
+    this.tweens.add({ targets: overlay, alpha: { from: 0, to: 0.8 }, duration: 300 });
+
+    const panel = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 500, 280, 0x08020e)
+      .setStrokeStyle(3, 0xffd700).setDepth(9001);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, '★ MEMBERSHIP ACTIVATED ★', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(9002);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 55, m.badge + ' MEMBER', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#c100ff',
+    }).setOrigin(0.5).setDepth(9002);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 24, 'YOUR CARD NUMBER:', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#888888',
+    }).setOrigin(0.5).setDepth(9002);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 2, m.cardNumber, {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+      stroke: '#3d1a00', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(9002);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, 'Show this number to Security / Staff / Host to verify entry.', {
+      fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#aaaaaa',
+    }).setOrigin(0.5).setDepth(9002);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 65, `CARDS UNLOCKED: ${m.cardCount}   |   RENEWS: ${countdownStr(m.renewsAt)}`, {
+      fontFamily: 'monospace', fontSize: '11px', color: '#44cc44',
+    }).setOrigin(0.5).setDepth(9002);
+
+    const closeBtn = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, 200, 36, 0x1a1000)
+      .setStrokeStyle(2, 0xffd700).setDepth(9002).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, 'DONE — THANK YOU!', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ffd700',
+    }).setOrigin(0.5).setDepth(9003);
+    closeBtn.on('pointerdown', () => {
+      overlay.destroy(); panel.destroy();
+      this.scene.restart();
+    });
+
+    this.statusText.setText(m.badge + ' MEMBER');
+    this.countdownText.setText(`RENEWS IN  ${countdownStr(m.renewsAt)}`);
+    panel; closeBtn;
+  }
+
+  private showToast(msg: string): void {
+    const t = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, msg, {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffd700',
+      backgroundColor: '#08020e', padding: { x: 16, y: 8 },
+    }).setOrigin(0.5).setDepth(9990);
+    this.tweens.add({
+      targets: t, alpha: { from: 1, to: 0 }, delay: 1800, duration: 400,
+      onComplete: () => t.destroy(),
+    });
   }
 }
