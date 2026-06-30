@@ -58,11 +58,41 @@ export class OptionsScene extends Phaser.Scene {
         .setStrokeStyle(2, 0xffd700, 0.9);
     }
 
-    // ── Title ────────────────────────────────────────────────────────────
-    this.add.text(cx, cy - PANEL_H / 2 + 30, 'SETTINGS', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+    // ── Title bar (u1TitleBar2 or u1TitleBar1 as title strip) ─────────────
+    const titleY = cy - PANEL_H / 2 + 32;
+    const titleKey = [UI.u1TitleBar2, UI.u1TitleBar1, UI.u1TitleBar3]
+      .find(k => UISystem.ready(this) && this.textures.exists(k));
+    if (titleKey) {
+      this.add.image(cx, titleY, titleKey)
+        .setOrigin(0.5).setDisplaySize(360, 52).setDepth(9);
+    }
+    this.add.text(cx, titleY, 'SETTINGS', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffd700',
       stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(10);
+
+    // ── AUDIO / GAMEPLAY / CONTROLS tabs (visual only) ────────────────────
+    const TAB_LABELS = ['AUDIO', 'GAMEPLAY', 'CONTROLS'];
+    const tabY = cy - PANEL_H / 2 + 68;
+    const tabW = 110, tabH = 28;
+    const tabStartX = cx - (TAB_LABELS.length * tabW) / 2 + tabW / 2;
+    TAB_LABELS.forEach((lbl, ti) => {
+      const tx = tabStartX + ti * tabW;
+      const isActive = ti === 0;
+      const tabKey = isActive
+        ? (this.textures.exists(UI.u1TabActive) ? UI.u1TabActive : null)
+        : (this.textures.exists(UI.u1TabIdle) ? UI.u1TabIdle : null);
+      if (tabKey) {
+        this.add.image(tx, tabY, tabKey)
+          .setOrigin(0.5).setDisplaySize(tabW - 4, tabH).setDepth(9)
+          .setAlpha(isActive ? 1 : 0.6);
+      }
+      this.add.text(tx, tabY, lbl, {
+        fontFamily: 'monospace', fontSize: '10px',
+        color: isActive ? '#ffd700' : '#887799',
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(10);
+    });
 
     // ── Option rows ───────────────────────────────────────────────────────
     this.entries = [
@@ -178,24 +208,28 @@ export class OptionsScene extends Phaser.Scene {
 
     // ── Save + Back buttons ───────────────────────────────────────────────
     const btnY = cy + PANEL_H / 2 - 40;
+    const btnW2 = 140, btnH2 = 38;
 
-    const saveBtn = this.add.text(cx - 80, btnY, 'SAVE', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
-      stroke: '#000000', strokeThickness: 4,
-      backgroundColor: '#1a0a30', padding: { x: 18, y: 8 },
-    }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
-    saveBtn.on('pointerover', () => saveBtn.setColor('#ffffff'));
-    saveBtn.on('pointerout',  () => saveBtn.setColor('#ffd700'));
-    saveBtn.on('pointerdown', () => this.scene.start(this.prevScene));
+    const mkSceneBtn = (bx: number, label: string, artKey: string, hovKey: string, color: string) => {
+      if (UISystem.ready(this) && this.textures.exists(artKey)) {
+        const img = this.add.image(bx, btnY, artKey)
+          .setDisplaySize(btnW2, btnH2).setDepth(9).setInteractive({ useHandCursor: true });
+        img.on('pointerover', () => {
+          if (this.textures.exists(hovKey)) img.setTexture(hovKey);
+          img.setDisplaySize(btnW2 * 1.05, btnH2 * 1.05);
+        });
+        img.on('pointerout', () => { img.setTexture(artKey); img.setDisplaySize(btnW2, btnH2); });
+        img.on('pointerdown', () => this.scene.start(this.prevScene));
+      }
+      const txt = this.add.text(bx, btnY, label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '15px', color,
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
+      txt.on('pointerdown', () => this.scene.start(this.prevScene));
+    };
 
-    const backBtn = this.add.text(cx + 80, btnY, 'BACK', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#887799',
-      stroke: '#000000', strokeThickness: 4,
-      backgroundColor: '#0a0614', padding: { x: 18, y: 8 },
-    }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
-    backBtn.on('pointerover', () => backBtn.setColor('#ffffff'));
-    backBtn.on('pointerout',  () => backBtn.setColor('#887799'));
-    backBtn.on('pointerdown', () => this.scene.start(this.prevScene));
+    mkSceneBtn(cx - 80, 'SAVE', UI.u1BtnPrimary, UI.u1BtnPrimaryHov, '#ffd700');
+    mkSceneBtn(cx + 80, 'BACK', UI.u1BtnBack,    UI.u1BtnGhost,      '#ccbbee');
 
     // ── Keyboard ─────────────────────────────────────────────────────────
     this.input.keyboard!.on('keydown-ESC', () => this.scene.start(this.prevScene));

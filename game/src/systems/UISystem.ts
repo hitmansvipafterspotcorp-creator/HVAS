@@ -252,6 +252,29 @@ export const UI = {
   vmCrownPin:        'venue_map_021',        // crown map pin
   vmStarBadge:       'venue_map_030',        // star rating badge
 
+  // ── UI Kit 01 — named components ─────────────────────────────────────────
+  u1BtnPrimary:      'u1_btn_primary',
+  u1BtnPrimaryHov:   'u1_btn_primary_hover',
+  u1BtnPrimaryPress: 'u1_btn_primary_pressed',
+  u1BtnSecondary:    'u1_btn_secondary',
+  u1BtnBack:         'u1_btn_back',
+  u1BtnConfirm:      'u1_btn_confirm',
+  u1BtnDanger:       'u1_btn_danger',
+  u1BtnGhost:        'u1_btn_ghost',
+  u1TabActive:       'u1_tab_active',
+  u1TabHover:        'u1_tab_hover',
+  u1TabIdle:         'u1_tab_idle',
+  u1TabLocked:       'u1_tab_locked',
+  u1TitleBar1:       'u1_title_bar_1',
+  u1TitleBar2:       'u1_title_bar_2',
+  u1TitleBar3:       'u1_title_bar_3',
+  u1TitleBar4:       'u1_title_bar_4',
+  u1CornerBrackets:  'u1_corner_brackets',
+  u1SeparatorThin:   'u1_separator_thin',
+  u1NotifyChips:     'u1_notify_chips',    // star/skull/VIP hex badges strip
+  u1MotifCrown:      'u1_motif_crown',
+  u1MotifShield:     'u1_motif_shield',
+
   // ── Legacy aliases (kept so old code doesn't break) ───────────────────────
   healthBar:         'hud_health_bar',
   comboLabel:        'hud_combo_label',
@@ -543,6 +566,29 @@ const FILES: Array<[string, string]> = [
   [UI.vmMapPin,          'ui/elements/venue_map/venue_map_020.png'],
   [UI.vmCrownPin,        'ui/elements/venue_map/venue_map_021.png'],
   [UI.vmStarBadge,       'ui/elements/venue_map/venue_map_030.png'],
+
+  // ── UI Kit 01 ─────────────────────────────────────────────────────────────
+  [UI.u1BtnPrimary,      'ui/elements/ui01/btn_primary.png'],
+  [UI.u1BtnPrimaryHov,   'ui/elements/ui01/btn_primary_hover.png'],
+  [UI.u1BtnPrimaryPress, 'ui/elements/ui01/btn_primary_pressed.png'],
+  [UI.u1BtnSecondary,    'ui/elements/ui01/btn_secondary.png'],
+  [UI.u1BtnBack,         'ui/elements/ui01/btn_back.png'],
+  [UI.u1BtnConfirm,      'ui/elements/ui01/btn_confirm.png'],
+  [UI.u1BtnDanger,       'ui/elements/ui01/btn_danger.png'],
+  [UI.u1BtnGhost,        'ui/elements/ui01/btn_ghost.png'],
+  [UI.u1TabActive,       'ui/elements/ui01/tab_header_active.png'],
+  [UI.u1TabHover,        'ui/elements/ui01/tab_header_hover.png'],
+  [UI.u1TabIdle,         'ui/elements/ui01/tab_header_idle.png'],
+  [UI.u1TabLocked,       'ui/elements/ui01/tab_header_locked.png'],
+  [UI.u1TitleBar1,       'ui/elements/ui01/title_bar_01.png'],
+  [UI.u1TitleBar2,       'ui/elements/ui01/title_bar_02.png'],
+  [UI.u1TitleBar3,       'ui/elements/ui01/title_bar_03.png'],
+  [UI.u1TitleBar4,       'ui/elements/ui01/title_bar_04.png'],
+  [UI.u1CornerBrackets,  'ui/elements/ui01/corner_brackets.png'],
+  [UI.u1SeparatorThin,   'ui/elements/ui01/separator_thin.png'],
+  [UI.u1NotifyChips,     'ui/elements/ui01/notify_chips.png'],
+  [UI.u1MotifCrown,      'ui/elements/ui01/motif_crown.png'],
+  [UI.u1MotifShield,     'ui/elements/ui01/motif_shield.png'],
 ];
 
 export const UISystem = {
