@@ -15,6 +15,12 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { EnemyAISystem } from '../systems/EnemyAISystem';
 import { WaveSystem } from '../systems/WaveSystem';
 import { StageLoader } from '../systems/StageLoader';
+import { TileComposer, type TileLayout } from '../systems/TileComposer';
+import { CAFE8FIFTY_EXTERIOR_LAYOUT } from '../data/layouts/cafe8fifty_exterior';
+
+const STAGE_LAYOUTS: Record<string, TileLayout> = {
+  cafe8fifty: CAFE8FIFTY_EXTERIOR_LAYOUT,
+};
 import { PropDestructionSystem } from '../systems/PropDestructionSystem';
 import { WeaponSystem } from '../systems/WeaponSystem';
 import { BossSystem } from '../systems/BossSystem';
@@ -89,8 +95,17 @@ export class BrawlerScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    // Real backdrop if the PNG exists; graybox floor always drawn underneath.
-    StageLoader.loadBackdrop(this, this.stage);
+    // Tile-composed backdrop if (a) we have a layout for this stage AND
+    // (b) the ?tiles=1 query flag is set. Layouts are still being tuned so
+    // the default render path uses the pre-composited PNG via StageLoader.
+    const useTiles = typeof window !== 'undefined'
+      && window.location.search.includes('tiles=1');
+    const layout = STAGE_LAYOUTS[this.stage.id];
+    if (useTiles && layout) {
+      TileComposer.compose(this, layout);
+    } else {
+      StageLoader.loadBackdrop(this, this.stage);
+    }
 
     // Floor band spans the full scrolling world.
     const g = this.add.graphics().setDepth(-1999);
