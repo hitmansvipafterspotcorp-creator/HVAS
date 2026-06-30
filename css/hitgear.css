@@ -783,7 +783,7 @@ button.art-btn:disabled img, button.art-btn[style*="display:none"] { }
 /* ── Invisible hit areas over physical buttons ── */
 .shell-hit {
   position: absolute;
-  z-index: 10;
+  z-index: 20;
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;

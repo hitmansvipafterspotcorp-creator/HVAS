@@ -683,13 +683,15 @@ document.addEventListener('DOMContentLoaded', () => {
     screenArea.style.cssText =
       `left:${px(SCREEN_X1)}px;top:${py(SCREEN_Y1)}px;` +
       `width:${dw*(SCREEN_X2-SCREEN_X1)}px;height:${dh*(SCREEN_Y2-SCREEN_Y1)}px`;
-    // Position each button hit area (square, sized off the smaller image dimension)
+    // Position each button hit area (circle, sized off the shorter image dimension)
+    const debugMode = location.search.includes('debug');
     SHELL_BTNS.forEach(b => {
       const el = document.getElementById(b.id);
       if (!el) return;
       const size = b.r * 2 * Math.min(dw, dh);
       el.style.cssText =
-        `left:${px(b.cx)-size/2}px;top:${py(b.cy)-size/2}px;width:${size}px;height:${size}px`;
+        `left:${px(b.cx)-size/2}px;top:${py(b.cy)-size/2}px;width:${size}px;height:${size}px;` +
+        (debugMode ? 'background:rgba(255,0,255,0.35);border:2px solid #ff00ff;' : '');
     });
   }
 
@@ -731,8 +733,19 @@ document.addEventListener('DOMContentLoaded', () => {
   wireHitArea('sfbtn-x',     'touch-x');
   wireHitArea('sfbtn-y',     'touch-y');
 
-  document.getElementById('sfbtn-select')?.addEventListener('click', () => { if(typeof QuestEngine !== 'undefined') QuestEngine?.togglePause?.(); });
-  document.getElementById('sfbtn-start')?.addEventListener('click', () => { document.getElementById('touch-a')?.click(); });
+  // START = confirm / A-button equivalent
+  wireHitArea('sfbtn-start', 'touch-a');
+  // SELECT = pause / menu toggle
+  const selHit = document.getElementById('sfbtn-select');
+  if (selHit) {
+    const pauseFire = e => {
+      e.preventDefault();
+      if (typeof QuestEngine !== 'undefined') QuestEngine?.togglePause?.();
+      document.getElementById('touch-b')?.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+    };
+    selHit.addEventListener('touchstart', pauseFire, {passive:false});
+    selHit.addEventListener('mousedown',  pauseFire);
+  }
 });
 </script>
 </body>
