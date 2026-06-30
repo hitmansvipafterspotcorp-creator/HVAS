@@ -12,7 +12,6 @@ const STAGE_TRACKS: Record<string, number> = {
   outta_exterior:         4,
   qhf_exterior:           5,
   social_gaines_exterior: 1,
-  success_rooftop:        2,
   tally_exterior:         3,
 };
 
@@ -67,12 +66,17 @@ export class AudioSystem {
     scene.sound.getAllPlaying().forEach(s => { (s as Phaser.Sound.WebAudioSound).setVolume(v); });
   }
 
-  static setSfxVolume(_scene: Phaser.Scene, _v: number): void {
-    // SFX is WebAudio procedural; persisted to localStorage by OptionsScene.
+  static setSfxVolume(_scene: Phaser.Scene, v: number): void {
+    // SFX is WebAudio procedural — persist volume to localStorage so sfx() can read it.
+    try { localStorage.setItem('hvas_opt_sfx', String(Phaser.Math.Clamp(v, 0, 1))); } catch { /* */ }
+  }
+
+  static getSfxVolume(): number {
+    try { return parseFloat(localStorage.getItem('hvas_opt_sfx') ?? '0.8'); } catch { return 0.8; }
   }
 
   // Procedural SFX using WebAudio oscillator (no SFX files needed).
-  static sfx(scene: Phaser.Scene, type: 'hit' | 'superhit' | 'pickup_health' | 'pickup_meter' | 'pickup_weapon' | 'ko' | 'door'): void {
+  static sfx(scene: Phaser.Scene, type: 'hit' | 'superhit' | 'pickup_health' | 'pickup_meter' | 'pickup_weapon' | 'ko' | 'door' | 'dodge'): void {
     const ctx = (scene.sound as unknown as { context?: AudioContext }).context;
     if (!ctx) return;
     switch (type) {

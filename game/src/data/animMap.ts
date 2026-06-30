@@ -107,6 +107,8 @@ export const BRAWLER_ANIMS = [
   'special',
   'hurt',
   'knockdown',
+  'recover',
+  'victory',
   'defeated',
   'super1',
   'super2',

@@ -4,6 +4,7 @@ import { Fighter } from '../entities/Fighter';
 import { CombatSystem } from '../systems/CombatSystem';
 import { CHAR_FOLDERS } from '../data/animMap';
 import { AudioSystem } from '../systems/AudioSystem';
+import { CHAR_NAMES } from '../data/roster';
 
 // HVAS TV — a self-running spectator channel. Two AI fighters battle on a
 // random stage backdrop; a scrolling ticker carries venue news at the bottom.
@@ -52,14 +53,13 @@ export class TvModeScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(0x050308);
 
     // Channel header
-    const header = this.add.rectangle(GAME_WIDTH / 2, 22, GAME_WIDTH, 44, 0x0a0018).setDepth(1000);
+    this.add.rectangle(GAME_WIDTH / 2, 22, GAME_WIDTH, 44, 0x0a0018).setDepth(1000);
     this.add.text(16, 22, '📺 HVAS TV', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
     }).setOrigin(0, 0.5).setDepth(1001);
     this.add.text(GAME_WIDTH - 16, 22, 'LIVE', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ff2244',
     }).setOrigin(1, 0.5).setDepth(1001);
-    header; // referenced
 
     // Floor / arena
     const g = this.add.graphics().setDepth(-100);
@@ -79,12 +79,10 @@ export class TvModeScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(500);
 
     // Bottom ticker
-    const tickerBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 16, GAME_WIDTH, 32, 0x0a0018)
-      .setDepth(1000);
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 16, GAME_WIDTH, 32, 0x0a0018).setDepth(1000);
     this.ticker = this.add.text(this.tickerX, GAME_HEIGHT - 16, TICKER_ITEMS.join('   ·   '), {
       fontFamily: 'monospace', fontSize: '13px', color: '#ffd700',
     }).setOrigin(0, 0.5).setDepth(1001);
-    tickerBg; // referenced
 
     // Controls hint
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 52, 'SPACE — New Match   ESC — Menu', {
@@ -118,12 +116,7 @@ export class TvModeScene extends Phaser.Scene {
   }
 
   private getCharName(id: number): string {
-    const names: Record<number, string> = {
-      1:'Creator',2:'DJ',3:'FAMU',4:'FAMU M',5:'Influencer',6:'Photographer',
-      7:'Promoter',8:'Dancer',9:'Vendor',10:'Security',11:'Host',12:'FSU',
-      13:'FSU M',14:'Kendrick',20:'KT',21:'Big Soulja',22:'ELD',30:'Pete',31:'Snow',
-    };
-    return names[id] ?? `Fighter ${id}`;
+    return CHAR_NAMES[id] ?? `Fighter ${id}`;
   }
 
   override update(_t: number, delta: number): void {

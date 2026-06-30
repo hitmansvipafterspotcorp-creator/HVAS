@@ -86,9 +86,6 @@ export class MainMenuScene extends Phaser.Scene {
         .setOrigin(0.5).setDisplaySize(320, 52).setDepth(120).setScrollFactor(0).setAlpha(0.85);
     }
 
-    // ── Top-left: profile bar ─────────────────────────────────────────────
-    UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });
-
     // ── Top-right: profile bar ────────────────────────────────────────────
     UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });
 

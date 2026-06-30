@@ -77,7 +77,7 @@ export class MembershipScene extends Phaser.Scene {
   private selectedTier: MemberRecord['tier'] | null = null;
   private selectedCards = 0;
 
-  constructor() { super('Membership'); }
+  constructor() { super(SCENE.Membership); }
 
   create(): void {
     AudioSystem.playForScene(this, 'Venue');
@@ -257,7 +257,7 @@ export class MembershipScene extends Phaser.Scene {
       this.add.text(bx, secY + 229, `${icon} BUY ${pack.n}`, {
         fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffffff',
       }).setOrigin(0.5).setDepth(56);
-      this.add.text(bx, secY + 243, 'CARDS $', {
+      this.add.text(bx, secY + 243, `CARDS $${pack.n * 5}`, {
         fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffd700',
       }).setOrigin(0.5).setDepth(56);
       btn.on('pointerdown', () => this.buyCards(pack.n));

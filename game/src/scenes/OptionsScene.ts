@@ -34,6 +34,9 @@ export class OptionsScene extends Phaser.Scene {
   private labels: Phaser.GameObjects.Text[] = [];
   private entries: OptionEntry[] = [];
   private prevScene: string = SCENE.MainMenu;
+  private tabGroups: Phaser.GameObjects.Container[] = [];
+  private tabTextRefs: Phaser.GameObjects.Text[] = [];
+  private tabBgRefs: (Phaser.GameObjects.Image | null)[] = [];
 
   constructor() { super(SCENE.Options); }
 
@@ -71,27 +74,101 @@ export class OptionsScene extends Phaser.Scene {
       stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(10);
 
-    // ── AUDIO / GAMEPLAY / CONTROLS tabs (visual only) ────────────────────
+    // ── AUDIO / GAMEPLAY / CONTROLS tabs ─────────────────────────────────
     const TAB_LABELS = ['AUDIO', 'GAMEPLAY', 'CONTROLS'];
     const tabY = cy - PANEL_H / 2 + 68;
     const tabW = 110, tabH = 28;
     const tabStartX = cx - (TAB_LABELS.length * tabW) / 2 + tabW / 2;
+    this.tabTextRefs = [];
+    this.tabBgRefs = [];
     TAB_LABELS.forEach((lbl, ti) => {
       const tx = tabStartX + ti * tabW;
       const isActive = ti === 0;
       const tabKey = isActive
         ? (this.textures.exists(UI.u1TabActive) ? UI.u1TabActive : null)
         : (this.textures.exists(UI.u1TabIdle) ? UI.u1TabIdle : null);
+      let bgImg: Phaser.GameObjects.Image | null = null;
       if (tabKey) {
-        this.add.image(tx, tabY, tabKey)
+        bgImg = this.add.image(tx, tabY, tabKey)
           .setOrigin(0.5).setDisplaySize(tabW - 4, tabH).setDepth(9)
-          .setAlpha(isActive ? 1 : 0.6);
+          .setAlpha(isActive ? 1 : 0.6).setInteractive({ useHandCursor: true });
+        bgImg.on('pointerdown', () => this.switchTab(ti));
       }
-      this.add.text(tx, tabY, lbl, {
+      this.tabBgRefs.push(bgImg);
+      const lbl2 = this.add.text(tx, tabY, lbl, {
         fontFamily: 'monospace', fontSize: '10px',
         color: isActive ? '#ffd700' : '#887799',
         stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(10);
+      }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
+      lbl2.on('pointerdown', () => this.switchTab(ti));
+      this.tabTextRefs.push(lbl2);
+    });
+
+    // ── Tab content groups ────────────────────────────────────────────────
+    // Build all three tab panes; only one is visible at a time.
+    const audioGroup = this.add.container(0, 0).setDepth(5);
+    const gameplayGroup = this.add.container(0, 0).setDepth(5).setVisible(false);
+    const controlsGroup = this.add.container(0, 0).setDepth(5).setVisible(false);
+    this.tabGroups = [audioGroup, gameplayGroup, controlsGroup];
+
+    // GAMEPLAY tab content
+    const gpItems = [
+      { label: 'DIFFICULTY',    value: 'NORMAL',   opts: ['EASY','NORMAL','HARD','LEGEND'] },
+      { label: 'HIT SPARKS',    value: 'ON',        opts: ['ON','OFF'] },
+      { label: 'SCREEN SHAKE',  value: 'ON',        opts: ['ON','OFF'] },
+      { label: 'AUTO COMBO',    value: 'OFF',       opts: ['ON','OFF'] },
+    ];
+    const gpStore: Record<string, number> = {};
+    gpItems.forEach((item, gi) => {
+      const gy = ROW_Y0 + gi * ROW_GAP;
+      const lKey = `gp_${item.label}`;
+      gpStore[lKey] = parseInt(localStorage.getItem(lKey) ?? '0');
+      const lbl = this.add.text(cx - PANEL_W / 2 + 40, gy, item.label, {
+        fontFamily: 'monospace', fontSize: '13px', color: '#ccbbee',
+      }).setOrigin(0, 0.5);
+      const valTxt = this.add.text(cx + 80, gy, item.opts[gpStore[lKey] % item.opts.length], {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ffd700',
+      }).setOrigin(0.5);
+      const leftBtn = this.add.text(cx + 20, gy, '◀', {
+        fontFamily: 'monospace', fontSize: '16px', color: '#9933ff',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const rightBtn = this.add.text(cx + 140, gy, '▶', {
+        fontFamily: 'monospace', fontSize: '16px', color: '#9933ff',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      const update = (delta: number) => {
+        gpStore[lKey] = (gpStore[lKey] + delta + item.opts.length) % item.opts.length;
+        localStorage.setItem(lKey, String(gpStore[lKey]));
+        valTxt.setText(item.opts[gpStore[lKey]]);
+      };
+      leftBtn.on('pointerdown', () => update(-1));
+      rightBtn.on('pointerdown', () => update(1));
+      leftBtn.on('pointerover', () => leftBtn.setColor('#ffd700'));
+      leftBtn.on('pointerout', () => leftBtn.setColor('#9933ff'));
+      rightBtn.on('pointerover', () => rightBtn.setColor('#ffd700'));
+      rightBtn.on('pointerout', () => rightBtn.setColor('#9933ff'));
+      gameplayGroup.add([lbl, valTxt, leftBtn, rightBtn]);
+    });
+
+    // CONTROLS tab content — display key bindings
+    const ctrlBindings = [
+      ['MOVE LEFT',   'A / ◀'],
+      ['MOVE RIGHT',  'D / ▶'],
+      ['JUMP',        'W / ▲ / SPACE'],
+      ['DUCK / DODGE','S / ▼'],
+      ['ATTACK',      'J'],
+      ['BLOCK',       'K'],
+      ['GRAB',        'L'],
+      ['PAUSE',       'ESC'],
+    ];
+    ctrlBindings.forEach(([action, keys], ci) => {
+      const cy2 = ROW_Y0 - 10 + ci * 32;
+      const aLbl = this.add.text(cx - PANEL_W / 2 + 40, cy2, action, {
+        fontFamily: 'monospace', fontSize: '12px', color: '#ccbbee',
+      }).setOrigin(0, 0.5);
+      const kLbl = this.add.text(cx + 80, cy2, keys, {
+        fontFamily: 'monospace', fontSize: '12px', color: '#ffd700',
+      }).setOrigin(0, 0.5);
+      controlsGroup.add([aLbl, kLbl]);
     });
 
     // ── Option rows ───────────────────────────────────────────────────────
@@ -127,26 +204,28 @@ export class OptionsScene extends Phaser.Scene {
       const y = ROW_Y0 + i * ROW_GAP;
       const leftX = cx - PANEL_W / 2 + 40;
       const sliderX = cx + 20;
+      const rowObjs: Phaser.GameObjects.GameObject[] = [];
 
       // Row background — use slider art if available
       if (UISystem.ready(this) && this.textures.exists(UI.osxSliderRow)) {
-        this.add.image(sliderX + SLIDER_W / 2 - 30, y, UI.osxSliderRow)
-          .setOrigin(0.5).setDisplaySize(SLIDER_W + 100, SLIDER_H + 4).setAlpha(0.8).setDepth(2);
+        rowObjs.push(this.add.image(sliderX + SLIDER_W / 2 - 30, y, UI.osxSliderRow)
+          .setOrigin(0.5).setDisplaySize(SLIDER_W + 100, SLIDER_H + 4).setAlpha(0.8).setDepth(2));
       }
 
       // Row label
-      this.add.text(leftX, y, e.label, {
+      rowObjs.push(this.add.text(leftX, y, e.label, {
         fontFamily: 'monospace', fontSize: '13px', color: '#ccbbee',
-      }).setOrigin(0, 0.5).setDepth(10);
+      }).setOrigin(0, 0.5).setDepth(10));
 
       // Slider trough
-      this.add.rectangle(sliderX, y, SLIDER_W, 10, 0x1a0f2e).setOrigin(0, 0.5).setDepth(5);
+      rowObjs.push(this.add.rectangle(sliderX, y, SLIDER_W, 10, 0x1a0f2e).setOrigin(0, 0.5).setDepth(5));
 
       // Fill bar
       const frac = (e.getValue() - e.min) / (e.max - e.min);
       const fill = this.add.rectangle(sliderX, y, SLIDER_W * frac, 10, 0x9933ff)
         .setOrigin(0, 0.5).setDepth(6);
       this.fills.push(fill);
+      rowObjs.push(fill);
 
       // Diamond handle
       const diamond = this.add.image(sliderX + SLIDER_W * frac, y, '__DEFAULT')
@@ -155,16 +234,19 @@ export class OptionsScene extends Phaser.Scene {
       if (UISystem.ready(this) && this.textures.exists(UI.vmCrownPin)) {
         diamond.setTexture(UI.vmCrownPin).setDisplaySize(18, 18);
       }
+      rowObjs.push(diamond);
 
       // Value label
       const valText = this.add.text(sliderX + SLIDER_W + 14, y, String(e.getValue()), {
         fontFamily: 'monospace', fontSize: '13px', color: '#ffffff',
       }).setOrigin(0, 0.5).setDepth(10);
       this.labels.push(valText);
+      rowObjs.push(valText);
 
       // Click/drag on trough to set value
       const trough = this.add.rectangle(sliderX + SLIDER_W / 2, y, SLIDER_W, 28, 0x000000, 0)
         .setOrigin(0.5).setDepth(8).setInteractive({ useHandCursor: true });
+      rowObjs.push(trough);
 
       const setFromPointer = (ptr: Phaser.Input.Pointer) => {
         const rawFrac = Phaser.Math.Clamp((ptr.x - sliderX) / SLIDER_W, 0, 1);
@@ -200,10 +282,12 @@ export class OptionsScene extends Phaser.Scene {
           diamond.x = sliderX + SLIDER_W * f;
           valText.setText(String(next));
         });
+        rowObjs.push(btn);
         return btn;
       };
       mkArrow('◀', sliderX, -e.step);
       mkArrow('▶', sliderX + SLIDER_W, e.step);
+      audioGroup.add(rowObjs);
     }
 
     // ── Save + Back buttons ───────────────────────────────────────────────
@@ -233,5 +317,10 @@ export class OptionsScene extends Phaser.Scene {
 
     // ── Keyboard ─────────────────────────────────────────────────────────
     this.input.keyboard!.on('keydown-ESC', () => this.scene.start(this.prevScene));
+  }
+
+  private switchTab(index: number): void {
+    this.tabGroups.forEach((g, i) => g.setVisible(i === index));
+    this.tabTextRefs.forEach((t, i) => t.setColor(i === index ? '#ffd700' : '#887799'));
   }
 }

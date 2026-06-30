@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, ASSET_BASE } from '../config';
+import { AudioSystem } from '../systems/AudioSystem';
 
 // ── LevelEditorScene ────────────────────────────────────────────────────────
 // In-engine level editor. Left-click places the selected item type; right-click
@@ -57,6 +58,7 @@ export class LevelEditorScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(0x12101a);
+    AudioSystem.playForScene(this, 'StageSelect');
 
     // Grid.
     const grid = this.add.graphics().setDepth(-100);

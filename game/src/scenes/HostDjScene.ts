@@ -190,7 +190,7 @@ export class HostDjScene extends Phaser.Scene {
     const bg = this.add.rectangle(w / 2, h / 2, w, h, color).setStrokeStyle(1, 0x3a2a55);
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerdown', cb);
-    bg.on('pointerover', () => bg.setFillStyle(color + 0x100810));
+    bg.on('pointerover', () => bg.setFillStyle(Math.min(0xffffff, color + 0x100810)));
     bg.on('pointerout',  () => bg.setFillStyle(color));
     const lbl = this.add.text(14, h / 2, mainLabel, {
       fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#ffffff',
@@ -235,6 +235,7 @@ export class HostDjScene extends Phaser.Scene {
     const track = TRACKS[i];
     this.vpPerSec = 1 + track.energy * 0.3 + this.staffBonus();
     this.addFeed(`🎧 Now playing: ${track.name} (${track.genre})`);
+    AudioSystem.play(this, (i % 5) + 1);
     this.refreshStaffDisplay();
     // Re-render track buttons
     this.tabContents[1].destroy();

@@ -510,7 +510,8 @@ export class ArcadeVsScene extends Phaser.Scene {
     // Build HUD
     this.buildFightHUD();
 
-    // ESC = pause
+    // ESC = pause — remove any prior listener before adding to prevent accumulation
+    this.input.keyboard!.off('keydown-ESC');
     this.input.keyboard!.on('keydown-ESC', () => this.togglePause());
 
     this.flashBanner(`ROUND ${this.roundNum}`);
@@ -895,7 +896,7 @@ export class ArcadeVsScene extends Phaser.Scene {
     if (Math.abs(target.x - attacker.x) > 80 || Math.abs(target.feetY - attacker.feetY) > 30) return;
     const dmg = 22;
     target.hp = Math.max(0, target.hp - dmg);
-    target.state = 'knockdown' as any;
+    target.state = 'knockdown';
     target.stateTimer = 600;
     attacker.meter = Math.min(100, attacker.meter + 18);
     attacker.combo = (attacker.combo ?? 0) + 1;
@@ -1101,8 +1102,7 @@ export class ArcadeVsScene extends Phaser.Scene {
   private hidePauseOverlay(): void {
     this.pauseGroup?.destroy(true);
     this.pauseGroup = undefined;
-    // Re-wire ESC to toggle pause
-    this.input.keyboard!.once('keydown-ESC', () => this.togglePause());
+    // ESC handler already set persistently in startFight() — no re-wire needed
   }
 
   // ─────────────────────────────────────────────────────────────────────────
