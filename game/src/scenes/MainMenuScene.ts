@@ -17,7 +17,7 @@ const ITEMS: MenuItem[] = [
   { label: 'ARCADE VS',      btnKey: UI.mmBtnVsMode,     btnSelKey: UI.mmBtnVsModeSel,     scene: SCENE.ArcadeVs },
   { label: 'CHAR SELECT',    btnKey: UI.mmBtnCharSelect, btnSelKey: UI.mmBtnCharSelectSel, scene: SCENE.CharacterSelect },
   { label: 'VENUES',         btnKey: UI.mmBtnVenueMap,   btnSelKey: UI.mmBtnVenueMapSel,   scene: SCENE.VenueSelect },
-  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,    btnSelKey: UI.mmBtnOptionsSel },
+  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,    btnSelKey: UI.mmBtnOptionsSel,    scene: SCENE.Options },
   { label: 'EXIT / MAIN',    btnKey: UI.mmBtnExit,       btnSelKey: UI.mmBtnExitSel,       scene: SCENE.MainMenu },
 ];
 

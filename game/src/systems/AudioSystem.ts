@@ -59,6 +59,18 @@ export class AudioSystem {
     scene.sound.stopAll();
   }
 
+  static setMasterVolume(scene: Phaser.Scene, v: number): void {
+    scene.sound.volume = Phaser.Math.Clamp(v, 0, 1);
+  }
+
+  static setMusicVolume(scene: Phaser.Scene, v: number): void {
+    scene.sound.getAllPlaying().forEach(s => { (s as Phaser.Sound.WebAudioSound).setVolume(v); });
+  }
+
+  static setSfxVolume(_scene: Phaser.Scene, _v: number): void {
+    // SFX is WebAudio procedural; persisted to localStorage by OptionsScene.
+  }
+
   // Procedural SFX using WebAudio oscillator (no SFX files needed).
   static sfx(scene: Phaser.Scene, type: 'hit' | 'superhit' | 'pickup_health' | 'pickup_meter' | 'pickup_weapon' | 'ko' | 'door'): void {
     const ctx = (scene.sound as unknown as { context?: AudioContext }).context;

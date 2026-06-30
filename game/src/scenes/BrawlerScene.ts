@@ -785,22 +785,32 @@ export class BrawlerScene extends Phaser.Scene {
     // Dim backdrop
     g.add(this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65).setScrollFactor(0));
 
-    // Pause panel art (wide overlay or dark rectangle fallback)
-    if (this.textures.exists(UI.pmPanelWide)) {
-      const panel = this.add.image(cx, cy, UI.pmPanelWide)
-        .setDisplaySize(460, 360).setScrollFactor(0);
-      g.add(panel);
+    // Large panel frame — prefer pmxPanelLarge > pmPanelWide > rectangle
+    if (this.textures.exists(UI.pmxPanelLarge)) {
+      g.add(this.add.image(cx, cy, UI.pmxPanelLarge)
+        .setDisplaySize(480, 380).setScrollFactor(0));
+    } else if (this.textures.exists(UI.pmPanelWide)) {
+      g.add(this.add.image(cx, cy, UI.pmPanelWide)
+        .setDisplaySize(460, 360).setScrollFactor(0));
     } else {
       g.add(this.add.rectangle(cx, cy, 440, 340, 0x0a0614, 0.97)
         .setStrokeStyle(2, 0xffd700, 0.9).setScrollFactor(0));
     }
 
-    // Title banner art
-    const bannerY = cy - 148;
-    if (this.textures.exists(UI.pmTitleBanner)) {
-      const title = this.add.image(cx, bannerY, UI.pmTitleBanner)
-        .setDisplaySize(380, 76).setScrollFactor(0);
-      g.add(title);
+    // 4-button panel inside the large frame
+    if (this.textures.exists(UI.pmxBtnPanel)) {
+      g.add(this.add.image(cx, cy + 30, UI.pmxBtnPanel)
+        .setDisplaySize(320, 260).setScrollFactor(0).setAlpha(0.65));
+    }
+
+    // Title banner — prefer pmxTitle > pmTitleBanner > text
+    const bannerY = cy - 150;
+    if (this.textures.exists(UI.pmxTitle)) {
+      g.add(this.add.image(cx, bannerY, UI.pmxTitle)
+        .setDisplaySize(400, 72).setScrollFactor(0));
+    } else if (this.textures.exists(UI.pmTitleBanner)) {
+      g.add(this.add.image(cx, bannerY, UI.pmTitleBanner)
+        .setDisplaySize(380, 76).setScrollFactor(0));
     } else {
       g.add(this.add.text(cx, bannerY, '★ PAUSE ★', {
         fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
@@ -813,7 +823,7 @@ export class BrawlerScene extends Phaser.Scene {
       { label: 'RESUME',       key: UI.pmBtnContinue, hov: UI.pmBtnContinueHov, action: () => this.togglePause() },
       { label: 'RESTART',      key: UI.pmBtnRestart,  hov: UI.pmBtnRestartHov,  action: () => { this.paused = false; this.scene.restart(); } },
       { label: 'STAGE SELECT', key: UI.pmBtnRetry,    hov: UI.pmBtnRetryHov,    action: () => { this.paused = false; this.scene.start(SCENE.StageSelect); } },
-      { label: 'SETTINGS',     key: UI.pmBtnSettings, hov: UI.pmBtnSettingsHov, action: () => {} },
+      { label: 'SETTINGS',     key: UI.pmBtnSettings, hov: UI.pmBtnSettingsHov, action: () => { this.paused = false; this.scene.start(SCENE.Options); } },
       { label: 'MAIN MENU',    key: UI.pmBtnQuit,     hov: UI.pmBtnQuitHov,     action: () => { this.paused = false; this.scene.start(SCENE.MainMenu); } },
     ];
 

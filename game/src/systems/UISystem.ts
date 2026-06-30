@@ -186,6 +186,32 @@ export const UI = {
   dlgMission014:     'dialogue_mission_014',
   dlgMission015:     'dialogue_mission_015',
 
+  // ── Character Select numbered crops ──────────────────────────────────────
+  csxPortraitGold:   'character_select_000',  // gold/neon unlocked portrait frame
+  csxPortraitPurple: 'character_select_001',  // purple unlocked portrait frame
+  csxPortraitLocked: 'character_select_002',  // red/locked portrait frame
+  csxStatPanel:      'character_select_003',  // stat panel (unlocked)
+  csxStatPanelLock:  'character_select_004',  // stat panel (locked)
+  csxNameBar:        'character_select_005',  // wide name/alias bar
+  csxRankShield:     'character_select_010',  // shield rank badge
+  csxRankStar:       'character_select_020',  // hex star rank badge
+
+  // ── Pause Menu numbered crops ─────────────────────────────────────────────
+  pmxTitle:          'pause_menu_000',        // PAUSE MENU title banner
+  pmxFullMockup:     'pause_menu_001',        // complete pause menu mockup
+  pmxPanelSmall:     'pause_menu_002',        // small transparent panel
+  pmxPanelWide:      'pause_menu_003',        // wide dark panel
+  pmxBtnPanel:       'pause_menu_004',        // 4-slot button panel
+  pmxPanelLarge:     'pause_menu_005',        // large panel frame
+  pmxMissionSummary: 'pause_menu_006',        // Mission Summary side panel
+  pmxConfirmDialog:  'pause_menu_007',        // Confirmation dialog
+
+  // ── Options/Settings numbered crops ──────────────────────────────────────
+  osxPanel:          'options_settings_000',  // full settings panel
+  osxSidebar:        'options_settings_001',  // category sidebar
+  osxSliderRow:      'options_settings_002',  // volume slider row
+  osxToggleRow:      'options_settings_003',  // toggle (Music ON/OFF)
+
   // ── Frames & Emblems sheet crops ─────────────────────────────────────────
   feGameLogo:        'frames_emblems_005',   // full HITMANS VIP AFTER SPOT logo
   feMainMenuBanner:  'frames_emblems_000',   // MAIN MENU marquee banner
@@ -451,6 +477,32 @@ const FILES: Array<[string, string]> = [
   [UI.dlgMission013, 'ui/elements/dialogue_mission/dialogue_mission_013.png'],
   [UI.dlgMission014, 'ui/elements/dialogue_mission/dialogue_mission_014.png'],
   [UI.dlgMission015, 'ui/elements/dialogue_mission/dialogue_mission_015.png'],
+
+  // ── Character Select numbered ─────────────────────────────────────────────
+  [UI.csxPortraitGold,   'ui/elements/character_select/character_select_000.png'],
+  [UI.csxPortraitPurple, 'ui/elements/character_select/character_select_001.png'],
+  [UI.csxPortraitLocked, 'ui/elements/character_select/character_select_002.png'],
+  [UI.csxStatPanel,      'ui/elements/character_select/character_select_003.png'],
+  [UI.csxStatPanelLock,  'ui/elements/character_select/character_select_004.png'],
+  [UI.csxNameBar,        'ui/elements/character_select/character_select_005.png'],
+  [UI.csxRankShield,     'ui/elements/character_select/character_select_010.png'],
+  [UI.csxRankStar,       'ui/elements/character_select/character_select_020.png'],
+
+  // ── Pause Menu numbered ───────────────────────────────────────────────────
+  [UI.pmxTitle,          'ui/elements/pause_menu/pause_menu_000.png'],
+  [UI.pmxFullMockup,     'ui/elements/pause_menu/pause_menu_001.png'],
+  [UI.pmxPanelSmall,     'ui/elements/pause_menu/pause_menu_002.png'],
+  [UI.pmxPanelWide,      'ui/elements/pause_menu/pause_menu_003.png'],
+  [UI.pmxBtnPanel,       'ui/elements/pause_menu/pause_menu_004.png'],
+  [UI.pmxPanelLarge,     'ui/elements/pause_menu/pause_menu_005.png'],
+  [UI.pmxMissionSummary, 'ui/elements/pause_menu/pause_menu_006.png'],
+  [UI.pmxConfirmDialog,  'ui/elements/pause_menu/pause_menu_007.png'],
+
+  // ── Options/Settings numbered ─────────────────────────────────────────────
+  [UI.osxPanel,          'ui/elements/options_settings/options_settings_000.png'],
+  [UI.osxSidebar,        'ui/elements/options_settings/options_settings_001.png'],
+  [UI.osxSliderRow,      'ui/elements/options_settings/options_settings_002.png'],
+  [UI.osxToggleRow,      'ui/elements/options_settings/options_settings_003.png'],
 
   // ── Frames & Emblems ──────────────────────────────────────────────────────
   [UI.feGameLogo,       'ui/elements/frames_emblems/frames_emblems_005.png'],
