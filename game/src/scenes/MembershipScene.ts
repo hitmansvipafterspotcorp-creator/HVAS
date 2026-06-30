@@ -51,10 +51,12 @@ function countdownStr(ms: number): string {
   return `${String(d).padStart(2, '0')}D : ${String(h).padStart(2, '0')}H : ${String(m).padStart(2, '0')}M`;
 }
 
+// ── REAL MEMBERSHIP PRICES — Hitmans VIP After Spot ─────────────────────────
 const DUES = [
-  { tier: 'WEEKLY'  as const, price: '$20',  label: 'WEEKLY',  badge: 'SILVER'   as const },
-  { tier: 'MONTHLY' as const, price: '$50',  label: 'MONTHLY', badge: 'GOLD'     as const },
-  { tier: 'YEARLY'  as const, price: '$100', label: 'YEARLY',  badge: 'PLATINUM' as const },
+  { tier: 'WEEKLY'  as const, price: '$100',    label: 'WEEKLY',  badge: 'SILVER'   as const },
+  { tier: 'MONTHLY' as const, price: '$300',    label: 'MONTHLY', badge: 'GOLD'     as const },
+  { tier: 'YEARLY'  as const, price: '$1,000',  label: 'YEARLY',  badge: 'PLATINUM' as const },
+  { tier: 'VIP'     as const, price: '$5,000',  label: 'VIP',     badge: 'VIP'      as const },
 ];
 
 const PAYMENT_METHODS = [
@@ -142,16 +144,18 @@ export class MembershipScene extends Phaser.Scene {
     });
   }
 
-  // ── DUES OPTIONS: $20 WEEKLY / $50 MONTHLY / $100 YEARLY ─────────────────
+  // ── DUES OPTIONS: $100 WEEKLY / $300 MONTHLY / $1,000 YEARLY / $5,000 VIP ──
   private buildDuesSection(): void {
-    const secX = 40, secY = 118;
-    this.add.rectangle(secX + 190, secY + 155, 400, 320, 0x08020e, 0.7)
+    const secX = 20, secY = 118;
+    const cardW = 100, cardGap = 8;
+    const totalW = DUES.length * (cardW + cardGap) + 20;
+    this.add.rectangle(secX + totalW / 2, secY + 155, totalW, 320, 0x08020e, 0.7)
       .setStrokeStyle(1, 0xffd700, 0.4).setOrigin(0.5).setDepth(40);
 
-    this.makeChip(secX + 190, secY + 12, '✦ DUES OPTIONS ✦', 0x0a0500, 0xffd700, 11);
+    this.makeChip(secX + totalW / 2, secY + 12, '✦ MEMBERSHIP DUES ✦', 0x0a0500, 0xffd700, 11);
 
     DUES.forEach((due, i) => {
-      const cx = secX + 70 + i * 126;
+      const cx = secX + 10 + cardW / 2 + i * (cardW + cardGap);
       const cy = secY + 130;
       // Badge card
       const bg = this.add.rectangle(cx, cy, 110, 170, 0x0a0200)
@@ -165,7 +169,7 @@ export class MembershipScene extends Phaser.Scene {
       ));
 
       this.add.text(cx, cy - 58, due.price, {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '32px', color: '#ffd700',
+        fontFamily: 'Arial Black, sans-serif', fontSize: due.price.length > 5 ? '20px' : '26px', color: '#ffd700',
         stroke: '#3d1a00', strokeThickness: 2,
       }).setOrigin(0.5).setDepth(51).setName(`price_${i}`);
 
@@ -186,15 +190,16 @@ export class MembershipScene extends Phaser.Scene {
         }
       }
 
-      if (due.tier === 'YEARLY') {
+      if (due.tier === 'VIP') {
         this.add.text(cx, cy + 50, '👑', { fontSize: '18px' }).setOrigin(0.5).setDepth(52);
       }
     });
 
-    // SELECT button
-    const selBtn = this.add.rectangle(secX + 190, secY + 228, 200, 38, 0x1a1000)
+    // SELECT button centred under the cards
+    const btnCx = secX + 10 + DUES.length * (cardW + cardGap) / 2;
+    const selBtn = this.add.rectangle(btnCx, secY + 228, 220, 38, 0x1a1000)
       .setStrokeStyle(2, 0xffd700).setOrigin(0.5).setDepth(55).setInteractive({ useHandCursor: true });
-    const selLbl = this.add.text(secX + 190, secY + 228, 'SELECT DUES', {
+    const selLbl = this.add.text(btnCx, secY + 228, 'SELECT MEMBERSHIP', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '12px', color: '#ffd700',
     }).setOrigin(0.5).setDepth(56).setName('sel_dues_lbl');
     selBtn.on('pointerdown', () => this.confirmDues(selLbl));

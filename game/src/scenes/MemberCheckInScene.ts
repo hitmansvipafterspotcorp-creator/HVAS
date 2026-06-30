@@ -101,7 +101,8 @@ export class MemberCheckInScene extends Phaser.Scene {
     // Right: recent scans + profile
     this.buildRecentScans();
 
-    // Bottom: payment methods
+    // Bottom: entry schedule + payment methods
+    this.buildEntrySchedule();
     this.buildPaymentMethods();
 
     // Keyboard
@@ -399,6 +400,77 @@ export class MemberCheckInScene extends Phaser.Scene {
     this.add.text(lx + lw / 2, haY + 13, '👑 HOST APPROVAL REQUIRED', {
       fontFamily: 'Arial, sans-serif', fontSize: '10px', color: '#ffd700',
     }).setOrigin(0.5).setDepth(32);
+  }
+
+  // ── ENTRY SCHEDULE ────────────────────────────────────────────────────────
+  // Posted for staff reference at the door.
+  // Tue–Wed: Women/Students free until 2AM | Men $5 before 2AM
+  // Thu–Sat: Women/Students free→$5→$10 | Men $5→$10→$15→$20
+  private buildEntrySchedule(): void {
+    const baseY = GAME_HEIGHT - 148;
+    this.add.rectangle(GAME_WIDTH / 2, baseY + 30, GAME_WIDTH - 40, 66, 0x08020e)
+      .setStrokeStyle(1, 0x3a2a55).setOrigin(0.5).setDepth(60);
+
+    this.add.text(24, baseY + 4, '📋 ENTRY SCHEDULE', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ffd700',
+    }).setDepth(61);
+
+    // Tue–Wed column
+    this.add.text(180, baseY + 4, 'TUE – WED', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '9px', color: '#aaaaaa',
+    }).setOrigin(0.5, 0).setDepth(61);
+    const twRows = [
+      { g: '👩 WOMEN',    v: 'FREE until 2AM',  c: '#44cc44' },
+      { g: '🎓 STUDENTS', v: 'FREE until 2AM',  c: '#44cc44' },
+      { g: '👨 MEN',      v: '$5 before 2AM',   c: '#ffd700' },
+    ];
+    twRows.forEach((r, i) => {
+      this.add.text(100, baseY + 18 + i * 14, r.g, {
+        fontFamily: 'monospace', fontSize: '9px', color: '#888888',
+      }).setDepth(61);
+      this.add.text(260, baseY + 18 + i * 14, r.v, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '9px', color: r.c,
+      }).setOrigin(1, 0).setDepth(61);
+    });
+
+    // Divider
+    const dg = this.add.graphics().setDepth(61);
+    dg.lineStyle(1, 0x3a2a55, 1);
+    dg.strokeRect(275, baseY + 2, 0, 58);
+
+    // Thu–Sat column
+    this.add.text(640, baseY + 4, 'THU – SAT', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '9px', color: '#aaaaaa',
+    }).setOrigin(0.5, 0).setDepth(61);
+
+    // Header row
+    const headers = ['GROUP', 'BEFORE 2AM', 'AFTER 2AM', 'AFTER 3AM', 'AFTER 4AM'];
+    const cols    = [290, 400, 490, 576, 660];
+    headers.forEach((h, i) => {
+      this.add.text(cols[i], baseY + 14, h, {
+        fontFamily: 'monospace', fontSize: '8px', color: '#555555',
+      }).setDepth(61);
+    });
+
+    const tsRows = [
+      { g: '👩 WOMEN',    vals: ['FREE',  '$5',  '$10', '$10'], colors: ['#44cc44','#ffd700','#ff8800','#ff8800'] },
+      { g: '🎓 STUDENTS', vals: ['FREE*', '$5',  '$10', '$10'], colors: ['#44cc44','#ffd700','#ff8800','#ff8800'] },
+      { g: '👨 MEN',      vals: ['$5',   '$10', '$15', '$20'], colors: ['#ffd700','#ff8800','#ff5500','#ff2200'] },
+    ];
+    tsRows.forEach((r, i) => {
+      const y2 = baseY + 24 + i * 14;
+      this.add.text(cols[0], y2, r.g, {
+        fontFamily: 'monospace', fontSize: '9px', color: '#888888',
+      }).setDepth(61);
+      r.vals.forEach((v, ci) => {
+        this.add.text(cols[ci + 1] + 28, y2, v, {
+          fontFamily: 'Arial Black, sans-serif', fontSize: '9px', color: r.colors[ci],
+        }).setOrigin(0.5, 0).setDepth(61);
+      });
+    });
+    this.add.text(cols[1] + 28, baseY + 66, '*Student ID required', {
+      fontFamily: 'monospace', fontSize: '8px', color: '#444444',
+    }).setOrigin(0.5, 0).setDepth(61);
   }
 
   // ── PAYMENT METHODS ───────────────────────────────────────────────────────
