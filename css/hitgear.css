@@ -751,11 +751,11 @@ button.art-btn:disabled img, button.art-btn[style*="display:none"] { }
   top: 0; left: 0;
   width: 100%;
   height: 100%;
-  /* CONTAIN = the WHOLE device is always visible, never cropped.
-     The letterbox area is filled by the #console-shell background gradient,
-     so the handheld reads as a device sitting on a surface. The JS overlay
-     maps the screen cutout against this same contain rect. */
-  object-fit: contain;
+  /* COVER = shell fills the full viewport edge-to-edge, no letterbox bars.
+     Only the very outer device edges get clipped on wide screens — the
+     screen glass, dpad, and buttons all remain visible. The JS overlay
+     uses Math.max to match this same cover scaling. */
+  object-fit: cover;
   object-position: 50% 50%;
   pointer-events: none;
   user-select: none;

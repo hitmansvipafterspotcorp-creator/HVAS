@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Rendered with object-fit:CONTAIN / object-position 50% 50% — MUST match CSS.
   // All coordinates are fractions of the image, measured against the artwork.
   const SHELL_NAT_W = 1448, SHELL_NAT_H = 958;
-  const OBJ_POS_X = 0.50, OBJ_POS_Y = 0.50;  // keep in sync with #shell-img object-position
+  const OBJ_POS_X = 0.50, OBJ_POS_Y = 0.50;  // keep in sync with #shell-img object-position (cover)
   // Screen-glass cutout as fractions of the shell art (1448x958). Y2 pulled in
   // so gameplay content sits inside the glass and never runs onto the bottom bezel.
   const SCREEN_X1 = 0.205, SCREEN_Y1 = 0.140;
@@ -669,9 +669,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const screenArea = document.getElementById('screen-area');
     if (!shellEl || !screenArea) return;
     const cw = shellEl.clientWidth, ch = shellEl.clientHeight;
-    // object-fit: contain → image scaled to FIT inside the box (min scale),
-    // so the whole device is visible and never cropped.
-    const scale = Math.min(cw / SHELL_NAT_W, ch / SHELL_NAT_H);
+    // object-fit: cover → image scaled to FILL the box (max scale),
+    // shell fills viewport edge-to-edge; outer bezel edges may clip on wide screens.
+    const scale = Math.max(cw / SHELL_NAT_W, ch / SHELL_NAT_H);
     const dw = SHELL_NAT_W * scale, dh = SHELL_NAT_H * scale;
     // object-position 50% → letterbox centered
     const ox = (cw - dw) * OBJ_POS_X;
