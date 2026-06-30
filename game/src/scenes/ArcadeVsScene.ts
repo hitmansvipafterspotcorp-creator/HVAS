@@ -113,41 +113,90 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(0x0a0614);
 
-    // Title bar art
-    if (this.textures.exists(UI.u1TitleBar3)) {
-      grp.add(this.add.image(GAME_WIDTH / 2, 26, UI.u1TitleBar3)
-        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 44).setDepth(5).setAlpha(0.9));
-    }
-    // Corner brackets
-    if (this.textures.exists(UI.u1CornerBrackets)) {
-      grp.add(this.add.image(4, 4, UI.u1CornerBrackets)
-        .setOrigin(0, 0).setDisplaySize(56, 56).setDepth(4).setAlpha(0.7));
-      grp.add(this.add.image(GAME_WIDTH - 4, 4, UI.u1CornerBrackets)
-        .setOrigin(1, 0).setDisplaySize(56, 56).setDepth(4).setAlpha(0.7).setFlipX(true));
-    }
+    const tex = (k: string) => this.textures.exists(k);
+    const addImg = (key: string, x: number, y: number, w: number, h: number,
+                   ox = 0.5, oy = 0, depth = 10, alpha = 1) => {
+      if (!tex(key)) return null;
+      return this.add.image(x, y, key).setOrigin(ox, oy)
+        .setDisplaySize(w, h).setDepth(depth).setAlpha(alpha).setScrollFactor(0);
+    };
 
-    // Title
-    grp.add(this.add.text(GAME_WIDTH / 2, 26, 'ARCADE VS', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '26px', color: '#ffd700',
+    // ── Title banner (CHARACTER SELECT) ──────────────────────────────────────
+    const titleBanner = addImg(UI.csTitleBanner, GAME_WIDTH / 2, 0, GAME_WIDTH, 50, 0.5, 0, 50);
+    if (titleBanner) grp.add(titleBanner);
+
+    const titleTxt = this.add.text(GAME_WIDTH / 2, 25, 'ARCADE VS · CHARACTER SELECT', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
       stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(6));
+    }).setOrigin(0.5).setDepth(51);
+    grp.add(titleTxt);
 
-    this.phaseLabel = this.add.text(GAME_WIDTH / 2, 60, '', {
-      fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
-    }).setOrigin(0.5);
+    this.phaseLabel = this.add.text(GAME_WIDTH / 2, 55, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#ccbbdd',
+    }).setOrigin(0.5).setDepth(51);
     grp.add(this.phaseLabel);
 
-    // Real character-select grid background
-    if (this.textures.exists(UI.csGrid)) {
+    // ── LEFT PANEL — P1 portrait ──────────────────────────────────────────────
+    const LPORT_X = 88;
+    const LPORT_Y = 66;
+    const LPORT_W = 148;
+    const LPORT_H = 196;
+
+    const portFrameKey = tex(UI.csxPortraitGold) ? UI.csxPortraitGold : UI.csPortraitFrameLarge;
+    const lFrame = addImg(portFrameKey, LPORT_X, LPORT_Y, LPORT_W, LPORT_H, 0.5, 0, 15);
+    if (lFrame) grp.add(lFrame);
+
+    this.p1PortraitSpr = this.add.sprite(LPORT_X, LPORT_Y + LPORT_H - 8, '__DEFAULT')
+      .setOrigin(0.5, 1).setScale((LPORT_W - 20) / 181).setDepth(16);
+    grp.add(this.p1PortraitSpr);
+
+    grp.add(this.add.text(LPORT_X, LPORT_Y - 2, '★ PLAYER 1 ★', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#44aaff',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5, 1).setDepth(17));
+
+    this.p1NameTxt = this.add.text(LPORT_X, LPORT_Y + LPORT_H + 4, '', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ffd700',
+    }).setOrigin(0.5, 0).setDepth(17);
+    grp.add(this.p1NameTxt);
+
+    const lStatKey = tex(UI.csxStatPanel) ? UI.csxStatPanel : UI.csStatPanel;
+    const lStat = addImg(lStatKey, LPORT_X, LPORT_Y + LPORT_H + 16, LPORT_W, 80, 0.5, 0, 15);
+    if (lStat) grp.add(lStat);
+
+    // ── RIGHT PANEL — CPU portrait ────────────────────────────────────────────
+    const RPORT_X = GAME_WIDTH - 88;
+    const RPORT_Y = 66;
+
+    const rFrame = addImg(portFrameKey, RPORT_X, RPORT_Y, LPORT_W, LPORT_H, 0.5, 0, 15);
+    if (rFrame) grp.add(rFrame);
+
+    this.p2PortraitSpr = this.add.sprite(RPORT_X, RPORT_Y + LPORT_H - 8, '__DEFAULT')
+      .setOrigin(0.5, 1).setScale((LPORT_W - 20) / 181).setDepth(16).setFlipX(true);
+    grp.add(this.p2PortraitSpr);
+
+    grp.add(this.add.text(RPORT_X, RPORT_Y - 2, '★ CPU ★', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '10px', color: '#ff6644',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5, 1).setDepth(17));
+
+    this.p2NameTxt = this.add.text(RPORT_X, RPORT_Y + LPORT_H + 4, '', {
+      fontFamily: 'monospace', fontSize: '9px', color: '#ff9977',
+    }).setOrigin(0.5, 0).setDepth(17);
+    grp.add(this.p2NameTxt);
+
+    const rStat = addImg(lStatKey, RPORT_X, RPORT_Y + LPORT_H + 16, LPORT_W, 80, 0.5, 0, 15);
+    if (rStat) grp.add(rStat);
+
+    // ── CENTER CHARACTER GRID ─────────────────────────────────────────────────
+    if (tex(UI.csGrid)) {
       const gw = COLS * CELL + 12;
       const gh = ROWS * CELL + 12;
-      grp.add(this.add.image(GRID_X - 6, GRID_Y - 6, UI.csGrid)
-        .setOrigin(0, 0)
-        .setDisplaySize(gw, gh)
-        .setAlpha(0.5));
+      const gridBg = this.add.image(GRID_X - 6, GRID_Y - 6, UI.csGrid)
+        .setOrigin(0, 0).setDisplaySize(gw, gh).setAlpha(0.5).setDepth(8);
+      grp.add(gridBg);
     }
 
-    // Character grid cells
     for (let i = 0; i < ALL_CHARS.length; i++) {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
@@ -155,94 +204,67 @@ export class ArcadeVsScene extends Phaser.Scene {
       const cy = GRID_Y + row * CELL + CELL / 2;
       const charId = ALL_CHARS[i];
 
-      const cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820)
-        .setStrokeStyle(1, 0x3a2a5a);
-      grp.add(cell);
+      let cellObj: Phaser.GameObjects.GameObject;
+      if (tex(UI.csSlotIdle)) {
+        cellObj = this.add.image(cx, cy, UI.csSlotIdle).setDisplaySize(CELL - 4, CELL - 4).setDepth(9);
+      } else {
+        cellObj = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820).setStrokeStyle(1, 0x3a2a5a).setDepth(9);
+      }
+      grp.add(cellObj);
 
       const idleKey = AnimationSystem.animKey(charId, 'idle');
       if (this.anims.exists(idleKey)) {
-        const spr = this.add.sprite(cx, cy + 8, '__DEFAULT')
-          .setOrigin(0.5, 1).setScale(42 / 181).setDepth(1);
+        const spr = this.add.sprite(cx, cy + CELL * 0.4, '__DEFAULT')
+          .setOrigin(0.5, 1).setScale((CELL - 16) / 181).setDepth(11);
         spr.play(idleKey);
         grp.add(spr as Phaser.GameObjects.GameObject);
       } else {
-        grp.add(this.add.rectangle(cx, cy, 30, 48,
-          charId === 1 ? COLORS.player : COLORS.enemy));
+        grp.add(this.add.rectangle(cx, cy, 26, 44, charId === 1 ? COLORS.player : COLORS.enemy).setDepth(11));
       }
 
-      grp.add(this.add.text(cx, cy + CELL / 2 - 12,
+      grp.add(this.add.text(cx, cy + CELL / 2 - 7,
         (CHAR_NAMES[charId] ?? `#${charId}`).split(' ').slice(-1)[0], {
-          fontFamily: 'monospace', fontSize: '8px', color: '#ccbbee',
-        }).setOrigin(0.5));
+          fontFamily: 'monospace', fontSize: '7px', color: '#ccbbee',
+        }).setOrigin(0.5, 1).setDepth(12));
     }
 
-    // Cursor
+    // Cursor highlight
     this.cursorRect = this.add.rectangle(0, 0, CELL - 2, CELL - 2, 0xffd700, 0)
-      .setStrokeStyle(3, 0xffd700);
+      .setStrokeStyle(3, 0xffd700).setDepth(13);
     grp.add(this.cursorRect);
 
-    // Bottom strip — P1 and P2 portrait frames
-    const stripY = GRID_Y + ROWS * CELL + 14;
-
-    // P1 side
-    if (this.textures.exists(UI.csFrameL)) {
-      grp.add(this.add.image(80, stripY + 44, UI.csFrameL)
-        .setDisplaySize(96, 130).setOrigin(0.5));
-    }
-    grp.add(this.add.text(80, stripY + 4, 'P1', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#44aaff',
-    }).setOrigin(0.5));
-    this.p1PortraitSpr = this.add.sprite(80, stripY + 64, '__DEFAULT').setScale(48 / 181).setOrigin(0.5, 1);
-    grp.add(this.p1PortraitSpr);
-    this.p1NameTxt = this.add.text(80, stripY + 72, '', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#44aaff',
-    }).setOrigin(0.5);
-    grp.add(this.p1NameTxt);
-
-    // P2 side
-    if (this.textures.exists(UI.csFrameR)) {
-      grp.add(this.add.image(GAME_WIDTH - 80, stripY + 44, UI.csFrameR)
-        .setDisplaySize(96, 130).setOrigin(0.5));
-    }
-    grp.add(this.add.text(GAME_WIDTH - 80, stripY + 4, 'CPU', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ff6644',
-    }).setOrigin(0.5));
-    this.p2PortraitSpr = this.add.sprite(GAME_WIDTH - 80, stripY + 64, '__DEFAULT').setScale(48 / 181).setOrigin(0.5, 1);
-    grp.add(this.p2PortraitSpr);
-    this.p2NameTxt = this.add.text(GAME_WIDTH - 80, stripY + 72, '', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#ff6644',
-    }).setOrigin(0.5);
-    grp.add(this.p2NameTxt);
-
-    // VS graphic between portraits
-    if (this.textures.exists(UI.csVs)) {
-      grp.add(this.add.image(GAME_WIDTH / 2, stripY + 40, UI.csVs)
-        .setDisplaySize(120, 72).setOrigin(0.5));
-    } else {
-      grp.add(this.add.text(GAME_WIDTH / 2, stripY + 30, 'VS', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '36px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 6,
-      }).setOrigin(0.5));
-    }
-
-    // Difficulty buttons
-    const diffY = stripY + 108;
+    // ── DIFFICULTY BUTTONS (shown during diffselect phase) ────────────────────
+    const diffY = GRID_Y + ROWS * CELL + 14;
     this.diffButtons = [];
     for (let d = 0; d < DIFFICULTIES.length; d++) {
       const btn = this.add.text(
-        GAME_WIDTH / 2 + (d - 1.5) * 120, diffY,
+        GAME_WIDTH / 2 + (d - 1.5) * 108, diffY,
         DIFFICULTIES[d].label,
-        { fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: DIFFICULTIES[d].color },
-      ).setOrigin(0.5).setAlpha(0.3).setVisible(false);
+        { fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: DIFFICULTIES[d].color,
+          stroke: '#000000', strokeThickness: 3 },
+      ).setOrigin(0.5).setAlpha(0.3).setVisible(false).setDepth(51);
       grp.add(btn);
       this.diffButtons.push(btn);
     }
 
-    // Controls hint
-    grp.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 10,
-      'WASD/Arrows navigate  ·  Space/Enter confirm  ·  ESC back', {
-        fontFamily: 'monospace', fontSize: '11px', color: '#554466',
-      }).setOrigin(0.5));
+    // ── BOTTOM — instruction strip / action buttons ───────────────────────────
+    const instrKey = tex(UI.csInstructionStrip) ? UI.csInstructionStrip : null;
+    if (instrKey) {
+      const strip = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 2, instrKey)
+        .setOrigin(0.5, 1).setDisplaySize(GAME_WIDTH, 30).setDepth(30);
+      grp.add(strip);
+    } else {
+      grp.add(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8,
+        'WASD/Arrows navigate  ·  Space/Enter confirm  ·  ESC back', {
+          fontFamily: 'monospace', fontSize: '11px', color: '#554466',
+        }).setOrigin(0.5, 1).setDepth(30));
+    }
+
+    if (tex(UI.csActionBtns)) {
+      const actBtns = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 34, UI.csActionBtns)
+        .setOrigin(0.5, 1).setDisplaySize(280, 28).setDepth(29);
+      grp.add(actBtns);
+    }
 
     // Keyboard navigation
     const kb = this.input.keyboard!;
@@ -332,123 +354,171 @@ export class ArcadeVsScene extends Phaser.Scene {
   private showVsScreen(): void {
     this.phase = 'vs';
     this.selGroup.destroy(true);
-    this.input.keyboard!.removeAllListeners('keydown-LEFT');
-    this.input.keyboard!.removeAllListeners('keydown-RIGHT');
-    this.input.keyboard!.removeAllListeners('keydown-UP');
-    this.input.keyboard!.removeAllListeners('keydown-DOWN');
-    this.input.keyboard!.removeAllListeners('keydown-SPACE');
-    this.input.keyboard!.removeAllListeners('keydown-ENTER');
-    this.input.keyboard!.removeAllListeners('keydown-A');
-    this.input.keyboard!.removeAllListeners('keydown-D');
-    this.input.keyboard!.removeAllListeners('keydown-W');
-    this.input.keyboard!.removeAllListeners('keydown-S');
+    ['LEFT','RIGHT','UP','DOWN','SPACE','ENTER','A','D','W','S'].forEach(k =>
+      this.input.keyboard!.removeAllListeners(`keydown-${k}`));
 
-    this.cameras.main.setBackgroundColor(0x000000);
+    this.cameras.main.setBackgroundColor(0x050210);
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
+    const tex = (k: string) => this.textures.exists(k);
 
     const p1Name = CHAR_NAMES[this.p1CharId] ?? `Fighter ${this.p1CharId}`;
     const p2Name = CHAR_NAMES[this.p2CharId] ?? `Fighter ${this.p2CharId}`;
 
-    // Background halves
-    const p1Block = this.add.rectangle(0, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x001133).setOrigin(0, 0).setDepth(-1);
-    const p2Block = this.add.rectangle(cx, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x330011).setOrigin(0, 0).setDepth(-1);
-    this.tweens.add({ targets: [p1Block, p2Block], alpha: { from: 0, to: 1 }, duration: 200 });
-
-    // Diagonal slash
-    const gfx = this.add.graphics().setDepth(-0.5);
-    gfx.fillStyle(0xffd700, 0.10);
-    gfx.fillTriangle(cx - 24, 0, cx + 24, 0, cx - 24, GAME_HEIGHT);
-    gfx.fillTriangle(cx + 24, 0, cx - 24, GAME_HEIGHT, cx + 24, GAME_HEIGHT);
-
-    // P1 portrait frame art (left side)
-    if (this.textures.exists(UI.vsPortraitLargeL)) {
-      this.add.image(cx / 2, cy, UI.vsPortraitLargeL)
-        .setOrigin(0.5).setDisplaySize(360, GAME_HEIGHT - 40).setAlpha(0.7).setDepth(1);
-    }
-    // P2 portrait frame art (right side, mirrored)
-    if (this.textures.exists(UI.vsPortraitLargeR)) {
-      this.add.image(cx + cx / 2, cy, UI.vsPortraitLargeR)
-        .setOrigin(0.5).setDisplaySize(360, GAME_HEIGHT - 40).setAlpha(0.7).setDepth(1);
+    // ── 1. STAGE BANNER (full-screen background) ─────────────────────────────
+    if (tex(UI.vsStageBanners)) {
+      this.add.image(cx, cy, UI.vsStageBanners)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT).setDepth(0).setAlpha(0.55);
+    } else {
+      // Colored halves fallback
+      this.add.rectangle(0, 0, cx, GAME_HEIGHT, 0x001133).setOrigin(0, 0).setDepth(0);
+      this.add.rectangle(cx, 0, cx, GAME_HEIGHT, 0x330011).setOrigin(0, 0).setDepth(0);
     }
 
-    // Character sprites
+    // Diagonal center slash
+    const gfx = this.add.graphics().setDepth(1);
+    gfx.fillStyle(0xffd700, 0.08);
+    gfx.fillTriangle(cx - 20, 0, cx + 20, 0, cx - 20, GAME_HEIGHT);
+    gfx.fillTriangle(cx + 20, 0, cx - 20, GAME_HEIGHT, cx + 20, GAME_HEIGHT);
+
+    // ── 2. TOP TITLE BANNER ──────────────────────────────────────────────────
+    if (tex(UI.vsTitleLogo)) {
+      this.add.image(cx, 2, UI.vsTitleLogo)
+        .setOrigin(0.5, 0).setDisplaySize(480, 52).setDepth(20);
+    } else {
+      this.add.text(cx, 18, 'HITMANS VIP QUEST', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(20);
+    }
+
+    // Round indicators (top center, below title)
+    if (tex(UI.vsRoundIndicators)) {
+      this.add.image(cx, 56, UI.vsRoundIndicators)
+        .setOrigin(0.5, 0).setDisplaySize(200, 24).setDepth(20);
+    }
+
+    // ── 3. PORTRAIT FRAMES (left / right) ────────────────────────────────────
+    const portW = 296;
+    const portH = 360;
+    const portY  = 82;
+    const p1X   = cx / 2;   // ~240
+    const p2X   = cx + cx / 2; // ~720
+
+    if (tex(UI.vsPortraitLargeL)) {
+      this.add.image(p1X, portY, UI.vsPortraitLargeL)
+        .setOrigin(0.5, 0).setDisplaySize(portW, portH).setDepth(5);
+    } else {
+      this.add.rectangle(p1X, portY, portW, portH, 0x0a0330).setOrigin(0.5, 0)
+        .setStrokeStyle(2, 0x5522aa).setDepth(5);
+    }
+    if (tex(UI.vsPortraitLargeR)) {
+      this.add.image(p2X, portY, UI.vsPortraitLargeR)
+        .setOrigin(0.5, 0).setDisplaySize(portW, portH).setDepth(5);
+    } else {
+      this.add.rectangle(p2X, portY, portW, portH, 0x1a0010).setOrigin(0.5, 0)
+        .setStrokeStyle(2, 0xaa2255).setDepth(5);
+    }
+
+    // ── 4. CHARACTER SPRITES ──────────────────────────────────────────────────
+    const sprScale = 200 / 181;
     const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle');
     if (this.anims.exists(p1Key)) {
-      this.add.sprite(cx / 2, cy + 30, '__DEFAULT')
-        .setOrigin(0.5, 1).setScale(240 / 181).play(p1Key).setDepth(2);
+      this.add.sprite(p1X, portY + portH - 8, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale(sprScale).play(p1Key).setDepth(6);
     }
     const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle');
     if (this.anims.exists(p2Key)) {
-      this.add.sprite(cx + cx / 2, cy + 30, '__DEFAULT')
-        .setOrigin(0.5, 1).setScale(240 / 181).setFlipX(true).play(p2Key).setDepth(2);
+      this.add.sprite(p2X, portY + portH - 8, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale(sprScale).setFlipX(true).play(p2Key).setDepth(6);
     }
 
-    // P1 nameplate
-    if (this.textures.exists(UI.vsNameplateP1)) {
-      this.add.image(cx / 2, GAME_HEIGHT - 60, UI.vsNameplateP1)
-        .setOrigin(0.5).setDisplaySize(280, 38).setDepth(10).setAlpha(0);
-      this.tweens.add({ targets: this.children.list[this.children.list.length - 1], alpha: 1, duration: 300, delay: 150 });
+    // ── 5. PLAYER NAMEPLATES ──────────────────────────────────────────────────
+    const nameY = portY + portH + 4;
+
+    if (tex(UI.vsNameplateP1)) {
+      const np1 = this.add.image(p1X, nameY, UI.vsNameplateP1)
+        .setOrigin(0.5, 0).setDisplaySize(portW, 36).setDepth(15).setAlpha(0);
+      this.tweens.add({ targets: np1, alpha: 1, duration: 250, delay: 120 });
+    }
+    this.add.text(p1X, nameY + 18, `★ ${p1Name.toUpperCase()} ★`, {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(16);
+
+    if (tex(UI.vsNameplateP2)) {
+      const np2 = this.add.image(p2X, nameY, UI.vsNameplateP2)
+        .setOrigin(0.5, 0).setDisplaySize(portW, 36).setDepth(15).setAlpha(0);
+      this.tweens.add({ targets: np2, alpha: 1, duration: 250, delay: 120 });
+    }
+    this.add.text(p2X, nameY + 18, `★ ${p2Name.toUpperCase()} ★`, {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '11px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(16);
+
+    // ── 6. LEVEL CHIPS & RANK BADGES ─────────────────────────────────────────
+    const chipY = nameY + 40;
+    if (tex(UI.vsLevelChips)) {
+      this.add.image(p1X, chipY, UI.vsLevelChips).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
+      this.add.image(p2X, chipY, UI.vsLevelChips).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
+    }
+    if (tex(UI.vsRankBadges)) {
+      this.add.image(p1X, chipY + 28, UI.vsRankBadges).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
+      this.add.image(p2X, chipY + 28, UI.vsRankBadges).setOrigin(0.5, 0).setDisplaySize(portW, 24).setDepth(15);
+    }
+
+    // ── 7. WIN DOTS (round history) ───────────────────────────────────────────
+    if (tex(UI.vsWinDots)) {
+      this.add.image(p1X, chipY + 56, UI.vsWinDots).setOrigin(0.5, 0).setDisplaySize(portW - 20, 18).setDepth(15);
+      this.add.image(p2X, chipY + 56, UI.vsWinDots).setOrigin(0.5, 0).setDisplaySize(portW - 20, 18).setDepth(15);
+    }
+
+    // ── 8. READY MARKERS ─────────────────────────────────────────────────────
+    if (tex(UI.vsReadyMarkers)) {
+      this.add.image(p1X, chipY + 78, UI.vsReadyMarkers).setOrigin(0.5, 0).setDisplaySize(140, 28).setDepth(15);
+      this.add.image(p2X, chipY + 78, UI.vsReadyMarkers).setOrigin(0.5, 0).setDisplaySize(140, 28).setDepth(15).setFlipX(true);
+    }
+
+    // ── 9. CENTER VS EMBLEM ────────────────────────────────────────────────────
+    if (tex(UI.vsEmblem)) {
+      const emblem = this.add.image(cx, cy - 20, UI.vsEmblem)
+        .setOrigin(0.5).setDisplaySize(140, 140).setDepth(22).setScale(3).setAlpha(0);
+      this.tweens.add({ targets: emblem, scale: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
     } else {
-      const n1 = this.add.text(cx / 2, 80, p1Name.toUpperCase(), {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#44aaff',
-        stroke: '#000000', strokeThickness: 5,
-      }).setOrigin(0.5).setAlpha(0);
-      this.tweens.add({ targets: n1, alpha: 1, duration: 300, delay: 150 });
-    }
-
-    // P1 name text (over nameplate or standalone)
-    if (this.textures.exists(UI.vsNameplateP1)) {
-      this.add.text(cx / 2, GAME_HEIGHT - 60, p1Name.toUpperCase(), {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffffff',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(11);
-    }
-
-    // P2 nameplate
-    if (this.textures.exists(UI.vsNameplateP2)) {
-      this.add.image(cx + cx / 2, GAME_HEIGHT - 60, UI.vsNameplateP2)
-        .setOrigin(0.5).setDisplaySize(280, 38).setDepth(10).setAlpha(0);
-      this.tweens.add({ targets: this.children.list[this.children.list.length - 1], alpha: 1, duration: 300, delay: 150 });
-      this.add.text(cx + cx / 2, GAME_HEIGHT - 60, p2Name.toUpperCase(), {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffffff',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(11);
-    } else {
-      const n2 = this.add.text(cx + cx / 2, 80, p2Name.toUpperCase(), {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ff6644',
-        stroke: '#000000', strokeThickness: 5,
-      }).setOrigin(0.5).setAlpha(0);
-      this.tweens.add({ targets: n2, alpha: 1, duration: 300, delay: 150 });
-    }
-
-    // Round label
-    const roundLabel = this.add.text(cx, cy - 90,
-      `ROUND ${this.roundNum}  ·  ${this.difficulty.label}`, {
-        fontFamily: 'monospace', fontSize: '15px', color: this.difficulty.color,
-      }).setOrigin(0.5).setAlpha(0).setDepth(12);
-    this.tweens.add({ targets: roundLabel, alpha: 1, duration: 300, delay: 200 });
-
-    // Central VS emblem art or text fallback
-    if (this.textures.exists(UI.vsEmblem)) {
-      const emblem = this.add.image(cx, cy, UI.vsEmblem)
-        .setDisplaySize(160, 160).setDepth(12).setScale(4).setAlpha(0);
-      this.tweens.add({ targets: emblem, scale: 1, alpha: 1, duration: 350, delay: 100, ease: 'Back.out' });
-    } else {
-      const vs = this.add.text(cx, cy, 'VS', {
-        fontFamily: 'Arial Black, sans-serif', fontSize: '88px', color: '#ffd700',
+      const vs = this.add.text(cx, cy - 20, 'VS', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '72px', color: '#ffd700',
         stroke: '#000000', strokeThickness: 10,
-      }).setOrigin(0.5).setScale(4).setAlpha(0).setDepth(12);
-      this.tweens.add({ targets: vs, scale: 1, alpha: 1, duration: 350, delay: 100, ease: 'Back.out' });
+      }).setOrigin(0.5).setScale(3).setAlpha(0).setDepth(22);
+      this.tweens.add({ targets: vs, scale: 1, alpha: 1, duration: 350, delay: 80, ease: 'Back.out' });
     }
 
-    // Round indicators strip
-    if (this.textures.exists(UI.vsRoundIndicators)) {
-      this.add.image(cx, 24, UI.vsRoundIndicators)
-        .setOrigin(0.5, 0).setDisplaySize(180, 28).setDepth(12);
+    // ── 10. MATCH RULES (center bottom) ──────────────────────────────────────
+    const rulesY = GAME_HEIGHT - 78;
+    if (tex(UI.vsMatchRules)) {
+      this.add.image(cx, rulesY, UI.vsMatchRules).setOrigin(0.5, 0).setDisplaySize(200, 64).setDepth(18);
+    }
+    // Round + difficulty label
+    const roundLabel = this.add.text(cx, rulesY - 16,
+      `ROUND ${this.roundNum}  ·  ${this.difficulty.label}`, {
+        fontFamily: 'monospace', fontSize: '13px', color: this.difficulty.color,
+        stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5, 1).setAlpha(0).setDepth(20);
+    this.tweens.add({ targets: roundLabel, alpha: 1, duration: 300, delay: 180 });
+
+    // ── 11. BUTTON PROMPT CHIPS (bottom) ─────────────────────────────────────
+    if (tex(UI.vsBtnChips)) {
+      this.add.image(cx, GAME_HEIGHT - 4, UI.vsBtnChips)
+        .setOrigin(0.5, 1).setDisplaySize(440, 28).setDepth(18);
     }
 
+    // ── 12. PROGRESS BAR (loading indicator) ─────────────────────────────────
+    if (tex(UI.vsProgressBar)) {
+      this.add.image(cx, rulesY + 68, UI.vsProgressBar)
+        .setOrigin(0.5, 0).setDisplaySize(240, 12).setDepth(18);
+    }
+
+    // ── COUNTDOWN ────────────────────────────────────────────────────────────
     // Countdown 3, 2, 1, FIGHT!
     let count = 3;
     const countTxt = this.add.text(cx, cy + 80, '', {

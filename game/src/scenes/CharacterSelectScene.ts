@@ -5,19 +5,45 @@ import { AnimationSystem } from '../systems/AnimationSystem';
 import { CHAR_NAMES } from '../data/roster';
 import { AudioSystem } from '../systems/AudioSystem';
 
+// ── Roster ────────────────────────────────────────────────────────────────────
 const ALL_CHARS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 20, 21, 22, 30, 31];
-const COLS = 5;
-const ROWS = Math.ceil(ALL_CHARS.length / COLS);
-const CELL = 100;
-const GRID_X = (GAME_WIDTH - COLS * CELL) / 2;
-const GRID_Y = 130;
+
+// ── Layout — 960×540 ──────────────────────────────────────────────────────────
+const TITLE_H  = 52;
+const PANEL_W  = 188;
+
+// Character grid (center block)
+const GRID_COLS    = 7;
+const CELL         = 78;
+const GRID_W       = GRID_COLS * CELL;
+const GRID_LEFT    = (GAME_WIDTH - GRID_W) / 2;   // ~228
+const GRID_TOP     = TITLE_H + 6;                  // 58
+const GRID_ROWS    = Math.ceil(ALL_CHARS.length / GRID_COLS); // 3
+
+// Left/right panels
+const LPANEL_X = 0;
+const RPANEL_X = GAME_WIDTH - PANEL_W;
+const PANELS_Y  = TITLE_H + 4;
+const PORT_W    = PANEL_W - 12;
+const PORT_H    = 210;
+const NAME_Y    = PANELS_Y + PORT_H + 4;
+const STAT_Y    = NAME_Y + 28;
+const STAT_H    = 96;
+
+// Bottom area (stage preview + category tabs + action buttons)
+const BOTTOM_Y      = GRID_TOP + GRID_ROWS * CELL + 8;  // ~302
+const STAGE_PREV_Y  = BOTTOM_Y + 4;
+const STAGE_PREV_W  = 360;
+const STAGE_PREV_H  = 108;
+const CAT_TABS_Y    = STAGE_PREV_Y + STAGE_PREV_H + 4;
+const ACTION_Y      = CAT_TABS_Y + 4;
+const STRIP_Y       = GAME_HEIGHT - 2;
 
 export class CharacterSelectScene extends Phaser.Scene {
   private cursor = 0;
-  private selectedId = ALL_CHARS[0];
+  private cells: (Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle)[] = [];
   private previewSpr!: Phaser.GameObjects.Sprite;
   private nameTxt!: Phaser.GameObjects.Text;
-  private cells: Phaser.GameObjects.Rectangle[] = [];
 
   constructor() { super(SCENE.CharacterSelect); }
 
@@ -25,156 +51,175 @@ export class CharacterSelectScene extends Phaser.Scene {
     AudioSystem.playForScene(this, 'ArcadeVs');
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
+    const tex = (k: string) => this.textures.exists(k);
     const hasUI = UISystem.ready(this);
+    const img = (key: string, x: number, y: number, w: number, h: number,
+                 ox = 0.5, oy = 0, depth = 10, alpha = 1) => {
+      if (!hasUI || !tex(key)) return;
+      this.add.image(x, y, key).setOrigin(ox, oy)
+        .setDisplaySize(w, h).setDepth(depth).setAlpha(alpha).setScrollFactor(0);
+    };
 
-    // ── Title banner ───────────────────────────────────────────────────────
-    const titleBannerKey = [UI.csTitleBanner, UI.u1TitleBar2, UI.u1TitleBar1]
-      .find(k => hasUI && this.textures.exists(k));
-    if (titleBannerKey) {
-      this.add.image(GAME_WIDTH / 2, 26, titleBannerKey)
-        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 40, 44).setDepth(5);
-    }
-    this.add.text(GAME_WIDTH / 2, 26, 'CHARACTER SELECT', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffd700',
+    // ── 1. TITLE BANNER ──────────────────────────────────────────────────────
+    img(UI.csTitleBanner, GAME_WIDTH / 2, 0, GAME_WIDTH, TITLE_H, 0.5, 0, 50);
+    this.add.text(GAME_WIDTH / 2, TITLE_H / 2, 'CHARACTER SELECT', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '20px', color: '#ffd700',
       stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(6);
+    }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
 
-    // ── Corner bracket art ─────────────────────────────────────────────────
-    if (hasUI && this.textures.exists(UI.u1CornerBrackets)) {
-      this.add.image(4, 4, UI.u1CornerBrackets)
-        .setOrigin(0, 0).setDisplaySize(60, 60).setDepth(4).setAlpha(0.7);
-      this.add.image(GAME_WIDTH - 4, 4, UI.u1CornerBrackets)
-        .setOrigin(1, 0).setDisplaySize(60, 60).setDepth(4).setAlpha(0.7).setFlipX(true);
-    }
+    // ── 2. SLOT GRID (center) ────────────────────────────────────────────────
+    img(UI.csSlotGrid,
+      GRID_LEFT - 4, GRID_TOP - 4,
+      GRID_W + 8, GRID_ROWS * CELL + 8,
+      0, 0, 8, 0.6);
 
-    // ── Slot grid background ───────────────────────────────────────────────
-    if (hasUI && this.textures.exists(UI.csSlotGrid)) {
-      this.add.image(GRID_X - 8, GRID_Y - 8, UI.csSlotGrid)
-        .setOrigin(0, 0).setDisplaySize(COLS * CELL + 16, ROWS * CELL + 16).setAlpha(0.55);
-    }
-
-    // ── Character grid cells ───────────────────────────────────────────────
     this.cells = [];
     ALL_CHARS.forEach((charId, i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
-      const cx = GRID_X + col * CELL + CELL / 2;
-      const cy = GRID_Y + row * CELL + CELL / 2;
+      const col = i % GRID_COLS;
+      const row = Math.floor(i / GRID_COLS);
+      const cx = GRID_LEFT + col * CELL + CELL / 2;
+      const cy = GRID_TOP  + row * CELL + CELL / 2;
 
-      // Slot background
-      const slotKey = hasUI && this.textures.exists(UI.csSlotIdle) ? UI.csSlotIdle : '';
-      let cell: Phaser.GameObjects.Rectangle;
-      if (slotKey) {
-        this.add.image(cx, cy, slotKey).setDisplaySize(CELL - 6, CELL - 6);
-        cell = this.add.rectangle(cx, cy, CELL - 6, CELL - 6, 0, 0)
-          .setStrokeStyle(2, 0x3a2a5a, 0);
+      let cell: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      if (hasUI && tex(UI.csSlotIdle)) {
+        cell = this.add.image(cx, cy, UI.csSlotIdle).setDisplaySize(CELL - 4, CELL - 4).setDepth(9);
       } else {
-        cell = this.add.rectangle(cx, cy, CELL - 6, CELL - 6, 0x110820)
-          .setStrokeStyle(1, 0x3a2a5a);
+        cell = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820).setStrokeStyle(1, 0x3a2a5a).setDepth(9);
       }
       this.cells.push(cell);
 
-      // Character sprite or block
+      // Character idle sprite
       const idleKey = AnimationSystem.animKey(charId, 'idle');
       if (this.anims.exists(idleKey)) {
-        const spr = this.add.sprite(cx, cy + 10, '__DEFAULT')
-          .setOrigin(0.5, 1).setScale((CELL - 16) / 181);
-        spr.play(idleKey);
+        this.add.sprite(cx, cy + CELL * 0.46, '__DEFAULT')
+          .setOrigin(0.5, 1).setScale((CELL - 16) / 181).setDepth(11).play(idleKey);
       } else {
-        this.add.rectangle(cx, cy, 28, 50, charId === 1 ? COLORS.player : COLORS.enemy);
+        this.add.rectangle(cx, cy, 22, 42, charId === 1 ? COLORS.player : COLORS.enemy).setDepth(11);
       }
 
-      // Short name label
+      // Short name
       const short = (CHAR_NAMES[charId] ?? `#${charId}`).split(' ').pop()!;
-      this.add.text(cx, cy + CELL / 2 - 8, short, {
-        fontFamily: 'monospace', fontSize: '8px', color: '#ccbbee',
-      }).setOrigin(0.5);
+      this.add.text(cx, cy + CELL / 2 - 7, short, {
+        fontFamily: 'monospace', fontSize: '7px', color: '#ccbbee',
+      }).setOrigin(0.5, 1).setDepth(12);
 
-      // Click to select
       cell.setInteractive({ useHandCursor: true });
       cell.on('pointerover', () => { this.cursor = i; this.refreshGrid(); });
-      cell.on('pointerdown', () => { this.cursor = i; this.confirmSelection(); });
+      cell.on('pointerdown', () => { this.cursor = i; this.confirm(); });
     });
 
-    // ── Right panel: large portrait + stat panel ───────────────────────────
-    const panelX = GAME_WIDTH - 10;
-    const panelY = GRID_Y;
-    const panelW = GAME_WIDTH - (GRID_X + COLS * CELL + 20);
-    const portraitH = panelW * 1.25;
+    // ── 3. LEFT PANEL (Player 1) ──────────────────────────────────────────────
+    // Player 1 badge — top corner
+    img(UI.csxRankShield, LPANEL_X + 6, PANELS_Y, 78, 48, 0, 0, 20);
 
-    // Portrait frame — prefer new csxPortraitGold crop, fall back to old art
-    const portraitFrameKey = [UI.csxPortraitGold, UI.csPortraitFrameLarge]
-      .find(k => hasUI && this.textures.exists(k));
-    if (portraitFrameKey) {
-      this.add.image(panelX, panelY, portraitFrameKey)
-        .setOrigin(1, 0).setDisplaySize(panelW, portraitH);
+    // Featured portrait frame
+    const portFrameKey = tex(UI.csxPortraitGold) ? UI.csxPortraitGold : UI.csPortraitFrameLarge;
+    img(portFrameKey, LPANEL_X + PANEL_W / 2, PANELS_Y + 50, PORT_W, PORT_H, 0.5, 0, 15);
+
+    // Character preview sprite (P1 preview)
+    this.previewSpr = this.add.sprite(LPANEL_X + PANEL_W / 2, PANELS_Y + 50 + PORT_H - 8, '__DEFAULT')
+      .setOrigin(0.5, 1).setScale((PORT_W - 24) / 181).setDepth(16);
+
+    // Name bar
+    img(UI.csxNameBar, LPANEL_X + PANEL_W / 2, NAME_Y, PORT_W, 26, 0.5, 0, 17);
+    this.nameTxt = this.add.text(LPANEL_X + PANEL_W / 2, NAME_Y + 13, '', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '9px', color: '#ffd700',
+      stroke: '#000000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(18);
+
+    // Stat panel
+    const statKey = tex(UI.csxStatPanel) ? UI.csxStatPanel : UI.csStatPanel;
+    img(statKey, LPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0.5, 0, 15);
+
+    // Style tags
+    img(UI.csStyleTags, LPANEL_X + PANEL_W / 2, STAT_Y + STAT_H + 2, PORT_W, 42, 0.5, 0, 15);
+
+    // ── 4. RIGHT PANEL (CPU / Opponent) ───────────────────────────────────────
+    // CPU badge — top right
+    img(UI.csReadyCpu, RPANEL_X + PANEL_W - 6, PANELS_Y, 78, 48, 1, 0, 20);
+
+    // Portrait frame (mirrored)
+    img(portFrameKey, RPANEL_X + PANEL_W / 2, PANELS_Y + 50, PORT_W, PORT_H, 0.5, 0, 15);
+
+    // Stat panel
+    img(statKey, RPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0.5, 0, 15);
+
+    // Style tags
+    img(UI.csStyleTags, RPANEL_X + PANEL_W / 2, STAT_Y + STAT_H + 2, PORT_W, 42, 0.5, 0, 15);
+
+    // ── 5. BOTTOM AREA ───────────────────────────────────────────────────────
+    // Instruction strip / divider
+    img(UI.csDivider, GAME_WIDTH / 2, BOTTOM_Y - 2, GAME_WIDTH - PANEL_W * 2 - 16, 10, 0.5, 0.5, 20);
+
+    // Stage preview frame (bottom center)
+    img(UI.csSlotGrid, GAME_WIDTH / 2, STAGE_PREV_Y, STAGE_PREV_W, STAGE_PREV_H, 0.5, 0, 12, 0.5);
+
+    // Category tabs (ALL / ASSASSINS / ENFORCERS / TECH / WILDCARDS)
+    img(UI.csCategoryTabs, GAME_WIDTH / 2, CAT_TABS_Y, STAGE_PREV_W, 32, 0.5, 0, 20);
+
+    // Color / skin tabs (left of action buttons)
+    img(UI.csColorTabs, GAME_WIDTH / 2 - 90, ACTION_Y, 160, 32, 0.5, 0, 20);
+
+    // Action buttons: RANDOM / BACK / CONFIRM (bottom right)
+    img(UI.csActionBtns, GAME_WIDTH - PANEL_W - 4, ACTION_Y, 196, 32, 1, 0, 20);
+
+    // ── 6. INSTRUCTION STRIP (bottom) ─────────────────────────────────────────
+    img(UI.csInstructionStrip, GAME_WIDTH / 2, STRIP_Y, GAME_WIDTH, 36, 0.5, 1, 30);
+    if (!hasUI || !tex(UI.csInstructionStrip)) {
+      this.add.text(GAME_WIDTH / 2, STRIP_Y - 2,
+        'Arrow keys · Enter to confirm · ESC back',
+        { fontFamily: 'monospace', fontSize: '11px', color: '#8877aa' },
+      ).setOrigin(0.5, 1).setDepth(31);
     }
 
-    this.previewSpr = this.add.sprite(panelX - panelW / 2, panelY + portraitH * 0.88, '__DEFAULT')
-      .setOrigin(0.5, 1).setScale((panelW - 24) / 181);
-
-    // Name bar — csxNameBar crop sits between portrait and stat panel
-    const nameBarY = panelY + portraitH + 2;
-    const nameBarKey = hasUI && this.textures.exists(UI.csxNameBar) ? UI.csxNameBar : null;
-    if (nameBarKey) {
-      this.add.image(panelX - panelW / 2, nameBarY, nameBarKey)
-        .setOrigin(0.5, 0).setDisplaySize(panelW, 28);
-    }
-
-    // Stat panel — prefer csxStatPanel crop, fall back to old art
-    const statPanelKey = [UI.csxStatPanel, UI.csStatPanel]
-      .find(k => hasUI && this.textures.exists(k));
-    const statY = nameBarY + 30;
-    if (statPanelKey) {
-      this.add.image(panelX, statY, statPanelKey)
-        .setOrigin(1, 0).setDisplaySize(panelW, 110);
-    }
-
-    this.nameTxt = this.add.text(panelX - panelW / 2, nameBarY + 14,
-      '', { fontFamily: 'Arial Black, sans-serif', fontSize: '12px', color: '#ffd700',
-        stroke: '#000000', strokeThickness: 3 },
-    ).setOrigin(0.5);
-
-    // ── Bottom strip ───────────────────────────────────────────────────────
-    if (hasUI && this.textures.exists(UI.csInstructionStrip)) {
-      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 4, UI.csInstructionStrip)
-        .setOrigin(0.5, 1).setDisplaySize(700, 36);
-    } else {
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 10,
-        'Arrow keys / mouse to navigate • Enter / click to confirm • ESC back',
-        { fontFamily: 'monospace', fontSize: '11px', color: '#8877aa' }).setOrigin(0.5, 1);
-    }
-
-    // ── Keyboard nav ─────────────────────────────────────────────────────
+    // ── 7. INPUT ─────────────────────────────────────────────────────────────
     const kb = this.input.keyboard!;
-    kb.on('keydown-LEFT',  () => { this.cursor = Phaser.Math.Wrap(this.cursor - 1, 0, ALL_CHARS.length); this.refreshGrid(); });
-    kb.on('keydown-RIGHT', () => { this.cursor = Phaser.Math.Wrap(this.cursor + 1, 0, ALL_CHARS.length); this.refreshGrid(); });
-    kb.on('keydown-UP',    () => { this.cursor = Phaser.Math.Wrap(this.cursor - COLS, 0, ALL_CHARS.length); this.refreshGrid(); });
-    kb.on('keydown-DOWN',  () => { this.cursor = Phaser.Math.Wrap(this.cursor + COLS, 0, ALL_CHARS.length); this.refreshGrid(); });
-    kb.on('keydown-ENTER', () => this.confirmSelection());
+    kb.on('keydown-LEFT',  () => this.move(-1, 0));
+    kb.on('keydown-RIGHT', () => this.move(1, 0));
+    kb.on('keydown-UP',    () => this.move(0, -1));
+    kb.on('keydown-DOWN',  () => this.move(0, 1));
+    kb.on('keydown-ENTER', () => this.confirm());
     kb.on('keydown-ESC',   () => this.scene.start(SCENE.MainMenu));
 
     this.refreshGrid();
   }
 
-  private refreshGrid(): void {
-    const charId = ALL_CHARS[this.cursor];
-    this.selectedId = charId;
-
-    // Update preview
-    const idleKey = AnimationSystem.animKey(charId, 'idle');
-    if (this.anims.exists(idleKey)) {
-      this.previewSpr.play(idleKey, true);
-    }
-    this.nameTxt.setText(CHAR_NAMES[charId] ?? `Character ${charId}`);
-
-    // Highlight selected cell
-    this.cells.forEach((c, i) => {
-      c.setStrokeStyle(i === this.cursor ? 3 : 1, i === this.cursor ? 0xffd700 : 0x3a2a5a);
-    });
+  private move(dx: number, dy: number): void {
+    const col = this.cursor % GRID_COLS + dx;
+    const row = Math.floor(this.cursor / GRID_COLS) + dy;
+    const r = Phaser.Math.Clamp(row, 0, Math.floor((ALL_CHARS.length - 1) / GRID_COLS));
+    const c = Phaser.Math.Clamp(col, 0, GRID_COLS - 1);
+    const next = r * GRID_COLS + c;
+    this.cursor = Math.min(next, ALL_CHARS.length - 1);
+    this.refreshGrid();
   }
 
-  private confirmSelection(): void {
-    this.scene.start(SCENE.ArcadeVs, { p1CharId: this.selectedId });
+  private refreshGrid(): void {
+    const charId = ALL_CHARS[this.cursor];
+    const tex = (k: string) => this.textures.exists(k);
+    const hasUI = UISystem.ready(this);
+
+    this.cells.forEach((cell, i) => {
+      if (cell instanceof Phaser.GameObjects.Image) {
+        const key = i === this.cursor
+          ? (hasUI && tex(UI.csSlotSelected) ? UI.csSlotSelected : UI.csSlotIdle)
+          : UI.csSlotIdle;
+        cell.setTexture(key);
+        cell.setScale(i === this.cursor ? 1.08 : 1.0);
+      } else {
+        (cell as Phaser.GameObjects.Rectangle).setStrokeStyle(
+          i === this.cursor ? 3 : 1,
+          i === this.cursor ? 0xffd700 : 0x3a2a5a,
+        );
+      }
+    });
+
+    const idleKey = AnimationSystem.animKey(charId, 'idle');
+    if (this.anims.exists(idleKey)) this.previewSpr.play(idleKey, true);
+    this.nameTxt.setText(CHAR_NAMES[charId] ?? `Character ${charId}`);
+  }
+
+  private confirm(): void {
+    this.scene.start(SCENE.ArcadeVs, { p1CharId: ALL_CHARS[this.cursor] });
   }
 }

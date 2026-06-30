@@ -4,48 +4,85 @@ import { UISystem, UI } from '../systems/UISystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
-// Menu entries wired to real mm_btn_* textures
-type MenuItem = {
-  label: string;
-  btnKey: string;
-  btnSelKey: string;
-  scene?: string;
-};
+// ── Layout constants for 960×540 ─────────────────────────────────────────────
+const CX = GAME_WIDTH / 2;
+
+// Top bar
+const LOGO_X = 10;
+const LOGO_Y = 8;
+const LOGO_W = 220;
+const LOGO_H = 62;
+
+const PROFILE_X = GAME_WIDTH - 8;
+const PROFILE_Y = 8;
+
+const DECOR_X = CX;
+const DECOR_Y = 72;
+
+// Left column (taglines → mode badges → rank chips)
+const LEFT_X = 8;
+const TAGLINES_Y   = 82;
+const TAGLINES_W   = 196;
+const TAGLINES_H   = 108;
+const BADGES_Y     = 200;
+const BADGES_W     = 196;
+const BADGES_H     = 88;
+const RANK_Y       = 302;
+const RANK_W       = 196;
+const RANK_H       = 78;
+const PROMPT_X     = 8;
+const PROMPT_Y     = 392;
+const PROMPT_W     = 196;
+const PROMPT_H     = 56;
+
+// Center buttons column
+const BTN_X   = 490;
+const BTN_W   = 252;
+const BTN_H   = 42;
+const BTN_Y0  = 84;
+const BTN_GAP = 52;
+
+// Right panels (News & Events, Daily Quests)
+const RIGHT_X  = GAME_WIDTH - 8;
+const NEWS_Y   = 82;
+const NEWS_W   = 196;
+const NEWS_H   = 152;
+const QUEST_Y  = 248;
+const QUEST_W  = 196;
+const QUEST_H  = 132;
+const BOTTOM_ICONS_Y = 394;
+const BOTTOM_ICONS_W = 196;
+const BOTTOM_ICONS_H = 56;
+
+// Bottom strip
+const REWARD_Y  = GAME_HEIGHT - 2;
+const FOOTER_X  = GAME_WIDTH - 4;
+const FOOTER_Y  = GAME_HEIGHT - 2;
+
+// ── Menu items (map to real button textures) ──────────────────────────────────
+type MenuItem = { label: string; btnKey: string; btnSelKey: string; scene: string };
 
 const ITEMS: MenuItem[] = [
-  { label: 'QUEST',          btnKey: UI.mmBtnNewGame,    btnSelKey: UI.mmBtnNewGameSel,    scene: SCENE.StageSelect },
-  { label: 'ARCADE VS',      btnKey: UI.mmBtnVsMode,     btnSelKey: UI.mmBtnVsModeSel,     scene: SCENE.ArcadeVs },
-  { label: 'CHAR SELECT',    btnKey: UI.mmBtnCharSelect, btnSelKey: UI.mmBtnCharSelectSel, scene: SCENE.CharacterSelect },
-  { label: 'VENUES',         btnKey: UI.mmBtnVenueMap,   btnSelKey: UI.mmBtnVenueMapSel,   scene: SCENE.VenueSelect },
-  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,    btnSelKey: UI.mmBtnOptionsSel,    scene: SCENE.Options },
-  { label: 'EXIT / MAIN',    btnKey: UI.mmBtnExit,       btnSelKey: UI.mmBtnExitSel,       scene: SCENE.MainMenu },
+  { label: 'CONTINUE QUEST', btnKey: UI.mmBtnContinue,    btnSelKey: UI.mmBtnContinueSel,    scene: SCENE.StageSelect },
+  { label: 'NEW GAME',       btnKey: UI.mmBtnNewGame,      btnSelKey: UI.mmBtnNewGameSel,      scene: SCENE.StageSelect },
+  { label: 'CHARACTER SELECT', btnKey: UI.mmBtnCharSelect, btnSelKey: UI.mmBtnCharSelectSel,   scene: SCENE.CharacterSelect },
+  { label: 'VS MODE',        btnKey: UI.mmBtnVsMode,       btnSelKey: UI.mmBtnVsModeSel,       scene: SCENE.ArcadeVs },
+  { label: 'VENUE MAP',      btnKey: UI.mmBtnVenueMap,     btnSelKey: UI.mmBtnVenueMapSel,     scene: SCENE.VenueSelect },
+  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,      btnSelKey: UI.mmBtnOptionsSel,      scene: SCENE.Options },
+  { label: 'EXIT',           btnKey: UI.mmBtnExit,         btnSelKey: UI.mmBtnExitSel,         scene: SCENE.MainMenu },
 ];
-
-const BTN_W  = 220;
-const BTN_H  = 44;
-const BTN_X  = 480;    // center x of button column
-const BTN_Y0 = 268;    // top of first button
-const BTN_GAP = 54;    // spacing between buttons
 
 export class MainMenuScene extends Phaser.Scene {
   private index = 0;
   private btnImages: Phaser.GameObjects.Image[] = [];
 
-  constructor() {
-    super(SCENE.MainMenu);
-  }
+  constructor() { super(SCENE.MainMenu); }
 
   create(): void {
     AudioSystem.playForScene(this, 'MainMenu');
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    const hasUI = UISystem.ready(this);
-
-    if (hasUI) {
-      this.buildWithArt();
-    } else {
-      this.buildFallback();
-    }
+    UISystem.ready(this) ? this.buildWithArt() : this.buildFallback();
 
     const kb = this.input.keyboard!;
     kb.on('keydown-UP',    () => this.select(this.index - 1));
@@ -64,122 +101,99 @@ export class MainMenuScene extends Phaser.Scene {
 
   // ── Art build ─────────────────────────────────────────────────────────────
   private buildWithArt(): void {
-    const cx = GAME_WIDTH / 2;
+    const tex = (k: string) => this.textures.exists(k);
+    const img = (key: string, x: number, y: number, w: number, h: number,
+                 ox = 0, oy = 0, depth = 100, alpha = 1) => {
+      if (!tex(key)) return;
+      this.add.image(x, y, key)
+        .setOrigin(ox, oy).setDisplaySize(w, h).setDepth(depth).setAlpha(alpha).setScrollFactor(0);
+    };
 
-    // ── Center top: full game logo (feGameLogo = HITMANS VIP AFTER SPOT) ──
-    if (this.textures.exists(UI.feGameLogo)) {
-      const logo = this.add.image(cx, 120, UI.feGameLogo)
-        .setOrigin(0.5).setDisplaySize(480, 200).setDepth(150).setScrollFactor(0);
-      this.tweens.add({
-        targets: logo,
-        scaleX: logo.scaleX * 1.035, scaleY: logo.scaleY * 1.035,
-        duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut',
-      });
-    } else if (this.textures.exists(UI.mmLogo)) {
-      // Fallback to smaller logo art
-      UISystem.place(this, UI.mmLogo, cx, 90, { originX: 0.5, originY: 0.5, depth: 150 });
-    }
+    // ── TOP BAR ─────────────────────────────────────────────────────────────
+    // Logo — top-left
+    img(UI.mmLogo, LOGO_X, LOGO_Y, LOGO_W, LOGO_H, 0, 0, 150);
 
-    // ── Top-left: MAIN MENU banner strip ──────────────────────────────────
-    if (this.textures.exists(UI.feMainMenuBanner)) {
-      this.add.image(cx, 232, UI.feMainMenuBanner)
-        .setOrigin(0.5).setDisplaySize(320, 52).setDepth(120).setScrollFactor(0).setAlpha(0.85);
-    }
+    // Profile/Status bar — top-right
+    img(UI.mmProfileBar, PROFILE_X, PROFILE_Y, 370, 46, 1, 0, 150);
 
-    // ── Top-right: profile bar ────────────────────────────────────────────
-    UISystem.place(this, UI.mmProfileBar, GAME_WIDTH - 10, 14, { originX: 1, originY: 0, depth: 100 });
+    // Decorative dividers — centered below top bar
+    img(UI.mmDecorative, DECOR_X, DECOR_Y, 520, 18, 0.5, 0.5, 120);
 
-    // ── Left column: taglines + mode badges + rank chips ──────────────────
-    UISystem.place(this, UI.mmTaglines,   22, 178, { originX: 0, originY: 0, depth: 100 });
-    UISystem.place(this, UI.mmModeBadges, 22, 362, { originX: 0, originY: 0, depth: 100 });
-    UISystem.place(this, UI.mmRankChips,  22, 498, { originX: 0, originY: 0, depth: 100 });
+    // ── LEFT COLUMN ─────────────────────────────────────────────────────────
+    // Taglines (THE ULTIMATE VIP EXPERIENCE / FAME. FORTUNE. LEGEND. etc.)
+    img(UI.mmTaglines,   LEFT_X, TAGLINES_Y, TAGLINES_W, TAGLINES_H, 0, 0, 100);
 
-    // ── Right column: news + quests panels ───────────────────────────────
-    UISystem.place(this, UI.mmNewsPanel,   GAME_WIDTH - 22, 160, { originX: 1, originY: 0, depth: 100 });
-    UISystem.place(this, UI.mmQuestsPanel, GAME_WIDTH - 22, 440, { originX: 1, originY: 0, depth: 100 });
+    // Mode badges (STORY / VS / CO-OP / TIME TRIAL / EVENT)
+    img(UI.mmModeBadges, LEFT_X, BADGES_Y, BADGES_W, BADGES_H, 0, 0, 100);
 
-    // ── Bottom: reward strip + footer ornament ────────────────────────────
-    UISystem.place(this, UI.mmRewardStrip,    cx, GAME_HEIGHT - 4, { originX: 0.5, originY: 1, depth: 100 });
-    UISystem.place(this, UI.mmFooterOrnament, GAME_WIDTH - 6, GAME_HEIGHT - 2, { originX: 1, originY: 1, depth: 100 });
+    // Rank chips (BRONZE / SILVER / GOLD / PLATINUM / DIAMOND)
+    img(UI.mmRankChips,  LEFT_X, RANK_Y, RANK_W, RANK_H, 0, 0, 100);
 
-    // ── Progress readout ──────────────────────────────────────────────────
-    const beaten = ProgressionSystem.getBeatenBosses().length;
-    if (beaten > 0) {
-      this.add.text(cx, GAME_HEIGHT - 70,
-        `Quest: ${beaten}/7 bosses defeated`,
-        { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
-      ).setOrigin(0.5).setDepth(110).setScrollFactor(0);
-    }
+    // Prompt chips (A SELECT / B BACK / navigate / LT RT)
+    img(UI.mmPromptChips, PROMPT_X, PROMPT_Y, PROMPT_W, PROMPT_H, 0, 0, 100);
 
-    // ── Center: title menu full panel behind the buttons ─────────────────
-    if (this.textures.exists(UI.tmPanelFull)) {
-      this.add.image(cx, 390, UI.tmPanelFull)
-        .setOrigin(0.5).setDisplaySize(300, 280).setDepth(90).setAlpha(0.45).setScrollFactor(0);
-    }
+    // ── RIGHT PANELS ────────────────────────────────────────────────────────
+    // News & Events panel — top-right
+    img(UI.mmNewsPanel,   RIGHT_X, NEWS_Y,   NEWS_W,   NEWS_H,   1, 0, 100);
 
-    // ── Crown and shield emblems flanking the logo ────────────────────────
-    if (this.textures.exists(UI.feCrown)) {
-      this.add.image(cx - 240, 120, UI.feCrown)
-        .setOrigin(0.5).setDisplaySize(44, 44).setDepth(140).setAlpha(0.7).setScrollFactor(0);
-      this.add.image(cx + 240, 120, UI.feCrown)
-        .setOrigin(0.5).setDisplaySize(44, 44).setDepth(140).setAlpha(0.7).setScrollFactor(0);
-    }
+    // Daily Quests panel — below news
+    img(UI.mmQuestsPanel, RIGHT_X, QUEST_Y,  QUEST_W,  QUEST_H,  1, 0, 100);
 
-    // ── Center buttons ────────────────────────────────────────────────────
+    // Bottom icons (VIP promo / double rewards)
+    img(UI.mmBottomIcons, RIGHT_X, BOTTOM_ICONS_Y, BOTTOM_ICONS_W, BOTTOM_ICONS_H, 1, 0, 100);
+
+    // ── CENTER: MENU BUTTONS ─────────────────────────────────────────────────
     this.btnImages = [];
     ITEMS.forEach((item, i) => {
-      const y = BTN_Y0 + i * BTN_GAP;
-      const img = this.add.image(BTN_X, y, item.btnKey)
+      const by = BTN_Y0 + i * BTN_GAP;
+      const btnImg = this.add.image(BTN_X, by, item.btnKey)
         .setDisplaySize(BTN_W, BTN_H)
-        .setOrigin(0.5)
+        .setOrigin(0.5, 0.5)
         .setDepth(200)
         .setScrollFactor(0)
         .setInteractive({ useHandCursor: true });
 
-      img.on('pointerover', () => this.select(i));
-      img.on('pointerdown', () => this.activate(i));
-      this.btnImages.push(img);
+      btnImg.on('pointerover', () => this.select(i));
+      btnImg.on('pointerdown', () => this.activate(i));
+      this.btnImages.push(btnImg);
     });
 
-    // Hint text
-    this.add.text(BTN_X, BTN_Y0 + ITEMS.length * BTN_GAP + 18,
-      'Arrow keys or mouse • Enter/Space to select',
-      { fontFamily: 'monospace', fontSize: '11px', color: '#8877aa' },
-    ).setOrigin(0.5).setDepth(110).setScrollFactor(0);
+    // ── BOTTOM STRIP ────────────────────────────────────────────────────────
+    // Reward strip — full width at bottom
+    img(UI.mmRewardStrip, CX, REWARD_Y, GAME_WIDTH, 46, 0.5, 1, 110);
+
+    // Footer ornament — bottom-right
+    img(UI.mmFooterOrnament, FOOTER_X, FOOTER_Y, 180, 44, 1, 1, 111);
+
+    // Progress readout
+    const beaten = ProgressionSystem.getBeatenBosses().length;
+    if (beaten > 0) {
+      this.add.text(BTN_X, BTN_Y0 + ITEMS.length * BTN_GAP + 14,
+        `Quest: ${beaten}/7 bosses defeated`,
+        { fontFamily: 'monospace', fontSize: '11px', color: '#44dd88' },
+      ).setOrigin(0.5, 0).setDepth(110).setScrollFactor(0);
+    }
   }
 
-  // ── Fallback (art not loaded yet) ─────────────────────────────────────────
+  // ── Fallback ──────────────────────────────────────────────────────────────
   private buildFallback(): void {
-    const cx = GAME_WIDTH / 2;
-    this.add.text(cx, 70, 'HITMANS VIP AFTER SPOT', {
-      fontFamily: 'Arial Black, sans-serif',
-      fontSize: '32px',
-      color: '#ffd700',
+    this.add.text(CX, 60, 'HITMANS VIP AFTER SPOT', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '30px', color: '#ffd700',
     }).setOrigin(0.5);
 
     ITEMS.forEach((item, i) => {
-      const y = 200 + i * 54;
-      const txt = this.add.text(cx, y, item.label, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '22px',
-        color: '#ffffff',
+      const y = 160 + i * 50;
+      const txt = this.add.text(CX, y, item.label, {
+        fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#ffffff',
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       txt.on('pointerover', () => this.select(i));
       txt.on('pointerdown', () => this.activate(i));
       this.btnImages.push(txt as unknown as Phaser.GameObjects.Image);
     });
 
-    this.add.text(cx, GAME_HEIGHT - 30, 'Arrow keys / mouse • Enter to select', {
-      fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#8877aa',
+    this.add.text(CX, GAME_HEIGHT - 28, 'Arrow keys / mouse · Enter to select', {
+      fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#8877aa',
     }).setOrigin(0.5);
-
-    const beaten = ProgressionSystem.getBeatenBosses().length;
-    if (beaten > 0) {
-      this.add.text(cx, GAME_HEIGHT - 46,
-        `Quest: ${beaten}/7 bosses defeated`,
-        { fontFamily: 'monospace', fontSize: '12px', color: '#44dd88' },
-      ).setOrigin(0.5);
-    }
   }
 
   // ── Selection ─────────────────────────────────────────────────────────────
@@ -188,24 +202,19 @@ export class MainMenuScene extends Phaser.Scene {
     const hasUI = UISystem.ready(this);
     this.btnImages.forEach((btn, ri) => {
       if (hasUI) {
-        const item = ITEMS[ri];
-        const key = ri === this.index ? item.btnSelKey : item.btnKey;
+        const key = ri === this.index ? ITEMS[ri].btnSelKey : ITEMS[ri].btnKey;
         (btn as Phaser.GameObjects.Image).setTexture(key);
-        const scale = ri === this.index ? 1.08 : 1.0;
+        const scale = ri === this.index ? 1.06 : 1.0;
         btn.setDisplaySize(BTN_W * scale, BTN_H * scale);
       } else {
         const txt = btn as unknown as Phaser.GameObjects.Text;
-        if (txt.setColor) {
-          txt.setColor(ri === this.index ? '#ffd700' : '#ffffff');
-          txt.setScale(ri === this.index ? 1.1 : 1.0);
-        }
+        if (txt.setColor) txt.setColor(ri === this.index ? '#ffd700' : '#ffffff');
       }
     });
   }
 
   private activate(i: number): void {
     const item = ITEMS[i];
-    if (!item.scene) return;
     if (item.scene === SCENE.MainMenu) {
       this.scene.start(SCENE.VenueSelect);
       return;
