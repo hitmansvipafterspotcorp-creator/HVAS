@@ -95,13 +95,13 @@ export class BrawlerScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(COLORS.bg);
 
-    // Tile-composed backdrop if (a) we have a layout for this stage AND
-    // (b) the ?tiles=1 query flag is set. Layouts are still being tuned so
-    // the default render path uses the pre-composited PNG via StageLoader.
-    const useTiles = typeof window !== 'undefined'
-      && window.location.search.includes('tiles=1');
+    // Tile-composed backdrop when we have a layout for this stage; falls
+    // back to the pre-composited PNG via StageLoader otherwise. Pass
+    // ?nobackdrop=tiles in the URL to force the legacy path for A/B testing.
+    const forceLegacy = typeof window !== 'undefined'
+      && window.location.search.includes('nobackdrop=tiles');
     const layout = STAGE_LAYOUTS[this.stage.id];
-    if (useTiles && layout) {
+    if (layout && !forceLegacy) {
       TileComposer.compose(this, layout);
     } else {
       StageLoader.loadBackdrop(this, this.stage);
