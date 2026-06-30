@@ -13,7 +13,7 @@ import { UISystem, UI } from '../systems/UISystem';
 //   Footer:  SECURE & ENCRYPTED | NO REFUNDS | QUESTIONS? CONTACT HOST | THANK YOU
 
 interface MemberRecord {
-  tier: 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'VIP';
+  tier: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'VIP';
   cardCount: number;
   cardNumber: string;
   renewsAt: number; // timestamp ms
@@ -39,7 +39,7 @@ function generateCardNumber(): string {
 }
 
 function renewMs(tier: MemberRecord['tier']): number {
-  const days: Record<MemberRecord['tier'], number> = { WEEKLY: 7, MONTHLY: 30, YEARLY: 365, VIP: 365 };
+  const days: Record<MemberRecord['tier'], number> = { DAILY: 1, WEEKLY: 7, MONTHLY: 30, YEARLY: 365, VIP: 365 };
   return Date.now() + days[tier] * 24 * 60 * 60 * 1000;
 }
 
@@ -51,8 +51,10 @@ function countdownStr(ms: number): string {
   return `${String(d).padStart(2, '0')}D : ${String(h).padStart(2, '0')}H : ${String(m).padStart(2, '0')}M`;
 }
 
-// ── REAL MEMBERSHIP PRICES — Hitmans VIP After Spot ─────────────────────────
+// ── APP MEMBERSHIP TIERS — pay for access to the app to become a member ─────
+// DAILY = try it; WEEKLY/MONTHLY/YEARLY/VIP = scale up
 const DUES = [
+  { tier: 'DAILY'   as const, price: '$5',      label: 'DAILY',   badge: 'BRONZE'   as const },
   { tier: 'WEEKLY'  as const, price: '$100',    label: 'WEEKLY',  badge: 'SILVER'   as const },
   { tier: 'MONTHLY' as const, price: '$300',    label: 'MONTHLY', badge: 'GOLD'     as const },
   { tier: 'YEARLY'  as const, price: '$1,000',  label: 'YEARLY',  badge: 'PLATINUM' as const },
@@ -116,7 +118,7 @@ export class MembershipScene extends Phaser.Scene {
       stroke: '#3d1a00', strokeThickness: 3,
     }).setOrigin(0.5, 0).setDepth(101);
 
-    this.add.text(cx, 58, '✦ DUES  ✦  CARD PACKS  ✦  QR JOIN ✦', {
+    this.add.text(cx, 58, '✦ PAY FOR APP ACCESS  ✦  BECOME A MEMBER  ✦  SCALE YOUR EXPERIENCE ✦', {
       fontFamily: 'Arial, sans-serif', fontSize: '11px', color: '#c100ff',
     }).setOrigin(0.5, 0).setDepth(101);
 
@@ -475,7 +477,7 @@ export class MembershipScene extends Phaser.Scene {
     const panel = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 500, 280, 0x08020e)
       .setStrokeStyle(3, 0xffd700).setDepth(9001);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, '★ MEMBERSHIP ACTIVATED ★', {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, '★ APP ACCESS ACTIVATED ★', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
     }).setOrigin(0.5).setDepth(9002);
 
