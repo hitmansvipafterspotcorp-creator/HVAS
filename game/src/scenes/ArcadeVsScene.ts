@@ -332,68 +332,109 @@ export class ArcadeVsScene extends Phaser.Scene {
 
     this.cameras.main.setBackgroundColor(0x000000);
 
-    // Character name and VS splash
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
     const p1Name = CHAR_NAMES[this.p1CharId] ?? `Fighter ${this.p1CharId}`;
     const p2Name = CHAR_NAMES[this.p2CharId] ?? `Fighter ${this.p2CharId}`;
 
-    // Left side: P1
-    const p1Block = this.add.rectangle(0, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x001133)
-      .setOrigin(0, 0).setDepth(-1);
-    const p2Block = this.add.rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x330011)
-      .setOrigin(0, 0).setDepth(-1);
-    this.tweens.add({ targets: p1Block, alpha: { from: 0, to: 1 }, duration: 200 });
-    this.tweens.add({ targets: p2Block, alpha: { from: 0, to: 1 }, duration: 200 });
+    // Background halves
+    const p1Block = this.add.rectangle(0, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x001133).setOrigin(0, 0).setDepth(-1);
+    const p2Block = this.add.rectangle(cx, 0, GAME_WIDTH / 2, GAME_HEIGHT, 0x330011).setOrigin(0, 0).setDepth(-1);
+    this.tweens.add({ targets: [p1Block, p2Block], alpha: { from: 0, to: 1 }, duration: 200 });
 
-    // P1 big portrait (idle anim if available)
+    // Diagonal slash
+    const gfx = this.add.graphics().setDepth(-0.5);
+    gfx.fillStyle(0xffd700, 0.10);
+    gfx.fillTriangle(cx - 24, 0, cx + 24, 0, cx - 24, GAME_HEIGHT);
+    gfx.fillTriangle(cx + 24, 0, cx - 24, GAME_HEIGHT, cx + 24, GAME_HEIGHT);
+
+    // P1 portrait frame art (left side)
+    if (this.textures.exists(UI.vsPortraitLargeL)) {
+      this.add.image(cx / 2, cy, UI.vsPortraitLargeL)
+        .setOrigin(0.5).setDisplaySize(360, GAME_HEIGHT - 40).setAlpha(0.7).setDepth(1);
+    }
+    // P2 portrait frame art (right side, mirrored)
+    if (this.textures.exists(UI.vsPortraitLargeR)) {
+      this.add.image(cx + cx / 2, cy, UI.vsPortraitLargeR)
+        .setOrigin(0.5).setDisplaySize(360, GAME_HEIGHT - 40).setAlpha(0.7).setDepth(1);
+    }
+
+    // Character sprites
     const p1Key = AnimationSystem.animKey(this.p1CharId, 'idle');
     if (this.anims.exists(p1Key)) {
       this.add.sprite(cx / 2, cy + 30, '__DEFAULT')
-        .setOrigin(0.5, 1).setScale(240 / 181).play(p1Key);
+        .setOrigin(0.5, 1).setScale(240 / 181).play(p1Key).setDepth(2);
     }
-
-    // P2 big portrait
     const p2Key = AnimationSystem.animKey(this.p2CharId, 'idle');
     if (this.anims.exists(p2Key)) {
       this.add.sprite(cx + cx / 2, cy + 30, '__DEFAULT')
-        .setOrigin(0.5, 1).setScale(240 / 181).setFlipX(true).play(p2Key);
+        .setOrigin(0.5, 1).setScale(240 / 181).setFlipX(true).play(p2Key).setDepth(2);
     }
 
-    // Names
-    const n1 = this.add.text(cx / 2, 80, p1Name.toUpperCase(), {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#44aaff',
-      stroke: '#000000', strokeThickness: 5,
-    }).setOrigin(0.5).setAlpha(0);
-    const n2 = this.add.text(cx + cx / 2, 80, p2Name.toUpperCase(), {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ff6644',
-      stroke: '#000000', strokeThickness: 5,
-    }).setOrigin(0.5).setAlpha(0);
-    this.tweens.add({ targets: [n1, n2], alpha: 1, duration: 300, delay: 150 });
-
-    // Round and difficulty
-    const roundLabel = this.add.text(cx, cy - 60,
-      `ROUND ${this.roundNum}  [${this.difficulty.label}]`, {
-        fontFamily: 'monospace', fontSize: '16px', color: this.difficulty.color,
+    // P1 nameplate
+    if (this.textures.exists(UI.vsNameplateP1)) {
+      this.add.image(cx / 2, GAME_HEIGHT - 60, UI.vsNameplateP1)
+        .setOrigin(0.5).setDisplaySize(280, 38).setDepth(10).setAlpha(0);
+      this.tweens.add({ targets: this.children.list[this.children.list.length - 1], alpha: 1, duration: 300, delay: 150 });
+    } else {
+      const n1 = this.add.text(cx / 2, 80, p1Name.toUpperCase(), {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#44aaff',
+        stroke: '#000000', strokeThickness: 5,
       }).setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: n1, alpha: 1, duration: 300, delay: 150 });
+    }
+
+    // P1 name text (over nameplate or standalone)
+    if (this.textures.exists(UI.vsNameplateP1)) {
+      this.add.text(cx / 2, GAME_HEIGHT - 60, p1Name.toUpperCase(), {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffffff',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(11);
+    }
+
+    // P2 nameplate
+    if (this.textures.exists(UI.vsNameplateP2)) {
+      this.add.image(cx + cx / 2, GAME_HEIGHT - 60, UI.vsNameplateP2)
+        .setOrigin(0.5).setDisplaySize(280, 38).setDepth(10).setAlpha(0);
+      this.tweens.add({ targets: this.children.list[this.children.list.length - 1], alpha: 1, duration: 300, delay: 150 });
+      this.add.text(cx + cx / 2, GAME_HEIGHT - 60, p2Name.toUpperCase(), {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '14px', color: '#ffffff',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(11);
+    } else {
+      const n2 = this.add.text(cx + cx / 2, 80, p2Name.toUpperCase(), {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ff6644',
+        stroke: '#000000', strokeThickness: 5,
+      }).setOrigin(0.5).setAlpha(0);
+      this.tweens.add({ targets: n2, alpha: 1, duration: 300, delay: 150 });
+    }
+
+    // Round label
+    const roundLabel = this.add.text(cx, cy - 90,
+      `ROUND ${this.roundNum}  ·  ${this.difficulty.label}`, {
+        fontFamily: 'monospace', fontSize: '15px', color: this.difficulty.color,
+      }).setOrigin(0.5).setAlpha(0).setDepth(12);
     this.tweens.add({ targets: roundLabel, alpha: 1, duration: 300, delay: 200 });
 
-    // VS text — slam in
-    const vs = this.add.text(cx, cy, 'VS', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '88px', color: '#ffd700',
-      stroke: '#000000', strokeThickness: 10,
-    }).setOrigin(0.5).setScale(4).setAlpha(0);
-    this.tweens.add({
-      targets: vs, scale: 1, alpha: 1, duration: 350, delay: 100,
-      ease: 'Back.out',
-    });
+    // Central VS emblem art or text fallback
+    if (this.textures.exists(UI.vsEmblem)) {
+      const emblem = this.add.image(cx, cy, UI.vsEmblem)
+        .setDisplaySize(160, 160).setDepth(12).setScale(4).setAlpha(0);
+      this.tweens.add({ targets: emblem, scale: 1, alpha: 1, duration: 350, delay: 100, ease: 'Back.out' });
+    } else {
+      const vs = this.add.text(cx, cy, 'VS', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '88px', color: '#ffd700',
+        stroke: '#000000', strokeThickness: 10,
+      }).setOrigin(0.5).setScale(4).setAlpha(0).setDepth(12);
+      this.tweens.add({ targets: vs, scale: 1, alpha: 1, duration: 350, delay: 100, ease: 'Back.out' });
+    }
 
-    // Diagonal slash decoration
-    const gfx = this.add.graphics().setDepth(-0.5);
-    gfx.fillStyle(0xffd700, 0.12);
-    gfx.fillTriangle(cx - 20, 0, cx + 20, 0, cx - 20, GAME_HEIGHT);
-    gfx.fillTriangle(cx + 20, 0, cx - 20, GAME_HEIGHT, cx + 20, GAME_HEIGHT);
+    // Round indicators strip
+    if (this.textures.exists(UI.vsRoundIndicators)) {
+      this.add.image(cx, 24, UI.vsRoundIndicators)
+        .setOrigin(0.5, 0).setDisplaySize(180, 28).setDepth(12);
+    }
 
     // Countdown 3, 2, 1, FIGHT!
     let count = 3;
