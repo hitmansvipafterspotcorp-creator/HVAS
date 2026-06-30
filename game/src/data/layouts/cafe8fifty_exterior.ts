@@ -80,6 +80,26 @@ export const CAFE8FIFTY_EXTERIOR_LAYOUT: TileLayout = {
     { tile: 'fence_straight',         x: 950,  y: 555, w: 90,  h: 70,  depth: 555 },
     { tile: 'fence_corner',           x: 1045, y: 555, w: 90,  h: 90,  depth: 555 },
 
+    // ── LAYER 6.5: GROUND (asphalt with parking stripes between facade and fence)
+    // 4 asphalt tiles tile across the parking lot area
+    { tile: 'asphalt_tile',           x: 100,  y: 555, w: 220, h: 130, depth: -1500 },
+    { tile: 'asphalt_tile',           x: 320,  y: 555, w: 220, h: 130, depth: -1500 },
+    { tile: 'asphalt_tile',           x: 540,  y: 555, w: 220, h: 130, depth: -1500 },
+    { tile: 'asphalt_tile',           x: 760,  y: 555, w: 220, h: 130, depth: -1500 },
+    { tile: 'asphalt_tile',           x: 980,  y: 555, w: 220, h: 130, depth: -1500 },
+    { tile: 'asphalt_tile',           x: 1200, y: 555, w: 220, h: 130, depth: -1500 },
+    // Parking stripes (white lines on the asphalt)
+    { tile: 'parking_stripe_tile',    x: 200,  y: 520, w: 130, h: 50,  depth: -1490 },
+    { tile: 'parking_stripe_tile',    x: 360,  y: 520, w: 130, h: 50,  depth: -1490 },
+    { tile: 'parking_stripe_tile',    x: 870,  y: 520, w: 130, h: 50,  depth: -1490 },
+    { tile: 'parking_stripe_tile',    x: 1030, y: 520, w: 130, h: 50,  depth: -1490 },
+    // Sidewalk along the very bottom (in front of fence)
+    { tile: 'sidewalk_tile',          x: 100,  y: 615, w: 250, h: 50,  depth: -1480 },
+    { tile: 'sidewalk_tile',          x: 350,  y: 615, w: 250, h: 50,  depth: -1480 },
+    { tile: 'sidewalk_tile',          x: 600,  y: 615, w: 250, h: 50,  depth: -1480 },
+    { tile: 'sidewalk_tile',          x: 850,  y: 615, w: 250, h: 50,  depth: -1480 },
+    { tile: 'sidewalk_tile',          x: 1100, y: 615, w: 250, h: 50,  depth: -1480 },
+
     // ── LAYER 7: BOTTOM HEDGE WALL strip ────────────────────────────────────
     { tile: 'lot_edge_wall',          x: 0,    y: 677, w: 1439, h: 70, origin: [0, 1], depth: 670 },
     // Hedge planters along bottom
