@@ -168,6 +168,24 @@ export const UI = {
   dlgToastComplete:  'dlg_toast_complete',
   dlgToastReward:    'dlg_toast_reward',
 
+  // ── Dialogue mission portraits (indexed 000-015) ──────────────────────
+  dlgMission000:     'dialogue_mission_000',
+  dlgMission001:     'dialogue_mission_001',
+  dlgMission002:     'dialogue_mission_002',
+  dlgMission003:     'dialogue_mission_003',
+  dlgMission004:     'dialogue_mission_004',
+  dlgMission005:     'dialogue_mission_005',
+  dlgMission006:     'dialogue_mission_006',
+  dlgMission007:     'dialogue_mission_007',
+  dlgMission008:     'dialogue_mission_008',
+  dlgMission009:     'dialogue_mission_009',
+  dlgMission010:     'dialogue_mission_010',
+  dlgMission011:     'dialogue_mission_011',
+  dlgMission012:     'dialogue_mission_012',
+  dlgMission013:     'dialogue_mission_013',
+  dlgMission014:     'dialogue_mission_014',
+  dlgMission015:     'dialogue_mission_015',
+
   // ── Legacy aliases (kept so old code doesn't break) ───────────────────────
   healthBar:         'hud_health_bar',
   comboLabel:        'hud_combo_label',
@@ -375,6 +393,24 @@ const FILES: Array<[string, string]> = [
   [UI.dlgToastObjective, 'ui/elements/dialogue/dlg_toast_objective.png'],
   [UI.dlgToastComplete,  'ui/elements/dialogue/dlg_toast_complete.png'],
   [UI.dlgToastReward,    'ui/elements/dialogue/dlg_toast_reward.png'],
+
+  // ── Dialogue mission portraits ────────────────────────────────────────
+  [UI.dlgMission000, 'ui/elements/dialogue_mission/dialogue_mission_000.png'],
+  [UI.dlgMission001, 'ui/elements/dialogue_mission/dialogue_mission_001.png'],
+  [UI.dlgMission002, 'ui/elements/dialogue_mission/dialogue_mission_002.png'],
+  [UI.dlgMission003, 'ui/elements/dialogue_mission/dialogue_mission_003.png'],
+  [UI.dlgMission004, 'ui/elements/dialogue_mission/dialogue_mission_004.png'],
+  [UI.dlgMission005, 'ui/elements/dialogue_mission/dialogue_mission_005.png'],
+  [UI.dlgMission006, 'ui/elements/dialogue_mission/dialogue_mission_006.png'],
+  [UI.dlgMission007, 'ui/elements/dialogue_mission/dialogue_mission_007.png'],
+  [UI.dlgMission008, 'ui/elements/dialogue_mission/dialogue_mission_008.png'],
+  [UI.dlgMission009, 'ui/elements/dialogue_mission/dialogue_mission_009.png'],
+  [UI.dlgMission010, 'ui/elements/dialogue_mission/dialogue_mission_010.png'],
+  [UI.dlgMission011, 'ui/elements/dialogue_mission/dialogue_mission_011.png'],
+  [UI.dlgMission012, 'ui/elements/dialogue_mission/dialogue_mission_012.png'],
+  [UI.dlgMission013, 'ui/elements/dialogue_mission/dialogue_mission_013.png'],
+  [UI.dlgMission014, 'ui/elements/dialogue_mission/dialogue_mission_014.png'],
+  [UI.dlgMission015, 'ui/elements/dialogue_mission/dialogue_mission_015.png'],
 ];
 
 export const UISystem = {

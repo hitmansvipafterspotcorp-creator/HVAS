@@ -146,7 +146,7 @@ export class VenueScene extends Phaser.Scene {
         y: npc.y,
         radius: 70,
         label: npc.name,
-        activate: () => this.dialogue.open(npc.name, npc.lines),
+        activate: () => this.dialogue.open(npc.name, npc.lines, npc.charId % 16),
       });
     }
 
