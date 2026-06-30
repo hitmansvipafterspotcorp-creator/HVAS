@@ -39,9 +39,14 @@ export type TileLayout = {
 export const TileComposer = {
   /** Place every tile in the layout, loading each via Image probe. */
   compose(scene: Phaser.Scene, layout: TileLayout): void {
-    // Uniform scale that fits layout.worldW × worldH into the viewport.
-    const sx = GAME_WIDTH / layout.worldW;
-    const sy = GAME_HEIGHT / layout.worldH;
+    // If the scene has explicit camera bounds (top-down VenueScene with a
+    // larger-than-viewport world), use those bounds as the target — tiles
+    // are placed in world coords and the camera handles projection. Falls
+    // back to fitting into the viewport (BrawlerScene-style stages).
+    const camBounds = scene.cameras.main.getBounds();
+    const useCamWorld = camBounds.width > GAME_WIDTH || camBounds.height > GAME_HEIGHT;
+    const sx = useCamWorld ? camBounds.width  / layout.worldW : GAME_WIDTH  / layout.worldW;
+    const sy = useCamWorld ? camBounds.height / layout.worldH : GAME_HEIGHT / layout.worldH;
     for (const p of layout.tiles) {
       const key = `tile_${layout.id}_${p.tile}`;
       if (scene.textures.exists(key)) {

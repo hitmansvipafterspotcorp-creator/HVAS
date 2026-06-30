@@ -8,6 +8,12 @@ import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { PLAYER_ID } from '../data/roster';
 import type { VenueData, Facing } from '../data/venueTypes';
 import { AudioSystem } from '../systems/AudioSystem';
+import { TileComposer, type TileLayout } from '../systems/TileComposer';
+import { HVAS_INSIDE_LAYOUT } from '../data/layouts/hvas_inside';
+
+const VENUE_LAYOUTS: Record<string, TileLayout> = {
+  hitmans_vip_inside: HVAS_INSIDE_LAYOUT,
+};
 
 // ── Venue JSON registry ──────────────────────────────────────────────────────
 import hitmansVip   from '../data/venues/hitmans_vip_inside.json';
@@ -250,6 +256,14 @@ export class VenueScene extends Phaser.Scene {
 
   private tryLoadBackdrop(): void {
     const VENUE = this.venue;
+    // Tile-composed interior if a layout is registered for this venue.
+    const layout = VENUE_LAYOUTS[VENUE.id];
+    const forceLegacy = typeof window !== 'undefined'
+      && window.location.search.includes('nobackdrop=tiles');
+    if (layout && !forceLegacy) {
+      TileComposer.compose(this, layout);
+      return;
+    }
     if (!VENUE.backdrop) return;
     const key = `venue_bg_${VENUE.id}`;
     const place = () => {
