@@ -32,8 +32,12 @@ import cafe8fiftyStage from '../data/stages/cafe8fifty.json';
 // to load any JSON-authored stage without touching this file.
 const DEFAULT_STAGE: StageData = cafe8fiftyStage as StageData;
 
+// World is 3 screens wide — camera scrolls to follow the player.
+const ZONE_COUNT = 3;
+
 export class BrawlerScene extends Phaser.Scene {
   private stage!: StageData;
+  private worldWidth = GAME_WIDTH * ZONE_COUNT;
   private player!: Fighter;
   private controls!: InputSystem;
   private combat!: CombatSystem;
@@ -45,6 +49,11 @@ export class BrawlerScene extends Phaser.Scene {
   private boss: BossSystem | null = null;
   private bossRevealTriggered = false;
   private venueDoorSpawned = false;
+
+  // Scrolling world
+  private currentZone = 0;
+  private zoneBarriers: Phaser.GameObjects.Rectangle[] = [];
+  private zoneBarrierTexts: Phaser.GameObjects.Text[] = [];
 
   private hud!: Phaser.GameObjects.Text;
   private banner!: Phaser.GameObjects.Text;
@@ -75,12 +84,23 @@ export class BrawlerScene extends Phaser.Scene {
     // Real backdrop if the PNG exists; graybox floor always drawn underneath.
     StageLoader.loadBackdrop(this, this.stage);
 
-    // Floor band — visible over the backdrop so the walkable lane reads clearly.
+    // Floor band spans the full scrolling world.
     const g = this.add.graphics().setDepth(-1999);
     g.fillStyle(COLORS.floor, 0.45);
-    g.fillRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
+    g.fillRect(0, FLOOR_TOP, this.worldWidth, FLOOR_BOTTOM - FLOOR_TOP);
     g.lineStyle(2, COLORS.floorLine, 0.6);
-    g.strokeRect(0, FLOOR_TOP, GAME_WIDTH, FLOOR_BOTTOM - FLOOR_TOP);
+    g.strokeRect(0, FLOOR_TOP, this.worldWidth, FLOOR_BOTTOM - FLOOR_TOP);
+
+    // Zone separator markers (visual only — barriers added below).
+    for (let z = 1; z < ZONE_COUNT; z++) {
+      const bx = GAME_WIDTH * z;
+      const bar = this.add.rectangle(bx, GAME_HEIGHT / 2, 6, GAME_HEIGHT, 0xffd700, 0.8).setDepth(500);
+      const txt = this.add.text(bx, FLOOR_TOP - 18, `ZONE ${z + 1}`, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ffd700',
+      }).setOrigin(0.5, 1).setDepth(501);
+      this.zoneBarriers.push(bar);
+      this.zoneBarrierTexts.push(txt);
+    }
 
     // Player — uses real sprite art if its anims are built, else graybox.
     this.player = new Fighter(this, 'player', 180, FLOOR_BOTTOM - 20, 120, PLAYER_ID);
@@ -96,6 +116,10 @@ export class BrawlerScene extends Phaser.Scene {
     this.props = new PropDestructionSystem(this);
     if (this.stage.props?.length) this.props.init(this.stage.props, this.stage.id);
     if (this.stage.boss) this.boss = new BossSystem(this, this.stage.boss);
+
+    // Camera: follow player across the full scrolling world.
+    this.cameras.main.setBounds(0, 0, this.worldWidth, GAME_HEIGHT);
+    this.cameras.main.startFollow(this.player.sprite!, false, 0.08, 0);
 
     // HUD — real art kit when available, text otherwise.
     this.buildHud();
@@ -384,7 +408,9 @@ export class BrawlerScene extends Phaser.Scene {
 
   private clampPlayer(): void {
     const p = this.player;
-    p.x = Phaser.Math.Clamp(p.x, 20, GAME_WIDTH - 20);
+    // Clamp to current zone: can't pass the next barrier until it dissolves.
+    const zoneMax = GAME_WIDTH * (this.currentZone + 1) - 20;
+    p.x = Phaser.Math.Clamp(p.x, 20, Math.min(zoneMax, this.worldWidth - 20));
     p.feetY = Phaser.Math.Clamp(p.feetY, FLOOR_TOP + 10, FLOOR_BOTTOM - 5);
   }
 
@@ -403,7 +429,15 @@ export class BrawlerScene extends Phaser.Scene {
         }
         return;
       }
-      // No boss — immediate clear (guard so this only fires once).
+      // All waves in this zone cleared — advance to next zone if available.
+      if (this.currentZone < ZONE_COUNT - 1) {
+        if (!this.venueDoorSpawned) {
+          this.venueDoorSpawned = true; // reuse flag as zone-advance-in-progress
+          this.advanceZone();
+        }
+        return;
+      }
+      // Final zone clear — stage done (no boss scenario).
       if (!this.venueDoorSpawned) {
         this.venueDoorSpawned = true;
         this.banner.setText('STAGE CLEAR!');
@@ -416,6 +450,27 @@ export class BrawlerScene extends Phaser.Scene {
       const advanced = this.waves.tryAdvance();
       if (advanced) this.flashBanner(`WAVE ${this.waves.current + 1}`);
     }
+  }
+
+  private advanceZone(): void {
+    this.currentZone++;
+    const barrierIdx = this.currentZone - 1;
+    const bar  = this.zoneBarriers[barrierIdx];
+    const txt  = this.zoneBarrierTexts[barrierIdx];
+    this.flashBanner(`ZONE ${this.currentZone + 1}`);
+    // Dissolve the barrier with a tween.
+    if (bar) {
+      this.tweens.add({
+        targets: [bar, txt], alpha: 0, duration: 600, ease: 'Quad.out',
+        onComplete: () => { bar.destroy(); txt?.destroy(); },
+      });
+    }
+    // Spawn next zone's wave a beat later.
+    this.time.delayedCall(800, () => {
+      this.venueDoorSpawned = false; // reset so next zone-clear can fire
+      this.waves.tryAdvance();
+      this.flashBanner(`WAVE ${this.waves.current + 1}`);
+    });
   }
 
   private onBossDefeated(): void {
@@ -449,12 +504,12 @@ export class BrawlerScene extends Phaser.Scene {
 
     // Standard single-venue unlock.
     if (s.venueUnlocks) {
-      this.addVenueDoor(GAME_WIDTH - 120, FLOOR_BOTTOM - 40, 'Enter Venue', s.venueUnlocks);
+      this.addVenueDoor(this.worldWidth - 120, FLOOR_BOTTOM - 40, 'Enter Venue', s.venueUnlocks);
     }
 
     // Above-venue (rooftop etc.) unlocked at the same time.
     if (s.aboveVenueUnlocks) {
-      this.addVenueDoor(GAME_WIDTH - 240, FLOOR_BOTTOM - 80, 'Rooftop', s.aboveVenueUnlocks);
+      this.addVenueDoor(this.worldWidth - 240, FLOOR_BOTTOM - 80, 'Rooftop', s.aboveVenueUnlocks);
     }
   }
 

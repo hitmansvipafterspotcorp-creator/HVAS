@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SCENE, COLORS, ASSET_BASE } from '../config';
+import { SCENE, COLORS, ASSET_BASE, GAME_WIDTH } from '../config';
 import { InputSystem } from '../systems/InputSystem';
 import { DialogueSystem } from '../systems/DialogueSystem';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -73,6 +73,7 @@ export class VenueScene extends Phaser.Scene {
     const VENUE = this.venue;
 
     this.cameras.main.setBackgroundColor(0x120c1c);
+    this.cameras.main.setBounds(0, 0, VENUE.width, VENUE.height);
 
     const wk = VENUE.walkable;
     this.add
@@ -206,13 +207,18 @@ export class VenueScene extends Phaser.Scene {
     this.player.setScale(TD_SCALE);
     this.playAnim('td_idle_s');
 
+    // Camera follows the player with gentle lerp — true Pokemon-style.
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+
     this.add
-      .text(VENUE.width - 12, 10, 'WASD move • E interact • ESC menu', {
+      .text(GAME_WIDTH - 12, 10, 'WASD move • E interact • ESC menu', {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#8877aa',
       })
-      .setOrigin(1, 0);
+      .setOrigin(1, 0)
+      .setScrollFactor(0)
+      .setDepth(50000);
     this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.VenueSelect));
 
     this.tryLoadBackdrop();
