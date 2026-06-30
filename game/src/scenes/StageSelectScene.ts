@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT, COLORS, ASSET_BASE } from '../config';
 import { ProgressionSystem, STAGE_SEQUENCE, STAGE_UNLOCKS } from '../systems/ProgressionSystem';
+import { UISystem, UI } from '../systems/UISystem';
 import type { StageId } from '../systems/ProgressionSystem';
 
 // Stage display metadata — name, boss name, boss charId, backdrop hint.
@@ -46,6 +47,25 @@ export class StageSelectScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bg);
+
+    // Map frame art (background panel)
+    if (UISystem.ready(this) && this.textures.exists(UI.ssMapFrame)) {
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.ssMapFrame)
+        .setOrigin(0.5).setDisplaySize(GAME_WIDTH - 20, GAME_HEIGHT - 20)
+        .setAlpha(0.18).setDepth(-100);
+    }
+
+    // Stage info panel (right side)
+    if (UISystem.ready(this) && this.textures.exists(UI.ssStageInfoPanel)) {
+      this.add.image(GAME_WIDTH - 10, GAME_HEIGHT / 2 + 10, UI.ssStageInfoPanel)
+        .setOrigin(1, 0.5).setDisplaySize(240, 280).setAlpha(0.7).setDepth(-50);
+    }
+
+    // Legend panel (top-left overlay)
+    if (UISystem.ready(this) && this.textures.exists(UI.ssLegendPanel)) {
+      this.add.image(8, GAME_HEIGHT - 8, UI.ssLegendPanel)
+        .setOrigin(0, 1).setDisplaySize(200, 80).setAlpha(0.65);
+    }
 
     // Title.
     this.add.text(GAME_WIDTH / 2, 28, 'QUEST — STAGE SELECT', {
