@@ -29,7 +29,6 @@ const MAX_DIGITS = 8;
 export class MemberCheckInScene extends Phaser.Scene {
   private enteredDigits = '';
   private digitBoxes: Phaser.GameObjects.Text[] = [];
-  private resultPanel!: Phaser.GameObjects.Container;
   private resultTitle!: Phaser.GameObjects.Text;
   private resultSub!: Phaser.GameObjects.Text;
   private resultBg!: Phaser.GameObjects.Rectangle;
