@@ -45,8 +45,11 @@ export class CombatSystem {
       t.state = 'hit';
       t.stateTimer = 180;
 
-      // Knockback along attacker facing.
-      t.x += attacker.facing * opts.knockback;
+      // Knockback along attacker facing, clamped to the scrolling world so
+      // enemies don't get launched off-screen and become unreachable.
+      const worldW = (this.scene as unknown as { worldWidth?: number }).worldWidth
+        ?? this.scene.scale.width;
+      t.x = Math.max(20, Math.min(worldW - 20, t.x + attacker.facing * opts.knockback));
 
       // Combo + meter for attacker.
       attacker.combo += 1;
