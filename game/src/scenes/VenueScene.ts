@@ -75,20 +75,27 @@ export class VenueScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(0x120c1c);
     this.cameras.main.setBounds(0, 0, VENUE.width, VENUE.height);
 
+    // If a real backdrop is provided, draw the walkable area + colliders as
+    // INVISIBLE markers so the art shows through. Without a backdrop we keep
+    // the graybox so the player can still see the floor.
+    const hasBackdrop = !!VENUE.backdrop;
     const wk = VENUE.walkable;
-    this.add
-      .rectangle(wk.x, wk.y, wk.w, wk.h, COLORS.floor)
-      .setOrigin(0, 0)
-      .setStrokeStyle(2, COLORS.floorLine);
-    this.add
-      .text(VENUE.width / 2, 90, VENUE.name, {
-        fontFamily: 'Arial Black, sans-serif',
-        fontSize: '26px',
-        color: '#ffd700',
-      })
-      .setOrigin(0.5);
+    if (!hasBackdrop) {
+      this.add
+        .rectangle(wk.x, wk.y, wk.w, wk.h, COLORS.floor)
+        .setOrigin(0, 0)
+        .setStrokeStyle(2, COLORS.floorLine).setDepth(-4000);
+      this.add
+        .text(VENUE.width / 2, 90, VENUE.name, {
+          fontFamily: 'Arial Black, sans-serif',
+          fontSize: '26px',
+          color: '#ffd700',
+        })
+        .setOrigin(0.5).setDepth(-3999);
+    }
 
     for (const c of VENUE.colliders) {
+      if (hasBackdrop) continue; // collider visualisation hides the backdrop
       this.add
         .rectangle(c.x, c.y, c.w, c.h, 0x241a36)
         .setOrigin(0, 0)
