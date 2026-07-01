@@ -16,6 +16,9 @@ import { MemberCheckInScene } from './scenes/MemberCheckInScene';
 import { MembershipScene } from './scenes/MembershipScene';
 import { CharacterSelectScene } from './scenes/CharacterSelectScene';
 import { OptionsScene } from './scenes/OptionsScene';
+import { AppHubScene } from './scenes/AppHubScene';
+import { SecurityDoorScene } from './scenes/SecurityDoorScene';
+import { OwnerCommandScene } from './scenes/OwnerCommandScene';
 
 // Android landscape-first, desktop playable. Phaser.Scale.FIT keeps the 16:9
 // stage centered and unstretched on any device — no stretched assets/QR codes.
@@ -35,7 +38,7 @@ const config: Phaser.Types.Core.GameConfig = {
     arcade: { gravity: { x: 0, y: 0 }, debug: false },
   },
   input: { gamepad: true },
-  scene: [BootScene, PreloadScene, MainMenuScene, BrawlerScene, VenueScene, LevelEditorScene, ArcadeVsScene, StageSelectScene, VenueSelectScene, LipsyncBingoScene, TvModeScene, HostDjScene, MemberCheckInScene, MembershipScene, CharacterSelectScene, OptionsScene],
+  scene: [BootScene, PreloadScene, MainMenuScene, BrawlerScene, VenueScene, LevelEditorScene, ArcadeVsScene, StageSelectScene, VenueSelectScene, LipsyncBingoScene, TvModeScene, HostDjScene, MemberCheckInScene, MembershipScene, CharacterSelectScene, OptionsScene, AppHubScene, SecurityDoorScene, OwnerCommandScene],
 };
 
 const game = new Phaser.Game(config);

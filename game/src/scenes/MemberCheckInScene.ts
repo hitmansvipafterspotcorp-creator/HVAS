@@ -113,7 +113,7 @@ export class MemberCheckInScene extends Phaser.Scene {
     }
     kb.on('keydown-BACKSPACE', () => this.backspace());
     kb.on('keydown-ENTER',     () => this.verify());
-    kb.on('keydown-ESC',       () => this.scene.start(SCENE.MainMenu));
+    kb.on('keydown-ESC',       () => this.scene.start(SCENE.AppHub));
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, 'ESC — Main Menu   |   ENTER — Verify', {
       fontFamily: 'monospace', fontSize: '11px', color: '#443355',

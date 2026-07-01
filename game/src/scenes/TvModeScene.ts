@@ -90,7 +90,7 @@ export class TvModeScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(500);
 
     const kb = this.input.keyboard!;
-    kb.on('keydown-ESC',   () => this.scene.start(SCENE.MainMenu));
+    kb.on('keydown-ESC',   () => this.scene.start(SCENE.AppHub));
     kb.on('keydown-SPACE', () => this.spawnFighters());
 
     this.combat = new CombatSystem(this);

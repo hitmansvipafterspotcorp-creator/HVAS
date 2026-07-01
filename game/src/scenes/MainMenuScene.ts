@@ -57,6 +57,7 @@ export class MainMenuScene extends Phaser.Scene {
     kb.on('keydown-R', (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey) { ProgressionSystem.reset(); this.scene.restart(); }
     });
+    kb.on('keydown-M', () => this.scene.start(SCENE.AppHub));
 
     this.select(0);
   }
@@ -194,7 +195,7 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 1, GAME_WIDTH, 28, 0x0a0220, 0.95)
       .setOrigin(0.5, 1).setStrokeStyle(1, 0xffd700, 0.5).setDepth(110);
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8,
-      '★ COMPLETE MISSIONS TO UNLOCK VIP REWARDS  ★  WEEKLY BONUS  ★',
+      '★ COMPLETE MISSIONS TO UNLOCK VIP REWARDS  ★  WEEKLY BONUS  ★  [M] MEMBER APP ★',
       { fontFamily: 'monospace', fontSize: '10px', color: '#ffd700' },
     ).setOrigin(0.5, 1).setDepth(111);
   }

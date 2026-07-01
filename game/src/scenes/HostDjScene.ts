@@ -132,7 +132,7 @@ export class HostDjScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '12px', color: '#554466',
     }).setOrigin(0.5);
 
-    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
+    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.AppHub));
 
     // Passive VP tick every second
     this.time.addEvent({ delay: 1000, callback: this.passiveTick, callbackScope: this, loop: true });
@@ -304,6 +304,6 @@ export class HostDjScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(90001);
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => this.scene.restart());
-    kb.once('keydown-ESC',   () => this.scene.start(SCENE.MainMenu));
+    kb.once('keydown-ESC',   () => this.scene.start(SCENE.AppHub));
   }
 }

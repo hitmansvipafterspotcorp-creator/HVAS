@@ -99,7 +99,7 @@ export class MembershipScene extends Phaser.Scene {
     this.buildPrivateRules();
     this.buildFooter();
 
-    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.MainMenu));
+    this.input.keyboard!.on('keydown-ESC', () => this.scene.start(SCENE.AppHub));
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export class MembershipScene extends Phaser.Scene {
     // Back button
     this.makeChip(60, 36, 'ESC — BACK', 0x1a0030, 0xc100ff, 12)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start(SCENE.MainMenu));
+      .on('pointerdown', () => this.scene.start(SCENE.AppHub));
   }
 
   // ── Top chips: PRIVATE MEMBERS ONLY | ENTRY DUES | UNLOCK 2-3 CARDS | JOIN LIVE BY QR

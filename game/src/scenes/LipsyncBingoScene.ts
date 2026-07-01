@@ -65,7 +65,7 @@ export class LipsyncBingoScene extends Phaser.Scene {
 
     this.input.keyboard!.on('keydown-ESC', () => {
       this.callTimer?.destroy();
-      this.scene.start(SCENE.MainMenu);
+      this.scene.start(SCENE.AppHub);
     });
 
     this.dealCard();
@@ -214,6 +214,6 @@ export class LipsyncBingoScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => this.scene.restart());
-    kb.once('keydown-ESC',   () => this.scene.start(SCENE.MainMenu));
+    kb.once('keydown-ESC',   () => this.scene.start(SCENE.AppHub));
   }
 }

@@ -57,4 +57,7 @@ export const SCENE = {
   Membership: 'Membership',
   CharacterSelect: 'CharacterSelect',
   Options: 'Options',
+  AppHub: 'AppHub',
+  SecurityDoor: 'SecurityDoor',
+  OwnerCommand: 'OwnerCommand',
 } as const;
