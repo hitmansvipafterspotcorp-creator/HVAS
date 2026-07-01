@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
-import { UISystem, UI } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
 // ── MembershipScene ─────────────────────────────────────────────────────────
@@ -85,12 +84,11 @@ export class MembershipScene extends Phaser.Scene {
     this.selectedTier = null;
     this.selectedCards = 0;
 
-    // Background
-    if (UISystem.ready(this)) {
-      UISystem.backdrop(this, UI.lsbMembership, 1, -5000);
-    } else {
-      this.cameras.main.setBackgroundColor(0x06030e);
-    }
+    // Background — solid color only. The raw lsb_sheet_08_membership.png is
+    // a developer reference sheet full of labels/instructions/preview crops;
+    // it must never be shown as live UI. All real UI below is drawn from
+    // code (or, once sliced, individual cropped component assets).
+    this.cameras.main.setBackgroundColor(0x06030e);
 
     this.buildHeader();
     this.buildTopChips();

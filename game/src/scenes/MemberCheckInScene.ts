@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
-import { UISystem, UI } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
 // ── MemberCheckInScene ───────────────────────────────────────────────────────
@@ -74,11 +73,10 @@ export class MemberCheckInScene extends Phaser.Scene {
     this.selectedPayment = 0;
     this.seedDemoMembers();
 
-    if (UISystem.ready(this)) {
-      UISystem.backdrop(this, UI.lsbVerification, 1, -5000);
-    } else {
-      this.cameras.main.setBackgroundColor(COLORS.bg);
-    }
+    // Background — solid color only. The raw lsb_sheet_05_card_verification.png
+    // is a developer reference sheet, not live UI. All UI below is drawn from
+    // code (or, once sliced, individual cropped component assets).
+    this.cameras.main.setBackgroundColor(COLORS.bg);
 
     // ── Header ─────────────────────────────────────────────────────────────
     this.add.rectangle(GAME_WIDTH / 2, 30, GAME_WIDTH, 60, 0x08020e, 0.95).setDepth(100);
