@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-basic-ssl": "latest",
+    "vite": "latest",
+    "typescript": "latest",
+    "phaser": "4.1.0"
+  },
+  "devDependencies": {}
+}
