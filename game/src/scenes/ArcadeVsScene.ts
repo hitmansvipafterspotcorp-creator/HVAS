@@ -64,6 +64,7 @@ export class ArcadeVsScene extends Phaser.Scene {
   private selGroup!: Phaser.GameObjects.Container;
   private phaseLabel!: Phaser.GameObjects.Text;
   private cursorRect!: Phaser.GameObjects.Rectangle;
+  private gridCellSprites: Phaser.GameObjects.Sprite[] = [];
   private p1PortraitSpr!: Phaser.GameObjects.Sprite;
   private p2PortraitSpr!: Phaser.GameObjects.Sprite;
   private p1NameTxt!: Phaser.GameObjects.Text;
@@ -123,8 +124,12 @@ export class ArcadeVsScene extends Phaser.Scene {
     };
 
     // ── Title banner (CHARACTER SELECT) ──────────────────────────────────────
-    const titleBanner = addImg(UI.csTitleBanner, GAME_WIDTH / 2, 0, GAME_WIDTH, 50, 0.5, 0, 50);
-    if (titleBanner) grp.add(titleBanner);
+    // cs_title_banner.png is a design-guide export with "01. CHARACTER SELECT
+    // TITLE BANNER" annotation baked in — never use it as live UI (same issue
+    // fixed in CharacterSelectScene). Clean rendered strip only.
+    const bannerStrip = this.add.rectangle(GAME_WIDTH / 2, 0, GAME_WIDTH, 50, 0x0a0420, 0.92)
+      .setOrigin(0.5, 0).setStrokeStyle(1, 0xffd700, 0.5).setDepth(50).setScrollFactor(0);
+    grp.add(bannerStrip);
 
     const titleTxt = this.add.text(GAME_WIDTH / 2, 25, 'ARCADE VS · CHARACTER SELECT', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
@@ -198,6 +203,10 @@ export class ArcadeVsScene extends Phaser.Scene {
       grp.add(gridBg);
     }
 
+    // cs_slot_idle.png has a "02. CHARA" annotation baked in from the design
+    // guide export — never use it as a live slot frame (same issue fixed in
+    // CharacterSelectScene). Clean rectangle frames instead.
+    this.gridCellSprites = [];
     for (let i = 0; i < ALL_CHARS.length; i++) {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
@@ -205,29 +214,36 @@ export class ArcadeVsScene extends Phaser.Scene {
       const cy = GRID_Y + row * CELL + CELL / 2;
       const charId = ALL_CHARS[i];
 
-      let cellObj: Phaser.GameObjects.GameObject;
-      if (tex(UI.csSlotIdle)) {
-        cellObj = this.add.image(cx, cy, UI.csSlotIdle).setDisplaySize(CELL - 4, CELL - 4).setDepth(9);
-      } else {
-        cellObj = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820).setStrokeStyle(1, 0x3a2a5a).setDepth(9);
-      }
+      const cellObj = this.add.rectangle(cx, cy, CELL - 4, CELL - 4, 0x110820)
+        .setStrokeStyle(1, 0x3a2a5a).setDepth(9);
       grp.add(cellObj);
 
+      // Sprite slot — texture swapped in once the roster-wide lazy-load
+      // (kicked off below) finishes building each character's idle anim.
+      const spr = this.add.sprite(cx, cy + CELL * 0.4, '__DEFAULT')
+        .setOrigin(0.5, 1).setScale((CELL - 16) / 181).setDepth(11).setVisible(false);
+      grp.add(spr as Phaser.GameObjects.GameObject);
+      this.gridCellSprites.push(spr);
       const idleKey = AnimationSystem.animKey(charId, 'idle');
-      if (this.anims.exists(idleKey)) {
-        const spr = this.add.sprite(cx, cy + CELL * 0.4, '__DEFAULT')
-          .setOrigin(0.5, 1).setScale((CELL - 16) / 181).setDepth(11);
-        spr.play(idleKey);
-        grp.add(spr as Phaser.GameObjects.GameObject);
-      } else {
-        grp.add(this.add.rectangle(cx, cy, 26, 44, charId === 1 ? COLORS.player : COLORS.enemy).setDepth(11));
-      }
+      if (this.anims.exists(idleKey)) spr.setVisible(true).play(idleKey);
 
       grp.add(this.add.text(cx, cy + CELL / 2 - 7,
         (CHAR_NAMES[charId] ?? `#${charId}`).split(' ').slice(-1)[0], {
           fontFamily: 'monospace', fontSize: '7px', color: '#ccbbee',
         }).setOrigin(0.5, 1).setDepth(12));
     }
+
+    // Lazy-load idle frames for the full roster so the grid never falls back
+    // to a placeholder rectangle for characters outside the priority preload.
+    AnimationSystem.loadOnDemand(this, [...ALL_CHARS], ['idle']).then(() => {
+      for (const id of ALL_CHARS) AnimationSystem.build(this, id, ['idle']);
+      this.gridCellSprites.forEach((spr, i) => {
+        if (!spr.visible) {
+          const k = AnimationSystem.animKey(ALL_CHARS[i], 'idle');
+          if (this.anims.exists(k)) spr.setVisible(true).play(k);
+        }
+      });
+    }).catch(() => {});
 
     // Cursor highlight
     this.cursorRect = this.add.rectangle(0, 0, CELL - 2, CELL - 2, 0xffd700, 0)
