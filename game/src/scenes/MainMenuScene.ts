@@ -83,9 +83,20 @@ export class MainMenuScene extends Phaser.Scene {
       .setOrigin(0, 0).setDepth(0);
 
     // ── TOP BAR ─────────────────────────────────────────────────────────────
+    // mm_logo.png's bottom ~24% is a "QUEST" neon-script wordmark physically
+    // cropped by the source export's own canvas edge (cut off mid-glyph) —
+    // same corrupted-export class as the other fixed assets. The top ~76%
+    // (crown + "HITMANS" crest) is clean, so crop to that and draw the
+    // "QUEST" line ourselves.
     if (tex(UI.mmLogo)) {
-      this.add.image(LOGO_X, LOGO_Y, UI.mmLogo)
-        .setOrigin(0, 0).setDisplaySize(220, 115).setDepth(150);
+      const logoH = 60;
+      const logo = this.add.image(LOGO_X, LOGO_Y, UI.mmLogo).setOrigin(0, 0).setDepth(150);
+      logo.setCrop(0, 0, 439, 175);
+      logo.setDisplaySize(439 * (logoH / 175), logoH);
+      this.add.text(LOGO_X + 16, LOGO_Y + logoH + 1, '★ QUEST', {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ff2fd0',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0, 0).setDepth(150);
     }
     if (tex(UI.mmProfileBar)) {
       this.add.image(PROFILE_X, PROFILE_Y, UI.mmProfileBar)

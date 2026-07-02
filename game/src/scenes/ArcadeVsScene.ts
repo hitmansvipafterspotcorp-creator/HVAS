@@ -400,11 +400,14 @@ export class ArcadeVsScene extends Phaser.Scene {
     gfx.fillTriangle(cx + 20, 0, cx - 20, GAME_HEIGHT, cx + 20, GAME_HEIGHT);
 
     // ── 2. TOP TITLE BANNER ──────────────────────────────────────────────────
-    // vs_title_logo is 442x225 (~2:1) — keep aspect at 200x100 so it sits
-    // cleanly above the portraits instead of being width-stretched and clipped.
+    // vs_title_logo.png's bottom ~22% is a "QUEST" neon-script wordmark
+    // physically cropped by the source export's own canvas edge (cut off
+    // mid-glyph) — same corrupted-export class fixed on the main menu logo.
+    // The top ~78% (crown + "HITMANS" crest) is clean; crop to that.
     if (tex(UI.vsTitleLogo)) {
-      this.add.image(cx, 2, UI.vsTitleLogo)
-        .setOrigin(0.5, 0).setDisplaySize(200, 100).setDepth(20);
+      const logo = this.add.image(cx, 2, UI.vsTitleLogo).setOrigin(0.5, 0).setDepth(20);
+      logo.setCrop(0, 0, 442, 176);
+      logo.setDisplaySize(200, 100 * (176 / 225));
     } else {
       this.add.text(cx, 18, 'HITMANS VIP QUEST', {
         fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#ffd700',
