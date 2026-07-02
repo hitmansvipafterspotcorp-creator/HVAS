@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AudioSystem } from '../systems/AudioSystem';
+import { UISystem, UI } from '../systems/UISystem';
 
 // ── MemberCheckInScene ───────────────────────────────────────────────────────
 // Layout from LSB Sheet 5 (lsb_sheet_05_card_verification.png):
@@ -151,11 +152,18 @@ export class MemberCheckInScene extends Phaser.Scene {
   private buildCheckInPanel(): void {
     const px = 20, py = 96, pw = 320, ph = 400;
 
-    const bg = this.add.graphics().setDepth(30);
-    bg.fillStyle(COLORS.panel);
-    bg.fillRoundedRect(px, py, pw, ph, 10);
-    bg.lineStyle(2, COLORS.gold);
-    bg.strokeRoundedRect(px, py, pw, ph, 10);
+    // Real sliced panel-frame art as the container background, falling back
+    // to the code-drawn rounded rect if the texture failed to load.
+    if (UISystem.ready(this) && this.textures.exists(UI.cvCheckInPanel)) {
+      this.add.image(px + pw / 2, py + ph / 2, UI.cvCheckInPanel)
+        .setDisplaySize(pw, ph).setDepth(30);
+    } else {
+      const bg = this.add.graphics().setDepth(30);
+      bg.fillStyle(COLORS.panel);
+      bg.fillRoundedRect(px, py, pw, ph, 10);
+      bg.lineStyle(2, COLORS.gold);
+      bg.strokeRoundedRect(px, py, pw, ph, 10);
+    }
 
     const cx = px + pw / 2;
 
@@ -306,7 +314,15 @@ export class MemberCheckInScene extends Phaser.Scene {
   // ── PANEL_VERIFICATION_RESULT ─────────────────────────────────────────────
   private buildResultPanel(): void {
     const rx = 360, ry = 420, rw = 200, rh = 140;
-    this.resultBg = this.add.rectangle(rx + rw / 2, ry + rh / 2, rw, rh, COLORS.panel)
+
+    // Real sliced panel-frame art sits behind the dynamic color-tint rect —
+    // the rect's stroke color still switches valid/expired/trespass live.
+    if (UISystem.ready(this) && this.textures.exists(UI.cvResultPanel)) {
+      this.add.image(rx + rw / 2, ry + rh / 2, UI.cvResultPanel)
+        .setDisplaySize(rw, rh).setDepth(49);
+    }
+
+    this.resultBg = this.add.rectangle(rx + rw / 2, ry + rh / 2, rw, rh, COLORS.panel, 0.35)
       .setStrokeStyle(3, COLORS.valid).setDepth(50).setVisible(false);
 
     this.resultTitle = this.add.text(rx + rw / 2, ry + 38, '', {
@@ -340,11 +356,16 @@ export class MemberCheckInScene extends Phaser.Scene {
   private buildRecentScans(): void {
     const lx = 575, ly = 96, lw = GAME_WIDTH - 580, lh = 408;
 
-    const bg = this.add.graphics().setDepth(30);
-    bg.fillStyle(COLORS.panel);
-    bg.fillRoundedRect(lx, ly, lw, lh, 10);
-    bg.lineStyle(2, 0x3a2a55);
-    bg.strokeRoundedRect(lx, ly, lw, lh, 10);
+    if (UISystem.ready(this) && this.textures.exists(UI.cvHistoryPanel)) {
+      this.add.image(lx + lw / 2, ly + lh / 2, UI.cvHistoryPanel)
+        .setDisplaySize(lw, lh).setDepth(30);
+    } else {
+      const bg = this.add.graphics().setDepth(30);
+      bg.fillStyle(COLORS.panel);
+      bg.fillRoundedRect(lx, ly, lw, lh, 10);
+      bg.lineStyle(2, 0x3a2a55);
+      bg.strokeRoundedRect(lx, ly, lw, lh, 10);
+    }
 
     this.add.text(lx + lw / 2, ly + 18, 'RECENT SCANS', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '13px', color: '#ffd700',

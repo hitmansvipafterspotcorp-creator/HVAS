@@ -500,6 +500,12 @@ export const UI = {
   memFooterChip2:    'lsb_mem_footer_2',
   memFooterChip3:    'lsb_mem_footer_3',
   memFooterChip4:    'lsb_mem_footer_4',
+  // Individually-sliced card-verification panel frames (member check-in)
+  cvCheckInPanel:    'lsb_cv_checkin_panel',
+  cvCardPanel:       'lsb_cv_card_panel',
+  cvScanPanel:       'lsb_cv_scan_panel',
+  cvResultPanel:     'lsb_cv_result_panel',
+  cvHistoryPanel:    'lsb_cv_history_panel',
 } as const;
 
 // ─── Load manifest ───────────────────────────────────────────────────────────
@@ -674,6 +680,13 @@ const FILES: Array<[string, string]> = [
   ['lsb_mem_footer_2',      'ui/lsb/membership/membership_31.png'],
   ['lsb_mem_footer_3',      'ui/lsb/membership/membership_32.png'],
   ['lsb_mem_footer_4',      'ui/lsb/membership/membership_33.png'],
+
+  // ── LSB — individually-sliced card-verification panel frames ───────────────
+  ['lsb_cv_checkin_panel',  'ui/lsb/card_verification/card_verification_14.png'],
+  ['lsb_cv_card_panel',     'ui/lsb/card_verification/card_verification_16.png'],
+  ['lsb_cv_scan_panel',     'ui/lsb/card_verification/card_verification_19.png'],
+  ['lsb_cv_result_panel',   'ui/lsb/card_verification/card_verification_20.png'],
+  ['lsb_cv_history_panel',  'ui/lsb/card_verification/card_verification_24.png'],
 
   // ── Dialogue ─────────────────────────────────────────────────────────────
   [UI.dlgFrameLarge,     'ui/elements/dialogue/dlg_frame_large.png'],
