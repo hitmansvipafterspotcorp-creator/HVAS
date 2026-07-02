@@ -135,9 +135,12 @@ export class CharacterSelectScene extends Phaser.Scene {
       stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(18);
 
-    // Stat panel
-    const statKey = tex(UI.csxStatPanel) ? UI.csxStatPanel : UI.csStatPanel;
-    img(statKey, LPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0.5, 0, 15);
+    // Stat panel — cs_stat_panel.png / character_select_003.png are design-guide
+    // template art with permanent placeholder text baked in ("CHARACTER NAME",
+    // "TITLE / ALIAS", "DESCRIPTION GOES HERE") that no code ever overwrote.
+    // Same corrupted-export class as cs_title_banner/cs_slot_idle — draw clean.
+    this.add.rectangle(LPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0x140628, 0.9)
+      .setStrokeStyle(1, 0xffd700, 0.5).setDepth(15);
 
     // Style tags
     img(UI.csStyleTags, LPANEL_X + PANEL_W / 2, STAT_Y + STAT_H + 2, PORT_W, 42, 0.5, 0, 15);
@@ -149,8 +152,9 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Portrait frame (mirrored)
     img(portFrameKey, RPANEL_X + PANEL_W / 2, PANELS_Y + 50, PORT_W, PORT_H, 0.5, 0, 15);
 
-    // Stat panel
-    img(statKey, RPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0.5, 0, 15);
+    // Stat panel — see corrupted-asset note on the left panel above.
+    this.add.rectangle(RPANEL_X + PANEL_W / 2, STAT_Y, PORT_W, STAT_H, 0x140628, 0.9)
+      .setStrokeStyle(1, 0xffd700, 0.5).setDepth(15);
 
     // Style tags
     img(UI.csStyleTags, RPANEL_X + PANEL_W / 2, STAT_Y + STAT_H + 2, PORT_W, 42, 0.5, 0, 15);

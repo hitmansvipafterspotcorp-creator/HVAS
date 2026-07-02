@@ -21,22 +21,30 @@ const BTN_H   = 50;
 const BTN_Y0  = 130;
 const BTN_GAP = 54;
 
-// ── Menu items (map to real button textures) ──────────────────────────────────
-type MenuItem = { label: string; btnKey: string; btnSelKey: string; scene: string };
+// ── Menu items ────────────────────────────────────────────────────────────────
+// NOTE: the mm_btn_* button textures (ui/elements/main_menu/mm_btn_*.png) are a
+// corrupted design-guide export — every slice is shifted one slot from its
+// intended label (mm_btn_newgame.png reads "CONTINUE", mm_btn_charselect.png
+// reads "NEW GA" cropped mid-word, mm_btn_vsmode.png reads "CHARACTER", etc.),
+// and mm_btn_continue.png isn't a button at all (it's an unrelated "Night."/
+// "UNSEC" fragment). None of them are usable as live UI — same class of bug as
+// cs_title_banner/cs_slot_idle fixed earlier. Buttons are drawn clean below.
+type MenuItem = { label: string; scene: string };
 
 const ITEMS: MenuItem[] = [
-  { label: 'CONTINUE QUEST', btnKey: UI.mmBtnContinue,    btnSelKey: UI.mmBtnContinueSel,    scene: SCENE.StageSelect },
-  { label: 'NEW GAME',       btnKey: UI.mmBtnNewGame,      btnSelKey: UI.mmBtnNewGameSel,      scene: SCENE.StageSelect },
-  { label: 'CHARACTER SELECT', btnKey: UI.mmBtnCharSelect, btnSelKey: UI.mmBtnCharSelectSel,   scene: SCENE.CharacterSelect },
-  { label: 'VS MODE',        btnKey: UI.mmBtnVsMode,       btnSelKey: UI.mmBtnVsModeSel,       scene: SCENE.ArcadeVs },
-  { label: 'VENUE MAP',      btnKey: UI.mmBtnVenueMap,     btnSelKey: UI.mmBtnVenueMapSel,     scene: SCENE.VenueSelect },
-  { label: 'OPTIONS',        btnKey: UI.mmBtnOptions,      btnSelKey: UI.mmBtnOptionsSel,      scene: SCENE.Options },
-  { label: 'EXIT',           btnKey: UI.mmBtnExit,         btnSelKey: UI.mmBtnExitSel,         scene: SCENE.MainMenu },
+  { label: 'CONTINUE QUEST',   scene: SCENE.StageSelect },
+  { label: 'NEW GAME',         scene: SCENE.StageSelect },
+  { label: 'CHARACTER SELECT', scene: SCENE.CharacterSelect },
+  { label: 'VS MODE',          scene: SCENE.ArcadeVs },
+  { label: 'VENUE MAP',        scene: SCENE.VenueSelect },
+  { label: 'OPTIONS',          scene: SCENE.Options },
+  { label: 'EXIT',             scene: SCENE.MainMenu },
 ];
 
 export class MainMenuScene extends Phaser.Scene {
   private index = 0;
-  private btnImages: Phaser.GameObjects.Image[] = [];
+  private btnRects: Phaser.GameObjects.Rectangle[] = [];
+  private btnTexts: Phaser.GameObjects.Text[] = [];
 
   constructor() { super(SCENE.MainMenu); }
 
@@ -176,19 +184,22 @@ export class MainMenuScene extends Phaser.Scene {
     }).setDepth(102);
 
     // ── CENTER: MENU BUTTONS ─────────────────────────────────────────────────
-    this.btnImages = [];
+    this.btnRects = [];
+    this.btnTexts = [];
     ITEMS.forEach((item, i) => {
       const by = BTN_Y0 + i * BTN_GAP;
-      const btnImg = this.add.image(BTN_X, by, item.btnKey)
-        .setDisplaySize(BTN_W, BTN_H)
-        .setOrigin(0.5, 0.5)
-        .setDepth(200)
-        .setScrollFactor(0)
-        .setInteractive({ useHandCursor: true });
+      const rect = this.add.rectangle(BTN_X, by, BTN_W, BTN_H, 0x1a0a30, 0.92)
+        .setOrigin(0.5, 0.5).setStrokeStyle(2, 0xffd700, 0.7).setDepth(200)
+        .setScrollFactor(0).setInteractive({ useHandCursor: true });
+      const label = this.add.text(BTN_X, by, item.label, {
+        fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#ffffff',
+        stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(201);
 
-      btnImg.on('pointerover', () => this.select(i));
-      btnImg.on('pointerdown', () => this.activate(i));
-      this.btnImages.push(btnImg);
+      rect.on('pointerover', () => this.select(i));
+      rect.on('pointerdown', () => this.activate(i));
+      this.btnRects.push(rect);
+      this.btnTexts.push(label);
     });
 
     // ── BOTTOM STRIP ────────────────────────────────────────────────────────
@@ -213,7 +224,7 @@ export class MainMenuScene extends Phaser.Scene {
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       txt.on('pointerover', () => this.select(i));
       txt.on('pointerdown', () => this.activate(i));
-      this.btnImages.push(txt as unknown as Phaser.GameObjects.Image);
+      this.btnTexts.push(txt);
     });
 
     this.add.text(CX, GAME_HEIGHT - 28, 'Arrow keys / mouse · Enter to select', {
@@ -225,18 +236,14 @@ export class MainMenuScene extends Phaser.Scene {
   private select(i: number): void {
     this.index = Phaser.Math.Wrap(i, 0, ITEMS.length);
     const hasUI = UISystem.ready(this);
-    this.btnImages.forEach((btn, ri) => {
+    this.btnTexts.forEach((txt, ri) => {
+      const sel = ri === this.index;
+      txt.setColor(sel ? '#ffd700' : '#ffffff');
       if (hasUI) {
-        // The exported _sel button variants contain stray design-guide
-        // annotation text ("SELECTED (HOVER/FOCUS)"), so we ignore them and
-        // indicate selection via scale + tint on the clean default texture.
-        (btn as Phaser.GameObjects.Image).setTexture(ITEMS[ri].btnKey);
-        const sel = ri === this.index;
-        btn.setDisplaySize(BTN_W * (sel ? 1.08 : 1.0), BTN_H * (sel ? 1.08 : 1.0));
-        (btn as Phaser.GameObjects.Image).setTint(sel ? 0xffffff : 0xb8a0d4);
-      } else {
-        const txt = btn as unknown as Phaser.GameObjects.Text;
-        if (txt.setColor) txt.setColor(ri === this.index ? '#ffd700' : '#ffffff');
+        const rect = this.btnRects[ri];
+        rect.setStrokeStyle(2, sel ? 0xffffff : 0xffd700, sel ? 1 : 0.7);
+        rect.setScale(sel ? 1.06 : 1.0);
+        txt.setScale(sel ? 1.06 : 1.0);
       }
     });
   }

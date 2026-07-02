@@ -166,9 +166,13 @@ export class ArcadeVsScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setDepth(17);
     grp.add(this.p1NameTxt);
 
-    const lStatKey = tex(UI.csxStatPanel) ? UI.csxStatPanel : UI.csStatPanel;
-    const lStat = addImg(lStatKey, LPORT_X, LPORT_Y + LPORT_H + 16, LPORT_W, 80, 0.5, 0, 15);
-    if (lStat) grp.add(lStat);
+    // cs_stat_panel.png / character_select_003.png are design-guide template
+    // art with permanent placeholder text baked in ("CHARACTER NAME", "TITLE /
+    // ALIAS", "DESCRIPTION GOES HERE") — same corrupted-export class already
+    // fixed for cs_title_banner/cs_slot_idle. Draw a clean panel instead.
+    const lStat = this.add.rectangle(LPORT_X, LPORT_Y + LPORT_H + 16, LPORT_W, 80, 0x140628, 0.9)
+      .setOrigin(0.5, 0).setStrokeStyle(1, 0xffd700, 0.5).setDepth(15);
+    grp.add(lStat);
 
     // ── RIGHT PANEL — CPU portrait ────────────────────────────────────────────
     const RPORT_X = GAME_WIDTH - 88;
@@ -191,8 +195,9 @@ export class ArcadeVsScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setDepth(17);
     grp.add(this.p2NameTxt);
 
-    const rStat = addImg(lStatKey, RPORT_X, RPORT_Y + LPORT_H + 16, LPORT_W, 80, 0.5, 0, 15);
-    if (rStat) grp.add(rStat);
+    const rStat = this.add.rectangle(RPORT_X, RPORT_Y + LPORT_H + 16, LPORT_W, 80, 0x140628, 0.9)
+      .setOrigin(0.5, 0).setStrokeStyle(1, 0xffd700, 0.5).setDepth(15);
+    grp.add(rStat);
 
     // ── CENTER CHARACTER GRID ─────────────────────────────────────────────────
     if (tex(UI.csGrid)) {
