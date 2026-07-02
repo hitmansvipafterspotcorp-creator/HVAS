@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AudioSystem } from '../systems/AudioSystem';
+import { UISystem, UI } from '../systems/UISystem';
 
 // ── MembershipScene ─────────────────────────────────────────────────────────
 // Layout from LSB Sheet 8 (lsb_sheet_08_membership.png):
@@ -156,19 +157,35 @@ export class MembershipScene extends Phaser.Scene {
 
     this.makeChip(secX + totalW / 2, secY + 12, '✦ MEMBERSHIP DUES ✦', 0x0a0500, 0xffd700, 11);
 
+    const hasArt = UISystem.ready(this) && this.textures.exists(UI.memDuesCardA);
+    const cardArtKeys = [UI.memDuesCardA, UI.memDuesCardB];
+
     DUES.forEach((due, i) => {
       const cx = secX + 10 + cardW / 2 + i * (cardW + cardGap);
       const cy = secY + 130;
-      // Badge card
-      const bg = this.add.rectangle(cx, cy, 110, 170, 0x0a0200)
-        .setStrokeStyle(2, 0xffd700).setOrigin(0.5).setDepth(50)
-        .setInteractive({ useHandCursor: true });
+      // Badge card — real sliced card art (cycling the 2 available textures),
+      // falls back to a plain rectangle if the asset failed to load.
+      let bg: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+      if (hasArt) {
+        bg = this.add.image(cx, cy, cardArtKeys[i % cardArtKeys.length])
+          .setDisplaySize(110, 170).setDepth(50).setInteractive({ useHandCursor: true });
+      } else {
+        bg = this.add.rectangle(cx, cy, 110, 170, 0x0a0200)
+          .setStrokeStyle(2, 0xffd700).setOrigin(0.5).setDepth(50)
+          .setInteractive({ useHandCursor: true });
+      }
       bg.on('pointerdown', () => this.selectTier(due.tier, i));
-      bg.on('pointerover', () => bg.setStrokeStyle(3, 0xffd700));
-      bg.on('pointerout',  () => bg.setStrokeStyle(
-        this.selectedTier === due.tier ? 3 : 2,
-        this.selectedTier === due.tier ? 0xc100ff : 0xffd700,
-      ));
+      bg.on('pointerover', () => { if (!hasArt) (bg as Phaser.GameObjects.Rectangle).setStrokeStyle(3, 0xffd700); else bg.setScale(1.05); });
+      bg.on('pointerout',  () => {
+        if (!hasArt) {
+          (bg as Phaser.GameObjects.Rectangle).setStrokeStyle(
+            this.selectedTier === due.tier ? 3 : 2,
+            this.selectedTier === due.tier ? 0xc100ff : 0xffd700,
+          );
+        } else {
+          bg.setScale(1);
+        }
+      });
 
       this.add.text(cx, cy - 58, due.price, {
         fontFamily: 'Arial Black, sans-serif', fontSize: due.price.length > 5 ? '20px' : '26px', color: '#ffd700',
@@ -357,20 +374,28 @@ export class MembershipScene extends Phaser.Scene {
       loop: true,
     });
 
-    // Upgrade badges
+    // Upgrade badges — real sliced badge art (bronze/silver/gold/platinum);
+    // VIP has no separate sliced tile so it stays code-drawn.
     const badges = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'VIP'];
     const badgeColors = [0x8B4513, 0xC0C0C0, 0xFFD700, 0xE5E4E2, 0xC100FF];
+    const badgeArtKeys = [UI.memBadgeBronze, UI.memBadgeSilver, UI.memBadgeGold, UI.memBadgePlatinum];
+    const hasBadgeArt = UISystem.ready(this) && this.textures.exists(UI.memBadgeBronze);
     badges.forEach((b, i) => {
       const bx = GAME_WIDTH / 2 + 60 + i * 60;
       const isOwned = m?.badge === b;
-      const bg = this.add.graphics().setDepth(61);
-      bg.fillStyle(isOwned ? badgeColors[i] : 0x111111, isOwned ? 0.9 : 0.4);
-      bg.fillRoundedRect(bx - 22, barY - 16, 44, 32, 4);
-      bg.lineStyle(1, isOwned ? badgeColors[i] : 0x333333, 1);
-      bg.strokeRoundedRect(bx - 22, barY - 16, 44, 32, 4);
-      this.add.text(bx, barY, b, {
+      if (hasBadgeArt && i < badgeArtKeys.length) {
+        this.add.image(bx, barY, badgeArtKeys[i])
+          .setDisplaySize(30, 40).setDepth(61).setAlpha(isOwned ? 1 : 0.35);
+      } else {
+        const bg = this.add.graphics().setDepth(61);
+        bg.fillStyle(isOwned ? badgeColors[i] : 0x111111, isOwned ? 0.9 : 0.4);
+        bg.fillRoundedRect(bx - 22, barY - 16, 44, 32, 4);
+        bg.lineStyle(1, isOwned ? badgeColors[i] : 0x333333, 1);
+        bg.strokeRoundedRect(bx - 22, barY - 16, 44, 32, 4);
+      }
+      this.add.text(bx, barY + 24, b, {
         fontFamily: 'monospace', fontSize: '7px',
-        color: isOwned ? '#000000' : '#333333',
+        color: isOwned ? '#ffd700' : '#555555',
       }).setOrigin(0.5).setDepth(62);
     });
   }

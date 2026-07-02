@@ -486,6 +486,20 @@ export const UI = {
   lsbMembership:     'ui_lsb_membership',
   lsbPartyMode:      'ui_lsb_party_mode',
   lsbTvDisplay:      'ui_lsb_tv_display',
+  // Individually-sliced membership components (assets/ui/lsb/membership/)
+  memDuesCardA:      'lsb_mem_dues_card_a',
+  memDuesCardB:      'lsb_mem_dues_card_b',
+  memBadgeBronze:    'lsb_mem_badge_bronze',
+  memBadgeSilver:    'lsb_mem_badge_silver',
+  memBadgeGold:      'lsb_mem_badge_gold',
+  memBadgePlatinum:  'lsb_mem_badge_platinum',
+  memStatusChip:     'lsb_mem_status_chip',
+  memCardPacksChip:  'lsb_mem_cardpacks_chip',
+  memPaymentChip:    'lsb_mem_payment_chip',
+  memFooterChip1:    'lsb_mem_footer_1',
+  memFooterChip2:    'lsb_mem_footer_2',
+  memFooterChip3:    'lsb_mem_footer_3',
+  memFooterChip4:    'lsb_mem_footer_4',
 } as const;
 
 // ─── Load manifest ───────────────────────────────────────────────────────────
@@ -645,6 +659,21 @@ const FILES: Array<[string, string]> = [
   ['ui_lsb_membership',   'ui/lsb_sheet_08_membership.png'],
   ['ui_lsb_party_mode',   'ui/lsb_sheet_09_party_battlerz.png'],
   ['ui_lsb_tv_display',   'ui/lsb_sheet_10_tv_display.png'],
+
+  // ── LSB — individually-sliced membership components ────────────────────────
+  ['lsb_mem_dues_card_a',   'ui/lsb/membership/membership_10.png'],
+  ['lsb_mem_dues_card_b',   'ui/lsb/membership/membership_11.png'],
+  ['lsb_mem_badge_bronze',  'ui/lsb/membership/membership_20.png'],
+  ['lsb_mem_badge_silver',  'ui/lsb/membership/membership_21.png'],
+  ['lsb_mem_badge_gold',    'ui/lsb/membership/membership_22.png'],
+  ['lsb_mem_badge_platinum','ui/lsb/membership/membership_23.png'],
+  ['lsb_mem_status_chip',   'ui/lsb/membership/membership_24.png'],
+  ['lsb_mem_cardpacks_chip','ui/lsb/membership/membership_08.png'],
+  ['lsb_mem_payment_chip',  'ui/lsb/membership/membership_09.png'],
+  ['lsb_mem_footer_1',      'ui/lsb/membership/membership_30.png'],
+  ['lsb_mem_footer_2',      'ui/lsb/membership/membership_31.png'],
+  ['lsb_mem_footer_3',      'ui/lsb/membership/membership_32.png'],
+  ['lsb_mem_footer_4',      'ui/lsb/membership/membership_33.png'],
 
   // ── Dialogue ─────────────────────────────────────────────────────────────
   [UI.dlgFrameLarge,     'ui/elements/dialogue/dlg_frame_large.png'],
