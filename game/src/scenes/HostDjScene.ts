@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AudioSystem } from '../systems/AudioSystem';
+import { UISystem, UI } from '../systems/UISystem';
 
 // Host/DJ mode — manage a night at Hitmans VIP After Spot.
 // Three tabs: HOST (crowd energy via shoutouts/moments), DJ (pick tracks &
@@ -118,8 +119,13 @@ export class HostDjScene extends Phaser.Scene {
     ];
     this.showTab(this.tab);
 
-    // Event feed (right column)
-    this.add.rectangle(GAME_WIDTH - 170, 300, 310, 340, 0x0a0718).setOrigin(0.5);
+    // Event feed (right column) — real sliced panel-frame art, falls back
+    // to a plain rectangle if the texture failed to load.
+    if (UISystem.ready(this) && this.textures.exists(UI.hdjFeedPanel)) {
+      this.add.image(GAME_WIDTH - 170, 300, UI.hdjFeedPanel).setDisplaySize(310, 340).setOrigin(0.5);
+    } else {
+      this.add.rectangle(GAME_WIDTH - 170, 300, 310, 340, 0x0a0718).setOrigin(0.5);
+    }
     this.add.text(GAME_WIDTH - 310, 140, 'LIVE FEED', {
       fontFamily: 'monospace', fontSize: '11px', color: '#8877aa',
     });

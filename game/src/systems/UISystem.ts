@@ -506,6 +506,8 @@ export const UI = {
   cvScanPanel:       'lsb_cv_scan_panel',
   cvResultPanel:     'lsb_cv_result_panel',
   cvHistoryPanel:    'lsb_cv_history_panel',
+  // Individually-sliced host/DJ panel frame (event feed sidebar)
+  hdjFeedPanel:      'lsb_hdj_feed_panel',
 } as const;
 
 // ─── Load manifest ───────────────────────────────────────────────────────────
@@ -687,6 +689,9 @@ const FILES: Array<[string, string]> = [
   ['lsb_cv_scan_panel',     'ui/lsb/card_verification/card_verification_19.png'],
   ['lsb_cv_result_panel',   'ui/lsb/card_verification/card_verification_20.png'],
   ['lsb_cv_history_panel',  'ui/lsb/card_verification/card_verification_24.png'],
+
+  // ── LSB — individually-sliced host/DJ panel frame ───────────────────────────
+  ['lsb_hdj_feed_panel',    'ui/lsb/host_dj/host_dj_38.png'],
 
   // ── Dialogue ─────────────────────────────────────────────────────────────
   [UI.dlgFrameLarge,     'ui/elements/dialogue/dlg_frame_large.png'],
