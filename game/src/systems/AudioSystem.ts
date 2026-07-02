@@ -1,18 +1,19 @@
 import Phaser from 'phaser';
 import { ASSET_BASE } from '../config';
 
-// 5 real MP3 tracks exist at assets/audio/track01.mp3 … track05.mp3
-export const TRACK_COUNT = 5;
+// 8 real MP3 tracks exist at assets/audio/track01.mp3 … track08.mp3
+// track06 = "TO INFINITY Part 2", track07 = "Spartacus (Kill 'em ALL)", track08 = "GODLY"
+export const TRACK_COUNT = 8;
 
 // Stage → preferred track index (1-based). Cycles if not found.
 const STAGE_TRACKS: Record<string, number> = {
   cafe8fifty:             1,
   dukes_exterior:         2,
   kcs_exterior:           3,
-  outta_exterior:         4,
-  qhf_exterior:           5,
+  outta_exterior:         6, // was 4 (shared with MainMenu/StageSelect) — now dedicated
+  qhf_exterior:           7, // was 5 (shared with VenueSelect/Venue) — now dedicated
   social_gaines_exterior: 1,
-  tally_exterior:         3,
+  tally_exterior:         8, // was 3 (shared with kcs_exterior) — now dedicated
 };
 
 // Scene name → preferred track index.
@@ -25,7 +26,7 @@ const SCENE_TRACKS: Record<string, number> = {
 };
 
 export class AudioSystem {
-  // Queue all 5 tracks for preload. Call inside PreloadScene.preload().
+  // Queue all tracks for preload. Call inside PreloadScene.preload().
   static queue(scene: Phaser.Scene): void {
     for (let i = 1; i <= TRACK_COUNT; i++) {
       const key = `track${String(i).padStart(2, '0')}`;
