@@ -1,0 +1,308 @@
+{
+ "social_gaines_sheet01_00": {
+  "x": 3,
+  "y": 74,
+  "w": 119,
+  "h": 42
+ },
+ "social_gaines_sheet01_01": {
+  "x": 10,
+  "y": 75,
+  "w": 587,
+  "h": 261
+ },
+ "social_gaines_sheet01_02": {
+  "x": 128,
+  "y": 71,
+  "w": 132,
+  "h": 17
+ },
+ "social_gaines_sheet01_03": {
+  "x": 606,
+  "y": 71,
+  "w": 405,
+  "h": 270
+ },
+ "social_gaines_sheet01_04": {
+  "x": 1032,
+  "y": 71,
+  "w": 123,
+  "h": 18
+ },
+ "social_gaines_sheet01_05": {
+  "x": 1030,
+  "y": 86,
+  "w": 406,
+  "h": 256
+ },
+ "social_gaines_sheet01_06": {
+  "x": 156,
+  "y": 352,
+  "w": 134,
+  "h": 17
+ },
+ "social_gaines_sheet01_07": {
+  "x": 749,
+  "y": 352,
+  "w": 128,
+  "h": 18
+ },
+ "social_gaines_sheet01_08": {
+  "x": 6,
+  "y": 363,
+  "w": 317,
+  "h": 90
+ },
+ "social_gaines_sheet01_09": {
+  "x": 338,
+  "y": 373,
+  "w": 74,
+  "h": 116
+ },
+ "social_gaines_sheet01_10": {
+  "x": 427,
+  "y": 369,
+  "w": 232,
+  "h": 57
+ },
+ "social_gaines_sheet01_11": {
+  "x": 682,
+  "y": 374,
+  "w": 117,
+  "h": 127
+ },
+ "social_gaines_sheet01_12": {
+  "x": 803,
+  "y": 375,
+  "w": 102,
+  "h": 126
+ },
+ "social_gaines_sheet01_13": {
+  "x": 908,
+  "y": 375,
+  "w": 103,
+  "h": 127
+ },
+ "social_gaines_sheet01_14": {
+  "x": 1030,
+  "y": 376,
+  "w": 79,
+  "h": 110
+ },
+ "social_gaines_sheet01_15": {
+  "x": 1115,
+  "y": 376,
+  "w": 80,
+  "h": 110
+ },
+ "social_gaines_sheet01_16": {
+  "x": 1201,
+  "y": 376,
+  "w": 79,
+  "h": 110
+ },
+ "social_gaines_sheet01_17": {
+  "x": 1287,
+  "y": 377,
+  "w": 78,
+  "h": 110
+ },
+ "social_gaines_sheet01_18": {
+  "x": 1371,
+  "y": 377,
+  "w": 57,
+  "h": 110
+ },
+ "social_gaines_sheet01_19": {
+  "x": 427,
+  "y": 432,
+  "w": 231,
+  "h": 59
+ },
+ "social_gaines_sheet01_20": {
+  "x": 6,
+  "y": 534,
+  "w": 271,
+  "h": 59
+ },
+ "social_gaines_sheet01_21": {
+  "x": 379,
+  "y": 532,
+  "w": 52,
+  "h": 66
+ },
+ "social_gaines_sheet01_22": {
+  "x": 450,
+  "y": 532,
+  "w": 293,
+  "h": 119
+ },
+ "social_gaines_sheet01_23": {
+  "x": 725,
+  "y": 534,
+  "w": 113,
+  "h": 127
+ },
+ "social_gaines_sheet01_24": {
+  "x": 877,
+  "y": 531,
+  "w": 337,
+  "h": 133
+ },
+ "social_gaines_sheet01_25": {
+  "x": 1228,
+  "y": 535,
+  "w": 156,
+  "h": 126
+ },
+ "social_gaines_sheet01_26": {
+  "x": 1389,
+  "y": 535,
+  "w": 45,
+  "h": 57
+ },
+ "social_gaines_sheet01_27": {
+  "x": 5,
+  "y": 597,
+  "w": 87,
+  "h": 58
+ },
+ "social_gaines_sheet01_28": {
+  "x": 96,
+  "y": 598,
+  "w": 339,
+  "h": 57
+ },
+ "social_gaines_sheet01_29": {
+  "x": 814,
+  "y": 604,
+  "w": 48,
+  "h": 56
+ },
+ "social_gaines_sheet01_30": {
+  "x": 1269,
+  "y": 600,
+  "w": 59,
+  "h": 59
+ },
+ "social_gaines_sheet01_31": {
+  "x": 1393,
+  "y": 600,
+  "w": 41,
+  "h": 62
+ },
+ "social_gaines_sheet01_32": {
+  "x": 5,
+  "y": 672,
+  "w": 377,
+  "h": 139
+ },
+ "social_gaines_sheet01_33": {
+  "x": 495,
+  "y": 674,
+  "w": 132,
+  "h": 17
+ },
+ "social_gaines_sheet01_34": {
+  "x": 1140,
+  "y": 677,
+  "w": 148,
+  "h": 17
+ },
+ "social_gaines_sheet01_35": {
+  "x": 401,
+  "y": 694,
+  "w": 319,
+  "h": 114
+ },
+ "social_gaines_sheet01_36": {
+  "x": 740,
+  "y": 699,
+  "w": 201,
+  "h": 100
+ },
+ "social_gaines_sheet01_37": {
+  "x": 962,
+  "y": 702,
+  "w": 33,
+  "h": 96
+ },
+ "social_gaines_sheet01_38": {
+  "x": 1005,
+  "y": 702,
+  "w": 32,
+  "h": 95
+ },
+ "social_gaines_sheet01_39": {
+  "x": 1041,
+  "y": 703,
+  "w": 32,
+  "h": 94
+ },
+ "social_gaines_sheet01_40": {
+  "x": 1093,
+  "y": 706,
+  "w": 178,
+  "h": 106
+ },
+ "social_gaines_sheet01_41": {
+  "x": 1304,
+  "y": 695,
+  "w": 106,
+  "h": 116
+ },
+ "social_gaines_sheet01_42": {
+  "x": 610,
+  "y": 823,
+  "w": 160,
+  "h": 17
+ },
+ "social_gaines_sheet01_43": {
+  "x": 3,
+  "y": 840,
+  "w": 501,
+  "h": 121
+ },
+ "social_gaines_sheet01_44": {
+  "x": 508,
+  "y": 841,
+  "w": 377,
+  "h": 120
+ },
+ "social_gaines_sheet01_45": {
+  "x": 889,
+  "y": 841,
+  "w": 542,
+  "h": 115
+ },
+ "social_gaines_sheet01_46": {
+  "x": 5,
+  "y": 967,
+  "w": 642,
+  "h": 106
+ },
+ "social_gaines_sheet01_47": {
+  "x": 36,
+  "y": 998,
+  "w": 113,
+  "h": 28
+ },
+ "social_gaines_sheet01_48": {
+  "x": 648,
+  "y": 967,
+  "w": 787,
+  "h": 106
+ },
+ "social_gaines_sheet01_49": {
+  "x": 677,
+  "y": 996,
+  "w": 311,
+  "h": 67
+ },
+ "social_gaines_sheet01_50": {
+  "x": 1318,
+  "y": 1003,
+  "w": 70,
+  "h": 41
+ }
+}
