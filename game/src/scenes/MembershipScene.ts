@@ -4,7 +4,7 @@ import { AudioSystem } from '../systems/AudioSystem';
 import { UISystem, UI } from '../systems/UISystem';
 
 // ── MembershipScene ─────────────────────────────────────────────────────────
-// Layout from LSB Sheet 8 (lsb_sheet_08_membership.png):
+// Layout from LSB Sheet 8 (complete_ui_set membership screen asset):
 //   Header:  MEMBERSHIP • DUES • CARD PACKS • QR JOIN
 //   Top chips: PRIVATE MEMBERS ONLY | ENTRY DUES | UNLOCK 2-3 CARDS | JOIN LIVE BY QR
 //   Left:    DUES OPTIONS — $20 WEEKLY / $50 MONTHLY / $100 YEARLY
@@ -85,7 +85,7 @@ export class MembershipScene extends Phaser.Scene {
     this.selectedTier = null;
     this.selectedCards = 0;
 
-    // Background — solid color only. The raw lsb_sheet_08_membership.png is
+    // Background — solid color only. The raw complete_ui_set membership screen asset is
     // a developer reference sheet full of labels/instructions/preview crops;
     // it must never be shown as live UI. All real UI below is drawn from
     // code (or, once sliced, individual cropped component assets).
