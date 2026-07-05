@@ -1,0 +1,1950 @@
+{
+  "schema": "hvas.membership.asset_catalog.v1",
+  "generatedAt": "2026-07-03T01:47:29.972Z",
+  "mandatorySources": {
+    "characters": {
+      "id": "characters",
+      "label": "Playable member characters",
+      "count": 78,
+      "publicDir": "/assets/catalog/characters",
+      "assets": [
+        {
+          "id": "characters-001",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_24 AM (1)",
+          "sourceCategory": "characters",
+          "role": "default-avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_24 AM (1).png",
+          "url": "/assets/catalog/characters/001-chatgpt-image-jun-16-2026-03-56-24-am-1.png"
+        },
+        {
+          "id": "characters-002",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_24 AM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_24 AM (2).png",
+          "url": "/assets/catalog/characters/002-chatgpt-image-jun-16-2026-03-56-24-am-2.png"
+        },
+        {
+          "id": "characters-003",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_24 AM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_24 AM (3).png",
+          "url": "/assets/catalog/characters/003-chatgpt-image-jun-16-2026-03-56-24-am-3.png"
+        },
+        {
+          "id": "characters-004",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_25 AM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_25 AM (4).png",
+          "url": "/assets/catalog/characters/004-chatgpt-image-jun-16-2026-03-56-25-am-4.png"
+        },
+        {
+          "id": "characters-005",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_25 AM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_25 AM (5).png",
+          "url": "/assets/catalog/characters/005-chatgpt-image-jun-16-2026-03-56-25-am-5.png"
+        },
+        {
+          "id": "characters-006",
+          "name": "ChatGPT Image Jun 16, 2026, 03_56_25 AM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 03_56_25 AM (6).png",
+          "url": "/assets/catalog/characters/006-chatgpt-image-jun-16-2026-03-56-25-am-6.png"
+        },
+        {
+          "id": "characters-007",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_02 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_02 PM (1).png",
+          "url": "/assets/catalog/characters/007-chatgpt-image-jun-16-2026-04-18-02-pm-1.png"
+        },
+        {
+          "id": "characters-008",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_02 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_02 PM (2).png",
+          "url": "/assets/catalog/characters/008-chatgpt-image-jun-16-2026-04-18-02-pm-2.png"
+        },
+        {
+          "id": "characters-009",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_03 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_03 PM (3).png",
+          "url": "/assets/catalog/characters/009-chatgpt-image-jun-16-2026-04-18-03-pm-3.png"
+        },
+        {
+          "id": "characters-010",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_03 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_03 PM (4).png",
+          "url": "/assets/catalog/characters/010-chatgpt-image-jun-16-2026-04-18-03-pm-4.png"
+        },
+        {
+          "id": "characters-011",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_03 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_03 PM (5).png",
+          "url": "/assets/catalog/characters/011-chatgpt-image-jun-16-2026-04-18-03-pm-5.png"
+        },
+        {
+          "id": "characters-012",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_03 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_03 PM (6).png",
+          "url": "/assets/catalog/characters/012-chatgpt-image-jun-16-2026-04-18-03-pm-6.png"
+        },
+        {
+          "id": "characters-013",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (1).png",
+          "url": "/assets/catalog/characters/013-chatgpt-image-jun-16-2026-04-18-37-pm-1.png"
+        },
+        {
+          "id": "characters-014",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (2).png",
+          "url": "/assets/catalog/characters/014-chatgpt-image-jun-16-2026-04-18-37-pm-2.png"
+        },
+        {
+          "id": "characters-015",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (3).png",
+          "url": "/assets/catalog/characters/015-chatgpt-image-jun-16-2026-04-18-37-pm-3.png"
+        },
+        {
+          "id": "characters-016",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (4).png",
+          "url": "/assets/catalog/characters/016-chatgpt-image-jun-16-2026-04-18-37-pm-4.png"
+        },
+        {
+          "id": "characters-017",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (5).png",
+          "url": "/assets/catalog/characters/017-chatgpt-image-jun-16-2026-04-18-37-pm-5.png"
+        },
+        {
+          "id": "characters-018",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_37 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_37 PM (6).png",
+          "url": "/assets/catalog/characters/018-chatgpt-image-jun-16-2026-04-18-37-pm-6.png"
+        },
+        {
+          "id": "characters-019",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (1).png",
+          "url": "/assets/catalog/characters/019-chatgpt-image-jun-16-2026-04-18-46-pm-1.png"
+        },
+        {
+          "id": "characters-020",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (2).png",
+          "url": "/assets/catalog/characters/020-chatgpt-image-jun-16-2026-04-18-46-pm-2.png"
+        },
+        {
+          "id": "characters-021",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (3).png",
+          "url": "/assets/catalog/characters/021-chatgpt-image-jun-16-2026-04-18-46-pm-3.png"
+        },
+        {
+          "id": "characters-022",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (4).png",
+          "url": "/assets/catalog/characters/022-chatgpt-image-jun-16-2026-04-18-46-pm-4.png"
+        },
+        {
+          "id": "characters-023",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (5).png",
+          "url": "/assets/catalog/characters/023-chatgpt-image-jun-16-2026-04-18-46-pm-5.png"
+        },
+        {
+          "id": "characters-024",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_46 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_46 PM (6).png",
+          "url": "/assets/catalog/characters/024-chatgpt-image-jun-16-2026-04-18-46-pm-6.png"
+        },
+        {
+          "id": "characters-025",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (1).png",
+          "url": "/assets/catalog/characters/025-chatgpt-image-jun-16-2026-04-18-55-pm-1.png"
+        },
+        {
+          "id": "characters-026",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (2).png",
+          "url": "/assets/catalog/characters/026-chatgpt-image-jun-16-2026-04-18-55-pm-2.png"
+        },
+        {
+          "id": "characters-027",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (3).png",
+          "url": "/assets/catalog/characters/027-chatgpt-image-jun-16-2026-04-18-55-pm-3.png"
+        },
+        {
+          "id": "characters-028",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (4).png",
+          "url": "/assets/catalog/characters/028-chatgpt-image-jun-16-2026-04-18-55-pm-4.png"
+        },
+        {
+          "id": "characters-029",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (5).png",
+          "url": "/assets/catalog/characters/029-chatgpt-image-jun-16-2026-04-18-55-pm-5.png"
+        },
+        {
+          "id": "characters-030",
+          "name": "ChatGPT Image Jun 16, 2026, 04_18_55 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_18_55 PM (6).png",
+          "url": "/assets/catalog/characters/030-chatgpt-image-jun-16-2026-04-18-55-pm-6.png"
+        },
+        {
+          "id": "characters-031",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (1).png",
+          "url": "/assets/catalog/characters/031-chatgpt-image-jun-16-2026-04-19-05-pm-1.png"
+        },
+        {
+          "id": "characters-032",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (2).png",
+          "url": "/assets/catalog/characters/032-chatgpt-image-jun-16-2026-04-19-05-pm-2.png"
+        },
+        {
+          "id": "characters-033",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (3).png",
+          "url": "/assets/catalog/characters/033-chatgpt-image-jun-16-2026-04-19-05-pm-3.png"
+        },
+        {
+          "id": "characters-034",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (4).png",
+          "url": "/assets/catalog/characters/034-chatgpt-image-jun-16-2026-04-19-05-pm-4.png"
+        },
+        {
+          "id": "characters-035",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (5).png",
+          "url": "/assets/catalog/characters/035-chatgpt-image-jun-16-2026-04-19-05-pm-5.png"
+        },
+        {
+          "id": "characters-036",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_05 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_05 PM (6).png",
+          "url": "/assets/catalog/characters/036-chatgpt-image-jun-16-2026-04-19-05-pm-6.png"
+        },
+        {
+          "id": "characters-037",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (1).png",
+          "url": "/assets/catalog/characters/037-chatgpt-image-jun-16-2026-04-19-15-pm-1.png"
+        },
+        {
+          "id": "characters-038",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (2).png",
+          "url": "/assets/catalog/characters/038-chatgpt-image-jun-16-2026-04-19-15-pm-2.png"
+        },
+        {
+          "id": "characters-039",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (3).png",
+          "url": "/assets/catalog/characters/039-chatgpt-image-jun-16-2026-04-19-15-pm-3.png"
+        },
+        {
+          "id": "characters-040",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (4).png",
+          "url": "/assets/catalog/characters/040-chatgpt-image-jun-16-2026-04-19-15-pm-4.png"
+        },
+        {
+          "id": "characters-041",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (5).png",
+          "url": "/assets/catalog/characters/041-chatgpt-image-jun-16-2026-04-19-15-pm-5.png"
+        },
+        {
+          "id": "characters-042",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_15 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_15 PM (6).png",
+          "url": "/assets/catalog/characters/042-chatgpt-image-jun-16-2026-04-19-15-pm-6.png"
+        },
+        {
+          "id": "characters-043",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (1).png",
+          "url": "/assets/catalog/characters/043-chatgpt-image-jun-16-2026-04-19-26-pm-1.png"
+        },
+        {
+          "id": "characters-044",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (2).png",
+          "url": "/assets/catalog/characters/044-chatgpt-image-jun-16-2026-04-19-26-pm-2.png"
+        },
+        {
+          "id": "characters-045",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (3).png",
+          "url": "/assets/catalog/characters/045-chatgpt-image-jun-16-2026-04-19-26-pm-3.png"
+        },
+        {
+          "id": "characters-046",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (4).png",
+          "url": "/assets/catalog/characters/046-chatgpt-image-jun-16-2026-04-19-26-pm-4.png"
+        },
+        {
+          "id": "characters-047",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (5).png",
+          "url": "/assets/catalog/characters/047-chatgpt-image-jun-16-2026-04-19-26-pm-5.png"
+        },
+        {
+          "id": "characters-048",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_26 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_26 PM (6).png",
+          "url": "/assets/catalog/characters/048-chatgpt-image-jun-16-2026-04-19-26-pm-6.png"
+        },
+        {
+          "id": "characters-049",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (1).png",
+          "url": "/assets/catalog/characters/049-chatgpt-image-jun-16-2026-04-19-36-pm-1.png"
+        },
+        {
+          "id": "characters-050",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (2).png",
+          "url": "/assets/catalog/characters/050-chatgpt-image-jun-16-2026-04-19-36-pm-2.png"
+        },
+        {
+          "id": "characters-051",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (3).png",
+          "url": "/assets/catalog/characters/051-chatgpt-image-jun-16-2026-04-19-36-pm-3.png"
+        },
+        {
+          "id": "characters-052",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (4).png",
+          "url": "/assets/catalog/characters/052-chatgpt-image-jun-16-2026-04-19-36-pm-4.png"
+        },
+        {
+          "id": "characters-053",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (5).png",
+          "url": "/assets/catalog/characters/053-chatgpt-image-jun-16-2026-04-19-36-pm-5.png"
+        },
+        {
+          "id": "characters-054",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_36 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_36 PM (6).png",
+          "url": "/assets/catalog/characters/054-chatgpt-image-jun-16-2026-04-19-36-pm-6.png"
+        },
+        {
+          "id": "characters-055",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_45 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_45 PM (1).png",
+          "url": "/assets/catalog/characters/055-chatgpt-image-jun-16-2026-04-19-45-pm-1.png"
+        },
+        {
+          "id": "characters-056",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_45 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_45 PM (2).png",
+          "url": "/assets/catalog/characters/056-chatgpt-image-jun-16-2026-04-19-45-pm-2.png"
+        },
+        {
+          "id": "characters-057",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_45 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_45 PM (3).png",
+          "url": "/assets/catalog/characters/057-chatgpt-image-jun-16-2026-04-19-45-pm-3.png"
+        },
+        {
+          "id": "characters-058",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_45 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_45 PM (4).png",
+          "url": "/assets/catalog/characters/058-chatgpt-image-jun-16-2026-04-19-45-pm-4.png"
+        },
+        {
+          "id": "characters-059",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_45 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_45 PM (5).png",
+          "url": "/assets/catalog/characters/059-chatgpt-image-jun-16-2026-04-19-45-pm-5.png"
+        },
+        {
+          "id": "characters-060",
+          "name": "ChatGPT Image Jun 16, 2026, 04_19_46 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_19_46 PM (6).png",
+          "url": "/assets/catalog/characters/060-chatgpt-image-jun-16-2026-04-19-46-pm-6.png"
+        },
+        {
+          "id": "characters-061",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_04 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_04 PM (1).png",
+          "url": "/assets/catalog/characters/061-chatgpt-image-jun-16-2026-04-20-04-pm-1.png"
+        },
+        {
+          "id": "characters-062",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_04 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_04 PM (2).png",
+          "url": "/assets/catalog/characters/062-chatgpt-image-jun-16-2026-04-20-04-pm-2.png"
+        },
+        {
+          "id": "characters-063",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_04 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_04 PM (3).png",
+          "url": "/assets/catalog/characters/063-chatgpt-image-jun-16-2026-04-20-04-pm-3.png"
+        },
+        {
+          "id": "characters-064",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_04 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_04 PM (4).png",
+          "url": "/assets/catalog/characters/064-chatgpt-image-jun-16-2026-04-20-04-pm-4.png"
+        },
+        {
+          "id": "characters-065",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_04 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_04 PM (5).png",
+          "url": "/assets/catalog/characters/065-chatgpt-image-jun-16-2026-04-20-04-pm-5.png"
+        },
+        {
+          "id": "characters-066",
+          "name": "ChatGPT Image Jun 16, 2026, 04_20_05 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 04_20_05 PM (6).png",
+          "url": "/assets/catalog/characters/066-chatgpt-image-jun-16-2026-04-20-05-pm-6.png"
+        },
+        {
+          "id": "characters-067",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_43 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_43 PM (1).png",
+          "url": "/assets/catalog/characters/067-chatgpt-image-jun-16-2026-05-37-43-pm-1.png"
+        },
+        {
+          "id": "characters-068",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_43 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_43 PM (2).png",
+          "url": "/assets/catalog/characters/068-chatgpt-image-jun-16-2026-05-37-43-pm-2.png"
+        },
+        {
+          "id": "characters-069",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_44 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_44 PM (3).png",
+          "url": "/assets/catalog/characters/069-chatgpt-image-jun-16-2026-05-37-44-pm-3.png"
+        },
+        {
+          "id": "characters-070",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_44 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_44 PM (4).png",
+          "url": "/assets/catalog/characters/070-chatgpt-image-jun-16-2026-05-37-44-pm-4.png"
+        },
+        {
+          "id": "characters-071",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_44 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_44 PM (5).png",
+          "url": "/assets/catalog/characters/071-chatgpt-image-jun-16-2026-05-37-44-pm-5.png"
+        },
+        {
+          "id": "characters-072",
+          "name": "ChatGPT Image Jun 16, 2026, 05_37_45 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 05_37_45 PM (6).png",
+          "url": "/assets/catalog/characters/072-chatgpt-image-jun-16-2026-05-37-45-pm-6.png"
+        },
+        {
+          "id": "characters-073",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_21 PM (1)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_21 PM (1).png",
+          "url": "/assets/catalog/characters/073-chatgpt-image-jun-16-2026-08-21-21-pm-1.png"
+        },
+        {
+          "id": "characters-074",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_23 PM (2)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_23 PM (2).png",
+          "url": "/assets/catalog/characters/074-chatgpt-image-jun-16-2026-08-21-23-pm-2.png"
+        },
+        {
+          "id": "characters-075",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_24 PM (3)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_24 PM (3).png",
+          "url": "/assets/catalog/characters/075-chatgpt-image-jun-16-2026-08-21-24-pm-3.png"
+        },
+        {
+          "id": "characters-076",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_25 PM (4)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_25 PM (4).png",
+          "url": "/assets/catalog/characters/076-chatgpt-image-jun-16-2026-08-21-25-pm-4.png"
+        },
+        {
+          "id": "characters-077",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_25 PM (5)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_25 PM (5).png",
+          "url": "/assets/catalog/characters/077-chatgpt-image-jun-16-2026-08-21-25-pm-5.png"
+        },
+        {
+          "id": "characters-078",
+          "name": "ChatGPT Image Jun 16, 2026, 08_21_26 PM (6)",
+          "sourceCategory": "characters",
+          "role": "avatar-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\first CHARACTERS\\ChatGPT Image Jun 16, 2026, 08_21_26 PM (6).png",
+          "url": "/assets/catalog/characters/078-chatgpt-image-jun-16-2026-08-21-26-pm-6.png"
+        }
+      ]
+    },
+    "ops_bosses": {
+      "id": "ops_bosses",
+      "label": "Ops, staff, security, hosts, bosses",
+      "count": 38,
+      "publicDir": "/assets/catalog/ops_bosses",
+      "assets": [
+        {
+          "id": "ops_bosses-001",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_15 PM (1)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_15 PM (1).png",
+          "url": "/assets/catalog/ops_bosses/001-chatgpt-image-jun-20-2026-09-38-15-pm-1.png"
+        },
+        {
+          "id": "ops_bosses-002",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_16 PM (1)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_16 PM (1).png",
+          "url": "/assets/catalog/ops_bosses/002-chatgpt-image-jun-20-2026-09-38-16-pm-1.png"
+        },
+        {
+          "id": "ops_bosses-003",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_16 PM (2)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_16 PM (2).png",
+          "url": "/assets/catalog/ops_bosses/003-chatgpt-image-jun-20-2026-09-38-16-pm-2.png"
+        },
+        {
+          "id": "ops_bosses-004",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_16 PM (3)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_16 PM (3).png",
+          "url": "/assets/catalog/ops_bosses/004-chatgpt-image-jun-20-2026-09-38-16-pm-3.png"
+        },
+        {
+          "id": "ops_bosses-005",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_16 PM (4)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_16 PM (4).png",
+          "url": "/assets/catalog/ops_bosses/005-chatgpt-image-jun-20-2026-09-38-16-pm-4.png"
+        },
+        {
+          "id": "ops_bosses-006",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_16 PM (5)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_16 PM (5).png",
+          "url": "/assets/catalog/ops_bosses/006-chatgpt-image-jun-20-2026-09-38-16-pm-5.png"
+        },
+        {
+          "id": "ops_bosses-007",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_17 PM (6)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_17 PM (6).png",
+          "url": "/assets/catalog/ops_bosses/007-chatgpt-image-jun-20-2026-09-38-17-pm-6.png"
+        },
+        {
+          "id": "ops_bosses-008",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_17 PM (7)",
+          "sourceCategory": "ops_bosses",
+          "role": "door-ops-npc-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_17 PM (7).png",
+          "url": "/assets/catalog/ops_bosses/008-chatgpt-image-jun-20-2026-09-38-17-pm-7.png"
+        },
+        {
+          "id": "ops_bosses-009",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_17 PM (8)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_17 PM (8).png",
+          "url": "/assets/catalog/ops_bosses/009-chatgpt-image-jun-20-2026-09-38-17-pm-8.png"
+        },
+        {
+          "id": "ops_bosses-010",
+          "name": "ChatGPT Image Jun 20, 2026, 09_38_18 PM (9)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 09_38_18 PM (9).png",
+          "url": "/assets/catalog/ops_bosses/010-chatgpt-image-jun-20-2026-09-38-18-pm-9.png"
+        },
+        {
+          "id": "ops_bosses-011",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_22 PM (1)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_22 PM (1).png",
+          "url": "/assets/catalog/ops_bosses/011-chatgpt-image-jun-20-2026-10-32-22-pm-1.png"
+        },
+        {
+          "id": "ops_bosses-012",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_22 PM (2)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_22 PM (2).png",
+          "url": "/assets/catalog/ops_bosses/012-chatgpt-image-jun-20-2026-10-32-22-pm-2.png"
+        },
+        {
+          "id": "ops_bosses-013",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_23 PM (3)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_23 PM (3).png",
+          "url": "/assets/catalog/ops_bosses/013-chatgpt-image-jun-20-2026-10-32-23-pm-3.png"
+        },
+        {
+          "id": "ops_bosses-014",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_23 PM (4)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_23 PM (4).png",
+          "url": "/assets/catalog/ops_bosses/014-chatgpt-image-jun-20-2026-10-32-23-pm-4.png"
+        },
+        {
+          "id": "ops_bosses-015",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_23 PM (5)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_23 PM (5).png",
+          "url": "/assets/catalog/ops_bosses/015-chatgpt-image-jun-20-2026-10-32-23-pm-5.png"
+        },
+        {
+          "id": "ops_bosses-016",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_23 PM (6)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_23 PM (6).png",
+          "url": "/assets/catalog/ops_bosses/016-chatgpt-image-jun-20-2026-10-32-23-pm-6.png"
+        },
+        {
+          "id": "ops_bosses-017",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_23 PM (7)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_23 PM (7).png",
+          "url": "/assets/catalog/ops_bosses/017-chatgpt-image-jun-20-2026-10-32-23-pm-7.png"
+        },
+        {
+          "id": "ops_bosses-018",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_24 PM (8)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_24 PM (8).png",
+          "url": "/assets/catalog/ops_bosses/018-chatgpt-image-jun-20-2026-10-32-24-pm-8.png"
+        },
+        {
+          "id": "ops_bosses-019",
+          "name": "ChatGPT Image Jun 20, 2026, 10_32_24 PM (9)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 20, 2026, 10_32_24 PM (9).png",
+          "url": "/assets/catalog/ops_bosses/019-chatgpt-image-jun-20-2026-10-32-24-pm-9.png"
+        },
+        {
+          "id": "ops_bosses-020",
+          "name": "ChatGPT Image Jun 22, 2026, 01_15_58 PM (1)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_15_58 PM (1).png",
+          "url": "/assets/catalog/ops_bosses/020-chatgpt-image-jun-22-2026-01-15-58-pm-1.png"
+        },
+        {
+          "id": "ops_bosses-021",
+          "name": "ChatGPT Image Jun 22, 2026, 01_15_58 PM (2)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_15_58 PM (2).png",
+          "url": "/assets/catalog/ops_bosses/021-chatgpt-image-jun-22-2026-01-15-58-pm-2.png"
+        },
+        {
+          "id": "ops_bosses-022",
+          "name": "ChatGPT Image Jun 22, 2026, 01_15_58 PM (3)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_15_58 PM (3).png",
+          "url": "/assets/catalog/ops_bosses/022-chatgpt-image-jun-22-2026-01-15-58-pm-3.png"
+        },
+        {
+          "id": "ops_bosses-023",
+          "name": "ChatGPT Image Jun 22, 2026, 01_15_59 PM (4)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_15_59 PM (4).png",
+          "url": "/assets/catalog/ops_bosses/023-chatgpt-image-jun-22-2026-01-15-59-pm-4.png"
+        },
+        {
+          "id": "ops_bosses-024",
+          "name": "ChatGPT Image Jun 22, 2026, 01_15_59 PM (5)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_15_59 PM (5).png",
+          "url": "/assets/catalog/ops_bosses/024-chatgpt-image-jun-22-2026-01-15-59-pm-5.png"
+        },
+        {
+          "id": "ops_bosses-025",
+          "name": "ChatGPT Image Jun 22, 2026, 01_16_00 PM (6)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_16_00 PM (6).png",
+          "url": "/assets/catalog/ops_bosses/025-chatgpt-image-jun-22-2026-01-16-00-pm-6.png"
+        },
+        {
+          "id": "ops_bosses-026",
+          "name": "ChatGPT Image Jun 22, 2026, 01_16_00 PM (7)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_16_00 PM (7).png",
+          "url": "/assets/catalog/ops_bosses/026-chatgpt-image-jun-22-2026-01-16-00-pm-7.png"
+        },
+        {
+          "id": "ops_bosses-027",
+          "name": "ChatGPT Image Jun 22, 2026, 01_16_00 PM (8)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_16_00 PM (8).png",
+          "url": "/assets/catalog/ops_bosses/027-chatgpt-image-jun-22-2026-01-16-00-pm-8.png"
+        },
+        {
+          "id": "ops_bosses-028",
+          "name": "ChatGPT Image Jun 22, 2026, 01_16_00 PM (9)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_16_00 PM (9).png",
+          "url": "/assets/catalog/ops_bosses/028-chatgpt-image-jun-22-2026-01-16-00-pm-9.png"
+        },
+        {
+          "id": "ops_bosses-029",
+          "name": "ChatGPT Image Jun 22, 2026, 01_16_01 PM (10)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 01_16_01 PM (10).png",
+          "url": "/assets/catalog/ops_bosses/029-chatgpt-image-jun-22-2026-01-16-01-pm-10.png"
+        },
+        {
+          "id": "ops_bosses-030",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (1)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (1).png",
+          "url": "/assets/catalog/ops_bosses/030-chatgpt-image-jun-22-2026-12-45-10-pm-1.png"
+        },
+        {
+          "id": "ops_bosses-031",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (2)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (2).png",
+          "url": "/assets/catalog/ops_bosses/031-chatgpt-image-jun-22-2026-12-45-10-pm-2.png"
+        },
+        {
+          "id": "ops_bosses-032",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (3)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (3).png",
+          "url": "/assets/catalog/ops_bosses/032-chatgpt-image-jun-22-2026-12-45-10-pm-3.png"
+        },
+        {
+          "id": "ops_bosses-033",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (4)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (4).png",
+          "url": "/assets/catalog/ops_bosses/033-chatgpt-image-jun-22-2026-12-45-10-pm-4.png"
+        },
+        {
+          "id": "ops_bosses-034",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (5)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (5).png",
+          "url": "/assets/catalog/ops_bosses/034-chatgpt-image-jun-22-2026-12-45-10-pm-5.png"
+        },
+        {
+          "id": "ops_bosses-035",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (6)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (6).png",
+          "url": "/assets/catalog/ops_bosses/035-chatgpt-image-jun-22-2026-12-45-10-pm-6.png"
+        },
+        {
+          "id": "ops_bosses-036",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (7)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (7).png",
+          "url": "/assets/catalog/ops_bosses/036-chatgpt-image-jun-22-2026-12-45-10-pm-7.png"
+        },
+        {
+          "id": "ops_bosses-037",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (8)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (8).png",
+          "url": "/assets/catalog/ops_bosses/037-chatgpt-image-jun-22-2026-12-45-10-pm-8.png"
+        },
+        {
+          "id": "ops_bosses-038",
+          "name": "ChatGPT Image Jun 22, 2026, 12_45_10 PM (9)",
+          "sourceCategory": "ops_bosses",
+          "role": "boss-or-staff-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\OPS AND BOSSES\\ChatGPT Image Jun 22, 2026, 12_45_10 PM (9).png",
+          "url": "/assets/catalog/ops_bosses/038-chatgpt-image-jun-22-2026-12-45-10-pm-9.png"
+        }
+      ]
+    },
+    "venues": {
+      "id": "venues",
+      "label": "Venue maps and modular venue sheets",
+      "count": 124,
+      "publicDir": "/assets/catalog/venues",
+      "assets": [
+        {
+          "id": "venues-001",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (1)",
+          "sourceCategory": "venues",
+          "role": "starting-venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (1).png",
+          "url": "/assets/catalog/venues/001-chatgpt-image-jun-18-2026-09-27-52-pm-1.png"
+        },
+        {
+          "id": "venues-002",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (2).png",
+          "url": "/assets/catalog/venues/002-chatgpt-image-jun-18-2026-09-27-52-pm-2.png"
+        },
+        {
+          "id": "venues-003",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (3).png",
+          "url": "/assets/catalog/venues/003-chatgpt-image-jun-18-2026-09-27-52-pm-3.png"
+        },
+        {
+          "id": "venues-004",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (4).png",
+          "url": "/assets/catalog/venues/004-chatgpt-image-jun-18-2026-09-27-52-pm-4.png"
+        },
+        {
+          "id": "venues-005",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (5).png",
+          "url": "/assets/catalog/venues/005-chatgpt-image-jun-18-2026-09-27-53-pm-5.png"
+        },
+        {
+          "id": "venues-006",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (6).png",
+          "url": "/assets/catalog/venues/006-chatgpt-image-jun-18-2026-09-27-53-pm-6.png"
+        },
+        {
+          "id": "venues-007",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (7).png",
+          "url": "/assets/catalog/venues/007-chatgpt-image-jun-18-2026-09-27-53-pm-7.png"
+        },
+        {
+          "id": "venues-008",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_54 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_54 PM (8).png",
+          "url": "/assets/catalog/venues/008-chatgpt-image-jun-18-2026-09-27-54-pm-8.png"
+        },
+        {
+          "id": "venues-009",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_54 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_54 PM (9).png",
+          "url": "/assets/catalog/venues/009-chatgpt-image-jun-18-2026-09-27-54-pm-9.png"
+        },
+        {
+          "id": "venues-010",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_55 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_55 PM (10).png",
+          "url": "/assets/catalog/venues/010-chatgpt-image-jun-18-2026-09-27-55-pm-10.png"
+        },
+        {
+          "id": "venues-011",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_11 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_11 PM (1).png",
+          "url": "/assets/catalog/venues/011-chatgpt-image-jun-18-2026-09-28-11-pm-1.png"
+        },
+        {
+          "id": "venues-012",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_11 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_11 PM (2).png",
+          "url": "/assets/catalog/venues/012-chatgpt-image-jun-18-2026-09-28-11-pm-2.png"
+        },
+        {
+          "id": "venues-013",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (3).png",
+          "url": "/assets/catalog/venues/013-chatgpt-image-jun-18-2026-09-28-12-pm-3.png"
+        },
+        {
+          "id": "venues-014",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (4).png",
+          "url": "/assets/catalog/venues/014-chatgpt-image-jun-18-2026-09-28-12-pm-4.png"
+        },
+        {
+          "id": "venues-015",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (5).png",
+          "url": "/assets/catalog/venues/015-chatgpt-image-jun-18-2026-09-28-12-pm-5.png"
+        },
+        {
+          "id": "venues-016",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_13 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_13 PM (6).png",
+          "url": "/assets/catalog/venues/016-chatgpt-image-jun-18-2026-09-28-13-pm-6.png"
+        },
+        {
+          "id": "venues-017",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_13 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_13 PM (7).png",
+          "url": "/assets/catalog/venues/017-chatgpt-image-jun-18-2026-09-28-13-pm-7.png"
+        },
+        {
+          "id": "venues-018",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_15 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_15 PM (8).png",
+          "url": "/assets/catalog/venues/018-chatgpt-image-jun-18-2026-09-28-15-pm-8.png"
+        },
+        {
+          "id": "venues-019",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_15 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_15 PM (9).png",
+          "url": "/assets/catalog/venues/019-chatgpt-image-jun-18-2026-09-28-15-pm-9.png"
+        },
+        {
+          "id": "venues-020",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_17 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_17 PM (10).png",
+          "url": "/assets/catalog/venues/020-chatgpt-image-jun-18-2026-09-28-17-pm-10.png"
+        },
+        {
+          "id": "venues-021",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (1).png",
+          "url": "/assets/catalog/venues/021-chatgpt-image-jun-19-2026-01-45-31-pm-1.png"
+        },
+        {
+          "id": "venues-022",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (10).png",
+          "url": "/assets/catalog/venues/022-chatgpt-image-jun-19-2026-01-45-31-pm-10.png"
+        },
+        {
+          "id": "venues-023",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (2).png",
+          "url": "/assets/catalog/venues/023-chatgpt-image-jun-19-2026-01-45-31-pm-2.png"
+        },
+        {
+          "id": "venues-024",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (3).png",
+          "url": "/assets/catalog/venues/024-chatgpt-image-jun-19-2026-01-45-31-pm-3.png"
+        },
+        {
+          "id": "venues-025",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (4).png",
+          "url": "/assets/catalog/venues/025-chatgpt-image-jun-19-2026-01-45-31-pm-4.png"
+        },
+        {
+          "id": "venues-026",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (5).png",
+          "url": "/assets/catalog/venues/026-chatgpt-image-jun-19-2026-01-45-31-pm-5.png"
+        },
+        {
+          "id": "venues-027",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (6).png",
+          "url": "/assets/catalog/venues/027-chatgpt-image-jun-19-2026-01-45-31-pm-6.png"
+        },
+        {
+          "id": "venues-028",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (7).png",
+          "url": "/assets/catalog/venues/028-chatgpt-image-jun-19-2026-01-45-31-pm-7.png"
+        },
+        {
+          "id": "venues-029",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (8).png",
+          "url": "/assets/catalog/venues/029-chatgpt-image-jun-19-2026-01-45-31-pm-8.png"
+        },
+        {
+          "id": "venues-030",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (9).png",
+          "url": "/assets/catalog/venues/030-chatgpt-image-jun-19-2026-01-45-31-pm-9.png"
+        },
+        {
+          "id": "venues-031",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_31 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_31 PM (1).png",
+          "url": "/assets/catalog/venues/031-chatgpt-image-jun-20-2026-05-22-31-pm-1.png"
+        },
+        {
+          "id": "venues-032",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_32 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_32 PM (2).png",
+          "url": "/assets/catalog/venues/032-chatgpt-image-jun-20-2026-05-22-32-pm-2.png"
+        },
+        {
+          "id": "venues-033",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (3).png",
+          "url": "/assets/catalog/venues/033-chatgpt-image-jun-20-2026-05-22-33-pm-3.png"
+        },
+        {
+          "id": "venues-034",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (4).png",
+          "url": "/assets/catalog/venues/034-chatgpt-image-jun-20-2026-05-22-33-pm-4.png"
+        },
+        {
+          "id": "venues-035",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (5).png",
+          "url": "/assets/catalog/venues/035-chatgpt-image-jun-20-2026-05-22-33-pm-5.png"
+        },
+        {
+          "id": "venues-036",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (6).png",
+          "url": "/assets/catalog/venues/036-chatgpt-image-jun-20-2026-05-22-33-pm-6.png"
+        },
+        {
+          "id": "venues-037",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (7).png",
+          "url": "/assets/catalog/venues/037-chatgpt-image-jun-20-2026-05-22-33-pm-7.png"
+        },
+        {
+          "id": "venues-038",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_34 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_34 PM (8).png",
+          "url": "/assets/catalog/venues/038-chatgpt-image-jun-20-2026-05-22-34-pm-8.png"
+        },
+        {
+          "id": "venues-039",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (1).png",
+          "url": "/assets/catalog/venues/039-chatgpt-image-jun-20-2026-05-22-57-pm-1.png"
+        },
+        {
+          "id": "venues-040",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (2).png",
+          "url": "/assets/catalog/venues/040-chatgpt-image-jun-20-2026-05-22-57-pm-2.png"
+        },
+        {
+          "id": "venues-041",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (3).png",
+          "url": "/assets/catalog/venues/041-chatgpt-image-jun-20-2026-05-22-57-pm-3.png"
+        },
+        {
+          "id": "venues-042",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (4).png",
+          "url": "/assets/catalog/venues/042-chatgpt-image-jun-20-2026-05-22-58-pm-4.png"
+        },
+        {
+          "id": "venues-043",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (5).png",
+          "url": "/assets/catalog/venues/043-chatgpt-image-jun-20-2026-05-22-58-pm-5.png"
+        },
+        {
+          "id": "venues-044",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (6).png",
+          "url": "/assets/catalog/venues/044-chatgpt-image-jun-20-2026-05-22-58-pm-6.png"
+        },
+        {
+          "id": "venues-045",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (7).png",
+          "url": "/assets/catalog/venues/045-chatgpt-image-jun-20-2026-05-22-58-pm-7.png"
+        },
+        {
+          "id": "venues-046",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_59 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_59 PM (8).png",
+          "url": "/assets/catalog/venues/046-chatgpt-image-jun-20-2026-05-22-59-pm-8.png"
+        },
+        {
+          "id": "venues-047",
+          "name": "ChatGPT Image Jun 20, 2026, 06_45_58 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_45_58 PM (1).png",
+          "url": "/assets/catalog/venues/047-chatgpt-image-jun-20-2026-06-45-58-pm-1.png"
+        },
+        {
+          "id": "venues-048",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (2).png",
+          "url": "/assets/catalog/venues/048-chatgpt-image-jun-20-2026-06-46-00-pm-2.png"
+        },
+        {
+          "id": "venues-049",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (3).png",
+          "url": "/assets/catalog/venues/049-chatgpt-image-jun-20-2026-06-46-00-pm-3.png"
+        },
+        {
+          "id": "venues-050",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (4).png",
+          "url": "/assets/catalog/venues/050-chatgpt-image-jun-20-2026-06-46-00-pm-4.png"
+        },
+        {
+          "id": "venues-051",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (5).png",
+          "url": "/assets/catalog/venues/051-chatgpt-image-jun-20-2026-06-46-01-pm-5.png"
+        },
+        {
+          "id": "venues-052",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (6).png",
+          "url": "/assets/catalog/venues/052-chatgpt-image-jun-20-2026-06-46-01-pm-6.png"
+        },
+        {
+          "id": "venues-053",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (7).png",
+          "url": "/assets/catalog/venues/053-chatgpt-image-jun-20-2026-06-46-01-pm-7.png"
+        },
+        {
+          "id": "venues-054",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (8).png",
+          "url": "/assets/catalog/venues/054-chatgpt-image-jun-20-2026-06-46-01-pm-8.png"
+        },
+        {
+          "id": "venues-055",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_01 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_01 PM (1).png",
+          "url": "/assets/catalog/venues/055-chatgpt-image-jun-20-2026-07-19-01-pm-1.png"
+        },
+        {
+          "id": "venues-056",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_01 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_01 PM (2).png",
+          "url": "/assets/catalog/venues/056-chatgpt-image-jun-20-2026-07-19-01-pm-2.png"
+        },
+        {
+          "id": "venues-057",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (3).png",
+          "url": "/assets/catalog/venues/057-chatgpt-image-jun-20-2026-07-19-02-pm-3.png"
+        },
+        {
+          "id": "venues-058",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (4).png",
+          "url": "/assets/catalog/venues/058-chatgpt-image-jun-20-2026-07-19-02-pm-4.png"
+        },
+        {
+          "id": "venues-059",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (5).png",
+          "url": "/assets/catalog/venues/059-chatgpt-image-jun-20-2026-07-19-02-pm-5.png"
+        },
+        {
+          "id": "venues-060",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (6).png",
+          "url": "/assets/catalog/venues/060-chatgpt-image-jun-20-2026-07-19-02-pm-6.png"
+        },
+        {
+          "id": "venues-061",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_03 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_03 PM (7).png",
+          "url": "/assets/catalog/venues/061-chatgpt-image-jun-20-2026-07-19-03-pm-7.png"
+        },
+        {
+          "id": "venues-062",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_03 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_03 PM (8).png",
+          "url": "/assets/catalog/venues/062-chatgpt-image-jun-20-2026-07-19-03-pm-8.png"
+        },
+        {
+          "id": "venues-063",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (1).png",
+          "url": "/assets/catalog/venues/063-chatgpt-image-jun-18-2026-09-27-52-pm-1.png"
+        },
+        {
+          "id": "venues-064",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (2).png",
+          "url": "/assets/catalog/venues/064-chatgpt-image-jun-18-2026-09-27-52-pm-2.png"
+        },
+        {
+          "id": "venues-065",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (3).png",
+          "url": "/assets/catalog/venues/065-chatgpt-image-jun-18-2026-09-27-52-pm-3.png"
+        },
+        {
+          "id": "venues-066",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_52 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_52 PM (4).png",
+          "url": "/assets/catalog/venues/066-chatgpt-image-jun-18-2026-09-27-52-pm-4.png"
+        },
+        {
+          "id": "venues-067",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (5).png",
+          "url": "/assets/catalog/venues/067-chatgpt-image-jun-18-2026-09-27-53-pm-5.png"
+        },
+        {
+          "id": "venues-068",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (6).png",
+          "url": "/assets/catalog/venues/068-chatgpt-image-jun-18-2026-09-27-53-pm-6.png"
+        },
+        {
+          "id": "venues-069",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_53 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_53 PM (7).png",
+          "url": "/assets/catalog/venues/069-chatgpt-image-jun-18-2026-09-27-53-pm-7.png"
+        },
+        {
+          "id": "venues-070",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_54 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_54 PM (8).png",
+          "url": "/assets/catalog/venues/070-chatgpt-image-jun-18-2026-09-27-54-pm-8.png"
+        },
+        {
+          "id": "venues-071",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_54 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_54 PM (9).png",
+          "url": "/assets/catalog/venues/071-chatgpt-image-jun-18-2026-09-27-54-pm-9.png"
+        },
+        {
+          "id": "venues-072",
+          "name": "ChatGPT Image Jun 18, 2026, 09_27_55 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_27_55 PM (10).png",
+          "url": "/assets/catalog/venues/072-chatgpt-image-jun-18-2026-09-27-55-pm-10.png"
+        },
+        {
+          "id": "venues-073",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_11 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_11 PM (1).png",
+          "url": "/assets/catalog/venues/073-chatgpt-image-jun-18-2026-09-28-11-pm-1.png"
+        },
+        {
+          "id": "venues-074",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_11 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_11 PM (2).png",
+          "url": "/assets/catalog/venues/074-chatgpt-image-jun-18-2026-09-28-11-pm-2.png"
+        },
+        {
+          "id": "venues-075",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (3).png",
+          "url": "/assets/catalog/venues/075-chatgpt-image-jun-18-2026-09-28-12-pm-3.png"
+        },
+        {
+          "id": "venues-076",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (4).png",
+          "url": "/assets/catalog/venues/076-chatgpt-image-jun-18-2026-09-28-12-pm-4.png"
+        },
+        {
+          "id": "venues-077",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_12 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_12 PM (5).png",
+          "url": "/assets/catalog/venues/077-chatgpt-image-jun-18-2026-09-28-12-pm-5.png"
+        },
+        {
+          "id": "venues-078",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_13 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_13 PM (6).png",
+          "url": "/assets/catalog/venues/078-chatgpt-image-jun-18-2026-09-28-13-pm-6.png"
+        },
+        {
+          "id": "venues-079",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_13 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_13 PM (7).png",
+          "url": "/assets/catalog/venues/079-chatgpt-image-jun-18-2026-09-28-13-pm-7.png"
+        },
+        {
+          "id": "venues-080",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_15 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_15 PM (8).png",
+          "url": "/assets/catalog/venues/080-chatgpt-image-jun-18-2026-09-28-15-pm-8.png"
+        },
+        {
+          "id": "venues-081",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_15 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_15 PM (9).png",
+          "url": "/assets/catalog/venues/081-chatgpt-image-jun-18-2026-09-28-15-pm-9.png"
+        },
+        {
+          "id": "venues-082",
+          "name": "ChatGPT Image Jun 18, 2026, 09_28_17 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 18, 2026, 09_28_17 PM (10).png",
+          "url": "/assets/catalog/venues/082-chatgpt-image-jun-18-2026-09-28-17-pm-10.png"
+        },
+        {
+          "id": "venues-083",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (1).png",
+          "url": "/assets/catalog/venues/083-chatgpt-image-jun-19-2026-01-45-31-pm-1.png"
+        },
+        {
+          "id": "venues-084",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (10)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (10).png",
+          "url": "/assets/catalog/venues/084-chatgpt-image-jun-19-2026-01-45-31-pm-10.png"
+        },
+        {
+          "id": "venues-085",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (2).png",
+          "url": "/assets/catalog/venues/085-chatgpt-image-jun-19-2026-01-45-31-pm-2.png"
+        },
+        {
+          "id": "venues-086",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (3).png",
+          "url": "/assets/catalog/venues/086-chatgpt-image-jun-19-2026-01-45-31-pm-3.png"
+        },
+        {
+          "id": "venues-087",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (4).png",
+          "url": "/assets/catalog/venues/087-chatgpt-image-jun-19-2026-01-45-31-pm-4.png"
+        },
+        {
+          "id": "venues-088",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (5).png",
+          "url": "/assets/catalog/venues/088-chatgpt-image-jun-19-2026-01-45-31-pm-5.png"
+        },
+        {
+          "id": "venues-089",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (6).png",
+          "url": "/assets/catalog/venues/089-chatgpt-image-jun-19-2026-01-45-31-pm-6.png"
+        },
+        {
+          "id": "venues-090",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (7).png",
+          "url": "/assets/catalog/venues/090-chatgpt-image-jun-19-2026-01-45-31-pm-7.png"
+        },
+        {
+          "id": "venues-091",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (8).png",
+          "url": "/assets/catalog/venues/091-chatgpt-image-jun-19-2026-01-45-31-pm-8.png"
+        },
+        {
+          "id": "venues-092",
+          "name": "ChatGPT Image Jun 19, 2026, 01_45_31 PM (9)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 19, 2026, 01_45_31 PM (9).png",
+          "url": "/assets/catalog/venues/092-chatgpt-image-jun-19-2026-01-45-31-pm-9.png"
+        },
+        {
+          "id": "venues-093",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_31 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_31 PM (1).png",
+          "url": "/assets/catalog/venues/093-chatgpt-image-jun-20-2026-05-22-31-pm-1.png"
+        },
+        {
+          "id": "venues-094",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_32 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_32 PM (2).png",
+          "url": "/assets/catalog/venues/094-chatgpt-image-jun-20-2026-05-22-32-pm-2.png"
+        },
+        {
+          "id": "venues-095",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (3).png",
+          "url": "/assets/catalog/venues/095-chatgpt-image-jun-20-2026-05-22-33-pm-3.png"
+        },
+        {
+          "id": "venues-096",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (4).png",
+          "url": "/assets/catalog/venues/096-chatgpt-image-jun-20-2026-05-22-33-pm-4.png"
+        },
+        {
+          "id": "venues-097",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (5).png",
+          "url": "/assets/catalog/venues/097-chatgpt-image-jun-20-2026-05-22-33-pm-5.png"
+        },
+        {
+          "id": "venues-098",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (6).png",
+          "url": "/assets/catalog/venues/098-chatgpt-image-jun-20-2026-05-22-33-pm-6.png"
+        },
+        {
+          "id": "venues-099",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_33 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_33 PM (7).png",
+          "url": "/assets/catalog/venues/099-chatgpt-image-jun-20-2026-05-22-33-pm-7.png"
+        },
+        {
+          "id": "venues-100",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_34 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_34 PM (8).png",
+          "url": "/assets/catalog/venues/100-chatgpt-image-jun-20-2026-05-22-34-pm-8.png"
+        },
+        {
+          "id": "venues-101",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (1).png",
+          "url": "/assets/catalog/venues/101-chatgpt-image-jun-20-2026-05-22-57-pm-1.png"
+        },
+        {
+          "id": "venues-102",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (2).png",
+          "url": "/assets/catalog/venues/102-chatgpt-image-jun-20-2026-05-22-57-pm-2.png"
+        },
+        {
+          "id": "venues-103",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_57 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_57 PM (3).png",
+          "url": "/assets/catalog/venues/103-chatgpt-image-jun-20-2026-05-22-57-pm-3.png"
+        },
+        {
+          "id": "venues-104",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (4).png",
+          "url": "/assets/catalog/venues/104-chatgpt-image-jun-20-2026-05-22-58-pm-4.png"
+        },
+        {
+          "id": "venues-105",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (5).png",
+          "url": "/assets/catalog/venues/105-chatgpt-image-jun-20-2026-05-22-58-pm-5.png"
+        },
+        {
+          "id": "venues-106",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (6).png",
+          "url": "/assets/catalog/venues/106-chatgpt-image-jun-20-2026-05-22-58-pm-6.png"
+        },
+        {
+          "id": "venues-107",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_58 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_58 PM (7).png",
+          "url": "/assets/catalog/venues/107-chatgpt-image-jun-20-2026-05-22-58-pm-7.png"
+        },
+        {
+          "id": "venues-108",
+          "name": "ChatGPT Image Jun 20, 2026, 05_22_59 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 05_22_59 PM (8).png",
+          "url": "/assets/catalog/venues/108-chatgpt-image-jun-20-2026-05-22-59-pm-8.png"
+        },
+        {
+          "id": "venues-109",
+          "name": "ChatGPT Image Jun 20, 2026, 06_45_58 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_45_58 PM (1).png",
+          "url": "/assets/catalog/venues/109-chatgpt-image-jun-20-2026-06-45-58-pm-1.png"
+        },
+        {
+          "id": "venues-110",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (2).png",
+          "url": "/assets/catalog/venues/110-chatgpt-image-jun-20-2026-06-46-00-pm-2.png"
+        },
+        {
+          "id": "venues-111",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (3).png",
+          "url": "/assets/catalog/venues/111-chatgpt-image-jun-20-2026-06-46-00-pm-3.png"
+        },
+        {
+          "id": "venues-112",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_00 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_00 PM (4).png",
+          "url": "/assets/catalog/venues/112-chatgpt-image-jun-20-2026-06-46-00-pm-4.png"
+        },
+        {
+          "id": "venues-113",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (5).png",
+          "url": "/assets/catalog/venues/113-chatgpt-image-jun-20-2026-06-46-01-pm-5.png"
+        },
+        {
+          "id": "venues-114",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (6).png",
+          "url": "/assets/catalog/venues/114-chatgpt-image-jun-20-2026-06-46-01-pm-6.png"
+        },
+        {
+          "id": "venues-115",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (7).png",
+          "url": "/assets/catalog/venues/115-chatgpt-image-jun-20-2026-06-46-01-pm-7.png"
+        },
+        {
+          "id": "venues-116",
+          "name": "ChatGPT Image Jun 20, 2026, 06_46_01 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 06_46_01 PM (8).png",
+          "url": "/assets/catalog/venues/116-chatgpt-image-jun-20-2026-06-46-01-pm-8.png"
+        },
+        {
+          "id": "venues-117",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_01 PM (1)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_01 PM (1).png",
+          "url": "/assets/catalog/venues/117-chatgpt-image-jun-20-2026-07-19-01-pm-1.png"
+        },
+        {
+          "id": "venues-118",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_01 PM (2)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_01 PM (2).png",
+          "url": "/assets/catalog/venues/118-chatgpt-image-jun-20-2026-07-19-01-pm-2.png"
+        },
+        {
+          "id": "venues-119",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (3)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (3).png",
+          "url": "/assets/catalog/venues/119-chatgpt-image-jun-20-2026-07-19-02-pm-3.png"
+        },
+        {
+          "id": "venues-120",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (4)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (4).png",
+          "url": "/assets/catalog/venues/120-chatgpt-image-jun-20-2026-07-19-02-pm-4.png"
+        },
+        {
+          "id": "venues-121",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (5)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (5).png",
+          "url": "/assets/catalog/venues/121-chatgpt-image-jun-20-2026-07-19-02-pm-5.png"
+        },
+        {
+          "id": "venues-122",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_02 PM (6)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_02 PM (6).png",
+          "url": "/assets/catalog/venues/122-chatgpt-image-jun-20-2026-07-19-02-pm-6.png"
+        },
+        {
+          "id": "venues-123",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_03 PM (7)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_03 PM (7).png",
+          "url": "/assets/catalog/venues/123-chatgpt-image-jun-20-2026-07-19-03-pm-7.png"
+        },
+        {
+          "id": "venues-124",
+          "name": "ChatGPT Image Jun 20, 2026, 07_19_03 PM (8)",
+          "sourceCategory": "venues",
+          "role": "venue-sheet",
+          "originalPath": "C:\\Users\\bullo\\Downloads\\VENUES\\VENUES\\ChatGPT Image Jun 20, 2026, 07_19_03 PM (8).png",
+          "url": "/assets/catalog/venues/124-chatgpt-image-jun-20-2026-07-19-03-pm-8.png"
+        }
+      ]
+    }
+  }
+}

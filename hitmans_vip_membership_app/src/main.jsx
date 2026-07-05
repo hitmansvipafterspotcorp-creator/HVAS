@@ -41,11 +41,11 @@ const ui = {
     { label: 'Cash App', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_046_189x46.png' },
   ],
   tiers: [
-    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338.png', price: '$ --', status: 'Available' },
-    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338.png', price: '$ --', status: 'Available' },
-    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337.png', price: '$ --', status: 'Active' },
-    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337.png', price: '$ --', status: 'Available' },
-    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337.png', price: '$ --', status: 'Verified' },
+    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338.png' },
+    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338.png' },
+    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337.png' },
+    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337.png' },
+    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337.png' },
   ],
   titles: {
     membership: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_01_001_897x135.png',
@@ -402,28 +402,79 @@ const appMenus = [
       { title: 'Scan App', detail: 'Scan member QR code', chip: ui.chips.active, target: 'payVerify' },
       { title: 'Search Member', detail: 'Search by name or ID', chip: ui.chips.checkedIn, target: 'searchMember' },
       { title: 'Verify Tier', detail: 'Check plan and status', chip: ui.chips.vip, target: 'verification' },
-      { title: 'Grant / Deny Entry', detail: 'Approve or deny access', chip: ui.chips.staff, target: 'payVerify' },
+      { title: 'Grant / Deny Entry', detail: 'Approve or deny access', chip: ui.chips.staff, target: 'entry' },
       { title: 'Check-In Log', detail: 'View entry history', chip: ui.chips.checkedIn, target: 'checkInLog' },
     ],
   },
 ];
 
+const mainMenuUi = {
+  logo: '/assets/ui/new_main_menu/optimized/brand/mm_logo_badge.png',
+  topbar: '/assets/ui/new_main_menu/optimized/bars/mm_topbar_shell.png',
+  menuIcon: '/assets/ui/new_main_menu/optimized/bars/mm_menu_icon.png',
+  hitkoinIcon: '/assets/ui/new_main_menu/optimized/bars/topbar_hitkoin_icon.png',
+  ticketsIcon: '/assets/ui/new_main_menu/optimized/bars/topbar_ticket_icon.png',
+  notificationIcon: '/assets/ui/new_main_menu/optimized/bars/topbar_bell_icon.png',
+  navRail: '/assets/ui/new_main_menu/optimized/navigation/mm_nav_rail.png',
+  railRowFrame: '/assets/ui/new_main_menu/support/support_frame_long.png',
+  hero: '/assets/ui/new_main_menu/optimized/hero/mm_hero_banner.png',
+  tabBar: '/assets/ui/new_main_menu/optimized/components/mm_tab_bar.png',
+  quickInvite: '/assets/ui/new_main_menu/optimized/components/mm_chip_quick_invite.png',
+  quickCheckin: '/assets/ui/new_main_menu/optimized/components/mm_chip_quick_checkin.png',
+  bannerGranted: '/assets/ui/new_main_menu/optimized/components/mm_banner_granted.png',
+  cards: [
+    { title: 'Home', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_home.png', target: 'memberHome' },
+    { title: 'My Pass', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_mypass.png', target: 'myPass' },
+    { title: 'Event Access', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_event_access.png', target: 'eventAccess' },
+    { title: 'Venue Access', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_venue_access.png', target: 'venueAccess' },
+    { title: 'Profile', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_profile.png', target: 'profile' },
+    { title: 'History', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_history.png', target: 'history' },
+    { title: 'Staff Check-In', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_staff_checkin.png', target: 'staffDashboard' },
+    { title: 'Scan QR', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_scan_qr.png', target: 'payVerify' },
+    { title: 'Search Member', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_search_member.png', target: 'searchMember' },
+    { title: 'Verify Tier', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_verify_tier.png', target: 'verification' },
+    { title: 'Grant / Deny Entry', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_grant_deny.png', target: 'entry' },
+    { title: 'Check-In Log', src: '/assets/ui/new_main_menu/optimized/cards/mm_card_checkin_log.png', target: 'checkInLog' },
+  ],
+  rail: [
+    { title: 'Home', target: 'memberHome', icon: '/assets/ui/new_main_menu/icons/icon_home.png' },
+    { title: 'Events', target: 'eventAccess', icon: '/assets/ui/new_main_menu/icons/icon_events.png' },
+    { title: 'Membership', target: 'membership', icon: '/assets/ui/new_main_menu/icons/icon_membership.png' },
+    { title: 'Wallet', target: 'checkout', icon: '/assets/ui/new_main_menu/icons/icon_wallet.png' },
+    { title: 'Settings', target: 'profile', icon: '/assets/ui/new_main_menu/icons/icon_settings.png' },
+  ],
+  tabs: [
+    { title: 'Home', target: 'memberHome' },
+    { title: 'Events', target: 'eventAccess' },
+    { title: 'Membership', target: 'membership' },
+    { title: 'Wallet', target: 'checkout' },
+    { title: 'Settings', target: 'profile' },
+  ],
+};
+
+function getInitialScreen() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get('screen');
+  return screens.some((screen) => screen.id === requested) ? requested : 'home';
+}
+
 function App() {
-  const [activeScreen, setActiveScreen] = useState('home');
-  const [targetScreen, setTargetScreen] = useState('home');
+  const initialScreen = getInitialScreen();
+  const [activeScreen, setActiveScreen] = useState(initialScreen);
+  const [targetScreen, setTargetScreen] = useState(initialScreen);
   const [transition, setTransition] = useState({
-    active: true,
+    active: false,
     from: 'Loading',
     to: 'After Spot Access Hub',
-    progress: 0,
-    phase: loadingPhases[0].label,
-    message: loadingPhases[0].message,
+    progress: 100,
+    phase: loadingPhases.at(-1).label,
+    message: loadingPhases.at(-1).message,
   });
 
   const current = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
 
   useEffect(() => {
-    runTransition('Boot', current.title, () => setActiveScreen('home'));
+    runTransition('Boot', current.title, () => setActiveScreen(initialScreen));
   }, []);
 
   function phaseFor(progress) {
@@ -433,7 +484,7 @@ function App() {
   function runTransition(from, to, commit) {
     const duration = from === 'Boot' ? 1550 : 1050;
     let committed = false;
-    let rafId = 0;
+    let timerId = 0;
     const startedAt = performance.now();
 
     setTransition({
@@ -445,7 +496,8 @@ function App() {
       message: loadingPhases[0].message,
     });
 
-    const frame = (now) => {
+    const frame = () => {
+      const now = performance.now();
       const t = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - t, 3);
       const progress = Math.min(100, Math.round(eased * 100));
@@ -466,17 +518,17 @@ function App() {
       });
 
       if (progress >= 100) {
+        window.clearInterval(timerId);
         window.setTimeout(() => {
           setTransition((state) => ({ ...state, active: false, progress: 100 }));
         }, 180);
         return;
       }
-
-      rafId = window.requestAnimationFrame(frame);
     };
 
-    rafId = window.requestAnimationFrame(frame);
-    return () => window.cancelAnimationFrame(rafId);
+    frame();
+    timerId = window.setInterval(frame, 32);
+    return () => window.clearInterval(timerId);
   }
 
   function navigate(nextId) {
@@ -525,73 +577,165 @@ function TransitionOverlay({ transition }) {
 
 function ScreenHeader({ screen, onBack }) {
   return (
-    <header className="screen-header">
+    <header className="screen-header compact-return" aria-label={`${screen.title} navigation`}>
       <button className="back-to-menu" type="button" onClick={onBack}>Home</button>
-      <div>
-        <span className="eyebrow">{screen.eyebrow}</span>
-        <h1>{screen.title}</h1>
-        <p>{screen.detail}</p>
-      </div>
     </header>
   );
 }
 
 function ScreenBody({ activeScreen, navigate }) {
   if (activeScreen === 'home') return <HomeScreen navigate={navigate} />;
-  if (activeScreen === 'payVerify') return <PayVerifyScreen />;
-  if (activeScreen === 'memberHome') return <MemberHomeScreen />;
-  if (activeScreen === 'myPass') return <PassScreen />;
-  if (activeScreen === 'membership') return <MembershipScreen />;
-  if (activeScreen === 'eventAccess') return <SimpleAccessScreen title="Event Access" rows={['Tonight Event', 'Lip Sync Bingo', 'VIP Social']} />;
-  if (activeScreen === 'venueAccess') return <SimpleAccessScreen title="Venue Access" rows={['Front Door', 'Networking Floor', 'VIP Lounge']} />;
-  if (activeScreen === 'profile') return <ProfileScreen />;
-  if (activeScreen === 'history') return <HistoryScreen />;
-  if (activeScreen === 'staffDashboard') return <SimpleAccessScreen title="Staff Dashboard" rows={['Door Status', 'Active Members', 'Pending Review']} />;
-  if (activeScreen === 'searchMember') return <SimpleAccessScreen title="Search Member" rows={['Name Search', 'Member Number', 'Status Review']} />;
-  if (activeScreen === 'checkInLog') return <HistoryScreen />;
-  if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
-  if (activeScreen === 'entry') return <EntryScreen />;
-  if (activeScreen === 'bingoStyle') return <BingoStyleScreen />;
-  if (activeScreen === 'tv') return <TvDisplayScreen />;
-  if (activeScreen === 'lobby') return <LobbyScreen />;
-  if (activeScreen === 'playerCard') return <PlayerCardScreen />;
-  if (activeScreen === 'host') return <HostScreen />;
-  if (activeScreen === 'verification') return <VerificationScreen />;
-  if (activeScreen === 'songQueue') return <SongQueueScreen />;
-  if (activeScreen === 'winner') return <WinnerScreen />;
-  if (activeScreen === 'checkout') return <CheckoutScreen />;
-  return <PartyScreen />;
+  if (activeScreen === 'payVerify') return <PayVerifyScreen navigate={navigate} />;
+  if (activeScreen === 'memberHome') return <MemberHomeScreen navigate={navigate} />;
+  if (activeScreen === 'myPass') return <PassScreen navigate={navigate} />;
+  if (activeScreen === 'membership') return <MembershipScreen navigate={navigate} />;
+  if (activeScreen === 'eventAccess') return <EventScreen navigate={navigate} />;
+  if (activeScreen === 'venueAccess') return <VenueScreen navigate={navigate} />;
+  if (activeScreen === 'profile') return <ProfileScreen navigate={navigate} />;
+  if (activeScreen === 'history') return <HistoryScreen navigate={navigate} />;
+  if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
+  if (activeScreen === 'searchMember') return <SearchMemberScreen navigate={navigate} />;
+  if (activeScreen === 'checkInLog') return <CheckInLogScreen navigate={navigate} />;
+  if (activeScreen === 'pricingDigits') return <PricingDigitsScreen navigate={navigate} />;
+  if (activeScreen === 'entry') return <EntryScreen navigate={navigate} />;
+  if (activeScreen === 'bingoStyle') return <BingoStyleScreen navigate={navigate} />;
+  if (activeScreen === 'tv') return <TvDisplayScreen navigate={navigate} />;
+  if (activeScreen === 'lobby') return <LobbyScreen navigate={navigate} />;
+  if (activeScreen === 'playerCard') return <PlayerCardScreen navigate={navigate} />;
+  if (activeScreen === 'host') return <HostScreen navigate={navigate} />;
+  if (activeScreen === 'verification') return <VerificationScreen navigate={navigate} />;
+  if (activeScreen === 'songQueue') return <SongQueueScreen navigate={navigate} />;
+  if (activeScreen === 'winner') return <WinnerScreen navigate={navigate} />;
+  if (activeScreen === 'checkout') return <CheckoutScreen navigate={navigate} />;
+  return <PartyScreen navigate={navigate} />;
 }
 
 function HomeScreen({ navigate }) {
+  const [railOpen, setRailOpen] = useState(() => new URLSearchParams(window.location.search).get('rail') === 'open');
+  const memberData = null;
+  const liveStatus = null;
+  const hitkoinTotal = null;
+  const ticketTotal = null;
+  const notificationTotal = null;
+
+  function go(target) {
+    setRailOpen(false);
+    navigate(target);
+  }
+
   return (
-    <div className="home-dashboard">
-      <section className="sheet-title-banner">
-        <div>
-          <span>HITMANS VIP AFTER SPOT CORP.</span>
-          <h1>After Spot Main Menu</h1>
+    <div className={railOpen ? 'main-menu-blueprint rail-open' : 'main-menu-blueprint'} aria-label="After Spot main menu">
+      {railOpen && <button className="main-menu-rail-backdrop" type="button" onClick={() => setRailOpen(false)} aria-label="Close menu" />}
+
+      <aside className="main-menu-rail" aria-hidden={!railOpen}>
+        <div className="main-menu-rail-wrap">
+          {mainMenuUi.rail.map((item) => (
+            <button
+              className="main-menu-rail-row"
+              type="button"
+              key={item.title}
+              onClick={() => go(item.target)}
+              aria-label={item.title}
+            >
+              <span className="main-menu-rail-row-frame" aria-hidden="true" style={{ backgroundImage: `url(${mainMenuUi.railRowFrame})` }} />
+              <img src={item.icon} alt="" />
+              <span>{item.title}</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      <section className="main-menu-device">
+        <div className="main-menu-topbar">
+          <img src={mainMenuUi.topbar} alt="" />
+          {memberData && (
+            <div className="main-menu-live-member">
+              <span>{memberData.greeting}</span>
+              <strong>{memberData.name}</strong>
+              <small>{memberData.level}</small>
+            </div>
+          )}
+          <button className="topbar-live-chip topbar-hitkoin" type="button" onClick={() => go('checkout')} aria-label="Hitkoin wallet">
+            <img src={mainMenuUi.hitkoinIcon} alt="" />
+            {hitkoinTotal !== null && <span>{hitkoinTotal}</span>}
+          </button>
+          <button className="topbar-live-chip topbar-tickets" type="button" onClick={() => go('eventAccess')} aria-label="VIP tickets">
+            <img src={mainMenuUi.ticketsIcon} alt="" />
+            {ticketTotal !== null && <span>{ticketTotal}</span>}
+          </button>
+          <button className="topbar-icon-button topbar-notifications" type="button" onClick={() => go('history')} aria-label="Notifications">
+            <img src={mainMenuUi.notificationIcon} alt="" />
+            {notificationTotal !== null && <span>{notificationTotal}</span>}
+          </button>
+          <button className="main-menu-toggle topbar-icon-button topbar-menu" type="button" onClick={() => setRailOpen(true)} aria-label="Open menu">
+            <img src={mainMenuUi.menuIcon} alt="" />
+          </button>
+        </div>
+
+        <div className="main-menu-hero">
+          <img src={mainMenuUi.hero} alt="" />
+          <button className="hero-hotspot" type="button" onClick={() => go('membership')} aria-label="Explore membership" />
+        </div>
+
+        <div className="main-menu-card-grid">
+          {mainMenuUi.cards.map((card) => (
+            <button className="main-menu-card" type="button" key={card.title} onClick={() => go(card.target)} aria-label={card.title}>
+              <img src={card.src} alt="" />
+            </button>
+          ))}
+        </div>
+
+        <div className={liveStatus ? 'main-menu-status-strip' : 'main-menu-status-strip is-empty'} aria-label="Quick actions">
+          <button className="main-menu-strip-action" type="button" onClick={() => go('party')} aria-label="Invite and earn">
+            <img src={mainMenuUi.quickInvite} alt="" />
+          </button>
+          <span>{liveStatus ?? ''}</span>
+          <button className="main-menu-strip-action" type="button" onClick={() => go('payVerify')} aria-label="Check in member">
+            <img src={mainMenuUi.quickCheckin} alt="" />
+          </button>
+        </div>
+
+        <div className="main-menu-tabs">
+          <img src={mainMenuUi.tabBar} alt="" />
+          {mainMenuUi.tabs.map((item, index) => (
+            <button
+              className="main-menu-hotspot tab-hotspot"
+              style={{ '--index': index }}
+              type="button"
+              key={item.title}
+              onClick={() => go(item.target)}
+              aria-label={item.title}
+            />
+          ))}
+          <button
+            className="main-menu-hotspot tab-logo-hotspot"
+            type="button"
+            onClick={() => setRailOpen(true)}
+            aria-label="Open menu"
+          />
         </div>
       </section>
-      <div className="app-menu-board">
-        {appMenus.map((menu) => (
-          <AppPanel key={menu.title} title={menu.title} subtitle={menu.subtitle}>
-            <div className="menu-flow-list">
-              {menu.items.map((item, index) => (
-                <MenuFlowRow key={item.title} index={index + 1} onSelect={() => navigate(item.target)} {...item} />
-              ))}
-            </div>
-          </AppPanel>
-        ))}
-      </div>
     </div>
   );
 }
 
+function MemberHomeScreen() {
+  return (
+    <MenuWorkspace eyebrow="Member App" title="Home" layout="member">
+      <LiveFrame title="Member Status" state="Waiting for member login or staff scan">
+        <StatusStrip items={[]} />
+      </LiveFrame>
+      <FlowCard title="Quick Access" steps={['My Pass', 'Event Access', 'Venue Access']} />
+    </MenuWorkspace>
+  );
+}
+
 function PayVerifyScreen() {
-  const [selectedTier, setSelectedTier] = useState('Daily');
-  const [selectedPayment, setSelectedPayment] = useState('Credit / Debit');
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const [verified, setVerified] = useState(false);
-  const selectedPass = ui.passes.find((pass) => pass.name === selectedTier) ?? ui.passes[0];
+  const selectedPass = selectedTier ? ui.passes.find((pass) => pass.name === selectedTier) : null;
+  const verificationReady = Boolean(selectedTier && selectedPayment && verified);
 
   return (
     <div className="door-preview-flow">
@@ -602,14 +746,14 @@ function PayVerifyScreen() {
         </header>
 
         <div className="member-pass-preview">
-          <img src={selectedPass.src} alt="" />
+          <img src={selectedPass?.src ?? mainMenuUi.logo} alt="" />
           <div className="member-pass-live-copy">
             <span>Selected Plan</span>
-            <strong>{selectedTier}</strong>
-            <small>{selectedPayment}</small>
-            <StatusStrip items={[ui.chips.active, selectedTier === 'VIP' ? ui.chips.vip : ui.chips.checkedIn]} />
+            <strong>{selectedTier ?? 'Choose Plan'}</strong>
+            <small>{selectedPayment ?? 'Choose payment method'}</small>
+            <StatusStrip items={selectedTier ? [ui.chips.active, selectedTier === 'VIP' ? ui.chips.vip : ui.chips.checkedIn] : []} />
           </div>
-          <div className="qr-placeholder">SCAN</div>
+          <div className="qr-placeholder">{verificationReady ? 'PASS' : 'QR'}</div>
         </div>
 
         <div className="preview-wallet-strip">
@@ -664,8 +808,8 @@ function PayVerifyScreen() {
             <img src={ui.verify.checkInPanel} alt="" />
           </div>
           <div className="staff-result-panel">
-            <img src={verified ? ui.verify.result : ui.verify.entryVerified} alt="" />
-            <StatusStrip items={[verified ? ui.verify.valid : ui.verify.expired, ui.verify.privateMember, ui.verify.cardOwner]} />
+            <img src={verificationReady ? ui.banners.granted : ui.banners.denied} alt="" />
+            <StatusStrip items={verificationReady ? [ui.verify.valid, ui.verify.cardOwner] : [ui.verify.cardNumber, ui.verify.privateMember]} />
           </div>
         </div>
 
@@ -682,9 +826,9 @@ function PayVerifyScreen() {
       <section className="door-preview-decision">
         <div>
           <span>Door Verification</span>
-          <strong>{verified ? 'Ready To Grant Entry' : 'Payment And Verification Required'}</strong>
+          <strong>{verificationReady ? 'Ready To Grant Entry' : 'Select Plan, Take Payment, Verify'}</strong>
         </div>
-        <img src={verified ? ui.banners.granted : ui.banners.denied} alt="" />
+        <img src={verificationReady ? ui.banners.granted : ui.banners.denied} alt="" />
         <div className="preview-action-grid final-actions">
           <AssetButton src={ui.buttons.rescan} label="Rescan" />
           <AssetButton src={ui.buttons.grant} label="Grant Entry" />
@@ -695,288 +839,248 @@ function PayVerifyScreen() {
   );
 }
 
-function MembershipScreen() {
+function MembershipScreen({ navigate }) {
   return (
-    <div className="assembled-page membership-page">
-      <div className="membership-rebuild-row">
-        <div className="tier-live-grid">
+    <MenuWorkspace eyebrow="Member Access" title="Membership" layout="member">
+      <LiveFrame title="Tier Selection" state="Prices and plan status load from system settings">
+        <div className="tier-live-grid compact">
           {ui.tiers.map((tier) => (
             <button className="image-action tile-image-button tier-card-live" type="button" key={tier.name} aria-label={`${tier.name} tier`}>
               <img src={tier.src} alt="" />
-              <span className="tier-price-mask">
-                <b>{tier.price}</b>
-                <small>{tier.status}</small>
-              </span>
             </button>
           ))}
         </div>
-        <PlanActionGrid />
-      </div>
-    </div>
+      </LiveFrame>
+      <FlowCard title="Plan Flow" steps={['Select tier', 'Take payment', 'Issue pass', 'Verify at door']} />
+      <ActionStack
+        title="Plan Actions"
+        navigate={navigate}
+        actions={ui.planActions.map((action) => ({ src: action.src, label: action.label, target: 'checkout' }))}
+      />
+    </MenuWorkspace>
   );
 }
 
-function PricingDigitsScreen() {
+function PricingDigitsScreen({ navigate }) {
   return (
-    <div className="assembled-page digits-page">
-      <div className="digit-asset-strip">
-        {ui.digits.map((digit, index) => (
-          <img src={digit} alt="" key={`${digit}-${index}`} />
-        ))}
-      </div>
-      <div className="metric-grid">
-        <MetricTile label="Price" value="$ --" />
-        <MetricTile label="Members" value="--" />
-        <MetricTile label="Room" value="----" />
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Dynamic Display" title="Price / Number Display" layout="member">
+      <LiveFrame title="Digit Library" state="Numbers render from live pricing and counts">
+        <div className="digit-asset-strip compact">
+          {ui.digits.map((digit, index) => (
+            <img src={digit} alt="" key={`${digit}-${index}`} />
+          ))}
+        </div>
+      </LiveFrame>
+      <FlowCard title="Display Rules" steps={['Use digits only', 'Bind values to data', 'Keep examples hidden']} />
+      <ActionStack
+        title="Payment Actions"
+        navigate={navigate}
+        actions={ui.planActions.map((action) => ({ src: action.src, label: action.label, target: 'checkout' }))}
+      />
+    </MenuWorkspace>
   );
 }
 
-function EntryScreen() {
+function EntryScreen({ navigate }) {
   return (
-    <div className="assembled-page entry-page">
-      <div className="entry-preview-grid">
-        <div className="live-pass-card">
-          <img src={ui.logo} alt="" />
-          <div>
-            <span>Member Pass</span>
-            <strong>Active Member</strong>
-            <small>Member # HV-000000 - Valid Today</small>
-            <StatusStrip items={[ui.chips.active, ui.chips.vip]} />
-          </div>
-          <div className="qr-placeholder">PASS</div>
+    <MenuWorkspace eyebrow="Door Check-In" title="Member Entry" layout="staff">
+      <LiveFrame title="Pass Check" state="Scan a member pass or enter member number">
+        <div className="pass-card-empty">
+          <img src={mainMenuUi.logo} alt="" />
+          <div className="qr-placeholder">QR</div>
         </div>
-        <div className="staff-scan-card">
-          <strong>Staff Verification</strong>
-          <div className="scan-box compact"><span>Ready To Scan</span></div>
-          <small>Search, scan, or enter member number.</small>
-        </div>
-      </div>
-      <div className="entry-action-dock">
-        <StatusStrip items={[ui.chips.active, ui.chips.checkedIn, ui.chips.vip, ui.chips.staff]} />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.buttons.scan} label="Scan App" />
-          <AssetButton src={ui.buttons.verify} label="Verify Member" />
-          <AssetButton src={ui.buttons.grant} label="Grant Entry" />
-          <AssetButton src={ui.buttons.deny} label="Deny Entry" />
-          <AssetButton src={ui.buttons.rescan} label="Rescan" />
-          <AssetButton src={ui.buttons.manual} label="Manual Check-In" />
-        </div>
-      </div>
-    </div>
+      </LiveFrame>
+      <FlowCard title="Entry Flow" steps={['Scan app', 'Verify tier', 'Check venue rules', 'Grant or deny']} />
+      <ActionStack
+        title="Door Actions"
+        navigate={navigate}
+        actions={[
+          { src: ui.buttons.scan, label: 'Scan App', target: 'payVerify' },
+          { src: ui.buttons.manual, label: 'Manual Check-In', target: 'searchMember' },
+          { src: ui.buttons.grant, label: 'Grant Entry', target: 'checkInLog' },
+          { src: ui.buttons.deny, label: 'Deny Entry', target: 'checkInLog' },
+        ]}
+      />
+    </MenuWorkspace>
   );
 }
 
 function BingoStyleScreen() {
   return (
-    <div className="assembled-page bingo-style-page">
-      <div className="style-kit-dock">
-        <img src={ui.styleKit.panel} alt="" />
-        <img src={ui.styleKit.timer} alt="" />
-        <div className="bingo-action-grid">
-          <AssetButton src={ui.bingo.join} label="Join Game" />
-          <AssetButton src={ui.bingo.ready} label="Ready" />
-          <AssetButton src={ui.bingo.party} label="Party Mode" />
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Lip Sync Bingo" title="Game Menu" layout="member">
+      <LiveFrame title="Game Status" state="Game data loads when a room is created">
+        <StatusStrip items={[ui.chips.active, ui.chips.vip]} />
+      </LiveFrame>
+      <FlowCard title="Game Flow" steps={['Join lobby', 'Confirm pass', 'Start round', 'Track rewards']} />
+      <ActionStack title="Game Actions" actions={[ui.bingo.join, ui.bingo.ready, ui.bingo.party]} />
+    </MenuWorkspace>
   );
 }
 
 function TvDisplayScreen() {
   return (
-    <div className="assembled-page tv-page">
-      <div className="tv-piece-row">
-        <img src={ui.tv.header} alt="" />
-        <img src={ui.tv.timerFrame} alt="" />
-        <img src={ui.tv.songBanner} alt="" />
-        <img src={ui.tv.winnerBanner} alt="" />
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Room Display" title="TV Live Display" layout="staff">
+      <LiveFrame title="Display Feed" state="Public display waits for live round data">
+        <div className="qr-placeholder">LIVE</div>
+      </LiveFrame>
+      <FlowCard title="Display Flow" steps={['Load event', 'Show current round', 'Show winners', 'Reset display']} />
+      <ActionStack title="Display Controls" actions={[ui.host.nextSong, ui.host.pauseRound, ui.host.endRound]} />
+    </MenuWorkspace>
   );
 }
 
 function LobbyScreen() {
   return (
-    <div className="assembled-page lobby-page">
-      <div className="lobby-piece-row">
-        <img src={ui.bingo.welcome} alt="" />
-        <img src={ui.bingo.invite} alt="" />
-        <div className="bingo-action-grid">
-          <AssetButton src={ui.bingo.join} label="Join Game" />
-          <AssetButton src={ui.bingo.ready} label="Ready" />
-          <AssetButton src={ui.bingo.party} label="Party Mode" />
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Lip Sync Bingo" title="Lobby" layout="member">
+      <LiveFrame title="Lobby Status" state="No live room selected">
+        <div className="qr-placeholder">ROOM</div>
+      </LiveFrame>
+      <FlowCard title="Lobby Flow" steps={['Create room', 'Invite members', 'Ready players', 'Launch game']} />
+      <ActionStack title="Lobby Actions" actions={[ui.bingo.join, ui.bingo.ready, ui.bingo.party]} />
+    </MenuWorkspace>
   );
 }
 
 function PlayerCardScreen() {
   return (
-    <div className="assembled-page player-page">
-      <div className="player-piece-row">
-        <img src={ui.player.emptyCard} alt="" />
-        <img src={ui.player.coveredCard} alt="" />
-        <img src={ui.player.calledCard} alt="" />
-        <img src={ui.player.lipSyncCard} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.player.mark} label="Mark" />
-          <AssetButton src={ui.player.undo} label="Undo" />
-          <AssetButton src={ui.player.confirm} label="Confirm" />
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Player Game" title="Bingo Card" layout="member">
+      <LiveFrame title="Player Card" state="Card appears after player joins a live room">
+        <BingoCard compact />
+      </LiveFrame>
+      <FlowCard title="Player Flow" steps={['Join room', 'Receive card', 'Mark calls', 'Submit bingo']} />
+      <ActionStack title="Card Actions" actions={[ui.player.mark, ui.player.undo, ui.player.confirm]} />
+    </MenuWorkspace>
   );
 }
 
 function HostScreen() {
   return (
-    <div className="assembled-page host-page">
-      <div className="host-piece-row">
-        <img src={ui.host.liveRound} alt="" />
-        <img src={ui.host.songHistory} alt="" />
-        <img src={ui.host.hostNotes} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.host.callSong} label="Call Song" />
-          <AssetButton src={ui.host.skipSong} label="Skip Song" />
-          <AssetButton src={ui.host.nextSong} label="Next Song" />
-          <AssetButton src={ui.host.pauseRound} label="Pause Round" />
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Operator" title="Host / DJ Control" layout="staff">
+      <LiveFrame title="Round Control" state="Host tools activate after a room is selected">
+        <QueueRows />
+      </LiveFrame>
+      <FlowCard title="Host Flow" steps={['Create round', 'Call song', 'Review claims', 'Close round']} />
+      <ActionStack title="Host Actions" actions={[ui.host.callSong, ui.host.skipSong, ui.host.nextSong, ui.host.pauseRound]} />
+    </MenuWorkspace>
   );
 }
 
-function VerificationScreen() {
+function VerificationScreen({ navigate }) {
   return (
-    <div className="assembled-page verification-page">
-      <div className="verify-piece-row">
-        <img src={ui.verify.keypad} alt="" />
-        <img src={ui.verify.result} alt="" />
-        <div className="status-strip">
-          {[ui.verify.valid, ui.verify.expired, ui.verify.trespass, ui.verify.privateMember].map((item) => <img src={item} alt="" key={item} />)}
+    <MenuWorkspace eyebrow="Staff Check-In" title="Verify Tier" layout="staff">
+      <LiveFrame title="Tier Verification" state="Scan or search a member first">
+        <div className="verify-tier-live">
+          <img src={ui.verify.qrFrame} alt="" />
+          <StatusStrip items={[ui.verify.cardNumber, ui.verify.privateMember]} />
         </div>
-        <div className="staff-image-actions">
-          <AssetButton src={ui.verify.verifyCard} label="Verify Card" />
-          <AssetButton src={ui.verify.rejectCard} label="Reject Card" />
-        </div>
-      </div>
-    </div>
+      </LiveFrame>
+      <FlowCard title="Decision Flow" steps={['Load member', 'Check plan', 'Confirm venue access', 'Open entry decision']} />
+      <ActionStack
+        title="Tier Actions"
+        navigate={navigate}
+        actions={[
+          { src: ui.verify.verifyCard, label: 'Verify Card', target: 'entry' },
+          { src: ui.verify.rejectCard, label: 'Reject Card', target: 'checkInLog' },
+          { src: ui.buttons.manual, label: 'Manual Check-In', target: 'searchMember' },
+        ]}
+      />
+    </MenuWorkspace>
   );
 }
 
 function SongQueueScreen() {
   return (
-    <div className="assembled-page queue-page">
-      <div className="queue-piece-row">
-        <img src={ui.queue.nowPlaying} alt="" />
-        <img src={ui.queue.queuePanel} alt="" />
-        <img src={ui.queue.roundTracker} alt="" />
-        <div className="genre-chip-row">
-          {[ui.queue.allSongs, ui.queue.hipHop, ui.queue.rb, ui.queue.country, ui.queue.dance].map((item) => <img src={item} alt="" key={item} />)}
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Host Tools" title="Song Queue / Call History" layout="staff">
+      <LiveFrame title="Queue" state="Song queue loads from the host session">
+        <QueueRows />
+      </LiveFrame>
+      <FlowCard title="Queue Flow" steps={['Add songs', 'Call next', 'Track history', 'Lock round']} />
+      <ActionStack title="Queue Actions" actions={[ui.host.callSong, ui.host.nextSong, ui.host.pauseRound]} />
+    </MenuWorkspace>
   );
 }
 
 function WinnerScreen() {
   return (
-    <div className="assembled-page winner-page">
-      <div className="winner-piece-row">
-        <img src={ui.winner.spotlight} alt="" />
-        <img src={ui.winner.prize} alt="" />
-        <img src={ui.winner.payout} alt="" />
-        <div className="genre-chip-row">
-          {[ui.winner.correct, ui.winner.wrong, ui.winner.bingo, ui.winner.missed].map((item) => <img src={item} alt="" key={item} />)}
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Rewards" title="Winner Validation / Payout" layout="staff">
+      <LiveFrame title="Claim Review" state="Claims appear after a player submits bingo">
+        <StatusStrip items={[ui.verify.cardNumber, ui.verify.privateMember]} />
+      </LiveFrame>
+      <FlowCard title="Winner Flow" steps={['Review card', 'Confirm pattern', 'Approve reward', 'Log payout']} />
+      <ActionStack title="Winner Actions" actions={[ui.verify.verifyCard, ui.verify.rejectCard, ui.buttons.manual]} />
+    </MenuWorkspace>
   );
 }
 
-function CheckoutScreen() {
+function CheckoutScreen({ navigate }) {
   return (
-    <div className="sheet-screen-grid checkout-flow">
-      <AppPanel title="Payment Methods" subtitle="Checkout">
+    <MenuWorkspace eyebrow="Checkout" title="Payment Methods" layout="member">
+      <LiveFrame title="Payment Step" state="Select a plan before taking payment">
         <CheckoutMethods />
-      </AppPanel>
-      <AppPanel title="Checkout State" subtitle="Live payment step">
-        <div className="checkout-state">
-          <strong>Select Payment</strong>
-          <span>Plan price and member status render from app data.</span>
-        </div>
-      </AppPanel>
-    </div>
+      </LiveFrame>
+      <FlowCard title="Checkout Flow" steps={['Select plan', 'Choose payment', 'Confirm payment', 'Issue pass']} />
+      <ActionStack
+        title="Plan Actions"
+        navigate={navigate}
+        actions={ui.planActions.map((action) => ({ src: action.src, label: action.label, target: 'membership' }))}
+      />
+    </MenuWorkspace>
   );
 }
 
 function PartyScreen() {
   return (
-    <div className="assembled-page party-page">
-      <div className="party-piece-row">
-        <img src={ui.party.battleCard} alt="" />
-        <img src={ui.party.hypeMeter} alt="" />
-        <img src={ui.party.startBattle} alt="" />
-        <div className="reaction-row">
-          {[ui.party.reaction1, ui.party.reaction2, ui.party.reaction3, ui.party.reaction4].map((item) => <img src={item} alt="" key={item} />)}
-        </div>
-      </div>
-    </div>
+    <MenuWorkspace eyebrow="Party Mode" title="Party Mode Battlez" layout="member">
+      <LiveFrame title="Battle Status" state="Battle mode waits for a host session">
+        <StatusStrip items={[ui.chips.vip, ui.chips.checkedIn]} />
+      </LiveFrame>
+      <FlowCard title="Party Flow" steps={['Create battle', 'Invite players', 'Track reactions', 'Award winner']} />
+      <ActionStack title="Party Actions" actions={[ui.party.mode, ui.party.battlez, ui.party.quickPlay]} />
+    </MenuWorkspace>
   );
 }
 
-function PassScreen() {
+function PassScreen({ navigate }) {
   return (
-    <div className="pass-layout refined">
-      <AppPanel title="My Pass" subtitle="Menu destination">
-        <p className="panel-note">This page will hold the live member pass after the menu system is approved. Sheet examples with names and fake IDs are not used as live member data.</p>
-        <StatusStrip items={[ui.chips.active, ui.chips.vip]} />
-      </AppPanel>
-      <AppPanel title="Plan Actions" subtitle="Renewal and upgrade controls">
-        <div className="tier-live-grid">
-          {ui.tiers.map((tier) => (
-            <button className="image-action tile-image-button" type="button" key={tier.name} aria-label={`${tier.name} ${tier.status}`}>
-              <img src={tier.src} alt="" />
-              <span>{tier.status}</span>
-            </button>
-          ))}
+    <MenuWorkspace eyebrow="Member App" title="My Pass" layout="pass">
+      <LiveFrame title="Pass Card" state="No active member loaded">
+        <div className="pass-card-empty">
+          <img src={mainMenuUi.logo} alt="" />
+          <div className="qr-placeholder">QR</div>
         </div>
-        <PlanActionGrid />
-        <CheckoutMethods />
-      </AppPanel>
-    </div>
+      </LiveFrame>
+      <WalletTierRail />
+      <ActionStack
+        title="Pass Actions"
+        navigate={navigate}
+        actions={[
+          { src: ui.buttons.selectPlan, label: 'Select Plan', target: 'membership' },
+          { src: ui.buttons.renewPlan, label: 'Renew Plan', target: 'checkout' },
+        ]}
+      />
+    </MenuWorkspace>
   );
 }
 
 function EventScreen() {
   return (
-    <div className="access-screen-grid">
-      <AppPanel title="Event Access" subtitle="Tonight">
-        <AccessRow title="Main Floor Social" status="Unlocked" chip={ui.chips.active} />
-        <AccessRow title="Lip Sync Bingo" status="Available" chip={ui.chips.checkedIn} />
-        <AccessRow title="VIP Lounge" status="VIP Verified" chip={ui.chips.vip} />
-      </AppPanel>
-      <AppPanel title="Plan Actions" subtitle="Shown only when needed">
-        <p className="panel-note">If access expires, the member chooses a plan action first, then finishes through a payment method.</p>
-        <PlanActionGrid />
-        <CheckoutMethods />
-      </AppPanel>
-    </div>
+    <MenuWorkspace eyebrow="Member App" title="Event Access" layout="access">
+      <LiveFrame title="Available Events" state="Events populate from the venue schedule">
+        <StatusStrip items={[]} />
+      </LiveFrame>
+      <FlowCard title="Access Logic" steps={['Choose event', 'Verify pass', 'Show QR']} />
+    </MenuWorkspace>
   );
 }
 
 function VenueScreen() {
   return (
-    <div className="venue-screen-grid menu-only">
-      <AppPanel title="Venue Access" subtitle="Venue menu">
-        <AccessRow title="Front Door" status="Granted" chip={ui.chips.active} />
-        <AccessRow title="Networking Floor" status="Open" chip={ui.chips.checkedIn} />
-        <AccessRow title="VIP Lounge" status="VIP" chip={ui.chips.vip} />
-      </AppPanel>
-    </div>
+    <MenuWorkspace eyebrow="Member App" title="Venue Access" layout="access">
+      <LiveFrame title="Venue Permissions" state="Access zones load after member verification">
+        <StatusStrip items={[]} />
+      </LiveFrame>
+      <FlowCard title="Venue Flow" steps={['Confirm plan', 'Check venue rules', 'Show entry status']} />
+    </MenuWorkspace>
   );
 }
 
@@ -999,6 +1103,68 @@ function StaffScreen() {
         </div>
       </AppPanel>
     </div>
+  );
+}
+
+function StaffDashboardScreen({ navigate }) {
+  return (
+    <MenuWorkspace eyebrow="Staff Check-In" title="Dashboard" layout="staff">
+      <LiveFrame title="Door Status" state="No live check-in session selected">
+        <StatusStrip items={[ui.chips.staff, ui.chips.active]} />
+      </LiveFrame>
+      <FlowCard title="Staff Flow" steps={['Scan app', 'Search member', 'Verify tier', 'Grant or deny']} />
+      <ActionStack
+        title="Door Controls"
+        navigate={navigate}
+        actions={[
+          { src: ui.buttons.scan, label: 'Scan App', target: 'payVerify' },
+          { src: ui.buttons.manual, label: 'Manual Check-In', target: 'searchMember' },
+          { src: ui.buttons.rescan, label: 'Rescan', target: 'payVerify' },
+        ]}
+      />
+    </MenuWorkspace>
+  );
+}
+
+function SearchMemberScreen({ navigate }) {
+  return (
+    <MenuWorkspace eyebrow="Staff Check-In" title="Search Member" layout="staff">
+      <LiveFrame title="Member Lookup" state="Enter a member number, phone, or name">
+        <div className="designer-search-box">
+          <span>Search</span>
+          <input type="text" placeholder="Member number or name" />
+        </div>
+      </LiveFrame>
+      <FlowCard title="Lookup Flow" steps={['Search', 'Review match', 'Verify tier', 'Open decision']} />
+      <ActionStack
+        title="Lookup Actions"
+        navigate={navigate}
+        actions={[
+          { src: ui.buttons.verify, label: 'Verify Member', target: 'verification' },
+          { src: ui.buttons.manual, label: 'Manual Check-In', target: 'entry' },
+          { src: ui.buttons.rescan, label: 'Rescan', target: 'payVerify' },
+        ]}
+      />
+    </MenuWorkspace>
+  );
+}
+
+function CheckInLogScreen({ navigate }) {
+  return (
+    <MenuWorkspace eyebrow="Staff Check-In" title="Check-In Log" layout="staff">
+      <LiveFrame title="Recent Activity" state="No check-ins loaded yet">
+        <StatusStrip items={[ui.chips.checkedIn, ui.chips.staff]} />
+      </LiveFrame>
+      <FlowCard title="Audit Flow" steps={['Review decision', 'Filter by staff', 'Export when connected']} />
+      <ActionStack
+        title="Log Actions"
+        navigate={navigate}
+        actions={[
+          { src: ui.buttons.rescan, label: 'Rescan', target: 'payVerify' },
+          { src: ui.buttons.manual, label: 'Manual Check-In', target: 'searchMember' },
+        ]}
+      />
+    </MenuWorkspace>
   );
 }
 
@@ -1042,33 +1208,106 @@ function SimpleAccessScreen({ title, rows }) {
 
 function ProfileScreen() {
   return (
-    <div className="profile-grid">
-      <AppPanel title="Member Profile" subtitle="Identity">
-        <div className="profile-card">
-          <img src={ui.logo} alt="" />
-          <div>
-            <strong>Member Profile</strong>
-            <span>Account and preference controls</span>
-            <StatusStrip items={[ui.chips.active, ui.chips.vip]} />
-          </div>
-        </div>
-      </AppPanel>
-      <AppPanel title="Preferences" subtitle="Member settings">
-        <AccessRow title="Music" status="On" chip={ui.chips.active} />
-        <AccessRow title="Entry Alerts" status="On" chip={ui.chips.checkedIn} />
-        <AccessRow title="Private Member" status="Enabled" chip={ui.chips.vip} />
-      </AppPanel>
-    </div>
+    <MenuWorkspace eyebrow="Member Account" title="Profile" layout="member">
+      <LiveFrame title="Profile Details" state="Profile fields load after account sign-in">
+        <img className="profile-emblem" src={mainMenuUi.logo} alt="" />
+      </LiveFrame>
+      <FlowCard title="Account Areas" steps={['Contact', 'Preferences', 'Privacy']} />
+    </MenuWorkspace>
   );
 }
 
 function HistoryScreen() {
   return (
-    <div className="history-list">
-      <AppPanel title="Activity History" subtitle="Menu destination">
-        <p className="panel-note">History rows will be generated from real member activity. The sheet examples are blueprint references only.</p>
-      </AppPanel>
+    <MenuWorkspace eyebrow="Member Account" title="History" layout="member">
+      <LiveFrame title="Activity Timeline" state="No member history loaded">
+        <StatusStrip items={[ui.chips.checkedIn]} />
+      </LiveFrame>
+      <FlowCard title="History Types" steps={['Entries', 'Payments', 'Venue access']} />
+    </MenuWorkspace>
+  );
+}
+
+function MenuWorkspace({ eyebrow, title, layout, children }) {
+  return (
+    <div className={`designer-workspace designer-${layout}`}>
+      <section className="designer-hero-card">
+        <span>{eyebrow}</span>
+        <h2>{title}</h2>
+        <p>Live data appears here only after the member, venue, staff session, or payment step provides it.</p>
+      </section>
+      <div className="designer-content-grid">{children}</div>
     </div>
+  );
+}
+
+function LiveFrame({ title, state, children }) {
+  return (
+    <article className="designer-panel live-frame">
+      <header>
+        <span>{title}</span>
+        <strong>{state}</strong>
+      </header>
+      <div className="live-frame-body">{children}</div>
+    </article>
+  );
+}
+
+function FlowCard({ title, steps }) {
+  return (
+    <article className="designer-panel flow-card">
+      <header>
+        <span>{title}</span>
+      </header>
+      <div className="flow-step-list">
+        {steps.map((step, index) => (
+          <div className="flow-step" key={step}>
+            <b>{index + 1}</b>
+            <strong>{step}</strong>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ActionStack({ title, actions, navigate }) {
+  return (
+    <article className="designer-panel action-stack">
+      <header>
+        <span>{title}</span>
+      </header>
+      <div className="designer-action-list">
+        {actions.map((action) => {
+          const item = typeof action === 'string' ? { src: action, label: 'Action' } : action;
+          return (
+            <AssetButton
+              src={item.src}
+              label={item.label}
+              key={`${item.src}-${item.label}`}
+              onClick={item.target && navigate ? () => navigate(item.target) : undefined}
+            />
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+function WalletTierRail() {
+  return (
+    <article className="designer-panel wallet-tier-rail">
+      <header>
+        <span>Membership Wallet</span>
+      </header>
+      <div>
+        {ui.tiers.map((tier) => (
+          <button className="tier-wallet-item" type="button" key={tier.name} aria-label={`${tier.name} plan`}>
+            <img src={tier.src} alt="" />
+          </button>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -1202,9 +1441,9 @@ function StatusStrip({ items }) {
   );
 }
 
-function AssetButton({ src, label }) {
+function AssetButton({ src, label, onClick }) {
   return (
-    <button className="image-action" type="button" aria-label={label}>
+    <button className="image-action" type="button" aria-label={label} onClick={onClick}>
       <img src={src} alt="" />
     </button>
   );
