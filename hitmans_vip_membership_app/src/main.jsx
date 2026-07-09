@@ -408,6 +408,22 @@ const appMenus = [
   },
 ];
 
+// Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
+// app works under a GitHub Pages project subpath as well as at root. All
+// asset paths funnel through the four data objects above, so one in-place
+// recursive pass covers every reference.
+const ASSET_BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+const prefixAssets = (node) => {
+  if (typeof node === 'string') return node.startsWith('/assets/') ? ASSET_BASE + node : node;
+  if (Array.isArray(node)) return node.map(prefixAssets);
+  if (node && typeof node === 'object') {
+    for (const key of Object.keys(node)) node[key] = prefixAssets(node[key]);
+    return node;
+  }
+  return node;
+};
+[ui, screens, loadingPhases, appMenus].forEach(prefixAssets);
+
 function App() {
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
