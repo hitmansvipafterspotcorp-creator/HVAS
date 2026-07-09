@@ -82,7 +82,7 @@ button {
 }
 
 .dynamic-bg-hitkoin {
-  background-image: url("/hvas/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png");
+  background-image: url("/HVAS/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png");
   background-position: center;
   background-size: auto 112%;
   animation: hitkoin-cycle 26s cubic-bezier(0.42, 0, 0.24, 1) infinite;
@@ -107,7 +107,7 @@ button {
 }
 
 .dynamic-bg-vip {
-  background-image: url("/hvas/assets/ui/main-menu-background.png");
+  background-image: url("/HVAS/assets/ui/main-menu-background.png");
   background-position: center;
   background-size: auto 112%;
   animation: vip-cycle 26s cubic-bezier(0.42, 0, 0.24, 1) infinite;
@@ -2528,7 +2528,7 @@ button {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-image: url("/hvas/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png");
+  background-image: url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png");
   background-size: 100% 100%;
   background-position: center;
   background-repeat: no-repeat;
