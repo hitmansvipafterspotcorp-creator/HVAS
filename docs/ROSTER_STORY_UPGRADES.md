@@ -115,6 +115,36 @@ against its original so no sprite was silently damaged.
   - `photographer/combat/r00_f00`, `photographer/combat/r03_f00` — label
     fused to a partial lunge pose.
 
+## 5b. Full integrity sweep — "missing body parts / VFX fully sliced"
+
+Checked every fighter, every sheet.
+
+- **Character completeness is GOOD.** Of ~3,600 character frames (loco/combat/
+  damage/supers/topdown), only **16** are shorter than half their animation
+  row's body height — and most of those are *legitimately* short (knockdown/
+  prone damage poses, smaller top-down sprites, or the f00 label frames already
+  handled). Genuinely clipped "missing arm/head/half-body" frames are a small
+  handful, not widespread. **The roster is not a mass redo.**
+- **VFX sizes vary by design** (a burst grows then fades) — large size
+  variation in vfx rows is NOT a defect. The real VFX risk is effects that
+  cross cell boundaries on the source sheet (e.g. photographer's "Exposure
+  Beam" spans columns); those are clipped at the cell edge by the sheet's own
+  layout and can only be fully recovered by re-slicing with overlapping cells
+  or regenerating — inherent, low-impact.
+- **Root cause of both leaks and clips:** the slicer uses a fixed 8-col grid
+  (`GRID_X0=346, FRAME_W=131`) calibrated for the 1448×1086 opaque sheets; the
+  cleaner transparent `tsheet` variants are a different size (e.g. 1048×868)
+  and their columns overlap (VFX/pose bleed), so neither a fixed grid nor a
+  simple adaptive projection slices them perfectly.
+
+### Remaining true remainder (needs careful, verified re-slice — not bulk auto)
+- 6 label frames from §5 (kt, kendrick, big_soulja/combat, eld/damage,
+  photographer/combat ×2).
+- ~handful of genuinely-clipped character frames (dj/damage, photographer,
+  a few f00 combat) — verify individually against row siblings before re-cut.
+- kt, kendrick: off-model realistic style — **regenerate** to match chibi,
+  can't be sliced clean from the existing source.
+
 ## 6. Status
 - [x] Real roster imported into Character Select (13 playable portraits).
 - [x] Story rewritten around the real crew + named tier.
