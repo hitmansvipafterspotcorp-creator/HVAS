@@ -469,6 +469,8 @@ const ROSTER = [
   { id: 'famu_male', name: 'FAMU Student ♂', role: 'Campus to club', portrait: '/assets/fighters/famu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#52ffa8' },
   { id: 'fsu_female', name: 'FSU Student ♀', role: 'New to the scene', portrait: '/assets/fighters/fsu_female.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
   { id: 'fsu_male', name: 'FSU Student ♂', role: 'Chasing status', portrait: '/assets/fighters/fsu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
+  { id: 'kendrick', name: 'Kendrick', role: 'Kitchen manager · chef', portrait: '/assets/fighters/kendrick.png', strong: 'Kitchen combos · pan block · crowd feed', weak: 'Mid mobility', accent: '#4c9cff' },
+  { id: 'kt', name: 'KT', role: 'Cafe8Fifty owner · boss', portrait: '/assets/fighters/kt.png', strong: 'Owner access · money · boss presence', weak: 'Heavy, slower dodge', accent: '#ff3b3b' },
 ];
 // Story / boss tier — met on the route, unlockable later. Shown locked (also
 // keeps the two art-remaster fighters, kendrick & kt, from rendering broken).
@@ -477,8 +479,6 @@ const STORY_TIER = [
   { id: 'eld', name: 'Entry Line Disruptor', note: 'Recurring problem' },
   { id: 'predator_pete', name: 'Predator Pete', note: 'Rival boss' },
   { id: 'agent_snow', name: 'Agent Snow', note: 'Final boss' },
-  { id: 'kendrick', name: 'Kendrick', note: 'Remaster in progress' },
-  { id: 'kt', name: 'KT', note: 'Remaster in progress' },
 ];
 
 // Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
