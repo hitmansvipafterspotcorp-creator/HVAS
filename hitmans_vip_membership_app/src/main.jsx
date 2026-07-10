@@ -381,32 +381,67 @@ const loadingPhases = [
   { until: 100, label: 'Ready', message: 'Ready' },
 ];
 
-const appMenus = [
+// ── Roles & access control ──────────────────────────────────────────────
+// Three distinct experiences. A user lands on a role picker and only ever
+// sees the screens for their role — members never see staff/host tools, and
+// host/operator tools are hidden from everyone but the operator. Items can
+// be gated behind a session flag via `requires` (shown locked, not hidden,
+// so the member knows the path exists — e.g. Event/Venue Access unlock only
+// after check-in). Screens not in a role's ALLOWED set are unreachable.
+const ROLES = [
   {
-    title: 'Member App',
-    subtitle: 'Recommended menu flow',
-    items: [
+    id: 'member',
+    label: 'Member',
+    tagline: 'Your night, your access',
+    eyebrow: 'MEMBER APP',
+    chip: 'vip',
+    menu: [
       { title: 'Home', detail: 'Overview and quick status', chip: ui.chips.active, target: 'memberHome' },
-      { title: 'My Pass', detail: 'View pass and tier status', chip: ui.chips.vip, target: 'myPass' },
-      { title: 'Event Access', detail: 'Events you can attend', chip: ui.chips.checkedIn, target: 'eventAccess' },
-      { title: 'Venue Access', detail: 'Venues you can access', chip: ui.chips.active, target: 'venueAccess' },
+      { title: 'My Pass', detail: 'Pass, tier, and QR access', chip: ui.chips.vip, target: 'myPass' },
+      { title: 'Membership', detail: 'Plans, upgrades, renewals', chip: ui.chips.vip, target: 'membership' },
+      { title: 'Event Access', detail: 'Events you can attend', chip: ui.chips.checkedIn, target: 'eventAccess', requires: 'checkedIn' },
+      { title: 'Venue Access', detail: 'Venues you can enter', chip: ui.chips.active, target: 'venueAccess', requires: 'checkedIn' },
       { title: 'Profile', detail: 'Account and preferences', chip: ui.chips.vip, target: 'profile' },
       { title: 'History', detail: 'Past entries and activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
+    allowed: ['memberHome', 'myPass', 'membership', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
   },
   {
-    title: 'Staff Check-In',
-    subtitle: 'Staff verification flow',
-    items: [
-      { title: 'Dashboard', detail: 'Overview and stats', chip: ui.chips.staff, target: 'staffDashboard' },
-      { title: 'Scan App', detail: 'Scan member QR code', chip: ui.chips.active, target: 'payVerify' },
-      { title: 'Search Member', detail: 'Search by name or ID', chip: ui.chips.checkedIn, target: 'searchMember' },
-      { title: 'Verify Tier', detail: 'Check plan and status', chip: ui.chips.vip, target: 'verification' },
-      { title: 'Grant / Deny Entry', detail: 'Approve or deny access', chip: ui.chips.staff, target: 'payVerify' },
-      { title: 'Check-In Log', detail: 'View entry history', chip: ui.chips.checkedIn, target: 'checkInLog' },
+    id: 'staff',
+    label: 'Staff Check-In',
+    tagline: 'Door and verification tools',
+    eyebrow: 'STAFF',
+    chip: 'staff',
+    menu: [
+      { title: 'Dashboard', detail: 'Door status and stats', chip: ui.chips.staff, target: 'staffDashboard' },
+      { title: 'Scan · Pay & Verify', detail: 'Scan member, take entry', chip: ui.chips.active, target: 'payVerify' },
+      { title: 'Search Member', detail: 'Find by name or ID', chip: ui.chips.checkedIn, target: 'searchMember' },
+      { title: 'Verify Card', detail: 'QR + keypad validation', chip: ui.chips.vip, target: 'verification' },
+      { title: 'Member Entry', detail: 'Grant / deny at the door', chip: ui.chips.staff, target: 'entry' },
+      { title: 'Check-In Log', detail: 'Recent door decisions', chip: ui.chips.checkedIn, target: 'checkInLog' },
     ],
+    allowed: ['staffDashboard', 'payVerify', 'searchMember', 'verification', 'entry', 'checkInLog'],
+  },
+  {
+    id: 'host',
+    label: 'Host / Operator',
+    tagline: 'Lip Sync Bingo night controls',
+    eyebrow: 'OPERATOR',
+    chip: 'staff',
+    menu: [
+      { title: 'Game Menu', detail: 'Bingo setup and selectors', chip: ui.chips.staff, target: 'bingoStyle' },
+      { title: 'Lobby', detail: 'Join, ready, party mode', chip: ui.chips.active, target: 'lobby' },
+      { title: 'Player Card', detail: 'Card, marks, confirm', chip: ui.chips.checkedIn, target: 'playerCard' },
+      { title: 'Host Control', detail: 'Rounds, queue, notes', chip: ui.chips.staff, target: 'host' },
+      { title: 'Song Queue', detail: 'Now playing and history', chip: ui.chips.vip, target: 'songQueue' },
+      { title: 'Winner · Payout', detail: 'Validate and pay out', chip: ui.chips.vip, target: 'winner' },
+      { title: 'TV Display', detail: 'Public room screen', chip: ui.chips.active, target: 'tv' },
+      { title: 'Party Mode', detail: 'Battlez and voting', chip: ui.chips.staff, target: 'party' },
+    ],
+    allowed: ['bingoStyle', 'lobby', 'playerCard', 'host', 'songQueue', 'winner', 'tv', 'party'],
   },
 ];
+const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
 
 // Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
 // app works under a GitHub Pages project subpath as well as at root. All
@@ -422,11 +457,13 @@ const prefixAssets = (node) => {
   }
   return node;
 };
-[ui, screens, loadingPhases, appMenus].forEach(prefixAssets);
+[ui, screens, loadingPhases, ROLES].forEach(prefixAssets);
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
+  const [role, setRole] = useState(null);       // null until the user picks a role
+  const [checkedIn, setCheckedIn] = useState(false); // gates member event/venue access
   const [transition, setTransition] = useState({
     active: true,
     from: 'Loading',
@@ -499,12 +536,22 @@ function App() {
     if (nextId === activeScreen || transition.active) return;
     const next = screens.find((screen) => screen.id === nextId);
     if (!next) return;
+    // Access control: outside 'home', the target must be in the active role's
+    // allowed set — members can never reach staff/host tools, and vice versa.
+    if (nextId !== 'home') {
+      const r = roleById(role);
+      if (!r || !r.allowed.includes(nextId)) return;
+    }
     setTargetScreen(nextId);
     runTransition(current.title, next.title, () => {
       setActiveScreen(nextId);
       setTargetScreen(nextId);
     });
   }
+
+  const session = { role, checkedIn };
+  function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); }
+  function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); }
 
   return (
     <main className="app-shell menu-shell">
@@ -513,10 +560,27 @@ function App() {
         <span className="dynamic-bg-layer dynamic-bg-vip" />
       </div>
       <TransitionOverlay transition={transition} destination={targetScreen} />
-      <section className={`screen screen-${current.id}`}>
-        {current.id !== 'home' && <ScreenHeader screen={current} onBack={() => navigate('home')} />}
-        <ScreenBody activeScreen={current.id} navigate={navigate} />
-      </section>
+      {!role ? (
+        <RoleLanding onPick={chooseRole} />
+      ) : (
+        <section className={`screen screen-${current.id}`}>
+          {current.id === 'home' ? (
+            <RoleBadge
+              role={roleById(role)}
+              checkedIn={checkedIn}
+              onToggleCheckIn={() => setCheckedIn((v) => !v)}
+              onSwitch={switchRole}
+            />
+          ) : (
+            <ScreenHeader screen={current} onBack={() => navigate('home')} />
+          )}
+          {current.id === 'home' ? (
+            <HomeScreen role={roleById(role)} session={session} navigate={navigate} />
+          ) : (
+            <ScreenBody activeScreen={current.id} navigate={navigate} />
+          )}
+        </section>
+      )}
     </main>
   );
 }
@@ -553,7 +617,8 @@ function ScreenHeader({ screen, onBack }) {
 }
 
 function ScreenBody({ activeScreen, navigate }) {
-  if (activeScreen === 'home') return <HomeScreen navigate={navigate} />;
+  // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
+  // the individual screens below.
   if (activeScreen === 'payVerify') return <PayVerifyScreen />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
   if (activeScreen === 'myPass') return <PassScreen />;
@@ -579,25 +644,76 @@ function ScreenBody({ activeScreen, navigate }) {
   return <PartyScreen />;
 }
 
-function HomeScreen({ navigate }) {
+// Landing role picker — the app entry gate. A user is one of three things,
+// and each sees a completely separate surface after this.
+function RoleLanding({ onPick }) {
+  return (
+    <section className="screen screen-landing">
+      <div className="home-dashboard">
+        <section className="sheet-title-banner">
+          <div>
+            <span>HITMANS VIP AFTER SPOT CORP.</span>
+            <h1>Choose Access</h1>
+          </div>
+        </section>
+        <div className="role-landing">
+          {ROLES.map((r) => (
+            <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
+              <span className="role-card-eyebrow">{r.eyebrow}</span>
+              <strong className="role-card-label">{r.label}</strong>
+              <span className="role-card-tagline">{r.tagline}</span>
+              <span className="role-card-go">Enter →</span>
+            </button>
+          ))}
+        </div>
+        <p className="role-landing-note">Members, door staff, and hosts each get their own screens. You only see what your role allows.</p>
+      </div>
+    </section>
+  );
+}
+
+// Compact header on the role home: shows current role, a demo check-in
+// toggle (progressive unlock), and a way back to the role picker.
+function RoleBadge({ role, checkedIn, onToggleCheckIn, onSwitch }) {
+  return (
+    <header className="role-badge">
+      <div className="role-badge-id">
+        <span className="eyebrow">{role.eyebrow}</span>
+        <h1>{role.label}</h1>
+      </div>
+      <div className="role-badge-actions">
+        {role.id === 'member' && (
+          <button type="button" className={`role-badge-checkin ${checkedIn ? 'on' : ''}`} onClick={onToggleCheckIn}>
+            {checkedIn ? '● Checked In' : '○ Check In'}
+          </button>
+        )}
+        <button type="button" className="role-badge-switch" onClick={onSwitch}>Switch</button>
+      </div>
+    </header>
+  );
+}
+
+function HomeScreen({ role, session, navigate }) {
   return (
     <div className="home-dashboard">
-      <section className="sheet-title-banner">
-        <div>
-          <span>HITMANS VIP AFTER SPOT CORP.</span>
-          <h1>After Spot Main Menu</h1>
-        </div>
-      </section>
       <div className="app-menu-board">
-        {appMenus.map((menu) => (
-          <AppPanel key={menu.title} title={menu.title} subtitle={menu.subtitle}>
-            <div className="menu-flow-list">
-              {menu.items.map((item, index) => (
-                <MenuFlowRow key={item.title} index={index + 1} onSelect={() => navigate(item.target)} {...item} />
-              ))}
-            </div>
-          </AppPanel>
-        ))}
+        <AppPanel title={role.label} subtitle={role.tagline}>
+          <div className="menu-flow-list">
+            {role.menu.map((item, index) => {
+              const locked = Boolean(item.requires) && !session[item.requires];
+              return (
+                <MenuFlowRow
+                  key={item.title}
+                  index={index + 1}
+                  {...item}
+                  detail={locked ? 'Locked · check in to unlock' : item.detail}
+                  locked={locked}
+                  onSelect={() => { if (!locked) navigate(item.target); }}
+                />
+              );
+            })}
+          </div>
+        </AppPanel>
       </div>
     </div>
   );
@@ -1155,15 +1271,23 @@ function AppPanel({ title, subtitle, children, className = '' }) {
   );
 }
 
-function MenuFlowRow({ chip, index, title, detail, target, onSelect }) {
+function MenuFlowRow({ chip, index, title, detail, target, onSelect, locked = false }) {
   return (
-    <button className="menu-flow-row" type="button" data-target={target} aria-label={`${title}. ${detail}`} onClick={onSelect}>
+    <button
+      className={`menu-flow-row${locked ? ' locked' : ''}`}
+      type="button"
+      data-target={target}
+      aria-label={`${title}. ${detail}`}
+      aria-disabled={locked}
+      onClick={onSelect}
+    >
       <b>{index}</b>
       <img className="beveled-asset chip-asset" src={chip} alt="" />
       <div>
         <strong>{title}</strong>
         <span>{detail}</span>
       </div>
+      {locked && <span className="menu-flow-lock" aria-hidden="true">🔒</span>}
     </button>
   );
 }

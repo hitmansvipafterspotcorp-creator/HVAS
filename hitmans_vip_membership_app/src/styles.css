@@ -2651,3 +2651,76 @@ button {
   }
 
 }
+
+/* ── Role landing + access gating ─────────────────────────────────────── */
+.role-landing {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+}
+.role-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 214, 107, 0.35);
+  background: linear-gradient(135deg, rgba(28, 6, 40, 0.92), rgba(10, 2, 18, 0.92));
+  color: #fff8e8;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.role-card:hover {
+  transform: translateY(-2px);
+  border-color: #ffd66b;
+  box-shadow: 0 10px 30px rgba(127, 60, 255, 0.35);
+}
+.role-card-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #ff2bd6;
+  font-weight: 800;
+}
+.role-card-label { font-size: 24px; font-weight: 900; color: #ffd66b; }
+.role-card-tagline { font-size: 13px; color: #c9b8ff; }
+.role-card-go { margin-top: 6px; font-size: 13px; font-weight: 800; color: #52ffa8; }
+.role-card-member:hover { box-shadow: 0 10px 30px rgba(255, 43, 214, 0.3); }
+.role-card-staff:hover { box-shadow: 0 10px 30px rgba(82, 255, 168, 0.25); }
+.role-landing-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #9a86c8;
+  text-align: center;
+}
+
+.role-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.role-badge-id .eyebrow { color: #ff2bd6; font-size: 11px; letter-spacing: 0.16em; font-weight: 800; }
+.role-badge-id h1 { font-size: 22px; font-weight: 900; color: #ffd66b; margin: 0; }
+.role-badge-actions { display: flex; gap: 8px; }
+.role-badge-checkin,
+.role-badge-switch {
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid rgba(255, 214, 107, 0.4);
+  background: rgba(20, 4, 32, 0.9);
+  color: #fff8e8;
+}
+.role-badge-checkin.on { border-color: #52ffa8; color: #52ffa8; }
+.role-badge-switch { border-color: rgba(255, 43, 214, 0.5); color: #ff9ce8; }
+
+.menu-flow-row.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+.menu-flow-row .menu-flow-lock { margin-left: auto; font-size: 15px; }
