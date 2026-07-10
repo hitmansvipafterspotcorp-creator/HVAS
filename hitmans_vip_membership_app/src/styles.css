@@ -2781,3 +2781,47 @@ button {
 }
 .char-soon { margin-top: 10px; font-size: 11px; color: #9a86c8; text-align: center; }
 .char-hint { font-size: 12px; color: #9a86c8; text-align: center; padding: 8px; }
+
+/* ── Character select: portraits + story tier ─────────────────────────── */
+.char-card { align-items: stretch; padding-top: 10px; }
+.char-portrait {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 96px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at 50% 90%, color-mix(in srgb, var(--accent) 30%, transparent), rgba(6,2,12,0.6) 70%);
+}
+.char-portrait img {
+  height: 92px;
+  width: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));
+}
+.char-name { font-size: 13px; }
+.char-tag { font-size: 10px; }
+
+.story-tier { margin-top: 22px; }
+.story-tier h3 {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ff2bd6;
+  margin: 0 0 10px;
+}
+.story-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.story-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(154, 134, 200, 0.3);
+  background: rgba(10, 3, 18, 0.85);
+  opacity: 0.7;
+}
+.story-name { font-size: 13px; font-weight: 800; color: #c9b8ff; }
+.story-note { font-size: 10px; color: #8a7bc8; }
+.story-lock { position: absolute; top: 10px; right: 12px; font-size: 13px; opacity: 0.7; }

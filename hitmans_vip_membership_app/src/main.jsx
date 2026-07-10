@@ -451,22 +451,34 @@ const ROLES = [
 ];
 const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
 
-// ── Playable character classes ──────────────────────────────────────────
-// Each class reframes the whole night — mission types, combat baseline,
-// networking. Hidden Mentor stays locked until the story unlocks it.
-const CHARACTER_CLASSES = [
-  { id: 'promoter', name: 'Promoter', tag: 'Bring the crowd', strong: 'Networking · crowd influence · event bonuses', weak: 'Weaker combat early', accent: '#ff2bd6' },
-  { id: 'artist', name: 'Artist', tag: 'Get seen, get clout', strong: 'Charisma · stage missions · crowd hype', weak: 'Needs protection from haters', accent: '#ffd66b' },
-  { id: 'dj', name: 'DJ', tag: 'Control the vibe', strong: 'Audio / VFX boosts · venue energy', weak: 'Limited street combat', accent: '#7f3cff' },
-  { id: 'security', name: 'Security', tag: 'Keep the peace', strong: 'Combat · blocking · crowd control', weak: 'Slower networking', accent: '#52ffa8' },
-  { id: 'vendor', name: 'Vendor', tag: 'Sell the night', strong: 'Money rewards · item bonuses', weak: 'Lower special meter', accent: '#ffab4c' },
-  { id: 'host', name: 'Host / MC', tag: 'Run the room', strong: 'Mini-game bonuses · dialogue', weak: 'Mid combat', accent: '#4cc9ff' },
-  { id: 'photographer', name: 'Photographer', tag: 'Capture the moment', strong: 'Marketing · reputation missions', weak: 'Fragile in fights', accent: '#ff6b8a' },
-  { id: 'vip', name: 'VIP Member', tag: 'Elite access', strong: 'Access · rewards · networking', weak: 'Must maintain status', accent: '#ffd66b' },
-  { id: 'student', name: 'Student', tag: 'Campus to club', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#a0ffcf' },
-  { id: 'owner', name: 'Business Owner', tag: 'Build the network', strong: 'Sales · contracts · VIP access', weak: 'Combat starts weak', accent: '#c9b8ff' },
-  { id: 'dancer', name: 'Dancer', tag: 'Own the floor', strong: 'Mini-games · charisma · hype', weak: 'Low defense', accent: '#ff2bd6' },
-  { id: 'mentor', name: 'Hidden Mentor', tag: 'Locked', strong: 'Balanced · special perks', weak: 'Unlocks later in the story', accent: '#8a7bc8', locked: true },
+// ── The real roster ─────────────────────────────────────────────────────
+// Playable crew — the fighters you pick to run the night. Each reframes the
+// whole run (mission types, combat baseline, networking). Portraits are the
+// game's own idle frames.
+const ROSTER = [
+  { id: 'creator', name: 'The Creator', role: 'Movement builder', portrait: '/assets/fighters/creator.png', strong: 'Networking · influence · event bonuses', weak: 'Weaker combat early', accent: '#ff2bd6' },
+  { id: 'dj', name: 'The DJ', role: 'Vibe control', portrait: '/assets/fighters/dj.png', strong: 'Audio / VFX crowd boosts', weak: 'Limited street combat', accent: '#7f3cff' },
+  { id: 'promoter', name: 'The Promoter', role: 'Guest list', portrait: '/assets/fighters/promoter.png', strong: 'Referrals · crowd pull', weak: 'Soft in a fight early', accent: '#ff2bd6' },
+  { id: 'dancer', name: 'The Dancer', role: 'Floor · hype', portrait: '/assets/fighters/dancer.png', strong: 'Mini-games · charisma', weak: 'Low defense', accent: '#ff6b8a' },
+  { id: 'host', name: 'The Host', role: 'Runs the room', portrait: '/assets/fighters/host.png', strong: 'Mini-game + dialogue bonuses', weak: 'Mid combat', accent: '#4cc9ff' },
+  { id: 'photographer', name: 'The Lens', role: 'Social proof', portrait: '/assets/fighters/photographer.png', strong: 'Marketing · reputation', weak: 'Fragile in fights', accent: '#ffd66b' },
+  { id: 'vendor', name: 'The Vendor', role: 'Sells the night', portrait: '/assets/fighters/vendor.png', strong: 'Money · item bonuses', weak: 'Low special meter', accent: '#ffab4c' },
+  { id: 'security', name: 'Security', role: 'Keeps the peace', portrait: '/assets/fighters/security.png', strong: 'Combat · block · crowd control', weak: 'Slow networking', accent: '#52ffa8' },
+  { id: 'influencer', name: 'The Influencer', role: 'Clout · reach', portrait: '/assets/fighters/influencer.png', strong: 'Reputation · viral missions', weak: 'Needs protection', accent: '#c9b8ff' },
+  { id: 'famu_female', name: 'FAMU Student ♀', role: 'Campus to club', portrait: '/assets/fighters/famu_female.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#52ffa8' },
+  { id: 'famu_male', name: 'FAMU Student ♂', role: 'Campus to club', portrait: '/assets/fighters/famu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#52ffa8' },
+  { id: 'fsu_female', name: 'FSU Student ♀', role: 'New to the scene', portrait: '/assets/fighters/fsu_female.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
+  { id: 'fsu_male', name: 'FSU Student ♂', role: 'Chasing status', portrait: '/assets/fighters/fsu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
+];
+// Story / boss tier — met on the route, unlockable later. Shown locked (also
+// keeps the two art-remaster fighters, kendrick & kt, from rendering broken).
+const STORY_TIER = [
+  { id: 'big_soulja', name: 'Big Soulja', note: 'Story ally / wall' },
+  { id: 'eld', name: 'Entry Line Disruptor', note: 'Recurring problem' },
+  { id: 'predator_pete', name: 'Predator Pete', note: 'Rival boss' },
+  { id: 'agent_snow', name: 'Agent Snow', note: 'Final boss' },
+  { id: 'kendrick', name: 'Kendrick', note: 'Remaster in progress' },
+  { id: 'kt', name: 'KT', note: 'Remaster in progress' },
 ];
 
 // Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
@@ -483,7 +495,7 @@ const prefixAssets = (node) => {
   }
   return node;
 };
-[ui, screens, loadingPhases, ROLES].forEach(prefixAssets);
+[ui, screens, loadingPhases, ROLES, ROSTER].forEach(prefixAssets);
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('home');
@@ -1300,25 +1312,25 @@ function AppPanel({ title, subtitle, children, className = '' }) {
 
 function CharacterSelectScreen() {
   const [picked, setPicked] = useState(null);
-  const chosen = CHARACTER_CLASSES.find((c) => c.id === picked) ?? null;
+  const chosen = ROSTER.find((c) => c.id === picked) ?? null;
   return (
     <div className="char-select">
       <div className="char-grid">
-        {CHARACTER_CLASSES.map((c) => (
+        {ROSTER.map((c) => (
           <button
             key={c.id}
             type="button"
-            className={`char-card${picked === c.id ? ' picked' : ''}${c.locked ? ' locked' : ''}`}
+            className={`char-card${picked === c.id ? ' picked' : ''}`}
             style={{ '--accent': c.accent }}
-            aria-disabled={c.locked}
-            onClick={() => { if (!c.locked) setPicked(c.id); }}
+            onClick={() => setPicked(c.id)}
           >
+            <span className="char-portrait"><img src={c.portrait} alt={c.name} /></span>
             <span className="char-name">{c.name}</span>
-            <span className="char-tag">{c.tag}</span>
-            {c.locked && <span className="char-lock" aria-hidden="true">🔒</span>}
+            <span className="char-tag">{c.role}</span>
           </button>
         ))}
       </div>
+
       {chosen ? (
         <div className="char-detail" style={{ '--accent': chosen.accent }}>
           <h2>{chosen.name}</h2>
@@ -1328,8 +1340,21 @@ function CharacterSelectScreen() {
           <p className="char-soon">Next: gameplay loads here — Cafe8Fifty → street brawler → inside venues → back to HITMANS VIP by 2AM.</p>
         </div>
       ) : (
-        <p className="char-hint">Tap a class to see how your night plays. Hidden Mentor unlocks later in the story.</p>
+        <p className="char-hint">Tap a fighter to see how your night plays.</p>
       )}
+
+      <div className="story-tier">
+        <h3>Story · Rivals · Bosses</h3>
+        <div className="story-grid">
+          {STORY_TIER.map((s) => (
+            <div key={s.id} className="story-card" aria-disabled="true">
+              <span className="story-name">{s.name}</span>
+              <span className="story-note">{s.note}</span>
+              <span className="story-lock" aria-hidden="true">🔒</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
