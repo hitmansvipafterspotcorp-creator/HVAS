@@ -212,6 +212,13 @@ const screens = [
     detail: 'Member access, staff check-in, Lip Sync Bingo, and host controls.',
   },
   {
+    id: 'characterSelect',
+    label: 'Start the Night',
+    eyebrow: 'THE NIGHT',
+    title: 'Choose Your Character',
+    detail: 'Pick who you are tonight — your class changes how the night plays.',
+  },
+  {
     id: 'payVerify',
     label: 'Pay & Verify',
     eyebrow: 'Front Door',
@@ -396,6 +403,7 @@ const ROLES = [
     eyebrow: 'MEMBER APP',
     chip: 'vip',
     menu: [
+      { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
       { title: 'Home', detail: 'Overview and quick status', chip: ui.chips.active, target: 'memberHome' },
       { title: 'My Pass', detail: 'Pass, tier, and QR access', chip: ui.chips.vip, target: 'myPass' },
       { title: 'Membership', detail: 'Plans, upgrades, renewals', chip: ui.chips.vip, target: 'membership' },
@@ -404,7 +412,7 @@ const ROLES = [
       { title: 'Profile', detail: 'Account and preferences', chip: ui.chips.vip, target: 'profile' },
       { title: 'History', detail: 'Past entries and activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['memberHome', 'myPass', 'membership', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
+    allowed: ['characterSelect', 'memberHome', 'myPass', 'membership', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
   },
   {
     id: 'staff',
@@ -442,6 +450,24 @@ const ROLES = [
   },
 ];
 const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
+
+// ── Playable character classes ──────────────────────────────────────────
+// Each class reframes the whole night — mission types, combat baseline,
+// networking. Hidden Mentor stays locked until the story unlocks it.
+const CHARACTER_CLASSES = [
+  { id: 'promoter', name: 'Promoter', tag: 'Bring the crowd', strong: 'Networking · crowd influence · event bonuses', weak: 'Weaker combat early', accent: '#ff2bd6' },
+  { id: 'artist', name: 'Artist', tag: 'Get seen, get clout', strong: 'Charisma · stage missions · crowd hype', weak: 'Needs protection from haters', accent: '#ffd66b' },
+  { id: 'dj', name: 'DJ', tag: 'Control the vibe', strong: 'Audio / VFX boosts · venue energy', weak: 'Limited street combat', accent: '#7f3cff' },
+  { id: 'security', name: 'Security', tag: 'Keep the peace', strong: 'Combat · blocking · crowd control', weak: 'Slower networking', accent: '#52ffa8' },
+  { id: 'vendor', name: 'Vendor', tag: 'Sell the night', strong: 'Money rewards · item bonuses', weak: 'Lower special meter', accent: '#ffab4c' },
+  { id: 'host', name: 'Host / MC', tag: 'Run the room', strong: 'Mini-game bonuses · dialogue', weak: 'Mid combat', accent: '#4cc9ff' },
+  { id: 'photographer', name: 'Photographer', tag: 'Capture the moment', strong: 'Marketing · reputation missions', weak: 'Fragile in fights', accent: '#ff6b8a' },
+  { id: 'vip', name: 'VIP Member', tag: 'Elite access', strong: 'Access · rewards · networking', weak: 'Must maintain status', accent: '#ffd66b' },
+  { id: 'student', name: 'Student', tag: 'Campus to club', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#a0ffcf' },
+  { id: 'owner', name: 'Business Owner', tag: 'Build the network', strong: 'Sales · contracts · VIP access', weak: 'Combat starts weak', accent: '#c9b8ff' },
+  { id: 'dancer', name: 'Dancer', tag: 'Own the floor', strong: 'Mini-games · charisma · hype', weak: 'Low defense', accent: '#ff2bd6' },
+  { id: 'mentor', name: 'Hidden Mentor', tag: 'Locked', strong: 'Balanced · special perks', weak: 'Unlocks later in the story', accent: '#8a7bc8', locked: true },
+];
 
 // Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
 // app works under a GitHub Pages project subpath as well as at root. All
@@ -619,6 +645,7 @@ function ScreenHeader({ screen, onBack }) {
 function ScreenBody({ activeScreen, navigate }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
+  if (activeScreen === 'characterSelect') return <CharacterSelectScreen />;
   if (activeScreen === 'payVerify') return <PayVerifyScreen />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
   if (activeScreen === 'myPass') return <PassScreen />;
@@ -1268,6 +1295,42 @@ function AppPanel({ title, subtitle, children, className = '' }) {
       </header>
       <div className="app-panel-body">{children}</div>
     </article>
+  );
+}
+
+function CharacterSelectScreen() {
+  const [picked, setPicked] = useState(null);
+  const chosen = CHARACTER_CLASSES.find((c) => c.id === picked) ?? null;
+  return (
+    <div className="char-select">
+      <div className="char-grid">
+        {CHARACTER_CLASSES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`char-card${picked === c.id ? ' picked' : ''}${c.locked ? ' locked' : ''}`}
+            style={{ '--accent': c.accent }}
+            aria-disabled={c.locked}
+            onClick={() => { if (!c.locked) setPicked(c.id); }}
+          >
+            <span className="char-name">{c.name}</span>
+            <span className="char-tag">{c.tag}</span>
+            {c.locked && <span className="char-lock" aria-hidden="true">🔒</span>}
+          </button>
+        ))}
+      </div>
+      {chosen ? (
+        <div className="char-detail" style={{ '--accent': chosen.accent }}>
+          <h2>{chosen.name}</h2>
+          <p className="char-line"><b>Strengths</b><span>{chosen.strong}</span></p>
+          <p className="char-line"><b>Weakness</b><span>{chosen.weak}</span></p>
+          <button type="button" className="char-start">Start the Night as {chosen.name} →</button>
+          <p className="char-soon">Next: gameplay loads here — Cafe8Fifty → street brawler → inside venues → back to HITMANS VIP by 2AM.</p>
+        </div>
+      ) : (
+        <p className="char-hint">Tap a class to see how your night plays. Hidden Mentor unlocks later in the story.</p>
+      )}
+    </div>
   );
 }
 

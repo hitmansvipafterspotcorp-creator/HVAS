@@ -2724,3 +2724,60 @@ button {
   filter: grayscale(0.5);
 }
 .menu-flow-row .menu-flow-lock { margin-left: auto; font-size: 15px; }
+
+/* ── Character select ─────────────────────────────────────────────────── */
+.char-select { display: flex; flex-direction: column; gap: 16px; }
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.char-card {
+  --accent: #7f3cff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 14px 14px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  color: #fff8e8;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 16%, rgba(12,3,20,0.95)), rgba(8,2,14,0.95));
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+.char-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+.char-card.picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), 0 10px 26px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.char-card.locked { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.55); }
+.char-name { font-size: 15px; font-weight: 900; color: var(--accent); }
+.char-tag { font-size: 11px; color: #c9b8ff; }
+.char-lock { position: absolute; top: 12px; right: 12px; font-size: 14px; }
+
+.char-detail {
+  --accent: #7f3cff;
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(160deg, rgba(20,4,32,0.95), rgba(8,2,14,0.95));
+}
+.char-detail h2 { margin: 0 0 10px; font-size: 22px; font-weight: 900; color: var(--accent); }
+.char-line { display: flex; gap: 10px; font-size: 13px; margin: 6px 0; color: #e9e0ff; }
+.char-line b { color: #ffd66b; min-width: 74px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 1px; }
+.char-start {
+  margin-top: 14px;
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 14px;
+  color: #0a0210;
+  background: var(--accent);
+}
+.char-soon { margin-top: 10px; font-size: 11px; color: #9a86c8; text-align: center; }
+.char-hint { font-size: 12px; color: #9a86c8; text-align: center; padding: 8px; }
