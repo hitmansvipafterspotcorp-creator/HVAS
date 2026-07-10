@@ -95,10 +95,30 @@ rivals, and bosses you meet on the route.
    mount → Cafe8Fifty street brawler (A/B/X/Y) → HITMANS door → top-down
    inside → check-in → district map.
 
-## 5. Status
+## 5. De-label remaster — done this pass
+
+Ran a verified 3-stage de-label pass (top-band crop → connected-component
+text removal → pure-label blanking), each frame re-scanned + visually checked
+against its original so no sprite was silently damaged.
+
+- **34 / 40 frames cleanly fixed** — label removed, sprite/VFX intact, size
+  reduced only where the label was trimmed. Pure-label junk frames
+  (eld/vfx r01_f00, predator_pete/vfx r00_f00, host/vfx r02_f00) blanked to
+  transparent.
+- **6 frames reverted to original** (auto-fix would have destroyed sprite —
+  the label overlaps/abuts the figure). These need a manual re-slice from the
+  source sheet with a corrected inset:
+  - `kt/loco/r01_f07`, `kendrick/loco/r04_f07` — off-model realistic style;
+    remaster (re-slice or regenerate to chibi), still locked in-app.
+  - `big_soulja/combat/r02_f07` — adjacent knocked-down figure bleeding in.
+  - `eld/damage/r02_f07` — label printed over the knocked-down body.
+  - `photographer/combat/r00_f00`, `photographer/combat/r03_f00` — label
+    fused to a partial lunge pose.
+
+## 6. Status
 - [x] Real roster imported into Character Select (13 playable portraits).
 - [x] Story rewritten around the real crew + named tier.
-- [x] kendrick/kt errors logged; shown locked (not rendered broken).
-- [ ] Frame-cut QA pass across all sheets.
-- [ ] kendrick/kt remaster.
+- [x] Full frame-cut/label audit across all fighters (40 leak frames found).
+- [x] 34/40 leak frames de-labeled and verified; 6 flagged for re-slice.
+- [ ] Re-slice the 6 remaining (incl. kt/kendrick remaster).
 - [ ] Phaser game embed.
