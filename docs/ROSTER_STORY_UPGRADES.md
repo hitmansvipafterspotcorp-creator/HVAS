@@ -65,8 +65,18 @@ rivals, and bosses you meet on the route.
   not match the chibi roster, and not cleanly transparent.
 - **Style outliers:** kendrick + kt are realistic vs the 17 chibi fighters —
   need either a chibi remaster or a deliberate "boss realism" treatment.
-- **Suspected systematic:** owner reports "some are cut bad" generally — the
-  per-sheet slice audit below must cover every animation row, not just idle.
+- **Systematic edge-margin label bleed — CONFIRMED via full audit.**
+  Ran `tools/scan_label_leaks.py` over the edge columns (f00/f07) of every
+  fighter's action sheets (1,064 frames): **40 frames across 16 fighters**
+  carry baked design-sheet label fragments, almost all in the **first (f00)
+  or last (f07) column** of combat / supers / vfx / damage rows. Clean
+  fighters (no leaks): creator, security, influencer. Worst: eld (8),
+  predator_pete (6), photographer (4). Full list: `docs/frame_leak_audit.txt`.
+  Root cause: the slice grid's horizontal margin is a few px too wide, so the
+  first/last frame of each row catches the sheet's margin label text. **Fix =
+  re-slice the affected sheets with a tighter inset (shift grid inward /
+  trim sheet margins), NOT a per-frame erase** (erasing edge blobs would
+  destroy legitimate disconnected VFX in combat/supers/vfx frames).
 
 ## 4. Upgrade roadmap (full-control mandate)
 
