@@ -2825,3 +2825,85 @@ button {
 .story-name { font-size: 13px; font-weight: 800; color: #c9b8ff; }
 .story-note { font-size: 10px; color: #8a7bc8; }
 .story-lock { position: absolute; top: 10px; right: 12px; font-size: 13px; opacity: 0.7; }
+
+/* ── Embedded brawler ─────────────────────────────────────────────────── */
+.game-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: #06030d;
+  color: #fff8e8;
+}
+.game-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(10, 3, 18, 0.95);
+  border-bottom: 1px solid rgba(255, 214, 107, 0.35);
+}
+.game-exit {
+  border: 1px solid rgba(255, 43, 214, 0.5);
+  background: rgba(20, 4, 32, 0.9);
+  color: #ff9ce8;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.game-title { font-weight: 900; color: #ffd66b; font-size: 13px; }
+.game-goal { font-size: 10px; color: #9a86c8; }
+.game-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #08040f;
+}
+.game-stage canvas { max-width: 100%; max-height: 100%; }
+
+.game-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 10px 18px 6px;
+  user-select: none;
+  touch-action: none;
+}
+.dpad { position: relative; width: 132px; height: 132px; }
+.dpad-btn {
+  position: absolute;
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 214, 107, 0.4);
+  background: rgba(24, 6, 38, 0.92);
+  color: #ffd66b;
+  font-size: 15px;
+  cursor: pointer;
+}
+.dpad-btn.up { top: 0; left: 44px; }
+.dpad-btn.down { bottom: 0; left: 44px; }
+.dpad-btn.left { top: 44px; left: 0; }
+.dpad-btn.right { top: 44px; right: 0; }
+
+.abxy { position: relative; width: 150px; height: 132px; }
+.abxy-mid { position: absolute; top: 44px; left: 0; right: 0; display: flex; justify-content: space-between; }
+.abxy button {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 2px solid;
+  font-weight: 900;
+  font-size: 16px;
+  cursor: pointer;
+  color: #0a0210;
+}
+.btn-a { position: absolute; bottom: 0; left: 51px; background: #52ffa8; border-color: #7fffc4; }
+.btn-b { background: #ff3864; border-color: #ff7a97; color: #fff; }
+.btn-x { background: #4cc9ff; border-color: #93ddff; }
+.btn-y { position: absolute; top: 0; left: 51px; background: #ffd66b; border-color: #ffe7a6; }
+.game-hint { text-align: center; font-size: 10px; color: #7d6ba8; padding: 2px 0 8px; }

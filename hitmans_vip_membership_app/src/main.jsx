@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import GameCanvas from './game/GameCanvas.jsx';
+import { GAME_FIGHTERS } from './game/BrawlerSlice.js';
 
 const ui = {
   logo: '/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png',
@@ -502,6 +504,7 @@ function App() {
   const [targetScreen, setTargetScreen] = useState('home');
   const [role, setRole] = useState(null);       // null until the user picks a role
   const [checkedIn, setCheckedIn] = useState(false); // gates member event/venue access
+  const [playing, setPlaying] = useState(null); // { id, name } while in the brawler
   const [transition, setTransition] = useState({
     active: true,
     from: 'Loading',
@@ -591,6 +594,11 @@ function App() {
   function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); }
   function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); }
 
+  // In-game takes over the whole screen.
+  if (playing) {
+    return <GameCanvas fighterId={playing.id} fighterName={playing.name} onExit={() => setPlaying(null)} />;
+  }
+
   return (
     <main className="app-shell menu-shell">
       <div className="dynamic-bg" aria-hidden="true">
@@ -615,7 +623,7 @@ function App() {
           {current.id === 'home' ? (
             <HomeScreen role={roleById(role)} session={session} navigate={navigate} />
           ) : (
-            <ScreenBody activeScreen={current.id} navigate={navigate} />
+            <ScreenBody activeScreen={current.id} navigate={navigate} onStartGame={(id, name) => setPlaying({ id, name })} />
           )}
         </section>
       )}
@@ -654,10 +662,10 @@ function ScreenHeader({ screen, onBack }) {
   );
 }
 
-function ScreenBody({ activeScreen, navigate }) {
+function ScreenBody({ activeScreen, navigate, onStartGame }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
-  if (activeScreen === 'characterSelect') return <CharacterSelectScreen />;
+  if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'payVerify') return <PayVerifyScreen />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
   if (activeScreen === 'myPass') return <PassScreen />;
@@ -1310,9 +1318,10 @@ function AppPanel({ title, subtitle, children, className = '' }) {
   );
 }
 
-function CharacterSelectScreen() {
+function CharacterSelectScreen({ onStartGame }) {
   const [picked, setPicked] = useState(null);
   const chosen = ROSTER.find((c) => c.id === picked) ?? null;
+  const canPlay = chosen && GAME_FIGHTERS.has(chosen.id);
   return (
     <div className="char-select">
       <div className="char-grid">
@@ -1336,8 +1345,17 @@ function CharacterSelectScreen() {
           <h2>{chosen.name}</h2>
           <p className="char-line"><b>Strengths</b><span>{chosen.strong}</span></p>
           <p className="char-line"><b>Weakness</b><span>{chosen.weak}</span></p>
-          <button type="button" className="char-start">Start the Night as {chosen.name} →</button>
-          <p className="char-soon">Next: gameplay loads here — Cafe8Fifty → street brawler → inside venues → back to HITMANS VIP by 2AM.</p>
+          <button
+            type="button"
+            className="char-start"
+            disabled={!canPlay}
+            onClick={() => canPlay && onStartGame(chosen.id, chosen.name)}
+          >
+            {canPlay ? `Start the Night as ${chosen.name} →` : `${chosen.name} — hitting the streets soon`}
+          </button>
+          <p className="char-soon">{canPlay
+            ? 'Cafe8Fifty street brawler loads now — D-pad to move, A to attack. Inside venues + the 2AM run are next.'
+            : 'Playable in Character Select; street frames are being sliced from the new sheets.'}</p>
         </div>
       ) : (
         <p className="char-hint">Tap a fighter to see how your night plays.</p>
