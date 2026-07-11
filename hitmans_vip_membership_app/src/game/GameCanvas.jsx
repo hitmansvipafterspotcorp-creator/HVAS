@@ -4,10 +4,10 @@ import { makeBrawler, VENUES } from './BrawlerSlice.js';
 // Mounts the Phaser brawler inside the app and renders the on-screen
 // controls (the fixed A/B/X/Y + D-pad contract). Keyboard also works:
 // arrows/WASD move, J attacks.
-export default function GameCanvas({ fighterId, fighterName, venueId = 'kingdom_come', onExit }) {
+export default function GameCanvas({ fighterId, fighterName, venueId = 'social_gaines', onExit }) {
   const hostRef = useRef(null);
   const gameRef = useRef(null);
-  const venue = VENUES[venueId] || VENUES.kingdom_come;
+  const venue = VENUES[venueId] || VENUES.social_gaines;
 
   useEffect(() => {
     if (!window.__hvasInput) window.__hvasInput = {};

@@ -21,15 +21,15 @@ export const GAME_FIGHTERS = new Set([
 // Per-venue stage definitions. `scroll:true` => wide side-scroller block.
 // floor/door/enter are fractions of the scaled stage so any backdrop drops in.
 export const VENUES = {
-  kingdom_come: {
-    name: 'Kingdom Come Saloon',
-    goal: 'Clear the block — reach the doors',
-    bg: 'venues/kingdom_come.png',
+  social_gaines: {
+    name: 'Social Gaines',
+    goal: 'Walk the block → reach the doors',
+    bg: 'venues/social_gaines.png',
     scroll: true,
-    floorY: 0.90,      // walk lane baseline (fraction of stage height)
-    laneDepth: 0.09,   // how far up/down the lane the fighter can shift
-    doorX: 0.86,       // where the entrance sits (fraction of world width)
-    waves: 3,          // goons to clear before the door opens
+    floorY: 0.92,      // walk lane baseline (fraction of stage height)
+    laneDepth: 0.08,   // how far up/down the lane the fighter can shift
+    doorX: 0.5,        // the double doors sit mid-block
+    waves: 0,          // goons off until real, distinct enemy art exists
   },
   cafe8fifty: {
     name: 'Cafe8Fifty',
@@ -45,8 +45,8 @@ export const VENUES = {
 
 const ENEMY_ID = 'security'; // stand-in goon art until enemy sheets land
 
-export function makeBrawler(parent, fighterId, venueId = 'kingdom_come') {
-  const V = VENUES[venueId] || VENUES.kingdom_come;
+export function makeBrawler(parent, fighterId, venueId = 'social_gaines') {
+  const V = VENUES[venueId] || VENUES.social_gaines;
 
   class Brawler extends Phaser.Scene {
     preload() {
@@ -127,17 +127,16 @@ export function makeBrawler(parent, fighterId, venueId = 'kingdom_come') {
       this.player.setPosition(this.leftB + 40, this.floorY);
 
       if (V.scroll) {
-        // door glow marker
-        this.doorGlow = this.add.ellipse(this.doorWorldX, this.floorY, W * 0.22, H * 0.05, 0xba6bff, 0.0);
-        // spawn goons spread along the block
-        const n = V.waves;
-        for (let i = 0; i < n; i++) {
-          const wx = this.worldW * (0.42 + 0.14 * i);
-          this.spawnEnemy(wx);
-        }
         this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-        this.remaining = n;
-        this.setBanner(`${V.name}\n${this.remaining} in your way`);
+        this.remaining = V.waves;
+        // door glow marker at the entrance
+        this.doorGlow = this.add.ellipse(this.doorWorldX, this.floorY, W * 0.22, H * 0.05, 0xba6bff, V.waves > 0 ? 0.0 : 0.45);
+        if (V.waves > 0) {
+          for (let i = 0; i < V.waves; i++) this.spawnEnemy(this.worldW * (0.42 + 0.14 * i));
+          this.setBanner(`${V.name}\n${this.remaining} in your way`);
+        } else {
+          this.setBanner(`${V.name}\nwalk the block →`);
+        }
       }
       this.player.setDepth(this.player.y);
 
