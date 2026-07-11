@@ -1,19 +1,20 @@
 import React, { useEffect, useRef } from 'react';
-import { makeBrawler } from './BrawlerSlice.js';
+import { makeBrawler, VENUES } from './BrawlerSlice.js';
 
 // Mounts the Phaser brawler inside the app and renders the on-screen
 // controls (the fixed A/B/X/Y + D-pad contract). Keyboard also works:
 // arrows/WASD move, J attacks.
-export default function GameCanvas({ fighterId, fighterName, onExit }) {
+export default function GameCanvas({ fighterId, fighterName, venueId = 'kingdom_come', onExit }) {
   const hostRef = useRef(null);
   const gameRef = useRef(null);
+  const venue = VENUES[venueId] || VENUES.kingdom_come;
 
   useEffect(() => {
     if (!window.__hvasInput) window.__hvasInput = {};
-    const game = makeBrawler(hostRef.current, fighterId);
+    const game = makeBrawler(hostRef.current, fighterId, venueId);
     gameRef.current = game;
     return () => { game.destroy(true); gameRef.current = null; };
-  }, [fighterId]);
+  }, [fighterId, venueId]);
 
   const set = (k, v) => { window.__hvasInput[k] = v; };
   const hold = (k) => ({
@@ -28,8 +29,8 @@ export default function GameCanvas({ fighterId, fighterName, onExit }) {
     <div className="game-shell">
       <div className="game-topbar">
         <button type="button" className="game-exit" onClick={onExit}>← Leave</button>
-        <span className="game-title">{fighterName} · Cafe8Fifty</span>
-        <span className="game-goal">Back to HITMANS by 2AM</span>
+        <span className="game-title">{fighterName} · {venue.name}</span>
+        <span className="game-goal">{venue.goal}</span>
       </div>
 
       <div className="game-stage" ref={hostRef} />
