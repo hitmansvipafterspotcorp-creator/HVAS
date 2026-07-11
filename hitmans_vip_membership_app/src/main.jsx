@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
-import { GAME_FIGHTERS } from './game/BrawlerSlice.js';
+import { GAME_FIGHTERS } from './game/venues.js';
 
 const ui = {
   logo: '/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png',
