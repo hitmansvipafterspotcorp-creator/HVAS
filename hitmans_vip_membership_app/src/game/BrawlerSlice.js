@@ -10,6 +10,7 @@ const A = (p) => `${BASE}assets/game/${p}`;
 export const GAME_FIGHTERS = new Set([
   'creator', 'dj', 'promoter', 'dancer', 'host', 'photographer', 'vendor',
   'security', 'influencer', 'famu_female', 'famu_male', 'fsu_female', 'fsu_male',
+  'kt', 'kendrick',
 ]);
 
 export function makeBrawler(parent, fighterId) {

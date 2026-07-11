@@ -150,5 +150,13 @@ Checked every fighter, every sheet.
 - [x] Story rewritten around the real crew + named tier.
 - [x] Full frame-cut/label audit across all fighters (40 leak frames found).
 - [x] 34/40 leak frames de-labeled and verified; 6 flagged for re-slice.
-- [ ] Re-slice the 6 remaining (incl. kt/kendrick remaster).
-- [ ] Phaser game embed.
+- [x] KT & Kendrick game frames sliced from the clean transparent `tsheet`
+  variants (`tools/slice_kt_kendrick_game.py`): idle/walk from loco rows 0/1,
+  atk from combat row 0, background already keyed, connected-component cleanup
+  + tight crop, and a repair pass that swaps the 3 source-glitch column-4
+  frames for their nearest good neighbor. Both unlocked as playable brawlers
+  and verified in-game (Playwright).
+- [ ] Re-slice the remaining 6 opaque-sheet leak frames (big_soulja/combat,
+  eld/damage, photographer/combat ×2, + the two old kt/kendrick loco frames
+  now superseded by the tsheet slice above).
+- [x] Phaser game embed (Cafe8Fifty street brawler, fills screen, 15 fighters).
