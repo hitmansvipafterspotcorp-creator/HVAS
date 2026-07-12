@@ -704,7 +704,7 @@ function App() {
           {current.id === 'home' ? (
             <HomeScreen role={roleById(role)} session={session} navigate={navigate} />
           ) : (
-            <ScreenBody activeScreen={current.id} navigate={navigate} onStartGame={(id, name) => setPlaying({ id, name })} />
+            <ScreenBody activeScreen={current.id} navigate={navigate} session={session} onStartGame={(id, name) => setPlaying({ id, name })} />
           )}
         </section>
       )}
@@ -743,12 +743,12 @@ function ScreenHeader({ screen, onBack }) {
   );
 }
 
-function ScreenBody({ activeScreen, navigate, onStartGame }) {
+function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
-  if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen navigate={navigate} />;
+  if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'eventAccess') return <SimpleAccessScreen title="Event Access" rows={['Tonight Event', 'Lip Sync Bingo', 'VIP Social']} />;
   if (activeScreen === 'venueAccess') return <SimpleAccessScreen title="Venue Access" rows={['Front Door', 'Networking Floor', 'VIP Lounge']} />;
   if (activeScreen === 'profile') return <ProfileScreen />;
@@ -971,9 +971,9 @@ function useQrDataUrl(text) {
 }
 
 // THE single membership screen: not a member -> buy a tier; member -> your pass.
-function MembershipScreen() {
+function MembershipScreen({ checkedIn }) {
   const member = useMember();
-  return member ? <MemberPass member={member} /> : <BuyMembership />;
+  return member ? <MemberPass member={member} checkedIn={checkedIn} /> : <BuyMembership />;
 }
 
 // Step 1 — you are not a member yet. Pick a tier, pick how you pay, purchase.
@@ -1034,14 +1034,20 @@ function RenewsIn({ expiresAt }) {
 
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
-function MemberPass({ member }) {
+function MemberPass({ member, checkedIn }) {
   const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`);
   const isVip = member.vip;
   const verified = member.status === 'verified';
   const entries = member.entries || 0;
   const { rank, next } = rankFor(entries);
   const progress = next ? Math.min(100, Math.round(((entries - rank.min) / (next.min - rank.min)) * 100)) : 100;
-  const soon = member.expiresAt - Date.now() < 7 * 86400000;
+  // live membership state
+  const msLeft = member.expiresAt - Date.now();
+  const expired = msLeft <= 0;
+  const soon = !expired && msLeft < 7 * 86400000;
+  const beenInside = checkedIn || entries > 0;   // event/venue access indicator
+  const tierIdx = TIERS.findIndex((t) => t.name === member.tier);
+  const nextUp = TIERS[tierIdx + 1] || null;      // step-up target (null at VIP)
   const [prefs, setPrefs] = useState({ music: true, alerts: true, priv: true });
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
 
@@ -1054,7 +1060,7 @@ function MemberPass({ member }) {
           <span className="mem-pass-eyebrow">HITMANS VIP · Member</span>
           <strong className="mem-pass-tier">{member.tier}{isVip ? ' VIP' : ''}</strong>
           <div className="mem-chip-row">
-            <img className="mem-chip" src={ui.chips.active} alt="Active" />
+            <img className="mem-chip" src={expired ? ui.chips.expired : ui.chips.active} alt={expired ? 'Expired' : 'Active'} />
             {isVip && <img className="mem-chip" src={ui.chips.vip} alt="VIP" />}
           </div>
           <dl className="mem-pass-meta">
@@ -1074,9 +1080,9 @@ function MemberPass({ member }) {
       </div>
 
       {/* — renewal countdown — */}
-      <div className={`renews-bar${soon ? ' soon' : ''}`}>
-        <span className="renews-tier">{member.tier}{isVip ? ' VIP' : ''} MEMBER<small>Active · thank you!</small></span>
-        <span className="renews-right"><small>Renews in</small><RenewsIn expiresAt={member.expiresAt} /></span>
+      <div className={`renews-bar${expired ? ' expiredbar' : soon ? ' soon' : ''}`}>
+        <span className="renews-tier">{member.tier}{isVip ? ' VIP' : ''} MEMBER<small>{expired ? 'Expired · renew now' : 'Active · thank you!'}</small></span>
+        <span className="renews-right"><small>{expired ? 'Status' : 'Renews in'}</small>{expired ? <span className="renews-time exp">EXPIRED</span> : <RenewsIn expiresAt={member.expiresAt} />}</span>
       </div>
 
       {/* — loyalty rank (earned by nights, not bought) — */}
@@ -1098,27 +1104,34 @@ function MemberPass({ member }) {
         <button type="button" className="loyalty-log" onClick={logEntry}>+ Log tonight’s entry</button>
       </section>
 
-      {/* — access ribbons — */}
+      {/* — status indicators (driven by real state, not buttons) — */}
       <div className="access-ribbons">
-        <img src={ui.ribbons[0]} alt="Active plan" />
+        {!expired && !soon && <img src={ui.ribbons[0]} alt="Active plan" />}
         {soon && <img src={ui.ribbons[1]} alt="Expires soon" />}
         {(verified || isVip) && <img src={ui.ribbons[2]} alt="VIP verified" />}
-        <img src={ui.ribbons[4]} alt="Event access" />
-        <img src={ui.ribbons[5]} alt="Venue access" />
+        {beenInside && <img src={ui.ribbons[4]} alt="Event access" />}
+        {beenInside && <img src={ui.ribbons[5]} alt="Venue access" />}
       </div>
+      <p className="access-note">{checkedIn ? 'Checked in — inside now.' : entries > 0 ? 'Access unlocks each night you check in.' : 'Check in at the door to unlock event & venue access.'}</p>
 
-      {/* — actions — */}
+      {/* — actions: renew (prominent when expired) + step-up to the next tier — */}
+      {expired && <div className="renew-alert">⚠ Your {member.tier} membership expired — renew to get back in.</div>}
       <div className="mem-actions">
-        {!isVip && (
-          <button type="button" className="asset-cta wide" onClick={() => purchaseTier('VIP', member.payment)} aria-label={`Upgrade to VIP ${fmtUSD(TIER_BY.VIP.price)}`}>
-            <img src={ui.buttons.upgradeVip} alt="Upgrade to VIP" />
-            <span className="asset-cta-note">{fmtUSD(TIER_BY.VIP.price)}</span>
+        {nextUp && (
+          <button type="button" className="upgrade-next" onClick={() => purchaseTier(nextUp.name, member.payment)}
+            aria-label={`Upgrade to ${nextUp.name} ${fmtUSD(nextUp.price)}`}>
+            <span className="up-label">▲ Upgrade to {nextUp.name}</span>
+            <span className="up-price">{fmtUSD(nextUp.price)}</span>
           </button>
         )}
-        <button type="button" className="asset-cta wide" onClick={() => purchaseTier(member.tier, member.payment)} aria-label={`Renew ${member.tier} ${fmtUSD(TIER_BY[member.tier].price)}`}>
+        <button type="button" className={`asset-cta wide${expired ? ' renew-hot' : ''}`} onClick={() => purchaseTier(member.tier, member.payment)}
+          aria-label={`Renew ${member.tier} ${fmtUSD(TIER_BY[member.tier].price)}`}>
           <img src={ui.buttons.renewPlan} alt="Renew plan" />
           <span className="asset-cta-note">{fmtUSD(TIER_BY[member.tier].price)}</span>
         </button>
+        {nextUp && nextUp.name !== 'VIP' && (
+          <button type="button" className="jump-vip" onClick={() => purchaseTier('VIP', member.payment)}>or jump to VIP · {fmtUSD(TIER_BY.VIP.price)}</button>
+        )}
       </div>
 
       {/* — profile preferences (folded in from the old Profile page) — */}
