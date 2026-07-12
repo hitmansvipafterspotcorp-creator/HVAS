@@ -59,8 +59,8 @@ def key_region(rgb_region, mode):
     border.discard(0)
     bg = np.isin(lab, list(border))
     fg = (~bg).astype('uint8')
-    fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
-    fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    # de-speckle only: remove isolated single pixels without eroding thin legs
+    fg = cv2.medianBlur(fg, 3)
     return fg
 
 
@@ -74,48 +74,76 @@ def grid_left(fg):
     return 316
 
 
-def row_bands(fg, x0, x1):
-    """Contiguous horizontal bands of sprite content within the grid columns."""
-    prof = fg[:, x0:x1].mean(1)
-    on = prof > 0.06
-    bands = []; s = None
-    for y, v in enumerate(on):
-        if v and s is None:
-            s = y
-        elif not v and s is not None:
-            if y - s > 40:
-                bands.append((s, y))
-            s = None
-    if s is not None and len(on) - s > 40:
-        bands.append((s, len(on)))
-    return bands
+def row_bands(fg, empty_thresh=0.03):
+    """Sprite-row bands from an accurate fg mask: split only at true gaps (runs
+    of near-empty rows) so thin legs/feet stay inside the band; drop short bands
+    (frame-number labels, title bars). `empty_thresh` is the row fill fraction
+    below which a row counts as background — higher for noisy checker sheets
+    (KT) whose inter-row gaps carry label/text specks, lower for clean white."""
+    prof = fg.mean(1)
+    empty = prof < empty_thresh
+    bands = []; s = None; gap = 0
+    for y in range(len(prof)):
+        if empty[y]:
+            gap += 1
+            if s is not None and gap >= 6:
+                bands.append((s, y - gap + 1)); s = None
+        else:
+            gap = 0
+            if s is None:
+                s = y
+    if s is not None:
+        bands.append((s, len(prof)))
+    return [(a, b) for a, b in bands if b - a > 60]
 
 
-def segment_row(rgb, mode, y0, y1, x0, x1, want=8):
-    band_rgb = rgb.crop((x0, y0, x1, y1))
-    fg = key_region(band_rgb, mode)              # clean alpha within the band
-    band = cv2.morphologyEx(fg.copy(), cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
-    n, lab, stats, cent = cv2.connectedComponentsWithStats(band, 8)
-    H = y1 - y0
-    comps = [(s[0], s[1], s[2], s[3], cent[i][0]) for i, s in enumerate(stats)
-             if i > 0 and s[4] >= 500 and s[3] >= 0.4 * H]
-    comps.sort(key=lambda c: c[4])
-    if comps:
-        med = np.median([c[2] for c in comps]); out = []
-        for x, y, w, h, cx in comps:
-            k = max(1, round(w / (med * 1.25)))
+def segment_band(grgb, gfg, y0, y1, want=8):
+    """Split one sprite row into frames by empty-column gaps (robust to thin
+    horizontal baselines that would merge connected components). The leftmost
+    block is any row-label pill, so keep the rightmost `want` runs."""
+    band = gfg[y0:y1]
+    colprof = band.mean(0)
+    on = colprof > 0.06
+    runs = []; s = None
+    for x in range(len(on)):
+        if on[x] and s is None:
+            s = x
+        elif not on[x] and s is not None:
+            runs.append((s, x)); s = None
+    if s is not None:
+        runs.append((s, len(on)))
+    if runs:
+        med = np.median([b - a for a, b in runs])
+        runs = [(a, b) for a, b in runs if (b - a) > 0.45 * med]   # drop specks
+        # split any run much wider than one sprite (two merged)
+        out = []
+        for a, b in runs:
+            k = max(1, round((b - a) / (med * 1.25)))
             if k == 1:
-                out.append((x, y, w, h))
+                out.append((a, b))
             else:
+                step = (b - a) // k
                 for j in range(k):
-                    out.append((x + j * w // k, y, w // k, h))
-        # sprites occupy the right of the row; any extra blobs are the left-hand
-        # row-label pill/icon (KT), so keep the rightmost `want` after ordering.
-        out.sort(key=lambda c: c[0])
-        comps = out[-want:]
-    arr = np.array(band_rgb); frames = []
-    for (x, y, w, h) in comps:
-        sub = arr[y:y + h, x:x + w]; m = fg[y:y + h, x:x + w]
+                    out.append((a + j * step, a + (j + 1) * step if j < k - 1 else b))
+        # drop short runs (row-label pills like ORDER_UP_JAB) by fg height
+        def run_h(a, b):
+            ys = np.where(band[:, a:b].any(1))[0]
+            return ys.max() - ys.min() + 1 if len(ys) else 0
+        hs = [run_h(a, b) for a, b in out]
+        if hs:
+            medh = np.median(hs)
+            out = [rb for rb, h in zip(out, hs) if h > 0.55 * medh]
+        runs = out[-want:]                       # sprites are right of any label pill
+    arr = np.array(grgb); frames = []
+    for (x0, x1) in runs:
+        m = gfg[y0:y1, x0:x1].copy()
+        # keep the sprite body; drop the detached frame-number label / specks below
+        n, lab, stats = cv2.connectedComponentsWithStats(m, 8)[:3]
+        if n > 1:
+            big = max(range(1, n), key=lambda i: stats[i][4])
+            keep = [i for i in range(1, n) if stats[i][4] >= 0.10 * stats[big][4]]
+            m = np.isin(lab, keep).astype('uint8')
+        sub = arr[y0:y1, x0:x1]
         ys, xs = np.where(m)
         if len(xs) == 0:
             continue
@@ -133,19 +161,24 @@ def process(char):
     out_dir = os.path.join(OUT, char)
     os.makedirs(out_dir, exist_ok=True)
     result = {}
+
+    def grid_of(path, mode):
+        im = load(path)
+        gl = grid_left(coarse_fg(im, mode)); gr = im.width - 40
+        grgb = im.crop((gl, 0, gr, im.height))      # sprite-grid columns, full height
+        gfg = key_region(grgb, mode)                # one accurate keyed mask
+        et = 0.03 if mode == 'white' else 0.22      # noisy checker needs a higher gap floor
+        return grgb, gfg, et
+
     # LOCO: band 0 -> idle, band 1 -> walk
-    loco_path, mode = cfg['loco']
-    im = load(loco_path); cfg_fg = coarse_fg(im, mode)
-    gl = grid_left(cfg_fg); gr = im.width - 40
-    bands = row_bands(cfg_fg, gl, gr)
-    result['idle'] = segment_row(im, mode, *bands[0], gl, gr)
-    result['walk'] = segment_row(im, mode, *bands[1], gl, gr)
+    grgb, gfg, et = grid_of(*cfg['loco'])
+    bands = row_bands(gfg, et)
+    result['idle'] = segment_band(grgb, gfg, *bands[0])
+    result['walk'] = segment_band(grgb, gfg, *bands[1])
     # COMBAT: band 0 -> atk
-    cb_path, mode = cfg['combat']
-    im = load(cb_path); cfg_fg = coarse_fg(im, mode)
-    gl = grid_left(cfg_fg); gr = im.width - 40
-    bands = row_bands(cfg_fg, gl, gr)
-    result['atk'] = segment_row(im, mode, *bands[0], gl, gr)
+    grgb, gfg, et = grid_of(*cfg['combat'])
+    bands = row_bands(gfg, et)
+    result['atk'] = segment_band(grgb, gfg, *bands[0])
     # write, padding each anim's frames to a common (max) canvas, feet-anchored
     for anim, frames in result.items():
         frames = frames[:8]
