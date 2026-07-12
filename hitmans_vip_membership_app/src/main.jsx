@@ -927,8 +927,10 @@ function PayVerifyScreen() {
   );
 }
 
-// Tier name -> its card artwork.
+// Tier name -> pricing-card artwork (buy screen, has the $ price slot).
 const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
+// Tier name -> member PASS-card artwork (the pass; "MONTHLY PASS", no price).
+const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
 const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass };
 
@@ -1004,7 +1006,7 @@ function MemberPass({ member }) {
   return (
     <div className="mem-screen mem-pass">
       <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
-        <img className="mem-pass-art" src={TIER_SRC[member.tier]} alt={`${member.tier} membership`} />
+        <img className="mem-pass-art" src={PASS_SRC[member.tier]} alt={`${member.tier} pass`} />
         <div className="mem-pass-info">
           <span className="mem-pass-eyebrow">HITMANS VIP · Member</span>
           <strong className="mem-pass-tier">{member.tier}{isVip ? ' VIP' : ''}</strong>

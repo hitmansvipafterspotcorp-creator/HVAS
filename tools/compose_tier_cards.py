@@ -1,69 +1,85 @@
 #!/usr/bin/env python3
-"""Compose the real membership price onto each full tier card using the
-gold digit-glyph assets (source_16). Masks the baked '88.88', keeps the card's
-'$', drops in the real whole-dollar price. Outputs full cards to the app.
+"""Compose a clean, professional price onto each full tier card using the gold
+digit-glyph assets (source_16) plus a matching gold '$'. Masks the baked
+'88.88' odometer, then lays out '$' + real whole-dollar price with consistent
+height and even spacing, vertically centered in the slot.
 """
 import os, numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = '/home/user/HVAS'
 SRC = f'{ROOT}/assets/ui/complete_ui_set/sliced_clean/by_type/cards'
 DST = f'{ROOT}/hitmans_vip_membership_app/public/assets/ui/complete_ui_set/sliced_clean/by_type/cards'
+FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 
-# digit char -> source_16 glyph file
 GLYPH = {'0':'source_16_001_198x257','1':'source_16_002_131x262','2':'source_16_003_181x259',
          '3':'source_16_004_184x258','4':'source_16_005_210x257','5':'source_16_006_185x258',
          '6':'source_16_010_195x257','7':'source_16_007_189x256','8':'source_16_008_194x261',
          '9':'source_16_009_192x258'}
-_glyph_cache = {}
-def glyph(ch):
-    if ch not in _glyph_cache:
-        im = Image.open(f'{SRC}/{GLYPH[ch]}.png').convert('RGBA')
-        a = np.array(im); ys, xs = np.where(a[:, :, 3] > 40)
-        _glyph_cache[ch] = im.crop((xs.min(), ys.min(), xs.max()+1, ys.max()+1))
-    return _glyph_cache[ch]
 
-# tier card -> price. Slot digit region (inside the $ ... boxes) is consistent.
+def _tight(im):
+    a = np.array(im); ys, xs = np.where(a[:, :, 3] > 30)
+    return im.crop((xs.min(), ys.min(), xs.max()+1, ys.max()+1))
+
+_cache = {}
+def glyph(ch):
+    if ch not in _cache:
+        _cache[ch] = _tight(Image.open(f'{SRC}/{GLYPH[ch]}.png').convert('RGBA'))
+    return _cache[ch]
+
+def dollar():
+    """A gold '$' with a purple neon glow to match the digit glyphs."""
+    if '$' in _cache:
+        return _cache['$']
+    h = 240
+    font = ImageFont.truetype(FONT, h)
+    W, H = h, int(h * 1.5)
+    core = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(core).text((W//2, H//2), '$', font=font, anchor='mm',
+                              fill=(255, 206, 74, 255), stroke_width=max(4, h//22), stroke_fill=(74, 26, 104, 255))
+    glow = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).text((W//2, H//2), '$', font=font, anchor='mm',
+                              fill=(178, 96, 255, 255), stroke_width=max(8, h//10), stroke_fill=(178, 96, 255, 255))
+    glow = glow.filter(ImageFilter.GaussianBlur(h//16))
+    _cache['$'] = _tight(Image.alpha_composite(glow, core))
+    return _cache['$']
+
 CARDS = {
     'source_01_025_183x338': 20, 'source_01_026_183x338': 100, 'source_01_027_181x337': 300,
     'source_01_028_181x337': 1850, 'source_01_029_179x337': 5000,
 }
-# mask the WHOLE slot interior (all boxes + baked $88.88 + glow), then place the
-# real price centered and large. RX = compose region, MX = mask region.
-RX0, RX1, RY0, RY1 = 54, 168, 247, 291
-MX0, MY0, MX1, MY1 = 47, 240, 174, 296
+# keep the card's own baked purple '$' (x~28-46); mask + fill only the digit
+# boxes to its right, then lay the real digits just after the '$'.
+MX0, MY0, MX1, MY1 = 49, 240, 174, 296
+RX0, RX1, RY0, RY1 = 55, 170, 246, 292
+GAP = 5
+MAXH = 40
 
-def slot_bg(arr, x0, x1, y0, y1):
-    reg = arr[y0:y1, x0:x1, :3].reshape(-1, 3)
-    bright = reg.sum(axis=1)
-    dark = reg[bright < np.percentile(bright, 40)]
-    return tuple(int(v) for v in np.median(dark, axis=0)) if len(dark) else (10, 6, 18)
+def slot_bg(arr):
+    reg = arr[MY0:MY1, MX0:MX1, :3].reshape(-1, 3)
+    b = reg.sum(axis=1); dark = reg[b < np.percentile(b, 40)]
+    return tuple(int(v) for v in np.median(dark, axis=0)) if len(dark) else (8, 4, 16)
 
 for name, price in CARDS.items():
     card = Image.open(f'{SRC}/{name}.png').convert('RGBA')
-    arr = np.array(card)
-    bg = slot_bg(arr, MX0, MX1, MY0, MY1)
-    # mask the baked digits + their glow halo
+    bg = slot_bg(np.array(card))
     d = Image.new('RGBA', card.size, (0, 0, 0, 0))
-    from PIL import ImageDraw
     ImageDraw.Draw(d).rectangle([MX0, MY0, MX1, MY1], fill=bg + (255,))
     card.alpha_composite(d)
-    # compose real digits
-    s = str(price)
-    crops = [glyph(c) for c in s]
-    gap = 3; region_w = RX1 - RX0; region_h = RY1 - RY0
-    th = region_h - 4
-    def total_w(h):
-        return sum(int(c.width * (h / c.height)) for c in crops) + gap * (len(crops) - 1)
-    if total_w(th) > region_w:
-        th = int(th * region_w / total_w(th))
-    widths = [int(c.width * (th / c.height)) for c in crops]
-    tw = sum(widths) + gap * (len(crops) - 1)
-    x = RX0 + (region_w - tw) // 2
-    y = RY0 + (region_h - th) // 2
-    for c, w in zip(crops, widths):
-        g = c.resize((max(1, w), th))
-        card.alpha_composite(g, (x, y))
-        x += w + gap
+
+    region_w, region_h = RX1 - RX0, RY1 - RY0
+    digits = [glyph(c) for c in str(price)]
+    def total_w(hh):
+        return sum(int(g.width * (hh / g.height)) for g in digits) + GAP * (len(digits) - 1)
+    h = min(MAXH, region_h - 4)
+    if total_w(h) > region_w:
+        h = int(h * region_w / total_w(h))
+    items = [g.resize((max(1, int(g.width * h / g.height)), h)) for g in digits]
+    tw = sum(im.width for im in items) + GAP * (len(items) - 1)
+    x = RX0 + max(0, (region_w - tw) // 2)   # centered in the digit region
+    baseline = RY0 + (region_h + h) // 2
+    for im in items:
+        card.alpha_composite(im, (x, baseline - im.height))
+        x += im.width + GAP
     card.save(f'{DST}/{name}.png')
-    print(f'{name}: ${price}  bg={bg}')
+    print(f'{name}: ${price}  h={h}')
