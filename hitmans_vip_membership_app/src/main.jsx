@@ -35,10 +35,35 @@ function genMemberNumber() {
 export function purchaseTier(tierName, payment) {
   const t = TIER_BY[tierName]; if (!t) return;
   const now = Date.now();
+  const prev = memberState || {};
   commitMember({
-    tier: tierName, vip: !!t.vip, number: genMemberNumber(), payment,
+    tier: tierName, vip: !!t.vip, number: prev.number || genMemberNumber(), payment,
     purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
+    // loyalty carries over across renew/upgrade
+    entries: prev.entries || 0, loyalty: prev.loyalty || 0,
   });
+}
+
+// Loyalty ranks — earned by nights attended (entries) + loyalty, not bought.
+const A_ = import.meta.env.BASE_URL;
+export const RANKS = [
+  { name: 'Bronze', min: 0, src: `${A_}assets/ui/rank/bronze.png` },
+  { name: 'Silver', min: 5, src: `${A_}assets/ui/rank/silver.png` },
+  { name: 'Gold', min: 12, src: `${A_}assets/ui/rank/gold.png` },
+  { name: 'Platinum', min: 25, src: `${A_}assets/ui/rank/platinum.png` },
+  { name: 'VIP', min: 45, src: `${A_}assets/ui/rank/vip.png` },
+];
+export function rankFor(entries = 0) {
+  let r = RANKS[0], next = null;
+  for (let i = 0; i < RANKS.length; i++) {
+    if (entries >= RANKS[i].min) { r = RANKS[i]; next = RANKS[i + 1] || null; }
+  }
+  return { rank: r, next };
+}
+// A logged entry = a night attended; drives the loyalty rank.
+export function logEntry() {
+  if (!memberState) return;
+  commitMember({ ...memberState, entries: (memberState.entries || 0) + 1, loyalty: (memberState.loyalty || 0) + 10 });
 }
 // Returns one of three door outcomes: valid (grant), expired (deny), or
 // trespass (deny — the number isn't a member at all). Security shows the
@@ -307,7 +332,7 @@ const screens = [
     label: 'Membership',
     eyebrow: 'Member Access',
     title: 'Membership',
-    detail: 'Tier cards, tier chips, plan ribbons, and member plan actions.',
+    detail: 'Your pass, QR, renewal, loyalty rank, and profile — all in one.',
   },
   {
     id: 'eventAccess',
@@ -468,13 +493,12 @@ const ROLES = [
     menu: [
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
       { title: 'Home', detail: 'Overview and quick status', chip: ui.chips.active, target: 'memberHome' },
-      { title: 'Membership & Pass', detail: 'Buy a tier, then your card, number & QR', chip: ui.chips.vip, target: 'membership' },
+      { title: 'Membership & Profile', detail: 'Pass, QR, renewal, loyalty rank & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'Event Access', detail: 'Events you can attend', chip: ui.chips.checkedIn, target: 'eventAccess', requires: 'checkedIn' },
       { title: 'Venue Access', detail: 'Venues you can enter', chip: ui.chips.active, target: 'venueAccess', requires: 'checkedIn' },
-      { title: 'Profile', detail: 'Account and membership', chip: ui.chips.vip, target: 'profile' },
       { title: 'History', detail: 'Past entries and activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['characterSelect', 'memberHome', 'membership', 'myPass', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
+    allowed: ['characterSelect', 'memberHome', 'membership', 'myPass', 'profile', 'eventAccess', 'venueAccess', 'history', 'checkout'],
   },
   {
     id: 'staff',
@@ -724,7 +748,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame }) {
   // the individual screens below.
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
-  if (activeScreen === 'myPass' || activeScreen === 'membership') return <MembershipScreen navigate={navigate} />;
+  if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen navigate={navigate} />;
   if (activeScreen === 'eventAccess') return <SimpleAccessScreen title="Event Access" rows={['Tonight Event', 'Lip Sync Bingo', 'VIP Social']} />;
   if (activeScreen === 'venueAccess') return <SimpleAccessScreen title="Venue Access" rows={['Front Door', 'Networking Floor', 'VIP Lounge']} />;
   if (activeScreen === 'profile') return <ProfileScreen />;
@@ -999,12 +1023,31 @@ function BuyMembership() {
 }
 
 // Step 2 — you are a member. This is your card, number, QR, status + actions.
+// Live DDd:HHh:MMm until expiry.
+function RenewsIn({ expiresAt }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const ms = Math.max(0, expiresAt - now);
+  const p = (n) => String(n).padStart(2, '0');
+  return <span className="renews-time">{p(Math.floor(ms / 86400000))}D : {p(Math.floor(ms / 3600000) % 24)}H : {p(Math.floor(ms / 60000) % 60)}M</span>;
+}
+
+// Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
+// access ribbons, and preferences.
 function MemberPass({ member }) {
   const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`);
   const isVip = member.vip;
   const verified = member.status === 'verified';
+  const entries = member.entries || 0;
+  const { rank, next } = rankFor(entries);
+  const progress = next ? Math.min(100, Math.round(((entries - rank.min) / (next.min - rank.min)) * 100)) : 100;
+  const soon = member.expiresAt - Date.now() < 7 * 86400000;
+  const [prefs, setPrefs] = useState({ music: true, alerts: true, priv: true });
+  const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
+
   return (
     <div className="mem-screen mem-pass">
+      {/* — the pass card — */}
       <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
         <img className="mem-pass-art" src={PASS_SRC[member.tier]} alt={`${member.tier} pass`} />
         <div className="mem-pass-info">
@@ -1030,6 +1073,41 @@ function MemberPass({ member }) {
         </div>
       </div>
 
+      {/* — renewal countdown — */}
+      <div className={`renews-bar${soon ? ' soon' : ''}`}>
+        <span className="renews-tier">{member.tier}{isVip ? ' VIP' : ''} MEMBER<small>Active · thank you!</small></span>
+        <span className="renews-right"><small>Renews in</small><RenewsIn expiresAt={member.expiresAt} /></span>
+      </div>
+
+      {/* — loyalty rank (earned by nights, not bought) — */}
+      <section className="loyalty">
+        <h3>Loyalty rank</h3>
+        <div className="loyalty-badges">
+          {RANKS.map((r) => (
+            <div key={r.name} className={`loyalty-badge${r.name === rank.name ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>
+              <img src={r.src} alt={r.name} />
+            </div>
+          ))}
+        </div>
+        <div className="loyalty-progress">
+          <div className="loyalty-bar"><span style={{ width: `${progress}%` }} /></div>
+          <p>{next
+            ? <><b>{rank.name}</b> · {entries} {entries === 1 ? 'night' : 'nights'} in · {next.min - entries} more to <b>{next.name}</b></>
+            : <><b>VIP rank</b> · {entries} nights in · top tier reached</>}</p>
+        </div>
+        <button type="button" className="loyalty-log" onClick={logEntry}>+ Log tonight’s entry</button>
+      </section>
+
+      {/* — access ribbons — */}
+      <div className="access-ribbons">
+        <img src={ui.ribbons[0]} alt="Active plan" />
+        {soon && <img src={ui.ribbons[1]} alt="Expires soon" />}
+        {(verified || isVip) && <img src={ui.ribbons[2]} alt="VIP verified" />}
+        <img src={ui.ribbons[4]} alt="Event access" />
+        <img src={ui.ribbons[5]} alt="Venue access" />
+      </div>
+
+      {/* — actions — */}
       <div className="mem-actions">
         {!isVip && (
           <button type="button" className="asset-cta wide" onClick={() => purchaseTier('VIP', member.payment)} aria-label={`Upgrade to VIP ${fmtUSD(TIER_BY.VIP.price)}`}>
@@ -1041,9 +1119,19 @@ function MemberPass({ member }) {
           <img src={ui.buttons.renewPlan} alt="Renew plan" />
           <span className="asset-cta-note">{fmtUSD(TIER_BY[member.tier].price)}</span>
         </button>
-        <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
       </div>
-      <p className="mem-fineprint">Your number + QR also show in Profile. At the door, Security scans the QR or types your number to verify.</p>
+
+      {/* — profile preferences (folded in from the old Profile page) — */}
+      <section className="prefs">
+        <h3>Profile &amp; preferences</h3>
+        {[['music', 'Music'], ['alerts', 'Entry alerts'], ['priv', 'Private member']].map(([k, label]) => (
+          <button key={k} type="button" className={`pref-row${prefs[k] ? ' on' : ''}`} onClick={() => togglePref(k)}>
+            <span>{label}</span><span className="pref-toggle" aria-hidden="true" />
+          </button>
+        ))}
+        <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
+      </section>
+      <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
     </div>
   );
 }

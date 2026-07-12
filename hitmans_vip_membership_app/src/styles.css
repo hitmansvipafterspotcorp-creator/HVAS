@@ -3076,3 +3076,41 @@ button {
 .scan-alert-verdict { margin: 4px 0 0; font-weight: 900; letter-spacing: .12em; font-size: 15px; }
 .scan-alert-verdict.go { color: #7dffb0; }
 .scan-alert-verdict.no { color: #ff8aa0; }
+
+/* ── Combined Membership + Profile hub ────────────────────────────── */
+.renews-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 16px; padding: 12px 18px; border-radius: 12px;
+  background: linear-gradient(90deg, #1a0f2e, #241436); border: 1px solid #6b3fa0; }
+.renews-bar.soon { border-color: #b8862f; background: linear-gradient(90deg, #2a1c0f, #34260f); }
+.renews-tier { color: #ffe8a3; font-weight: 800; font-size: 15px; display: flex; flex-direction: column; }
+.renews-tier small { color: #9a7ac0; font-weight: 600; font-size: 11px; text-transform: none; }
+.renews-right { text-align: right; display: flex; flex-direction: column; }
+.renews-right small { color: #9a7ac0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.renews-time { color: #ffd66b; font-family: ui-monospace, monospace; font-size: 18px; font-weight: 800; letter-spacing: .04em; }
+
+.loyalty { margin-top: 20px; }
+.loyalty h3, .prefs h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 12px; }
+.loyalty-badges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.loyalty-badge { display: grid; place-items: center; padding: 8px 4px; border-radius: 12px; border: 1px solid #2a1a40; background: #150a24; opacity: .38; filter: grayscale(.5); transition: all .15s; }
+.loyalty-badge.earned { opacity: 1; filter: none; }
+.loyalty-badge.current { border-color: #ffd66b; box-shadow: 0 0 0 1px #ffd66b inset, 0 6px 18px rgba(255,214,107,.25); background: #201038; }
+.loyalty-badge img { width: 100%; max-width: 72px; height: auto; }
+.loyalty-progress { margin: 12px 0 10px; }
+.loyalty-bar { height: 8px; border-radius: 999px; background: #20102e; overflow: hidden; border: 1px solid #3a2350; }
+.loyalty-bar span { display: block; height: 100%; background: linear-gradient(90deg, #b06bff, #ffd66b); border-radius: 999px; transition: width .35s; }
+.loyalty-progress p { color: #c9b8ff; font-size: 13px; margin: 8px 0 0; }
+.loyalty-progress b { color: #ffe8a3; }
+.loyalty-log { margin-top: 4px; background: #241436; color: #d8c4ff; border: 1px solid #4a2f6a; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 13px; }
+.loyalty-log:hover { background: #301a4a; }
+
+.access-ribbons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; justify-content: center; }
+.access-ribbons img { height: 40px; width: auto; }
+
+.prefs { margin-top: 22px; }
+.pref-row { width: 100%; display: flex; align-items: center; justify-content: space-between;
+  background: #150a24; border: 1px solid #2f1a4a; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
+  color: #e8dcff; font-weight: 600; cursor: pointer; }
+.pref-toggle { width: 42px; height: 24px; border-radius: 999px; background: #3a2350; position: relative; transition: background .15s; }
+.pref-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #9a7ac0; transition: all .15s; }
+.pref-row.on .pref-toggle { background: #6b3fa0; }
+.pref-row.on .pref-toggle::after { left: 21px; background: #ffd66b; }
