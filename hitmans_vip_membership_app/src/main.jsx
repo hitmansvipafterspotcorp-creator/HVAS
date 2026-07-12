@@ -40,14 +40,21 @@ export function purchaseTier(tierName, payment) {
     purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
   });
 }
+// Returns one of three door outcomes: valid (grant), expired (deny), or
+// trespass (deny — the number isn't a member at all). Security shows the
+// matching alert graphic for each.
 export function verifyByNumber(number) {
   const m = memberState;
   const clean = (number || '').trim().toUpperCase();
-  if (!m || !m.number) return { ok: false, reason: 'No membership on file — purchase a card.' };
-  if (m.number.toUpperCase() !== clean) return { ok: false, reason: 'Number not found — not a member.' };
-  if (Date.now() > m.expiresAt) return { ok: false, reason: 'Membership expired — renewal required.' };
+  if (!m || !m.number || m.number.toUpperCase() !== clean) {
+    return { ok: false, status: 'trespass', reason: 'No matching member — unauthorized. Do not admit.' };
+  }
+  if (Date.now() > m.expiresAt) {
+    commitMember({ ...m, status: 'expired' });
+    return { ok: false, status: 'expired', member: memberState, reason: 'Membership expired — renewal required.' };
+  }
   commitMember({ ...m, status: 'verified', verifiedAt: Date.now() });
-  return { ok: true, member: memberState };
+  return { ok: true, status: 'valid', member: memberState, reason: 'Member verified — grant entry.' };
 }
 export function resetMembership() { commitMember(null); }
 function useMember() {
@@ -922,6 +929,8 @@ function PayVerifyScreen() {
 
 // Tier name -> its card artwork.
 const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
+// Door-result status -> its alert chip graphic.
+const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass };
 
 function useQrDataUrl(text) {
   const [url, setUrl] = useState('');
@@ -960,9 +969,8 @@ function BuyMembership() {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            <img src={TIER_SRC[row.name]} alt={`${row.name} tier`} />
+            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={`${row.name} tier`} />
             <span className="tier-buy-price">{fmtUSD(row.price)}</span>
-            <span className="tier-buy-status">AVAILABLE</span>
           </button>
         ))}
       </div>
@@ -978,9 +986,12 @@ function BuyMembership() {
         </div>
       </div>
 
-      <button type="button" className="mem-buy-btn" onClick={() => purchaseTier(tier, pay)}>
-        Purchase {tier} — {fmtUSD(t.price)}{t.vip ? ' · VIP' : ''}
-      </button>
+      <div className="buy-checkout">
+        <p className="buy-summary">{tier} membership · <b>{fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {pay}</p>
+        <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay)} aria-label={`Buy ${tier} plan`}>
+          <img src={ui.buttons.selectPlan} alt="Select plan" />
+        </button>
+      </div>
       <p className="mem-fineprint">Demo checkout — no real charge. Buying mints your card + QR instantly.</p>
     </div>
   );
@@ -998,29 +1009,38 @@ function MemberPass({ member }) {
         <div className="mem-pass-info">
           <span className="mem-pass-eyebrow">HITMANS VIP · Member</span>
           <strong className="mem-pass-tier">{member.tier}{isVip ? ' VIP' : ''}</strong>
-          <div className={`mem-status ${verified ? 'verified' : 'active'}`}>{verified ? 'VERIFIED AT DOOR' : 'ACTIVE'}</div>
+          <div className="mem-chip-row">
+            <img className="mem-chip" src={ui.chips.active} alt="Active" />
+            {isVip && <img className="mem-chip" src={ui.chips.vip} alt="VIP" />}
+          </div>
           <dl className="mem-pass-meta">
             <div><dt>Member #</dt><dd className="mem-number">{member.number}</dd></div>
             <div><dt>Valid until</dt><dd>{fmtDate(member.expiresAt)}</dd></div>
             <div><dt>Paid with</dt><dd>{member.payment}</dd></div>
           </dl>
+          {verified && <img className="mem-verified-alert" src={ui.verify.entryVerified} alt="Entry status: verified" />}
         </div>
         <div className="mem-qr">
-          {qr ? <img src={qr} alt="Member QR code" /> : <div className="mem-qr-load">QR…</div>}
+          <div className="qr-framed">
+            <img className="qr-frame" src={ui.verify.qrFrame} alt="" />
+            {qr ? <img className="qr-code" src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
+          </div>
           <span>Security scans this</span>
         </div>
       </div>
 
       <div className="mem-actions">
         {!isVip && (
-          <button type="button" className="mem-action upgrade" onClick={() => purchaseTier('VIP', member.payment)}>
-            Upgrade to VIP — {fmtUSD(TIER_BY.VIP.price)}
+          <button type="button" className="asset-cta wide" onClick={() => purchaseTier('VIP', member.payment)} aria-label={`Upgrade to VIP ${fmtUSD(TIER_BY.VIP.price)}`}>
+            <img src={ui.buttons.upgradeVip} alt="Upgrade to VIP" />
+            <span className="asset-cta-note">{fmtUSD(TIER_BY.VIP.price)}</span>
           </button>
         )}
-        <button type="button" className="mem-action renew" onClick={() => purchaseTier(member.tier, member.payment)}>
-          Renew {member.tier} — {fmtUSD(TIER_BY[member.tier].price)}
+        <button type="button" className="asset-cta wide" onClick={() => purchaseTier(member.tier, member.payment)} aria-label={`Renew ${member.tier} ${fmtUSD(TIER_BY[member.tier].price)}`}>
+          <img src={ui.buttons.renewPlan} alt="Renew plan" />
+          <span className="asset-cta-note">{fmtUSD(TIER_BY[member.tier].price)}</span>
         </button>
-        <button type="button" className="mem-action cancel" onClick={resetMembership}>Cancel membership</button>
+        <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
       </div>
       <p className="mem-fineprint">Your number + QR also show in Profile. At the door, Security scans the QR or types your number to verify.</p>
     </div>
@@ -1071,47 +1091,58 @@ function SecurityVerifyScreen() {
     } catch { setResult({ ok: false, reason: 'Camera blocked — type the member number instead.' }); setScanning(false); }
   }
 
+  const dismiss = () => setResult(null);
   return (
     <div className="verify-screen">
       <div className="verify-panel">
         <h2>Door verification</h2>
         <p>Scan the member’s QR or type their number. No valid membership = no entry.</p>
 
-        {scanning ? (
-          <div className="verify-cam"><video ref={videoRef} playsInline muted /><button type="button" className="verify-cam-stop" onClick={stopScan}>Stop</button></div>
-        ) : (
-          <button type="button" className="verify-scan-btn" onClick={startScan}>📷 Scan QR</button>
-        )}
+        <div className="verify-scanbox">
+          <div className="qr-framed lg">
+            <img className="qr-frame" src={ui.verify.qrFrame} alt="" />
+            {scanning
+              ? <video className="qr-code cam" ref={videoRef} playsInline muted />
+              : <div className="qr-load">Camera off</div>}
+          </div>
+          {scanning
+            ? <button type="button" className="mem-cancel" onClick={stopScan}>Stop camera</button>
+            : <button type="button" className="asset-cta" onClick={startScan} aria-label="Scan app"><img src={ui.buttons.scan} alt="Scan app" /></button>}
+        </div>
 
         <div className="verify-manual">
           <label htmlFor="memnum">Or enter member number</label>
           <div className="verify-manual-row">
             <input id="memnum" type="text" placeholder="HV-0000-0000" value={num}
               onChange={(e) => setNum(e.target.value)} autoComplete="off" />
-            <button type="button" className="verify-go" onClick={() => setResult(verifyByNumber(num))}>Verify</button>
+            <button type="button" className="asset-cta compact" onClick={() => setResult(verifyByNumber(num))} aria-label="Verify card">
+              <img src={ui.verify.verifyCard} alt="Verify card" />
+            </button>
           </div>
         </div>
 
-        {result && (
-          <div className={`verify-result ${result.ok ? 'ok' : 'deny'}`}>
-            {result.ok ? (
-              <>
-                <strong>✓ VERIFIED</strong>
-                <span>{result.member.tier}{result.member.vip ? ' VIP' : ''} member · {result.member.number}</span>
-                <small>Valid until {fmtDate(result.member.expiresAt)} — grant entry.</small>
-              </>
-            ) : (
-              <>
-                <strong>✕ NOT A MEMBER</strong>
-                <span>{result.reason}</span>
-                <small>Send them to Membership to purchase a tier.</small>
-              </>
-            )}
-          </div>
-        )}
-
         <p className="verify-hint">{member ? `A member card is on file (${member.number}) — scan or type it to test a pass.` : 'No membership on file yet. Buy one as a Member first, then verify it here.'}</p>
       </div>
+
+      {result && (
+        <div className="scan-alert-overlay" onClick={dismiss}>
+          <div className={`scan-alert ${result.status}`} onClick={(e) => e.stopPropagation()}>
+            <img className="scan-alert-banner" src={result.ok ? ui.banners.granted : ui.banners.denied} alt={result.ok ? 'Access granted' : 'Access denied'} />
+            <img className="scan-alert-chip" src={STATUS_CHIP[result.status]} alt={result.status} />
+            {result.member ? (
+              <div className="scan-result-row">
+                <strong>{result.member.tier}{result.member.vip ? ' VIP' : ''} Member</strong>
+                <span className="scan-result-num">{result.member.number}</span>
+                <small>{result.status === 'valid' ? `Valid until ${fmtDate(result.member.expiresAt)}` : `Expired ${fmtDate(result.member.expiresAt)}`}</small>
+              </div>
+            ) : (
+              <p className="scan-alert-sub">{result.reason}</p>
+            )}
+            <p className={`scan-alert-verdict ${result.ok ? 'go' : 'no'}`}>{result.ok ? 'GRANT ENTRY' : 'DO NOT ADMIT'}</p>
+            <button type="button" className="scan-alert-dismiss" onClick={dismiss}>Dismiss</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

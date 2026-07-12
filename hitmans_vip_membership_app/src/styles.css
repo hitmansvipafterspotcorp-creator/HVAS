@@ -3019,3 +3019,60 @@ button {
   .mem-pass-card { grid-template-columns: 1fr; text-align: center; justify-items: center; }
   .mem-pass-meta { justify-content: center; }
 }
+
+/* ── Polish: real assets instead of CSS-drawn controls ────────────── */
+.tier-buy-card .tier-buy-art { width: 100%; max-width: 120px; height: auto; }
+.buy-checkout { text-align: center; margin-top: 6px; }
+.buy-summary { color: #e8dcff; margin: 0 0 10px; font-size: 15px; }
+.buy-summary b { color: #ffd66b; }
+
+/* image-asset call-to-action buttons (SELECT PLAN / UPGRADE / RENEW / SCAN / VERIFY) */
+.asset-cta { position: relative; background: none; border: none; padding: 0; cursor: pointer; line-height: 0; display: inline-block; }
+.asset-cta img { height: 56px; width: auto; display: block; }
+.asset-cta.wide img { height: 54px; }
+.asset-cta.compact img { height: 52px; }
+.asset-cta:hover { filter: brightness(1.1); }
+.asset-cta-note { position: absolute; top: -9px; right: -6px; background: #ffd66b; color: #2a1600; font-weight: 800; font-size: 12px; padding: 2px 9px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,.45); line-height: 1.4; }
+
+/* member pass chips + verified alert (real chip assets) */
+.mem-chip-row { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.mem-chip { height: 30px; width: auto; }
+.mem-verified-alert { display: block; height: 46px; width: auto; margin-top: 10px; }
+.mem-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
+.mem-cancel { background: none; border: none; color: #8a6fb0; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 8px; }
+
+/* QR inside the ornate frame asset */
+.qr-framed { position: relative; width: 150px; }
+.qr-framed.lg { width: 240px; margin: 0 auto; }
+.qr-framed .qr-frame { width: 100%; display: block; }
+.qr-framed .qr-code { position: absolute; left: 18%; top: 12%; width: 64%; height: auto; border-radius: 4px; }
+.qr-framed.lg .qr-code.cam { object-fit: cover; height: 46%; background: #000; }
+.qr-framed .qr-load { position: absolute; left: 18%; top: 12%; width: 64%; aspect-ratio: 1; display: grid; place-items: center; color: #9a7ac0; font-size: 12px; }
+.mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.mem-qr span { color: #9a7ac0; font-size: 11px; }
+
+/* security verify layout */
+.verify-scanbox { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-bottom: 10px; }
+.verify-manual-row .asset-cta.compact { flex: 0 0 auto; }
+
+/* scan-result ALERT that pops up (ACCESS GRANTED / ACCESS DENIED banners) */
+.scan-alert-overlay { position: fixed; inset: 0; background: rgba(6,3,14,.82); display: grid; place-items: center; z-index: 80; padding: 16px; animation: alertfade .18s ease; }
+.scan-alert { background: #140a20; border: 1px solid #3a2350; border-radius: 18px; padding: 22px; max-width: 420px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.scan-alert-banner { width: 100%; max-width: 360px; height: auto; }
+.scan-alert-chip { height: 58px; width: auto; }
+.scan-alert-line { color: #f4ecff; margin: 0; font-size: 15px; }
+.scan-alert-line b { font-family: ui-monospace, monospace; letter-spacing: .04em; }
+.scan-alert-sub { color: #9a7ac0; margin: 0; font-size: 13px; }
+.scan-alert-dismiss { margin-top: 6px; background: #241436; color: #b598d8; border: 1px solid #3a2350; border-radius: 10px; padding: 10px 26px; cursor: pointer; font-weight: 700; }
+@keyframes alertfade { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+
+/* scan result row + verdict (real status chips drive the color) */
+.scan-alert.valid { border-color: #2f7d55; }
+.scan-alert.expired, .scan-alert.trespass { border-color: #7d2f3f; }
+.scan-result-row { display: flex; flex-direction: column; gap: 2px; }
+.scan-result-row strong { color: #f4ecff; font-size: 16px; }
+.scan-result-num { font-family: ui-monospace, monospace; color: #c9b8ff; letter-spacing: .05em; }
+.scan-result-row small { color: #9a7ac0; }
+.scan-alert-verdict { margin: 4px 0 0; font-weight: 900; letter-spacing: .12em; font-size: 15px; }
+.scan-alert-verdict.go { color: #7dffb0; }
+.scan-alert-verdict.no { color: #ff8aa0; }
