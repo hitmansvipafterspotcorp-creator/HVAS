@@ -20,6 +20,17 @@ export const TIERS = [
 const TIER_BY = Object.fromEntries(TIERS.map((t) => [t.name, t]));
 const MEMBER_KEY = 'hvas_member_v1';
 
+// Tier perks. Hospitality tickets are issued per night and expire at 3AM.
+export const TIER_PERKS = {
+  Daily: { tickets: 0, meal: false, drinks: false, blurb: 'Entry access' },
+  Weekly: { tickets: 1, meal: false, drinks: false, blurb: '1 hospitality ticket a night (before 3AM)' },
+  Monthly: { tickets: 3, meal: false, drinks: false, blurb: '3 hospitality tickets daily (expire 3AM)' },
+  Yearly: { tickets: 3, meal: true, drinks: false, blurb: '3 tickets daily + a free Cafe8Fifty meal' },
+  VIP: { tickets: 3, meal: true, drinks: true, blurb: 'Free drinks all night + a free meal daily' },
+};
+// The "night" resets at 3AM — shift the clock back 3h and take the date.
+function nightKey(ts = Date.now()) { return new Date(ts - 3 * 3600000).toISOString().slice(0, 10); }
+
 function loadMember() { try { return JSON.parse(localStorage.getItem(MEMBER_KEY)); } catch { return null; } }
 const memberListeners = new Set();
 let memberState = loadMember();
@@ -36,12 +47,34 @@ export function purchaseTier(tierName, payment) {
   const t = TIER_BY[tierName]; if (!t) return;
   const now = Date.now();
   const prev = memberState || {};
+  const perk = TIER_PERKS[tierName] || TIER_PERKS.Daily;
+  const nk = nightKey();
   commitMember({
     tier: tierName, vip: !!t.vip, number: prev.number || genMemberNumber(), payment,
     purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
     // loyalty carries over across renew/upgrade
-    entries: prev.entries || 0, loyalty: prev.loyalty || 0,
+    entries: prev.entries || 0, loyalty: prev.loyalty || 0, lastEntryNight: prev.lastEntryNight || null,
+    // tonight's perks
+    tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
   });
+}
+
+// Reissue tonight's hospitality tickets / meal if we've crossed 3AM.
+export function refreshNight() {
+  if (!memberState) return;
+  const nk = nightKey();
+  if (memberState.ticketsNight !== nk) {
+    const perk = TIER_PERKS[memberState.tier] || TIER_PERKS.Daily;
+    commitMember({ ...memberState, tickets: perk.tickets, ticketsNight: nk, mealUsed: false });
+  }
+}
+export function useTicket() {
+  if (!memberState || (memberState.tickets || 0) <= 0) return;
+  commitMember({ ...memberState, tickets: memberState.tickets - 1 });
+}
+export function claimMeal() {
+  if (!memberState) return;
+  commitMember({ ...memberState, mealUsed: true });
 }
 
 // Loyalty ranks — earned by nights attended (entries) + loyalty, not bought.
@@ -60,10 +93,21 @@ export function rankFor(entries = 0) {
   }
   return { rank: r, next };
 }
-// A logged entry = a night attended; drives the loyalty rank.
+// Auto-logged when a member checks in at the door — one night per 3AM window,
+// so repeated check-in toggles don't double-count. Also (re)issues tonight's
+// hospitality tickets.
 export function logEntry() {
   if (!memberState) return;
-  commitMember({ ...memberState, entries: (memberState.entries || 0) + 1, loyalty: (memberState.loyalty || 0) + 10 });
+  const nk = nightKey();
+  if (memberState.lastEntryNight === nk) { refreshNight(); return; }
+  const perk = TIER_PERKS[memberState.tier] || TIER_PERKS.Daily;
+  commitMember({
+    ...memberState,
+    entries: (memberState.entries || 0) + 1,
+    loyalty: (memberState.loyalty || 0) + 10,
+    lastEntryNight: nk,
+    tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
+  });
 }
 // Returns one of three door outcomes: valid (grant), expired (deny), or
 // trespass (deny — the number isn't a member at all). Security shows the
@@ -695,7 +739,7 @@ function App() {
             <RoleBadge
               role={roleById(role)}
               checkedIn={checkedIn}
-              onToggleCheckIn={() => setCheckedIn((v) => !v)}
+              onToggleCheckIn={() => setCheckedIn((v) => { const next = !v; if (next) logEntry(); return next; })}
               onSwitch={switchRole}
             />
           ) : (
@@ -1048,6 +1092,9 @@ function MemberPass({ member, checkedIn }) {
   const beenInside = checkedIn || entries > 0;   // event/venue access indicator
   const tierIdx = TIERS.findIndex((t) => t.name === member.tier);
   const nextUp = TIERS[tierIdx + 1] || null;      // step-up target (null at VIP)
+  const perk = TIER_PERKS[member.tier] || TIER_PERKS.Daily;
+  const tickets = member.tickets ?? perk.tickets;
+  useEffect(() => { refreshNight(); }, []);       // reissue perks if we crossed 3AM
   const [prefs, setPrefs] = useState({ music: true, alerts: true, priv: true });
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
 
@@ -1071,13 +1118,34 @@ function MemberPass({ member, checkedIn }) {
           {verified && <img className="mem-verified-alert" src={ui.verify.entryVerified} alt="Entry status: verified" />}
         </div>
         <div className="mem-qr">
-          <div className="qr-framed">
-            <img className="qr-frame" src={ui.verify.qrFrame} alt="" />
-            {qr ? <img className="qr-code" src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
+          <div className="qr-clean">
+            {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
           </div>
-          <span>Security scans this</span>
+          <span>Show at the door</span>
         </div>
       </div>
+
+      {/* — tonight's perks: hospitality tickets / meal / drinks — */}
+      <section className="perks">
+        <h3>Tonight’s perks</h3>
+        {perk.tickets > 0 && (
+          <div className="perk-tickets">
+            <div className="ticket-stub"><b>{tickets}</b><span>hospitality<br />{tickets === 1 ? 'ticket' : 'tickets'}</span></div>
+            <div className="perk-body">
+              <p>Use inside before <b>3AM</b> · resets nightly.</p>
+              <button type="button" className="perk-use" disabled={tickets <= 0} onClick={useTicket}>
+                {tickets > 0 ? 'Use a ticket' : 'Used up tonight'}
+              </button>
+            </div>
+          </div>
+        )}
+        {perk.meal && (
+          <div className="perk-row"><span>🍽 Free Cafe8Fifty meal daily</span>
+            {member.mealUsed ? <span className="perk-done">Claimed tonight</span> : <button type="button" className="perk-claim" onClick={claimMeal}>Claim</button>}</div>
+        )}
+        {perk.drinks && <div className="perk-row"><span>🥂 Drinks free all night</span><span className="perk-vip">VIP</span></div>}
+        {perk.tickets === 0 && !perk.meal && !perk.drinks && <p className="perk-none">Entry access only. Upgrade for nightly hospitality tickets.</p>}
+      </section>
 
       {/* — renewal countdown — */}
       <div className={`renews-bar${expired ? ' expiredbar' : soon ? ' soon' : ''}`}>
@@ -1101,7 +1169,7 @@ function MemberPass({ member, checkedIn }) {
             ? <><b>{rank.name}</b> · {entries} {entries === 1 ? 'night' : 'nights'} in · {next.min - entries} more to <b>{next.name}</b></>
             : <><b>VIP rank</b> · {entries} nights in · top tier reached</>}</p>
         </div>
-        <button type="button" className="loyalty-log" onClick={logEntry}>+ Log tonight’s entry</button>
+        <p className="loyalty-note">Nights count automatically when you check in at the door.</p>
       </section>
 
       {/* — status indicators (driven by real state, not buttons) — */}
