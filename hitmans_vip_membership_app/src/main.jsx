@@ -969,8 +969,7 @@ function BuyMembership() {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={`${row.name} tier`} />
-            <span className="tier-buy-price">{fmtUSD(row.price)}</span>
+            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={`${row.name} — ${fmtUSD(row.price)}`} />
           </button>
         ))}
       </div>
