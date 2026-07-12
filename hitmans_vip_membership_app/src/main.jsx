@@ -93,21 +93,34 @@ export function rankFor(entries = 0) {
   }
   return { rank: r, next };
 }
-// Auto-logged when a member checks in at the door — one night per 3AM window,
-// so repeated check-in toggles don't double-count. Also (re)issues tonight's
-// hospitality tickets.
-export function logEntry() {
-  if (!memberState) return;
+// Admit the member for tonight — one night per 3AM window, so repeated
+// check-ins / door scans never double-count. Counts the night, adds loyalty,
+// and (re)issues tonight's hospitality tickets. Returns the next member object.
+function admitTonight(m) {
   const nk = nightKey();
-  if (memberState.lastEntryNight === nk) { refreshNight(); return; }
-  const perk = TIER_PERKS[memberState.tier] || TIER_PERKS.Daily;
-  commitMember({
-    ...memberState,
-    entries: (memberState.entries || 0) + 1,
-    loyalty: (memberState.loyalty || 0) + 10,
+  const perk = TIER_PERKS[m.tier] || TIER_PERKS.Daily;
+  if (m.lastEntryNight === nk) {
+    // already counted tonight — just keep perks fresh across a 3AM rollover
+    if (m.ticketsNight === nk) return m;
+    return { ...m, tickets: perk.tickets, ticketsNight: nk, mealUsed: false };
+  }
+  return {
+    ...m,
+    entries: (m.entries || 0) + 1,
+    loyalty: (m.loyalty || 0) + 10,
     lastEntryNight: nk,
     tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
-  });
+  };
+}
+// Has this member already been admitted for the current night?
+export function isInsideTonight(m = memberState) {
+  return !!(m && m.lastEntryNight === nightKey());
+}
+// Auto-logged when a member checks in (self) — same idempotent path the door
+// uses, so member-side check-in and staff verification stay consistent.
+export function logEntry() {
+  if (!memberState) return;
+  commitMember(admitTonight(memberState));
 }
 // Returns one of three door outcomes: valid (grant), expired (deny), or
 // trespass (deny — the number isn't a member at all). Security shows the
@@ -122,8 +135,10 @@ export function verifyByNumber(number) {
     commitMember({ ...m, status: 'expired' });
     return { ok: false, status: 'expired', member: memberState, reason: 'Membership expired — renewal required.' };
   }
-  commitMember({ ...m, status: 'verified', verifiedAt: Date.now() });
-  return { ok: true, status: 'valid', member: memberState, reason: 'Member verified — grant entry.' };
+  // Grant = admission: verify the pass AND log tonight's entry (idempotent),
+  // so the member's loyalty rank, ribbons, and perks update from this one event.
+  commitMember(admitTonight({ ...m, status: 'verified', verifiedAt: Date.now() }));
+  return { ok: true, status: 'valid', member: memberState, reason: 'Member verified — grant entry. Night logged.' };
 }
 export function resetMembership() { commitMember(null); }
 function useMember() {
@@ -628,7 +643,9 @@ function App() {
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
   const [role, setRole] = useState(null);       // null until the user picks a role
-  const [checkedIn, setCheckedIn] = useState(false); // gates member event/venue access
+  const member = useMember();                    // subscribe: door verification updates this
+  const [onTheWay, setOnTheWay] = useState(false); // member signal: heading to the venue (OTW)
+  const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
   const [playing, setPlaying] = useState(null); // { id, name } while in the brawler
   const [transition, setTransition] = useState({
     active: true,
@@ -715,7 +732,9 @@ function App() {
     });
   }
 
-  const session = { role, checkedIn };
+  // 'checkedIn' (menu gate + pass indicator) means admitted/inside — driven by
+  // the door verification, not the on-the-way toggle.
+  const session = { role, onTheWay, checkedIn: inside };
   function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); }
   function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); }
 
@@ -738,8 +757,9 @@ function App() {
           {current.id === 'home' ? (
             <RoleBadge
               role={roleById(role)}
-              checkedIn={checkedIn}
-              onToggleCheckIn={() => setCheckedIn((v) => { const next = !v; if (next) logEntry(); return next; })}
+              onTheWay={onTheWay}
+              inside={inside}
+              onToggleOtw={() => setOnTheWay((v) => !v)}
               onSwitch={switchRole}
             />
           ) : (
@@ -840,9 +860,10 @@ function RoleLanding({ onPick }) {
   );
 }
 
-// Compact header on the role home: shows current role, a demo check-in
-// toggle (progressive unlock), and a way back to the role picker.
-function RoleBadge({ role, checkedIn, onToggleCheckIn, onSwitch }) {
+// Compact header on the role home: current role, an "on the way" toggle a
+// member flips when heading over (not entry — that's the door verification),
+// an INSIDE indicator once verified, and a way back to the role picker.
+function RoleBadge({ role, onTheWay, inside, onToggleOtw, onSwitch }) {
   return (
     <header className="role-badge">
       <div className="role-badge-id">
@@ -851,9 +872,13 @@ function RoleBadge({ role, checkedIn, onToggleCheckIn, onSwitch }) {
       </div>
       <div className="role-badge-actions">
         {role.id === 'member' && (
-          <button type="button" className={`role-badge-checkin ${checkedIn ? 'on' : ''}`} onClick={onToggleCheckIn}>
-            {checkedIn ? '● Checked In' : '○ Check In'}
-          </button>
+          inside ? (
+            <span className="role-badge-checkin inside">● Inside</span>
+          ) : (
+            <button type="button" className={`role-badge-checkin ${onTheWay ? 'on' : ''}`} onClick={onToggleOtw}>
+              {onTheWay ? '● On the way' : '○ On the way'}
+            </button>
+          )
         )}
         <button type="button" className="role-badge-switch" onClick={onSwitch}>Switch</button>
       </div>
@@ -874,7 +899,7 @@ function HomeScreen({ role, session, navigate }) {
                   key={item.title}
                   index={index + 1}
                   {...item}
-                  detail={locked ? 'Locked · check in to unlock' : item.detail}
+                  detail={locked ? 'Locked · verify at the door to unlock' : item.detail}
                   locked={locked}
                   onSelect={() => { if (!locked) navigate(item.target); }}
                 />
@@ -1002,6 +1027,32 @@ const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
 const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass };
 
+// The pop-up alert shown when a membership is verified — the same overlay on
+// the staff door screen and on the member's own "Verify Membership" tap.
+// GRANTED / DENIED with the matching VALID / EXPIRED / TRESPASS chip.
+function ScanAlert({ result, onDismiss }) {
+  if (!result) return null;
+  return (
+    <div className="scan-alert-overlay" onClick={onDismiss}>
+      <div className={`scan-alert ${result.status}`} onClick={(e) => e.stopPropagation()}>
+        <img className="scan-alert-banner" src={result.ok ? ui.banners.granted : ui.banners.denied} alt={result.ok ? 'Access granted' : 'Access denied'} />
+        {STATUS_CHIP[result.status] && <img className="scan-alert-chip" src={STATUS_CHIP[result.status]} alt={result.status} />}
+        {result.member ? (
+          <div className="scan-result-row">
+            <strong>{result.member.tier}{result.member.vip ? ' VIP' : ''} Member</strong>
+            <span className="scan-result-num">{result.member.number}</span>
+            <small>{result.status === 'valid' ? `Valid until ${fmtDate(result.member.expiresAt)}` : `Expired ${fmtDate(result.member.expiresAt)}`}</small>
+          </div>
+        ) : (
+          <p className="scan-alert-sub">{result.reason}</p>
+        )}
+        <p className={`scan-alert-verdict ${result.ok ? 'go' : 'no'}`}>{result.ok ? 'GRANT ENTRY' : 'DO NOT ADMIT'}</p>
+        <button type="button" className="scan-alert-dismiss" onClick={onDismiss}>Dismiss</button>
+      </div>
+    </div>
+  );
+}
+
 function useQrDataUrl(text) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -1097,6 +1148,8 @@ function MemberPass({ member, checkedIn }) {
   useEffect(() => { refreshNight(); }, []);       // reissue perks if we crossed 3AM
   const [prefs, setPrefs] = useState({ music: true, alerts: true, priv: true });
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
+  // Member self-verify: same gate the door uses — pops GRANTED / DENIED / etc.
+  const [verifyResult, setVerifyResult] = useState(null);
 
   return (
     <div className="mem-screen mem-pass">
@@ -1121,7 +1174,10 @@ function MemberPass({ member, checkedIn }) {
           <div className="qr-clean">
             {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
           </div>
-          <span>Show at the door</span>
+          <span>Show at the door to get scanned</span>
+          <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(verifyByNumber(member.number))} aria-label="Verify membership">
+            <img src={ui.verify.verifyCard} alt="Verify membership" />
+          </button>
         </div>
       </div>
 
@@ -1169,7 +1225,7 @@ function MemberPass({ member, checkedIn }) {
             ? <><b>{rank.name}</b> · {entries} {entries === 1 ? 'night' : 'nights'} in · {next.min - entries} more to <b>{next.name}</b></>
             : <><b>VIP rank</b> · {entries} nights in · top tier reached</>}</p>
         </div>
-        <p className="loyalty-note">Nights count automatically when you check in at the door.</p>
+        <p className="loyalty-note">Nights count automatically each time security verifies you at the door.</p>
       </section>
 
       {/* — status indicators (driven by real state, not buttons) — */}
@@ -1180,7 +1236,7 @@ function MemberPass({ member, checkedIn }) {
         {beenInside && <img src={ui.ribbons[4]} alt="Event access" />}
         {beenInside && <img src={ui.ribbons[5]} alt="Venue access" />}
       </div>
-      <p className="access-note">{checkedIn ? 'Checked in — inside now.' : entries > 0 ? 'Access unlocks each night you check in.' : 'Check in at the door to unlock event & venue access.'}</p>
+      <p className="access-note">{checkedIn ? 'Verified at the door — inside tonight.' : entries > 0 ? 'Access unlocks each night you get verified at the door.' : 'Get scanned or tap Verify Membership at the door to unlock event & venue access.'}</p>
 
       {/* — actions: renew (prominent when expired) + step-up to the next tier — */}
       {expired && <div className="renew-alert">⚠ Your {member.tier} membership expired — renew to get back in.</div>}
@@ -1213,6 +1269,8 @@ function MemberPass({ member, checkedIn }) {
         <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
       </section>
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
+
+      <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
     </div>
   );
 }
@@ -1294,25 +1352,7 @@ function SecurityVerifyScreen() {
         <p className="verify-hint">{member ? `A member card is on file (${member.number}) — scan or type it to test a pass.` : 'No membership on file yet. Buy one as a Member first, then verify it here.'}</p>
       </div>
 
-      {result && (
-        <div className="scan-alert-overlay" onClick={dismiss}>
-          <div className={`scan-alert ${result.status}`} onClick={(e) => e.stopPropagation()}>
-            <img className="scan-alert-banner" src={result.ok ? ui.banners.granted : ui.banners.denied} alt={result.ok ? 'Access granted' : 'Access denied'} />
-            <img className="scan-alert-chip" src={STATUS_CHIP[result.status]} alt={result.status} />
-            {result.member ? (
-              <div className="scan-result-row">
-                <strong>{result.member.tier}{result.member.vip ? ' VIP' : ''} Member</strong>
-                <span className="scan-result-num">{result.member.number}</span>
-                <small>{result.status === 'valid' ? `Valid until ${fmtDate(result.member.expiresAt)}` : `Expired ${fmtDate(result.member.expiresAt)}`}</small>
-              </div>
-            ) : (
-              <p className="scan-alert-sub">{result.reason}</p>
-            )}
-            <p className={`scan-alert-verdict ${result.ok ? 'go' : 'no'}`}>{result.ok ? 'GRANT ENTRY' : 'DO NOT ADMIT'}</p>
-            <button type="button" className="scan-alert-dismiss" onClick={dismiss}>Dismiss</button>
-          </div>
-        </div>
-      )}
+      <ScanAlert result={result} onDismiss={dismiss} />
     </div>
   );
 }
