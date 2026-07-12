@@ -1,8 +1,62 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
+
+// ── Membership: the one source of truth ──────────────────────────────────
+// A member is either NOT a member (no card) or has ONE active tier. Buying a
+// tier mints a member number + QR; that pass is what shows on their pass/
+// profile and what Security scans/enters to verify. No fake sample data.
+export const TIERS = [
+  { name: 'Daily', price: 20, days: 1 },
+  { name: 'Weekly', price: 100, days: 7 },
+  { name: 'Monthly', price: 300, days: 30 },
+  { name: 'Yearly', price: 1850, days: 365 },
+  { name: 'VIP', price: 5000, days: 365, vip: true },
+];
+const TIER_BY = Object.fromEntries(TIERS.map((t) => [t.name, t]));
+const MEMBER_KEY = 'hvas_member_v1';
+
+function loadMember() { try { return JSON.parse(localStorage.getItem(MEMBER_KEY)); } catch { return null; } }
+const memberListeners = new Set();
+let memberState = loadMember();
+function commitMember(m) {
+  memberState = m;
+  try { m ? localStorage.setItem(MEMBER_KEY, JSON.stringify(m)) : localStorage.removeItem(MEMBER_KEY); } catch { /* ignore */ }
+  memberListeners.forEach((fn) => fn());
+}
+function genMemberNumber() {
+  const block = () => Math.floor(1000 + Math.random() * 9000);
+  return `HV-${block()}-${block()}`;
+}
+export function purchaseTier(tierName, payment) {
+  const t = TIER_BY[tierName]; if (!t) return;
+  const now = Date.now();
+  commitMember({
+    tier: tierName, vip: !!t.vip, number: genMemberNumber(), payment,
+    purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
+  });
+}
+export function verifyByNumber(number) {
+  const m = memberState;
+  const clean = (number || '').trim().toUpperCase();
+  if (!m || !m.number) return { ok: false, reason: 'No membership on file — purchase a card.' };
+  if (m.number.toUpperCase() !== clean) return { ok: false, reason: 'Number not found — not a member.' };
+  if (Date.now() > m.expiresAt) return { ok: false, reason: 'Membership expired — renewal required.' };
+  commitMember({ ...m, status: 'verified', verifiedAt: Date.now() });
+  return { ok: true, member: memberState };
+}
+export function resetMembership() { commitMember(null); }
+function useMember() {
+  const [, force] = useState(0);
+  useEffect(() => { const fn = () => force((n) => n + 1); memberListeners.add(fn); return () => memberListeners.delete(fn); }, []);
+  return memberState;
+}
+const fmtUSD = (n) => `$${n.toLocaleString('en-US')}`;
+const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const ui = {
   logo: '/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png',
@@ -407,14 +461,13 @@ const ROLES = [
     menu: [
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
       { title: 'Home', detail: 'Overview and quick status', chip: ui.chips.active, target: 'memberHome' },
-      { title: 'My Pass', detail: 'Pass, tier, and QR access', chip: ui.chips.vip, target: 'myPass' },
-      { title: 'Membership', detail: 'Plans, upgrades, renewals', chip: ui.chips.vip, target: 'membership' },
+      { title: 'Membership & Pass', detail: 'Buy a tier, then your card, number & QR', chip: ui.chips.vip, target: 'membership' },
       { title: 'Event Access', detail: 'Events you can attend', chip: ui.chips.checkedIn, target: 'eventAccess', requires: 'checkedIn' },
       { title: 'Venue Access', detail: 'Venues you can enter', chip: ui.chips.active, target: 'venueAccess', requires: 'checkedIn' },
-      { title: 'Profile', detail: 'Account and preferences', chip: ui.chips.vip, target: 'profile' },
+      { title: 'Profile', detail: 'Account and membership', chip: ui.chips.vip, target: 'profile' },
       { title: 'History', detail: 'Past entries and activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['characterSelect', 'memberHome', 'myPass', 'membership', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
+    allowed: ['characterSelect', 'memberHome', 'membership', 'myPass', 'eventAccess', 'venueAccess', 'profile', 'history', 'checkout'],
   },
   {
     id: 'staff',
@@ -423,14 +476,11 @@ const ROLES = [
     eyebrow: 'STAFF',
     chip: 'staff',
     menu: [
+      { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
       { title: 'Dashboard', detail: 'Door status and stats', chip: ui.chips.staff, target: 'staffDashboard' },
-      { title: 'Scan · Pay & Verify', detail: 'Scan member, take entry', chip: ui.chips.active, target: 'payVerify' },
-      { title: 'Search Member', detail: 'Find by name or ID', chip: ui.chips.checkedIn, target: 'searchMember' },
-      { title: 'Verify Card', detail: 'QR + keypad validation', chip: ui.chips.vip, target: 'verification' },
-      { title: 'Member Entry', detail: 'Grant / deny at the door', chip: ui.chips.staff, target: 'entry' },
       { title: 'Check-In Log', detail: 'Recent door decisions', chip: ui.chips.checkedIn, target: 'checkInLog' },
     ],
-    allowed: ['staffDashboard', 'payVerify', 'searchMember', 'verification', 'entry', 'checkInLog'],
+    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry'],
   },
   {
     id: 'host',
@@ -666,25 +716,21 @@ function ScreenBody({ activeScreen, navigate, onStartGame }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
-  if (activeScreen === 'payVerify') return <PayVerifyScreen />;
   if (activeScreen === 'memberHome') return <MemberHomeScreen />;
-  if (activeScreen === 'myPass') return <PassScreen />;
-  if (activeScreen === 'membership') return <MembershipScreen />;
+  if (activeScreen === 'myPass' || activeScreen === 'membership') return <MembershipScreen navigate={navigate} />;
   if (activeScreen === 'eventAccess') return <SimpleAccessScreen title="Event Access" rows={['Tonight Event', 'Lip Sync Bingo', 'VIP Social']} />;
   if (activeScreen === 'venueAccess') return <SimpleAccessScreen title="Venue Access" rows={['Front Door', 'Networking Floor', 'VIP Lounge']} />;
   if (activeScreen === 'profile') return <ProfileScreen />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'staffDashboard') return <SimpleAccessScreen title="Staff Dashboard" rows={['Door Status', 'Active Members', 'Pending Review']} />;
-  if (activeScreen === 'searchMember') return <SimpleAccessScreen title="Search Member" rows={['Name Search', 'Member Number', 'Status Review']} />;
+  if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
   if (activeScreen === 'checkInLog') return <HistoryScreen />;
   if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
-  if (activeScreen === 'entry') return <EntryScreen />;
   if (activeScreen === 'bingoStyle') return <BingoStyleScreen />;
   if (activeScreen === 'tv') return <TvDisplayScreen />;
   if (activeScreen === 'lobby') return <LobbyScreen />;
   if (activeScreen === 'playerCard') return <PlayerCardScreen />;
   if (activeScreen === 'host') return <HostScreen />;
-  if (activeScreen === 'verification') return <VerificationScreen />;
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
   if (activeScreen === 'checkout') return <CheckoutScreen />;
@@ -874,22 +920,197 @@ function PayVerifyScreen() {
   );
 }
 
+// Tier name -> its card artwork.
+const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
+
+function useQrDataUrl(text) {
+  const [url, setUrl] = useState('');
+  useEffect(() => {
+    let live = true;
+    if (!text) { setUrl(''); return undefined; }
+    QRCode.toDataURL(text, { margin: 1, width: 260, color: { dark: '#1b0b2e', light: '#f7ecff' } })
+      .then((u) => { if (live) setUrl(u); }).catch(() => {});
+    return () => { live = false; };
+  }, [text]);
+  return url;
+}
+
+// THE single membership screen: not a member -> buy a tier; member -> your pass.
 function MembershipScreen() {
+  const member = useMember();
+  return member ? <MemberPass member={member} /> : <BuyMembership />;
+}
+
+// Step 1 — you are not a member yet. Pick a tier, pick how you pay, purchase.
+function BuyMembership() {
+  const [tier, setTier] = useState('Monthly');
+  const [pay, setPay] = useState('Credit / Debit');
+  const t = TIER_BY[tier];
   return (
-    <div className="assembled-page membership-page">
-      <div className="membership-rebuild-row">
-        <div className="tier-live-grid">
-          {ui.tiers.map((tier) => (
-            <button className="image-action tile-image-button tier-card-live" type="button" key={tier.name} aria-label={`${tier.name} tier`}>
-              <img src={tier.src} alt="" />
-              <span className="tier-price-mask">
-                <b>{tier.price}</b>
-                <small>{tier.status}</small>
-              </span>
+    <div className="mem-screen">
+      <div className="mem-intro">
+        <h2>Become a member</h2>
+        <p>You must hold a membership to get in. Buy a tier and you’ll get a member card, a number, and a QR code security scans at the door.</p>
+      </div>
+      <div className="tier-buy-grid">
+        {TIERS.map((row) => (
+          <button
+            key={row.name}
+            type="button"
+            className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
+            onClick={() => setTier(row.name)}
+          >
+            <img src={TIER_SRC[row.name]} alt={`${row.name} tier`} />
+            <span className="tier-buy-price">{fmtUSD(row.price)}</span>
+            <span className="tier-buy-status">AVAILABLE</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mem-pay">
+        <span className="mem-pay-label">Pay with</span>
+        <div className="mem-pay-grid">
+          {ui.paymentMethods.map((m) => (
+            <button key={m.label} type="button" className={`image-action${pay === m.label ? ' selected' : ''}`} onClick={() => setPay(m.label)} aria-label={m.label}>
+              <img src={m.src} alt="" />
             </button>
           ))}
         </div>
-        <PlanActionGrid />
+      </div>
+
+      <button type="button" className="mem-buy-btn" onClick={() => purchaseTier(tier, pay)}>
+        Purchase {tier} — {fmtUSD(t.price)}{t.vip ? ' · VIP' : ''}
+      </button>
+      <p className="mem-fineprint">Demo checkout — no real charge. Buying mints your card + QR instantly.</p>
+    </div>
+  );
+}
+
+// Step 2 — you are a member. This is your card, number, QR, status + actions.
+function MemberPass({ member }) {
+  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`);
+  const isVip = member.vip;
+  const verified = member.status === 'verified';
+  return (
+    <div className="mem-screen mem-pass">
+      <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
+        <img className="mem-pass-art" src={TIER_SRC[member.tier]} alt={`${member.tier} membership`} />
+        <div className="mem-pass-info">
+          <span className="mem-pass-eyebrow">HITMANS VIP · Member</span>
+          <strong className="mem-pass-tier">{member.tier}{isVip ? ' VIP' : ''}</strong>
+          <div className={`mem-status ${verified ? 'verified' : 'active'}`}>{verified ? 'VERIFIED AT DOOR' : 'ACTIVE'}</div>
+          <dl className="mem-pass-meta">
+            <div><dt>Member #</dt><dd className="mem-number">{member.number}</dd></div>
+            <div><dt>Valid until</dt><dd>{fmtDate(member.expiresAt)}</dd></div>
+            <div><dt>Paid with</dt><dd>{member.payment}</dd></div>
+          </dl>
+        </div>
+        <div className="mem-qr">
+          {qr ? <img src={qr} alt="Member QR code" /> : <div className="mem-qr-load">QR…</div>}
+          <span>Security scans this</span>
+        </div>
+      </div>
+
+      <div className="mem-actions">
+        {!isVip && (
+          <button type="button" className="mem-action upgrade" onClick={() => purchaseTier('VIP', member.payment)}>
+            Upgrade to VIP — {fmtUSD(TIER_BY.VIP.price)}
+          </button>
+        )}
+        <button type="button" className="mem-action renew" onClick={() => purchaseTier(member.tier, member.payment)}>
+          Renew {member.tier} — {fmtUSD(TIER_BY[member.tier].price)}
+        </button>
+        <button type="button" className="mem-action cancel" onClick={resetMembership}>Cancel membership</button>
+      </div>
+      <p className="mem-fineprint">Your number + QR also show in Profile. At the door, Security scans the QR or types your number to verify.</p>
+    </div>
+  );
+}
+
+// Security (staff) side: scan the member's QR or type their number to verify.
+// AVAILABLE / ACTIVE / VERIFIED are RESULTS shown here — not buttons.
+function SecurityVerifyScreen() {
+  const member = useMember();
+  const [num, setNum] = useState('');
+  const [result, setResult] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const videoRef = useRef(null);
+  const rafRef = useRef(0);
+  const streamRef = useRef(null);
+
+  function stopScan() {
+    cancelAnimationFrame(rafRef.current);
+    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setScanning(false);
+  }
+  useEffect(() => () => stopScan(), []);
+
+  async function startScan() {
+    setResult(null);
+    if (!navigator.mediaDevices?.getUserMedia) { setResult({ ok: false, reason: 'No camera here — type the member number instead.' }); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream; setScanning(true);
+      const video = videoRef.current; video.srcObject = stream; await video.play();
+      const canvas = document.createElement('canvas');
+      const tick = () => {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(img.data, img.width, img.height);
+          if (code) {
+            const parsed = code.data.replace('HVAS-MEMBER:', '').trim();
+            setNum(parsed); stopScan(); setResult(verifyByNumber(parsed)); return;
+          }
+        }
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch { setResult({ ok: false, reason: 'Camera blocked — type the member number instead.' }); setScanning(false); }
+  }
+
+  return (
+    <div className="verify-screen">
+      <div className="verify-panel">
+        <h2>Door verification</h2>
+        <p>Scan the member’s QR or type their number. No valid membership = no entry.</p>
+
+        {scanning ? (
+          <div className="verify-cam"><video ref={videoRef} playsInline muted /><button type="button" className="verify-cam-stop" onClick={stopScan}>Stop</button></div>
+        ) : (
+          <button type="button" className="verify-scan-btn" onClick={startScan}>📷 Scan QR</button>
+        )}
+
+        <div className="verify-manual">
+          <label htmlFor="memnum">Or enter member number</label>
+          <div className="verify-manual-row">
+            <input id="memnum" type="text" placeholder="HV-0000-0000" value={num}
+              onChange={(e) => setNum(e.target.value)} autoComplete="off" />
+            <button type="button" className="verify-go" onClick={() => setResult(verifyByNumber(num))}>Verify</button>
+          </div>
+        </div>
+
+        {result && (
+          <div className={`verify-result ${result.ok ? 'ok' : 'deny'}`}>
+            {result.ok ? (
+              <>
+                <strong>✓ VERIFIED</strong>
+                <span>{result.member.tier}{result.member.vip ? ' VIP' : ''} member · {result.member.number}</span>
+                <small>Valid until {fmtDate(result.member.expiresAt)} — grant entry.</small>
+              </>
+            ) : (
+              <>
+                <strong>✕ NOT A MEMBER</strong>
+                <span>{result.reason}</span>
+                <small>Send them to Membership to purchase a tier.</small>
+              </>
+            )}
+          </div>
+        )}
+
+        <p className="verify-hint">{member ? `A member card is on file (${member.number}) — scan or type it to test a pass.` : 'No membership on file yet. Buy one as a Member first, then verify it here.'}</p>
       </div>
     </div>
   );
@@ -1220,22 +1441,26 @@ function SimpleAccessScreen({ title, rows }) {
 }
 
 function ProfileScreen() {
+  const member = useMember();
   return (
     <div className="profile-grid">
       <AppPanel title="Member Profile" subtitle="Identity">
         <div className="profile-card">
           <img src={ui.logo} alt="" />
           <div>
-            <strong>Member Profile</strong>
-            <span>Account and preference controls</span>
-            <StatusStrip items={[ui.chips.active, ui.chips.vip]} />
+            <strong>{member ? `${member.tier}${member.vip ? ' VIP' : ''} Member` : 'Not a member yet'}</strong>
+            <span>{member ? `Member # ${member.number}` : 'Buy a tier in Membership & Pass to activate your card.'}</span>
+            <div className={`mem-status ${member ? (member.status === 'verified' ? 'verified' : 'active') : 'none'}`}>
+              {member ? (member.status === 'verified' ? 'VERIFIED AT DOOR' : 'ACTIVE') : 'NO CARD'}
+            </div>
           </div>
         </div>
+        {member && <p className="panel-note">Valid until {fmtDate(member.expiresAt)} · paid with {member.payment}. Your card + QR live in Membership &amp; Pass.</p>}
       </AppPanel>
       <AppPanel title="Preferences" subtitle="Member settings">
         <AccessRow title="Music" status="On" chip={ui.chips.active} />
         <AccessRow title="Entry Alerts" status="On" chip={ui.chips.checkedIn} />
-        <AccessRow title="Private Member" status="Enabled" chip={ui.chips.vip} />
+        <AccessRow title="Private Member" status={member ? 'Enabled' : 'Members only'} chip={ui.chips.vip} />
       </AppPanel>
     </div>
   );
