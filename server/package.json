@@ -12,7 +12,8 @@
     "test:mesh-tcp": "node mesh-tcp-test.mjs",
     "test:encrypted": "node mesh-encrypted-test.mjs",
     "test:cluster": "node cluster-test.mjs",
+    "test:network": "node network-test.mjs",
     "test:ble": "node ../native/ble-test.mjs",
-    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node ../native/ble-test.mjs"
+    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node network-test.mjs && node ../native/ble-test.mjs"
   }
 }

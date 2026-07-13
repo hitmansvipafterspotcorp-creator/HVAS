@@ -17,7 +17,7 @@
 //
 // Trust: each op is signed with the venue Ed25519 key, so a node can't be
 // spoofed onto the mesh. (Production: per-node keys + a signed roster.)
-import { sign, verify, createHash } from 'node:crypto';
+import { sign, verify, createHash, randomBytes } from 'node:crypto';
 import net from 'node:net';
 import { seal, open } from './crypto.mjs';
 
@@ -40,6 +40,17 @@ export class MeshNode {
     this.ops = new Map();          // opId -> op  (the replicated log)
     this.transports = [];          // links to peers
     this.onChange = () => {};
+    this.onLive = () => {};        // ephemeral live messages (presence, typing…)
+    this.seenLive = new Set();     // recent live-msg ids, bounded (loop guard)
+  }
+
+  // Ephemeral flood — for high-frequency, disposable data (member presence /
+  // positions in a top-down venue). NOT stored in the op-log, NOT persisted.
+  live(payload) {
+    const id = randomBytes(8).toString('hex');
+    this.seenLive.add(id);
+    this.onLive(payload);
+    this._broadcast({ kind: 'live', id, payload });
   }
 
   // ── transport plumbing ──
@@ -74,6 +85,12 @@ export class MeshNode {
   _handle(msg, reply) {
     if (msg.kind === 'op') {
       if (this._ingest(msg.op)) this._broadcast({ kind: 'op', op: msg.op }); // relay onward (flood)
+    } else if (msg.kind === 'live') {
+      if (this.seenLive.has(msg.id)) return;                 // already flooded this one
+      this.seenLive.add(msg.id);
+      if (this.seenLive.size > 600) this.seenLive = new Set([...this.seenLive].slice(-300));
+      this.onLive(msg.payload);
+      this._broadcast(msg);                                  // relay onward
     } else if (msg.kind === 'digest') {
       // peer told us which op-ids it has; send back the ones it's missing
       const have = new Set(msg.ids);

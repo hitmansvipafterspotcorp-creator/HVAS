@@ -49,6 +49,25 @@ export function applyOp(db, op) {
       db.prepare('INSERT INTO decisions(member_id,number,status,at,by_staff) VALUES(?,?,?,?,?)')
         .run(d.member_id ?? null, d.number ?? null, d.status, d.at, d.by_staff ?? null);
       break;
+
+    // ── networking (top-down venues) ──
+    case 'link.request': {                             // one member asks to connect
+      const [a, b] = [d.from, d.to].sort();
+      db.prepare(`INSERT INTO connections(a,b,status,requested_by,at) VALUES(?,?,'pending',?,?)
+        ON CONFLICT(a,b) DO NOTHING`).run(a, b, d.from, ts);
+      break;
+    }
+    case 'link.accept': {                              // the other accepts → linked
+      const [a, b] = [d.from, d.to].sort();
+      db.prepare(`INSERT INTO connections(a,b,status,requested_by,at) VALUES(?,?,'linked',?,?)
+        ON CONFLICT(a,b) DO UPDATE SET status='linked', at=excluded.at`).run(a, b, d.to, ts);
+      break;
+    }
+    case 'chat':                                       // deduped by op id (PRIMARY KEY)
+      db.prepare(`INSERT OR IGNORE INTO messages(id,from_id,to_id,venue,body,at)
+        VALUES(?,?,?,?,?,?)`).run(op.id, d.from, d.to ?? null, d.venue ?? null, d.body, d.at ?? ts);
+      break;
+
     default:
       break;
   }

@@ -52,8 +52,46 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // node's SQLite (via applyOp) AND replicates, encrypted, to peer nodes — so a
   // verification at one door shows up at every other door with no cloud.
   const node = new MeshNode({ id: nodeId, privateKey: keys.privateKey, publicKey: keys.publicKey });
-  node.onChange = (op) => { applyOp(db, op); emitBoard(); };
+  // Durable chat/link ops also fan out to this node's live subscribers.
+  node.onChange = (op) => {
+    applyOp(db, op); emitBoard();
+    if (op.t === 'chat') fanout(op.data.to, { kind: 'chat', ...op.data });
+    if (op.t === 'link.request' || op.t === 'link.accept') fanout(op.data.to, { kind: op.t, ...op.data });
+  };
   const commit = (t, data) => node.apply(t, data);       // apply local + broadcast
+
+  // ── realtime social layer (top-down venues) ──────────────────────────────
+  // Presence: who's in each venue right now, with their top-down character +
+  // position. Ephemeral, TTL'd, gossiped over the mesh live channel (never
+  // stored). liveSubs is one realtime pipe per member carrying targeted events:
+  // chat, typing, reactions, snaps (chunked media), and WebRTC signaling for
+  // live video/audio calls — all peer-to-peer over the encrypted mesh, no cloud.
+  const presence = new Map();                            // memberId -> {…, ts}
+  const PRESENCE_TTL = 15000;
+  const presenceSubs = new Set();                        // { v, res }
+  const liveSubs = new Map();                            // memberId -> Set(SSE res)
+
+  node.onLive = (p) => {
+    if (!p) return;
+    if (p.type === 'presence') { presence.set(p.id, { ...p, ts: Date.now() }); emitPresence(p.venue); }
+    else if (p.type === 'dm') { for (const res of (liveSubs.get(p.to) || [])) res.write(`data: ${JSON.stringify(p.msg)}\n\n`); }
+  };
+  const fanout = (to, msg) => { for (const res of (liveSubs.get(to) || [])) res.write(`data: ${JSON.stringify(msg)}\n\n`); };
+  // Send a realtime event to a member anywhere on the mesh (local + gossip).
+  const sendLive = (to, msg) => { fanout(to, msg); node.live({ type: 'dm', to, msg }); };
+  const liveMembers = (venue) => {
+    const now = Date.now(); const out = [];
+    for (const [id, p] of presence) {
+      if (now - p.ts > PRESENCE_TTL) { presence.delete(id); continue; }
+      if (!venue || p.venue === venue) out.push({ id, name: p.name, number: p.number, avatar: p.avatar, x: p.x, y: p.y, vip: p.vip });
+    }
+    return out;
+  };
+  const emitPresence = (venue) => {
+    const data = `data: ${JSON.stringify({ venue, members: liveMembers(venue) })}\n\n`;
+    for (const { v, res } of presenceSubs) if (!v || v === venue) res.write(data);
+  };
+  setInterval(() => { const now = Date.now(); for (const [id, p] of presence) if (now - p.ts > PRESENCE_TTL) { presence.delete(id); emitPresence(p.venue); } }, 5000).unref?.();
 
   // ── data helpers ──
   const memberByNumber = (n) => db.prepare('SELECT * FROM members WHERE number=?').get(n);
@@ -156,6 +194,89 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const { on } = await readBody(req);
       commit('signal.otw', { member_id: c.sub, on: on ? 1 : 0 });
+      json(res, 200, { ok: true });
+    },
+
+    // ── social: presence in the top-down venue (with their top-down character) ──
+    'POST /presence': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { venue, avatar, x, y } = await readBody(req);
+      const m = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
+      const ms = membershipOf(c.sub);
+      node.live({ type: 'presence', id: c.sub, name: m?.name, number: m?.number, avatar: avatar || 'creator', venue, x, y, vip: !!ms?.vip });
+      json(res, 200, { ok: true, here: liveMembers(venue) });
+    },
+    'GET /venue/presence': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const venue = new URL(req.url, 'http://x').searchParams.get('venue');
+      json(res, 200, { venue, members: liveMembers(venue) });
+    },
+
+    // ── one realtime pipe per member: chat, typing, reactions, snaps, RTC ──
+    'GET /live/stream': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
+      res.write('data: {"kind":"hello"}\n\n');
+      if (!liveSubs.has(c.sub)) liveSubs.set(c.sub, new Set());
+      liveSubs.get(c.sub).add(res);
+      req.on('close', () => liveSubs.get(c.sub)?.delete(res));
+    },
+    'GET /venue/stream': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const v = new URL(req.url, 'http://x').searchParams.get('venue');
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
+      res.write(`data: ${JSON.stringify({ venue: v, members: liveMembers(v) })}\n\n`);
+      const sub = { v, res }; presenceSubs.add(sub);
+      req.on('close', () => presenceSubs.delete(sub));
+    },
+
+    // ── networking: link up (durable graph over the mesh) ──
+    'POST /link': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { to } = await readBody(req);
+      if (!to || to === c.sub) return json(res, 400, { error: 'bad target' });
+      commit('link.request', { from: c.sub, to, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /link/accept': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { from } = await readBody(req);
+      commit('link.accept', { from: c.sub, to: from, at: Date.now() }); // c accepts `from`
+      json(res, 200, { ok: true });
+    },
+    'GET /network': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare('SELECT * FROM connections WHERE a=? OR b=?').all(c.sub, c.sub);
+      const conns = rows.map((r) => ({ peer: r.a === c.sub ? r.b : r.a, status: r.status, requestedBy: r.requested_by, at: r.at }));
+      json(res, 200, { connections: conns });
+    },
+
+    // ── chat: durable text (history converges via mesh) + instant live push ──
+    'POST /chat': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { to, venue, body } = await readBody(req);
+      if (!body || (!to && !venue)) return json(res, 400, { error: 'need body + (to or venue)' });
+      commit('chat', { from: c.sub, to: to || null, venue: venue || null, body: String(body).slice(0, 2000), at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'GET /chat/history': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const peer = new URL(req.url, 'http://x').searchParams.get('peer');
+      const rows = db.prepare(`SELECT * FROM messages WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?) ORDER BY at ASC LIMIT 200`)
+        .all(c.sub, peer, peer, c.sub);
+      json(res, 200, { messages: rows });
+    },
+
+    // ── snaps + live video: ephemeral media / WebRTC signaling over the mesh ──
+    // A snap is chunked encrypted media pushed as live events (view-once on the
+    // client). RTC signaling (offer/answer/ICE) rides the SAME pipe — so live
+    // video/audio is peer-to-peer with NO cloud signaling server.
+    'POST /live/send': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { to, kind, data } = await readBody(req);
+      if (!to || !kind) return json(res, 400, { error: 'need to + kind' });
+      // kind: 'typing' | 'reaction' | 'snap' | 'rtc-offer' | 'rtc-answer' | 'rtc-ice'
+      sendLive(to, { kind, from: c.sub, data, at: Date.now() });
       json(res, 200, { ok: true });
     },
 

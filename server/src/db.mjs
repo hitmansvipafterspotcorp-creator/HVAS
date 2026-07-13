@@ -53,6 +53,24 @@ export function openDb(path) {
       at INTEGER NOT NULL,
       by_staff TEXT
     );
+    -- ── member networking (top-down venues) ──
+    CREATE TABLE IF NOT EXISTS connections (          -- the networking graph
+      a TEXT NOT NULL,                        -- sorted pair (a < b) = one row per pair
+      b TEXT NOT NULL,
+      status TEXT NOT NULL,                   -- pending | linked
+      requested_by TEXT,
+      at INTEGER NOT NULL,
+      PRIMARY KEY (a, b)
+    );
+    CREATE TABLE IF NOT EXISTS messages (             -- chat history (converges via mesh)
+      id TEXT PRIMARY KEY,                    -- op id (dedup)
+      from_id TEXT NOT NULL,
+      to_id TEXT,                             -- null = venue-local broadcast
+      venue TEXT,
+      body TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_id, to_id, at);
   `);
   return db;
 }

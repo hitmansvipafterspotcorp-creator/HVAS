@@ -169,6 +169,42 @@ npm run test:cluster    # two full API nodes: buy on A, admit on B
 npm run test:all        # everything (API + mesh + encrypted + cluster + BLE)
 ```
 
+## Social layer — networking, chat & live media in the top-down venues
+
+Members walk the top-down venues as **their chosen top-down character** and can
+see each other, link up, chat, and go live — peer-to-peer over the same
+encrypted mesh (no cloud). The heavy media (live video/audio) rides **WebRTC**,
+and members can use **their own service provider** for it or the venue mesh —
+the app just makes the capability available; the transport is whatever's
+present.
+
+| Feature | Endpoint(s) | Transport |
+|---|---|---|
+| **Presence** (who's here + their top-down avatar/position) | `POST /presence`, `GET /venue/stream` (SSE) | mesh live channel (ephemeral, TTL'd, never stored) |
+| **Link / network** (connection graph) | `POST /link`, `POST /link/accept`, `GET /network` | durable CRDT ops (converge across nodes) |
+| **Chat** (text, history) | `POST /chat`, `GET /chat/history`, `GET /live/stream` (SSE) | durable op (history) + instant live push |
+| **Typing / reactions** | `POST /live/send` (kind: `typing`/`reaction`) | mesh live channel |
+| **Snaps** (ephemeral photo/video, view-once) | `POST /live/send` (kind: `snap`, chunked+encrypted) | mesh live channel / member's own data |
+| **Live video/audio** (IG-Live / FaceTime style) | `POST /live/send` (kind: `rtc-offer`/`rtc-answer`/`rtc-ice`) | **WebRTC P2P** — signaling over the mesh, media over WebRTC (member's provider *or* mesh) |
+
+Every member has one realtime pipe (`GET /live/stream`) carrying chat, snaps,
+reactions, and WebRTC signaling targeted at them; presence is a per-venue pipe
+(`GET /venue/stream`). Chat/links are durable and converge; presence/snaps/RTC
+signaling are ephemeral live-gossip. Proven end-to-end in `network-test.mjs`
+(two members on two nodes: presence with top-down avatars, link request/accept
+converging both ways, live + durable chat, WebRTC offer relay, snap delivery).
+
+**Serverless WebRTC signaling** is the innovative bit: the offer/answer/ICE
+exchange rides the encrypted mesh, so **no cloud signaling server** is needed —
+two phones on the venue Wi-Fi can start a live video call with zero internet,
+and when a member has their own data the exact same flow works over it.
+
+**Frontend/native wiring (not in this backend):** camera/mic capture
+(`getUserMedia`), `RTCPeerConnection`, and rendering the top-down characters +
+chat UI live in the app/native shell. The backend provides presence, the
+networking graph, chat history, and the realtime relay; the client does capture
+and playback.
+
 ## Production hardening (not done here)
 
 - Swap the mock OTP for a real SMS/email provider; stop returning `devCode`.
