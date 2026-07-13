@@ -10,7 +10,7 @@
 //      authenticating API calls.
 import {
   generateKeyPairSync, sign, verify, createHmac, randomBytes,
-  createPublicKey, createPrivateKey,
+  createPublicKey, createPrivateKey, createCipheriv, createDecipheriv,
 } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
@@ -63,6 +63,32 @@ export function verifyPass(publicKey, token, now = Date.now()) {
   } catch {
     return { ok: false, reason: 'malformed' };
   }
+}
+
+// ── Mesh message encryption (AES-256-GCM) ───────────────────────────────────
+// Every message on the wire is sealed under a shared 32-byte venue key, so a
+// sniffer on the BLE/LAN link sees only ciphertext. GCM is authenticated, so
+// tampering is detected on decrypt. (Ops are also Ed25519-signed underneath —
+// encryption gives confidentiality, the signature gives origin authenticity.)
+export function venueSecret(path) {
+  if (existsSync(path)) return readFileSync(path);
+  const k = randomBytes(32);
+  writeFileSync(path, k);
+  return k;
+}
+export function seal(key, obj) {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([c.update(Buffer.from(JSON.stringify(obj))), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), ct]).toString('base64');
+}
+export function open(key, str) {
+  try {
+    const buf = Buffer.from(str, 'base64');
+    const d = createDecipheriv('aes-256-gcm', key, buf.subarray(0, 12));
+    d.setAuthTag(buf.subarray(12, 28));
+    return JSON.parse(Buffer.concat([d.update(buf.subarray(28)), d.final()]).toString());
+  } catch { return null; }
 }
 
 // ── HMAC session tokens ──────────────────────────────────────────────────

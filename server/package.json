@@ -10,6 +10,8 @@
     "test": "node test.mjs",
     "test:mesh": "node mesh-test.mjs",
     "test:mesh-tcp": "node mesh-tcp-test.mjs",
-    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs"
+    "test:encrypted": "node mesh-encrypted-test.mjs",
+    "test:ble": "node ../native/ble-test.mjs",
+    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node ../native/ble-test.mjs"
   }
 }

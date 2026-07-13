@@ -19,6 +19,7 @@
 // spoofed onto the mesh. (Production: per-node keys + a signed roster.)
 import { sign, verify, createHash } from 'node:crypto';
 import net from 'node:net';
+import { seal, open } from './crypto.mjs';
 
 const b64u = (b) => Buffer.from(b).toString('base64url');
 const canon = (op) => JSON.stringify({ t: op.t, ts: op.ts, node: op.node, data: op.data });
@@ -141,7 +142,11 @@ export function link(a, b) {
 // with no internet (a Raspberry Pi AP, an ad-hoc Wi-Fi, etc.). This is also the
 // shape the WebRTC data channel and the native-shell BLE bridge implement, so
 // the mesh core is transport-agnostic.
-function socketTransport(sock) {
+function socketTransport(sock, key = null) {
+  // With a venue key, every frame is AES-256-GCM sealed — the wire carries only
+  // ciphertext. Without one, plain JSON (dev/loopback).
+  const enc = (msg) => (key ? seal(key, msg) : JSON.stringify(msg));
+  const dec = (line) => (key ? open(key, line) : (() => { try { return JSON.parse(line); } catch { return null; } })());
   let buf = '', handler = null;
   sock.on('data', (d) => {
     buf += d;
@@ -149,18 +154,18 @@ function socketTransport(sock) {
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i); buf = buf.slice(i + 1);
       if (!line) continue;
-      let msg; try { msg = JSON.parse(line); } catch { continue; }
-      handler && handler(msg, (r) => { try { sock.write(JSON.stringify(r) + '\n'); } catch { /* dropped */ } });
+      const msg = dec(line);
+      if (msg) handler && handler(msg, (r) => { try { sock.write(enc(r) + '\n'); } catch { /* dropped */ } });
     }
   });
-  return { onMessage(cb) { handler = cb; }, send(msg) { try { sock.write(JSON.stringify(msg) + '\n'); } catch { /* link down */ } } };
+  return { onMessage(cb) { handler = cb; }, send(msg) { try { sock.write(enc(msg) + '\n'); } catch { /* link down */ } } };
 }
 
-// Accept inbound peers.
-export function meshListen(node, port, host = '0.0.0.0') {
+// Accept inbound peers. Pass a 32-byte `key` to encrypt every message.
+export function meshListen(node, port, host = '0.0.0.0', { key = null } = {}) {
   const srv = net.createServer((sock) => {
     sock.setNoDelay(true);
-    const tp = node.addTransport(socketTransport(sock));
+    const tp = node.addTransport(socketTransport(sock, key));
     node.syncWith(tp);                                    // backfill the newcomer
     const drop = () => { node.transports = node.transports.filter((t) => t !== tp); };
     sock.on('error', drop); sock.on('close', drop);
@@ -170,12 +175,12 @@ export function meshListen(node, port, host = '0.0.0.0') {
 }
 
 // Dial a peer, and auto-reconnect when the link drops — "always live the moment
-// the link returns" (Bluetooth/Wi-Fi back in range).
-export function meshDial(node, host, port, { retryMs = 1500, alive = { on: true } } = {}) {
+// the link returns" (Bluetooth/Wi-Fi back in range). Pass `key` to encrypt.
+export function meshDial(node, host, port, { retryMs = 1500, alive = { on: true }, key = null } = {}) {
   const connect = () => {
     const sock = net.connect(port, host);
     sock.setNoDelay(true);
-    const tp = node.addTransport(socketTransport(sock));
+    const tp = node.addTransport(socketTransport(sock, key));
     sock.on('connect', () => node.syncWith(tp));          // re-sync on (re)connect = heal
     const drop = () => {
       node.transports = node.transports.filter((t) => t !== tp);
