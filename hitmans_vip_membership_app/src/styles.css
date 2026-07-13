@@ -3167,3 +3167,16 @@ button {
 .access-col h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #c9a8ff; }
 .access-col ul { margin: 0; padding-left: 16px; color: #e7dcff; font-size: 13px; line-height: 1.6; }
 .access-list-lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #ffd66b; background: rgba(14, 8, 24, 0.72); border-radius: 14px; text-align: center; padding: 0 12px; }
+
+/* — staff door dashboard — */
+.staff-dash { display: flex; flex-direction: column; gap: 14px; }
+.dash-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; }
+.dash-row > div { flex: 1; display: flex; flex-direction: column; }
+.dash-row strong { color: #f4ecff; font-size: 15px; }
+.dash-num { color: #b79ae6; font-size: 13px; letter-spacing: 0.04em; }
+.dash-when { color: #9a7ac0; font-size: 12px; white-space: nowrap; }
+.dash-dot { width: 12px; height: 12px; border-radius: 999px; flex: none; }
+.dash-dot.amber { background: #ffb24c; box-shadow: 0 0 10px #ffb24c; }
+.dash-dot.green { background: #52ffa8; box-shadow: 0 0 10px #52ffa8; }
+.dash-chip { height: 34px; width: auto; flex: none; }
+.dash-empty { color: #8a6fb0; font-size: 13px; margin: 4px 0; }

@@ -101,11 +101,12 @@ function admitTonight(m) {
   const perk = TIER_PERKS[m.tier] || TIER_PERKS.Daily;
   if (m.lastEntryNight === nk) {
     // already counted tonight — just keep perks fresh across a 3AM rollover
-    if (m.ticketsNight === nk) return m;
-    return { ...m, tickets: perk.tickets, ticketsNight: nk, mealUsed: false };
+    if (m.ticketsNight === nk) return { ...m, onTheWay: false };
+    return { ...m, onTheWay: false, tickets: perk.tickets, ticketsNight: nk, mealUsed: false };
   }
   return {
     ...m,
+    onTheWay: false,                 // arrived — clear the incoming signal
     entries: (m.entries || 0) + 1,
     loyalty: (m.loyalty || 0) + 10,
     lastEntryNight: nk,
@@ -115,6 +116,16 @@ function admitTonight(m) {
 // Has this member already been admitted for the current night?
 export function isInsideTonight(m = memberState) {
   return !!(m && m.lastEntryNight === nightKey());
+}
+// Member "on the way" signal — set when they flip the OTW toggle, stored on the
+// shared member record so door staff can see who's incoming. Timestamped, and
+// cleared automatically on admission (in admitTonight).
+export function setOnTheWay(flag) {
+  if (!memberState) return;
+  commitMember({ ...memberState, onTheWay: !!flag, onTheWayAt: flag ? Date.now() : null });
+}
+export function isOnTheWay(m = memberState) {
+  return !!(m && m.onTheWay && !isInsideTonight(m));
 }
 // Auto-logged when a member checks in (self) — same idempotent path the door
 // uses, so member-side check-in and staff verification stay consistent.
@@ -562,9 +573,8 @@ const ROLES = [
     eyebrow: 'STAFF',
     chip: 'staff',
     menu: [
+      { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
-      { title: 'Dashboard', detail: 'Door status and stats', chip: ui.chips.staff, target: 'staffDashboard' },
-      { title: 'Check-In Log', detail: 'Recent door decisions', chip: ui.chips.checkedIn, target: 'checkInLog' },
     ],
     allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry'],
   },
@@ -640,7 +650,7 @@ function App() {
   const [targetScreen, setTargetScreen] = useState('home');
   const [role, setRole] = useState(null);       // null until the user picks a role
   const member = useMember();                    // subscribe: door verification updates this
-  const [onTheWay, setOnTheWay] = useState(false); // member signal: heading to the venue (OTW)
+  const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
   const [playing, setPlaying] = useState(null); // { id, name } while in the brawler
   const [transition, setTransition] = useState({
@@ -755,7 +765,8 @@ function App() {
               role={roleById(role)}
               onTheWay={onTheWay}
               inside={inside}
-              onToggleOtw={() => setOnTheWay((v) => !v)}
+              hasMember={!!member}
+              onToggleOtw={() => setOnTheWay(!onTheWay)}
               onSwitch={switchRole}
             />
           ) : (
@@ -809,7 +820,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
-  if (activeScreen === 'staffDashboard') return <SimpleAccessScreen title="Staff Dashboard" rows={['Door Status', 'Active Members', 'Pending Review']} />;
+  if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
   if (activeScreen === 'checkInLog') return <HistoryScreen />;
   if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
@@ -855,7 +866,7 @@ function RoleLanding({ onPick }) {
 // Compact header on the role home: current role, an "on the way" toggle a
 // member flips when heading over (not entry — that's the door verification),
 // an INSIDE indicator once verified, and a way back to the role picker.
-function RoleBadge({ role, onTheWay, inside, onToggleOtw, onSwitch }) {
+function RoleBadge({ role, onTheWay, inside, hasMember, onToggleOtw, onSwitch }) {
   return (
     <header className="role-badge">
       <div className="role-badge-id">
@@ -863,7 +874,7 @@ function RoleBadge({ role, onTheWay, inside, onToggleOtw, onSwitch }) {
         <h1>{role.label}</h1>
       </div>
       <div className="role-badge-actions">
-        {role.id === 'member' && (
+        {role.id === 'member' && hasMember && (
           inside ? (
             <span className="role-badge-checkin inside">● Inside</span>
           ) : (
@@ -1277,6 +1288,79 @@ function MemberPass({ member, checkedIn }) {
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
+    </div>
+  );
+}
+
+// Staff door dashboard — live status driven by the shared member store: who's
+// signalled on the way, who's been verified inside tonight, and the last door
+// decision. Ticks every 30s so the "on the way" age stays fresh.
+function StaffDashboardScreen({ navigate }) {
+  const member = useMember();
+  const [, tick] = useState(0);
+  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(id); }, []);
+
+  const incoming = isOnTheWay(member);
+  const inside = isInsideTonight(member);
+  const ago = (ts) => {
+    if (!ts) return '';
+    const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+    return mins < 1 ? 'just now' : mins === 1 ? '1 min ago' : `${mins} mins ago`;
+  };
+  const lastDecision = member && member.verifiedAt
+    ? { status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt }
+    : null;
+
+  return (
+    <div className="staff-dash">
+      <AppPanel title="On the way" subtitle="Members heading over">
+        {incoming ? (
+          <div className="dash-row incoming">
+            <span className="dash-dot amber" />
+            <div>
+              <strong>{member.tier}{member.vip ? ' VIP' : ''} Member</strong>
+              <span className="dash-num">{member.number}</span>
+            </div>
+            <span className="dash-when">{ago(member.onTheWayAt)}</span>
+          </div>
+        ) : (
+          <p className="dash-empty">No members signalled on the way right now.</p>
+        )}
+      </AppPanel>
+
+      <AppPanel title="Inside tonight" subtitle="Verified at the door">
+        {inside ? (
+          <div className="dash-row inside">
+            <span className="dash-dot green" />
+            <div>
+              <strong>{member.tier}{member.vip ? ' VIP' : ''} Member</strong>
+              <span className="dash-num">{member.number}</span>
+            </div>
+            <span className="dash-when">entry #{member.entries}</span>
+          </div>
+        ) : (
+          <p className="dash-empty">Nobody verified inside yet tonight.</p>
+        )}
+      </AppPanel>
+
+      <AppPanel title="Last door decision" subtitle="Most recent scan">
+        {lastDecision ? (
+          <div className={`dash-row ${lastDecision.status}`}>
+            <img className="dash-chip" src={STATUS_CHIP[lastDecision.status]} alt={lastDecision.status} />
+            <div>
+              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'}</strong>
+              <span className="dash-num">{member.number}</span>
+            </div>
+            <span className="dash-when">{ago(lastDecision.when)}</span>
+          </div>
+        ) : (
+          <p className="dash-empty">No scans yet this shift.</p>
+        )}
+      </AppPanel>
+
+      <button type="button" className="asset-cta wide" onClick={() => navigate('verification')} aria-label="Verify at the door">
+        <img src={ui.verify.verifyCard} alt="Verify at the door" />
+      </button>
     </div>
   );
 }
