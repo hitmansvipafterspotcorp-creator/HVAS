@@ -1,0 +1,12 @@
+{
+  "name": "hvas-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HVAS custom backend — rolling Ed25519 door passes, member/staff auth, live door board. Zero dependencies (Node 22 built-ins).",
+  "engines": { "node": ">=22.5.0" },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node test.mjs"
+  }
+}

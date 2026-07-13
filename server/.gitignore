@@ -1,0 +1,6 @@
+# runtime data — never commit the SQLite DB or the venue private key
+data/
+*.db
+*.db-*
+venue-key.json
+session.key
