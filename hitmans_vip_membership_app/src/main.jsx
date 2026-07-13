@@ -550,14 +550,10 @@ const ROLES = [
     eyebrow: 'MEMBER APP',
     chip: 'vip',
     menu: [
+      { title: 'Membership & Pass', detail: 'Pass, QR, verify at the door, renewal, loyalty & access', chip: ui.chips.vip, target: 'membership' },
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
-      { title: 'Home', detail: 'Overview and quick status', chip: ui.chips.active, target: 'memberHome' },
-      { title: 'Membership & Profile', detail: 'Pass, QR, renewal, loyalty rank & profile', chip: ui.chips.vip, target: 'membership' },
-      { title: 'Event Access', detail: 'Events you can attend', chip: ui.chips.checkedIn, target: 'eventAccess', requires: 'checkedIn' },
-      { title: 'Venue Access', detail: 'Venues you can enter', chip: ui.chips.active, target: 'venueAccess', requires: 'checkedIn' },
-      { title: 'History', detail: 'Past entries and activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['characterSelect', 'memberHome', 'membership', 'myPass', 'profile', 'eventAccess', 'venueAccess', 'history', 'checkout'],
+    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout'],
   },
   {
     id: 'staff',
@@ -811,11 +807,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
-  if (activeScreen === 'memberHome') return <MemberHomeScreen />;
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
-  if (activeScreen === 'eventAccess') return <SimpleAccessScreen title="Event Access" rows={['Tonight Event', 'Lip Sync Bingo', 'VIP Social']} />;
-  if (activeScreen === 'venueAccess') return <SimpleAccessScreen title="Venue Access" rows={['Front Door', 'Networking Floor', 'VIP Lounge']} />;
-  if (activeScreen === 'profile') return <ProfileScreen />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'staffDashboard') return <SimpleAccessScreen title="Staff Dashboard" rows={['Door Status', 'Active Members', 'Pending Review']} />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
@@ -1237,6 +1229,20 @@ function MemberPass({ member, checkedIn }) {
         {beenInside && <img src={ui.ribbons[5]} alt="Venue access" />}
       </div>
       <p className="access-note">{checkedIn ? 'Verified at the door — inside tonight.' : entries > 0 ? 'Access unlocks each night you get verified at the door.' : 'Get scanned or tap Verify Membership at the door to unlock event & venue access.'}</p>
+
+      {/* — what event/venue access opens once you're inside (folded in from the
+            old Event/Venue Access pages) — */}
+      <div className={`access-list${beenInside ? '' : ' locked'}`}>
+        <div className="access-col">
+          <h4>Events</h4>
+          <ul><li>Lip Sync Bingo</li><li>VIP Social</li><li>Tonight’s event</li></ul>
+        </div>
+        <div className="access-col">
+          <h4>Venue</h4>
+          <ul><li>Front door</li><li>Networking floor</li><li>VIP lounge</li></ul>
+        </div>
+        {!beenInside && <span className="access-list-lock">🔒 Unlocks when you’re verified inside</span>}
+      </div>
 
       {/* — actions: renew (prominent when expired) + step-up to the next tier — */}
       {expired && <div className="renew-alert">⚠ Your {member.tier} membership expired — renew to get back in.</div>}
