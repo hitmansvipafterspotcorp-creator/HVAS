@@ -7,6 +7,9 @@
   "engines": { "node": ">=22.5.0" },
   "scripts": {
     "start": "node src/index.mjs",
-    "test": "node test.mjs"
+    "test": "node test.mjs",
+    "test:mesh": "node mesh-test.mjs",
+    "test:mesh-tcp": "node mesh-tcp-test.mjs",
+    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs"
   }
 }

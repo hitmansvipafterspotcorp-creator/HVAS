@@ -89,6 +89,62 @@ Then point the static frontend at it with `VITE_HVAS_API=https://your-host`.
 Without that env var the app stays in its offline localStorage demo mode, so the
 GitHub Pages build keeps working with or without a live backend.
 
+## HVAS Mesh — always live, no cell towers
+
+The venue runs as a **peer-to-peer mesh**, not a single server everyone depends
+on. Every door station is a node; in a native shell (below) every phone is too.
+Nodes replicate a **signed, append-only op-log** and converge with **no central
+server and no internet** — any pair of nodes that can see each other over *any*
+transport keeps the whole venue in sync.
+
+Why it survives a dead network:
+
+- **Offline pass verification.** Any node/phone with the 32-byte venue public
+  key can verify a rolling pass with zero connectivity — the door never *needs*
+  the network to say grant/deny.
+- **CRDT convergence.** Every op is commutative + idempotent under its merge
+  rule (memberships last-write-wins; admissions are a set-union keyed by
+  member+night; decisions append), so nodes reconcile no matter the order or how
+  long they were apart. Admissions never double-count across doors.
+- **Partition tolerance + auto-heal.** Nodes flood ops to peers and run
+  anti-entropy (digest → backfill) on every (re)connect. When a link drops
+  (peer out of range) each side keeps working locally; when it returns, they
+  re-sync automatically. Proven in `mesh-test.mjs` (partition → concurrent
+  writes → heal → reconverge) and `mesh-tcp-test.mjs` (real sockets, socket
+  cut, auto-reconnect heal).
+- **Tamper-proof.** Every op is Ed25519-signed with the venue key; forged/
+  unsigned ops are rejected by the mesh.
+
+### Transport matrix (the mesh core is transport-agnostic)
+
+Each transport just implements `{ onMessage(cb), send(msg) }`:
+
+| Transport | Status | Use |
+|---|---|---|
+| **LAN TCP** (`meshListen`/`meshDial`, `node:net`) | ✅ built + tested | Door stations / a venue Raspberry-Pi AP with no internet |
+| **In-process** (`link`) | ✅ built + tested | Multi-node sim on one box, and the partition tests |
+| **WebRTC data channel** | interface-ready | Browser phone-to-phone once peers are introduced (QR/LAN signaling) |
+| **Bluetooth (BLE)** | needs native shell | True phone-to-phone with no Wi-Fi at all |
+
+### The honest Bluetooth boundary
+
+A browser **cannot** form a Bluetooth mesh: Web Bluetooth can only act as a
+central (it can't advertise as a peripheral) and there's no browser mesh API.
+Literal phone-to-phone Bluetooth requires wrapping this web app in a **native
+shell** — Capacitor or React Native — and implementing a `BleTransport` against
+a native BLE/Nearby plugin. Because the mesh core is transport-agnostic, that
+`BleTransport` drops in beside the LAN/WebRTC ones with no changes to the sync
+logic. Until then, "always live, no cell tower" is delivered by the **LAN mesh
+on venue Wi-Fi + offline crypto passes**, which needs no internet and no towers.
+
+### Run the mesh tests
+
+```bash
+npm run test:mesh       # convergence + partition/heal (in-process)
+npm run test:mesh-tcp   # real TCP sockets + auto-reconnect heal
+npm run test:all        # API + both mesh suites
+```
+
 ## Production hardening (not done here)
 
 - Swap the mock OTP for a real SMS/email provider; stop returning `devCode`.
