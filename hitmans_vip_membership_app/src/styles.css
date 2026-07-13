@@ -3180,3 +3180,19 @@ button {
 .dash-dot.green { background: #52ffa8; box-shadow: 0 0 10px #52ffa8; }
 .dash-chip { height: 34px; width: auto; flex: none; }
 .dash-empty { color: #8a6fb0; font-size: 13px; margin: 4px 0; }
+
+/* — auth: member sign-in + staff/host code gate — */
+.landing-account { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 8px 14px; border: 1px solid #3a2860; border-radius: 12px; background: rgba(30, 16, 52, 0.5); color: #d7c8ff; font-size: 13px; }
+.landing-account button { background: none; border: none; color: #ff9ae0; font-weight: 700; cursor: pointer; }
+.auth-screen { display: flex; flex-direction: column; }
+.auth-card { display: flex; flex-direction: column; gap: 14px; padding: 18px; border: 1px solid #3a2860; border-radius: 18px; background: rgba(24, 12, 44, 0.66); }
+.auth-card label { display: flex; flex-direction: column; gap: 6px; color: #c9a8ff; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; }
+.auth-card input { padding: 13px 14px; border-radius: 12px; border: 1px solid #4a3a72; background: #140a26; color: #f4ecff; font-size: 16px; }
+.auth-card input:focus { outline: none; border-color: #b06bff; box-shadow: 0 0 0 3px rgba(176, 107, 255, 0.25); }
+.auth-continue { margin-top: 4px; padding: 15px; border: none; border-radius: 12px; background: linear-gradient(135deg, #b06bff, #ff2bd6); color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; }
+.auth-continue:disabled { opacity: 0.45; cursor: not-allowed; }
+.auth-fine { color: #9a7ac0; font-size: 12px; line-height: 1.5; margin: 0; }
+.auth-fine code { background: #2a1650; color: #ffd66b; padding: 2px 7px; border-radius: 6px; font-weight: 800; letter-spacing: 0.08em; }
+.auth-back { align-self: flex-start; background: none; border: none; color: #b79ae6; font-size: 14px; cursor: pointer; padding: 2px 0; }
+.gate-lead { color: #e7dcff; font-size: 14px; line-height: 1.5; margin: 0; }
+.gate-err { color: #ff6b8a; font-size: 13px; font-weight: 700; margin: -4px 0 0; }

@@ -157,6 +157,31 @@ function useMember() {
   useEffect(() => { const fn = () => force((n) => n + 1); memberListeners.add(fn); return () => memberListeners.delete(fn); }, []);
   return memberState;
 }
+
+// ── Auth ────────────────────────────────────────────────────────────────
+// Members self-serve (phone/email identity). Staff & Host are privileged and
+// gated by a venue-issued access code. NOTE: this is a client-side demo of the
+// FLOW only — the codes live in the bundle, so real staff auth must move to a
+// backend before it protects anything. Members' real accounts would likewise
+// be verified server-side (SMS/email code).
+const AUTH_KEY = 'hvas_auth_v1';
+const ROLE_CODES = { staff: 'DOOR850', host: 'HOST850' }; // demo venue codes
+function loadAuth() { try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || {}; } catch { return {}; } }
+const authListeners = new Set();
+let authState = loadAuth();
+function commitAuth(a) {
+  authState = a;
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(a)); } catch { /* ignore */ }
+  authListeners.forEach((fn) => fn());
+}
+export function memberSignIn(name, contact) { commitAuth({ ...authState, member: { name: name.trim(), contact: contact.trim(), since: Date.now() } }); }
+export function memberSignOut() { commitAuth({ ...authState, member: null }); }
+export function checkRoleCode(role, code) { return (ROLE_CODES[role] || '').toUpperCase() === (code || '').trim().toUpperCase(); }
+function useAuth() {
+  const [, force] = useState(0);
+  useEffect(() => { const fn = () => force((n) => n + 1); authListeners.add(fn); return () => authListeners.delete(fn); }, []);
+  return authState;
+}
 const fmtUSD = (n) => `$${n.toLocaleString('en-US')}`;
 const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -649,6 +674,9 @@ function App() {
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
   const [role, setRole] = useState(null);       // null until the user picks a role
+  const auth = useAuth();                         // member account (self-serve identity)
+  const [unlocked, setUnlocked] = useState({ staff: false, host: false }); // per-session code unlock
+  const [gate, setGate] = useState(null);        // role awaiting auth: 'member' | 'staff' | 'host'
   const member = useMember();                    // subscribe: door verification updates this
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
@@ -741,8 +769,15 @@ function App() {
   // 'checkedIn' (menu gate + pass indicator) means admitted/inside — driven by
   // the door verification, not the on-the-way toggle.
   const session = { role, onTheWay, checkedIn: inside };
-  function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); }
-  function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); }
+  function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); setGate(null); }
+  function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); setGate(null); }
+  // Gate a role behind its auth: members self-serve (need a signed-in account),
+  // staff/host need the venue access code (unlocked per session).
+  function requestRole(id) {
+    if (id === 'member') return auth.member ? chooseRole('member') : setGate('member');
+    if (unlocked[id]) return chooseRole(id);
+    return setGate(id);
+  }
 
   // In-game takes over the whole screen.
   if (playing) {
@@ -757,7 +792,14 @@ function App() {
       </div>
       <TransitionOverlay transition={transition} destination={targetScreen} />
       {!role ? (
-        <RoleLanding onPick={chooseRole} />
+        gate === 'member' ? (
+          <MemberAuthScreen onBack={() => setGate(null)} onDone={() => chooseRole('member')} />
+        ) : gate ? (
+          <CodeGateScreen role={gate} onBack={() => setGate(null)}
+            onDone={() => { setUnlocked((u) => ({ ...u, [gate]: true })); chooseRole(gate); }} />
+        ) : (
+          <RoleLanding onPick={requestRole} auth={auth} onSignOut={memberSignOut} />
+        )
       ) : (
         <section className={`screen screen-${current.id}`}>
           {current.id === 'home' ? (
@@ -837,7 +879,8 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
 
 // Landing role picker — the app entry gate. A user is one of three things,
 // and each sees a completely separate surface after this.
-function RoleLanding({ onPick }) {
+function RoleLanding({ onPick, auth, onSignOut }) {
+  const lockFor = (id) => (id === 'member' ? (auth?.member ? null : 'account') : 'code');
   return (
     <section className="screen screen-landing">
       <div className="home-dashboard">
@@ -847,17 +890,77 @@ function RoleLanding({ onPick }) {
             <h1>Choose Access</h1>
           </div>
         </section>
+        {auth?.member && (
+          <div className="landing-account">
+            <span>Signed in · <b>{auth.member.name}</b></span>
+            <button type="button" onClick={onSignOut}>Sign out</button>
+          </div>
+        )}
         <div className="role-landing">
-          {ROLES.map((r) => (
-            <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
-              <span className="role-card-eyebrow">{r.eyebrow}</span>
-              <strong className="role-card-label">{r.label}</strong>
-              <span className="role-card-tagline">{r.tagline}</span>
-              <span className="role-card-go">Enter →</span>
-            </button>
-          ))}
+          {ROLES.map((r) => {
+            const lock = lockFor(r.id);
+            return (
+              <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
+                <span className="role-card-eyebrow">{r.eyebrow}</span>
+                <strong className="role-card-label">{r.label}</strong>
+                <span className="role-card-tagline">{r.tagline}</span>
+                <span className="role-card-go">
+                  {lock === 'account' ? 'Sign in →' : lock === 'code' ? '🔒 Staff code →' : 'Enter →'}
+                </span>
+              </button>
+            );
+          })}
         </div>
-        <p className="role-landing-note">Members, door staff, and hosts each get their own screens. You only see what your role allows.</p>
+        <p className="role-landing-note">Members sign in with their phone or email. Door staff and hosts need the venue access code.</p>
+      </div>
+    </section>
+  );
+}
+
+// Member self-serve sign in / sign up (phone or email identity). Client-side
+// demo — a real build verifies the contact with an SMS/email code server-side.
+function MemberAuthScreen({ onBack, onDone }) {
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const ok = name.trim().length >= 2 && contact.trim().length >= 5;
+  return (
+    <section className="screen screen-landing">
+      <div className="home-dashboard auth-screen">
+        <section className="sheet-title-banner"><div><span>MEMBER ACCESS</span><h1>Sign in</h1></div></section>
+        <div className="auth-card">
+          <label>Your name<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="name" /></label>
+          <label>Phone or email<input type="text" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="(850) 000-0000 or you@email.com" autoComplete="tel" /></label>
+          <button type="button" className="auth-continue" disabled={!ok} onClick={() => { memberSignIn(name, contact); onDone(); }}>
+            Continue →
+          </button>
+          <p className="auth-fine">New here? This creates your member account. Buy a membership inside to get your card + QR. Demo only — no code is actually sent.</p>
+          <button type="button" className="auth-back" onClick={onBack}>← Back</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Staff / Host venue access-code gate. Client-side demo — production checks the
+// code server-side so it can't be read from the bundle.
+function CodeGateScreen({ role, onBack, onDone }) {
+  const r = roleById(role);
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState(false);
+  const submit = () => { if (checkRoleCode(role, code)) onDone(); else setErr(true); };
+  return (
+    <section className="screen screen-landing">
+      <div className="home-dashboard auth-screen">
+        <section className="sheet-title-banner"><div><span>{r.eyebrow} ACCESS</span><h1>{r.label}</h1></div></section>
+        <div className="auth-card">
+          <p className="gate-lead">🔒 This role can verify entries and run the night. Enter the venue access code to continue.</p>
+          <label>Access code<input type="text" value={code} onChange={(e) => { setCode(e.target.value); setErr(false); }}
+            placeholder="Venue code" autoComplete="off" onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
+          {err && <p className="gate-err">Wrong code — check with the venue.</p>}
+          <button type="button" className="auth-continue" disabled={!code.trim()} onClick={submit}>Unlock {r.label} →</button>
+          <p className="auth-fine">Demo code for <b>{r.label}</b>: <code>{ROLE_CODES[role]}</code>. In production this is issued per staff member and verified on a server.</p>
+          <button type="button" className="auth-back" onClick={onBack}>← Back</button>
+        </div>
       </div>
     </section>
   );
