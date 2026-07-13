@@ -11,8 +11,10 @@ import { randomBytes } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
 import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
-  sessionSecret, signSession, readSession,
+  sessionSecret, signSession, readSession, venueSecret,
 } from './crypto.mjs';
+import { MeshNode, meshListen, meshDial } from './mesh.mjs';
+import { applyOp } from './reduce.mjs';
 
 const TIERS = {
   Daily: { days: 1, vip: false }, Weekly: { days: 7, vip: false },
@@ -38,11 +40,20 @@ const readBody = (req) => new Promise((resolve) => {
   req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch { resolve({}); } });
 });
 
-export function createApp({ dataDir }) {
+export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('hex')}`, meshPort = null, peers = [] } = {}) {
   const db = openDb(`${dataDir}/hvas.db`);
   const keys = loadOrCreateKeys(`${dataDir}/venue-key.json`);
   const secret = sessionSecret(`${dataDir}/session.key`);
+  const meshKey = venueSecret(`${dataDir}/mesh.key`);    // shared AES key for the mesh
   const sse = new Set(); // live door-board subscribers
+
+  // ── mesh (background) ──
+  // Every mutation goes through the mesh op-log: the op materializes into this
+  // node's SQLite (via applyOp) AND replicates, encrypted, to peer nodes — so a
+  // verification at one door shows up at every other door with no cloud.
+  const node = new MeshNode({ id: nodeId, privateKey: keys.privateKey, publicKey: keys.publicKey });
+  node.onChange = (op) => { applyOp(db, op); emitBoard(); };
+  const commit = (t, data) => node.apply(t, data);       // apply local + broadcast
 
   // ── data helpers ──
   const memberByNumber = (n) => db.prepare('SELECT * FROM members WHERE number=?').get(n);
@@ -104,8 +115,7 @@ export function createApp({ dataDir }) {
       let m = db.prepare('SELECT * FROM members WHERE contact=?').get(contact);
       if (!m) {
         const id = randomBytes(8).toString('hex');
-        db.prepare('INSERT INTO members(id,name,contact,number,created_at) VALUES(?,?,?,?,?)')
-          .run(id, (name || 'Member').trim(), contact, memNumber(), Date.now());
+        commit('member.upsert', { id, name: (name || 'Member').trim(), contact, number: memNumber(), created_at: Date.now() });
         m = db.prepare('SELECT * FROM members WHERE id=?').get(id);
       }
       json(res, 200, { token: signSession(secret, { sub: m.id, role: 'member' }, SESSION_TTL), member: publicMember(m) });
@@ -127,11 +137,10 @@ export function createApp({ dataDir }) {
       const { tier, payment } = await readBody(req);
       const t = TIERS[tier]; if (!t) return json(res, 400, { error: 'bad tier' });
       const now = Date.now();
-      db.prepare(`INSERT INTO memberships(member_id,tier,vip,payment,purchased_at,expires_at,status)
-        VALUES(?,?,?,?,?,?, 'active')
-        ON CONFLICT(member_id) DO UPDATE SET tier=excluded.tier, vip=excluded.vip, payment=excluded.payment,
-          purchased_at=excluded.purchased_at, expires_at=excluded.expires_at, status='active'`)
-        .run(c.sub, tier, t.vip ? 1 : 0, payment || null, now, now + t.days * 86400000);
+      commit('membership.upsert', {
+        member_id: c.sub, tier, vip: t.vip, payment: payment || null,
+        purchased_at: now, expires_at: now + t.days * 86400000, status: 'active',
+      });
       json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
     },
     // Rolling signed pass — the member's app fetches this every ~30s and renders
@@ -146,9 +155,7 @@ export function createApp({ dataDir }) {
     'POST /signal/otw': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const { on } = await readBody(req);
-      db.prepare('INSERT INTO signals(member_id,on_the_way,at) VALUES(?,?,?) ON CONFLICT(member_id) DO UPDATE SET on_the_way=excluded.on_the_way, at=excluded.at')
-        .run(c.sub, on ? 1 : 0, on ? Date.now() : null);
-      emitBoard();
+      commit('signal.otw', { member_id: c.sub, on: on ? 1 : 0 });
       json(res, 200, { ok: true });
     },
 
@@ -161,9 +168,7 @@ export function createApp({ dataDir }) {
       let num = number, checked = { ok: !!number };
       if (pass) { checked = verifyPass(keys.publicKey, pass); num = checked.number; }
       const decide = (status, member) => {
-        db.prepare('INSERT INTO decisions(member_id,number,status,at,by_staff) VALUES(?,?,?,?,?)')
-          .run(member?.id || null, num || null, status, Date.now(), c.sub);
-        emitBoard();
+        commit('decision', { member_id: member?.id || null, number: num || null, status, at: Date.now(), by_staff: c.sub });
         return json(res, 200, { ok: status === 'granted', status, member: member ? publicMember(member) : null, reason: REASONS[status] });
       };
       if (pass && !checked.ok) return decide(checked.reason === 'expired-qr' ? 'expired-qr' : 'trespass', null);
@@ -173,9 +178,8 @@ export function createApp({ dataDir }) {
       if (!ms) return decide('trespass', m);
       if (ms.status === 'suspended') return decide('suspended', m);
       if (Date.now() > ms.expires_at) return decide('expired', m);
-      // grant → log admission (idempotent per night) + clear OTW
-      db.prepare('INSERT OR IGNORE INTO entries(member_id,night,at,by_staff) VALUES(?,?,?,?)').run(m.id, nightKey(), Date.now(), c.sub);
-      db.prepare('UPDATE signals SET on_the_way=0 WHERE member_id=?').run(m.id);
+      // grant → admission op (idempotent per night; clears OTW in the reducer)
+      commit('entry.admit', { member_id: m.id, night: nightKey(), at: Date.now(), by_staff: c.sub });
       return decide('granted', m);
     },
 
@@ -207,5 +211,15 @@ export function createApp({ dataDir }) {
     if (!handler) return json(res, 404, { error: 'not found' });
     try { await handler(req, res); } catch (e) { json(res, 500, { error: String(e.message || e) }); }
   });
-  return { server, db, keys };
+
+  // Join the encrypted mesh in the background (peers = other door nodes).
+  let meshServer = null; const dials = [];
+  if (meshPort) meshServer = meshListen(node, meshPort, '0.0.0.0', { key: meshKey });
+  for (const p of peers) {
+    const [host, port] = p.split(':');
+    dials.push(meshDial(node, host, Number(port), { key: meshKey }));
+  }
+  const closeMesh = () => { meshServer?.close(); dials.forEach((d) => d.stop()); };
+
+  return { server, db, keys, node, closeMesh };
 }

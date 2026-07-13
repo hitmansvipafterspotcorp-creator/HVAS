@@ -14,7 +14,8 @@ export function openDb(path) {
       name TEXT NOT NULL,
       contact TEXT UNIQUE NOT NULL,
       number TEXT UNIQUE NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT 0   -- LWW clock for mesh merge
     );
     CREATE TABLE IF NOT EXISTS memberships (
       member_id TEXT PRIMARY KEY REFERENCES members(id),
@@ -23,7 +24,8 @@ export function openDb(path) {
       payment TEXT,
       purchased_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'active'   -- active | suspended
+      status TEXT NOT NULL DEFAULT 'active',  -- active | suspended
+      updated_at INTEGER NOT NULL DEFAULT 0   -- LWW clock for mesh merge
     );
     CREATE TABLE IF NOT EXISTS entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

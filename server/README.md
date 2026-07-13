@@ -137,12 +137,36 @@ a native BLE/Nearby plugin. Because the mesh core is transport-agnostic, that
 logic. Until then, "always live, no cell tower" is delivered by the **LAN mesh
 on venue Wi-Fi + offline crypto passes**, which needs no internet and no towers.
 
-### Run the mesh tests
+### API ↔ mesh bridge (it's one system, running in the background)
+
+The HTTP API and the mesh are wired together (`src/reduce.mjs`): **every**
+mutation — member sign-up, membership purchase, on-the-way, admission, door
+decision — is created as a signed mesh op, materialized into this node's SQLite,
+and replicated (encrypted) to peer nodes, which materialize it into theirs. The
+op-log is the source of truth; each node's SQLite is a convergent view.
+
+This runs as **background infrastructure**: the public app never sees the mesh —
+it just talks to whichever node it can reach. Start a node in the mesh with:
+
+```bash
+# door A accepts peers
+MESH_PORT=9944 NODE_ID=door-A npm start
+# door B dials A (and any others)
+MESH_PEERS=door-a.local:9944 NODE_ID=door-B npm start
+```
+
+Proven by `cluster-test.mjs`: two full nodes with **separate databases** — a
+member buys on node A, a different door (node B) verifies their rolling pass and
+admits them, and the admission replicates back to A. Both converge.
+
+### Run the tests
 
 ```bash
 npm run test:mesh       # convergence + partition/heal (in-process)
 npm run test:mesh-tcp   # real TCP sockets + auto-reconnect heal
-npm run test:all        # API + both mesh suites
+npm run test:encrypted  # wire is ciphertext-only
+npm run test:cluster    # two full API nodes: buy on A, admit on B
+npm run test:all        # everything (API + mesh + encrypted + cluster + BLE)
 ```
 
 ## Production hardening (not done here)
