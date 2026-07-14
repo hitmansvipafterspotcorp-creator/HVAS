@@ -36,6 +36,45 @@ export const TIER_PERKS = {
 // The "night" resets at 3AM — shift the clock back 3h and take the date.
 function nightKey(ts = Date.now()) { return new Date(ts - 3 * 3600000).toISOString().slice(0, 10); }
 
+// ── Daily entry window ───────────────────────────────────────────────────
+// Every night, Daily entry is an OPEN contribution (pay what you want, even
+// $0.00) — but only until 2:00 AM. A live countdown ticks down to the cutoff;
+// once it passes, Daily entry is a mandatory $15. The free window reopens each
+// evening when doors open.
+const DAILY_CUTOFF_HOUR = 2;    // 2:00 AM — free/open contribution window closes
+const DAILY_REOPEN_HOUR = 6;    // 6:00 AM — free window reopens after the late $15 hours
+export const DAILY_LATE_PRICE = 15;
+function nextHourMark(hour, now = Date.now()) {
+  const d = new Date(now); d.setHours(hour, 0, 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+// Free/open (pay whatever, including $0) every day up until 2:00 AM. From 2:00 AM
+// to 6:00 AM — the after-hours entry window — it's a mandatory $15. Then it
+// reopens free the rest of the day, counting down to the next 2:00 AM.
+export function dailyWindow(now = Date.now()) {
+  const h = new Date(now).getHours();
+  const late = h >= DAILY_CUTOFF_HOUR && h < DAILY_REOPEN_HOUR;   // 2AM → 6AM = $15
+  return late
+    ? { free: false, price: DAILY_LATE_PRICE, until: nextHourMark(DAILY_REOPEN_HOUR, now) }
+    : { free: true, price: 0, until: nextHourMark(DAILY_CUTOFF_HOUR, now) };
+}
+
+// A "paid" membership is an active one you actually paid for (any tier price or
+// contribution > $0). Free Daily entry is NOT a paid membership — it gets you in
+// tonight but doesn't preserve your loyalty stats over time.
+export function isPaidMember(m = memberState) {
+  return !!(m && Date.now() < m.expiresAt && (m.paid > 0 || m.vip));
+}
+// Enforce the rule: keep a paid membership or your stats start over. When a
+// membership lapses (expired) without a paid renewal, entries + loyalty reset.
+export function enforceMembership() {
+  const m = memberState; if (!m) return;
+  if (Date.now() >= m.expiresAt && m.status !== 'expired') {
+    commitMember({ ...m, status: 'expired', entries: 0, loyalty: 0, lastEntryNight: null });
+  }
+}
+
 function loadMember() { try { return JSON.parse(localStorage.getItem(MEMBER_KEY)); } catch { return null; } }
 const memberListeners = new Set();
 let memberState = loadMember();
@@ -712,6 +751,7 @@ function App() {
 
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
+    enforceMembership();       // keep a paid membership or stats start over
     // The app IS the backend: it always runs its own in-browser hub in the
     // background — no "connect to venue", no server. Members come onto the
     // network the moment they buy a membership (see purchaseTier).
@@ -1383,6 +1423,22 @@ function useQrDataUrl(text, logo) {
   return url;
 }
 
+// Live HH:MM:SS countdown to a target timestamp. Ticks every second; returns
+// null when there's no target.
+function useCountdown(target) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!target) return undefined;
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  if (!target) return null;
+  const ms = Math.max(0, target - Date.now());
+  const s = Math.floor(ms / 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return { ms, text: `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}` };
+}
+
 // THE single membership screen: not a member -> buy a tier; member -> your pass.
 function MembershipScreen({ checkedIn }) {
   const member = useMember();
@@ -1395,8 +1451,13 @@ function BuyMembership() {
   const [pay, setPay] = useState('PayPal');   // real payable method up front
   const [give, setGive] = useState('');        // open Daily contribution ('' = 0.00)
   const t = TIER_BY[tier];
-  const amount = t.open ? Math.max(0, Math.round((Number(give) || 0) * 100) / 100) : t.price;
-  const free = t.open && amount <= 0;
+  const win = t.open ? dailyWindow() : null;         // Daily: open (pay-what-you-want) until 2AM, else $15
+  const cd = useCountdown(win ? win.until : null);   // ticks; flips win.free at 2AM
+  const openFree = !!(win && win.free);              // in the pay-what-you-want window
+  const amount = t.open
+    ? (openFree ? Math.max(0, Math.round((Number(give) || 0) * 100) / 100) : DAILY_LATE_PRICE)
+    : t.price;
+  const free = openFree && amount <= 0;              // $0 contribution → join free
   return (
     <div className="mem-screen">
       <div className="mem-intro">
@@ -1416,8 +1477,13 @@ function BuyMembership() {
         ))}
       </div>
 
-      {t.open && (
+      {t.open && openFree && (
         <div className="mem-give">
+          <div className="daily-window open">
+            <span className="daily-window-label">🎟️ Open contribution · free entry closes in</span>
+            <span className="daily-window-clock">{cd?.text || '00:00:00'}</span>
+            <span className="daily-window-sub">until 2:00 AM — then entry is ${DAILY_LATE_PRICE}</span>
+          </div>
           <span className="mem-pay-label">Name your contribution</span>
           <div className="mem-give-row">
             <span className="mem-give-cur">$</span>
@@ -1425,6 +1491,15 @@ function BuyMembership() {
               value={give} onChange={(e) => setGive(e.target.value)} placeholder="0.00" />
           </div>
           <p className="mem-give-note">Pay what you want — even $0.00. Every bit helps keep the door open.</p>
+        </div>
+      )}
+      {t.open && !openFree && (
+        <div className="mem-give">
+          <div className="daily-window closed">
+            <span className="daily-window-label">⏰ Free window closed for tonight</span>
+            <span className="daily-window-clock">${DAILY_LATE_PRICE}</span>
+            <span className="daily-window-sub">mandatory for entry · free contribution reopens in {cd?.text || '—'}</span>
+          </div>
         </div>
       )}
 
@@ -1595,7 +1670,7 @@ function MemberPass({ member, checkedIn }) {
   const nextUp = TIERS[tierIdx + 1] || null;      // step-up target (null at VIP)
   const perk = TIER_PERKS[member.tier] || TIER_PERKS.Daily;
   const tickets = member.tickets ?? perk.tickets;
-  useEffect(() => { refreshNight(); }, []);       // reissue perks if we crossed 3AM
+  useEffect(() => { enforceMembership(); refreshNight(); }, []);   // reset stats if lapsed; reissue perks if we crossed 3AM
   const [prefs, setPrefs] = useState({ music: true, alerts: true, priv: true });
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
   // Member self-verify: same gate the door uses — pops GRANTED / DENIED / etc.
@@ -1662,6 +1737,9 @@ function MemberPass({ member, checkedIn }) {
       {/* — loyalty rank (earned by nights, not bought) — */}
       <section className="loyalty">
         <h3>Loyalty rank</h3>
+        {!isPaidMember(member) && (
+          <p className="loyalty-warn">⚠️ Keep a <b>paid membership</b> active to save your loyalty — if it lapses, your rank and nights start over.</p>
+        )}
         <div className="loyalty-badges">
           {RANKS.map((r) => (
             <div key={r.name} className={`loyalty-badge${r.name === rank.name ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>

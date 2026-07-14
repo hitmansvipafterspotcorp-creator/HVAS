@@ -2959,6 +2959,15 @@ button {
 .mem-give-input { flex: 1; background: none; border: none; outline: none; color: #fff; font-size: 24px; font-weight: 800; width: 100%; }
 .mem-give-input::-webkit-outer-spin-button, .mem-give-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .mem-give-note { color: #9a7ac0; font-size: 12px; margin: 8px 0 0; }
+/* Daily entry window countdown */
+.daily-window { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+.daily-window.open { background: linear-gradient(135deg, rgba(30,90,60,.55), rgba(20,60,120,.4)); border: 1px solid #2f9e6a; }
+.daily-window.closed { background: linear-gradient(135deg, rgba(120,40,40,.5), rgba(80,30,60,.4)); border: 1px solid #c0563c; }
+.daily-window-label { color: #cfe4ff; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.daily-window-clock { color: #fff; font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .04em; line-height: 1.05; }
+.daily-window.open .daily-window-clock { color: #7dffb4; }
+.daily-window.closed .daily-window-clock { color: #ffd66b; }
+.daily-window-sub { color: #b9a6d8; font-size: 11.5px; }
 .mem-pay { margin-bottom: 18px; }
 .mem-pay-label { display: block; color: #9a7ac0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
 .mem-pay-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -3097,6 +3106,8 @@ button {
 
 .loyalty { margin-top: 20px; }
 .loyalty h3, .prefs h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 12px; }
+.loyalty-warn { color: #ffcf8f; font-size: 12.5px; line-height: 1.4; background: rgba(120,70,20,.28); border: 1px solid #7a5a2a; border-radius: 10px; padding: 9px 12px; margin: 0 0 12px; }
+.loyalty-warn b { color: #ffe3b0; }
 .loyalty-badges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .loyalty-badge { display: grid; place-items: center; padding: 8px 4px; border-radius: 12px; border: 1px solid #2a1a40; background: #150a24; opacity: .38; filter: grayscale(.5); transition: all .15s; }
 .loyalty-badge.earned { opacity: 1; filter: none; }
