@@ -3237,3 +3237,16 @@ button {
 
 /* — Be the venue hub (in-browser, no server) — */
 .venue-hub-btn { margin-top: 8px; padding: 12px; border: 1px solid #6a3cff; border-radius: 10px; background: rgba(60,20,120,0.4); color: #d7c8ff; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+/* — QR scan-to-join — */
+.venue-connected-wrap { margin-top: 16px; }
+.venue-connect-note { color: #9a7ac0; font-size: 12px; margin: 2px 0 0; text-align: center; }
+.venue-scan-btn { padding: 12px; border: 1px solid #4c9cff; border-radius: 10px; background: rgba(20,50,120,0.4); color: #cfe4ff; font-size: 14px; font-weight: 800; cursor: pointer; }
+.qr-scan { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.qr-scan .auth-back { background: none; border: none; color: #7fb0ff; font-weight: 700; cursor: pointer; }
+.join-qr { margin-top: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.join-qr img { width: 220px; height: 220px; border-radius: 12px; background: #fff; padding: 10px; }
+.join-qr .qr-load { width: 220px; height: 220px; display: grid; place-items: center; border-radius: 12px; background: #0e1426; color: #9a7ac0; }
+.join-qr span { color: #52ffa8; font-size: 13px; font-weight: 800; }
+.join-qr small { color: #7a6a9a; font-size: 11px; word-break: break-all; text-align: center; }
+.join-qr .auth-back { background: none; border: none; color: #ff9ae0; font-weight: 700; cursor: pointer; margin-top: 4px; }

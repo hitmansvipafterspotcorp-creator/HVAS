@@ -5,7 +5,7 @@ import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
-import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
+import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, startHub, stopHub } from './hub.js';
@@ -928,6 +928,56 @@ function RoleLanding({ onPick, auth, onSignOut }) {
   );
 }
 
+// Camera QR scanner (reuses the device camera + jsQR, like the door). Calls
+// onDecode(text) with the first QR it sees.
+function QrScan({ onDecode, onCancel }) {
+  const videoRef = useRef(null); const rafRef = useRef(0); const streamRef = useRef(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      if (!navigator.mediaDevices?.getUserMedia) { setErr('No camera — paste the address instead.'); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (!live) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream; const video = videoRef.current; video.srcObject = stream; await video.play();
+        const canvas = document.createElement('canvas');
+        const tick = () => {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+            if (code) { onDecode(code.data.trim()); return; }
+          }
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      } catch { setErr('Camera blocked — paste the address instead.'); }
+    })();
+    return () => { live = false; cancelAnimationFrame(rafRef.current); streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
+  return (
+    <div className="qr-scan">
+      <div className="qr-framed lg"><video className="qr-code cam" ref={videoRef} playsInline muted /></div>
+      {err ? <p className="gate-err">{err}</p> : <p className="venue-connect-note">Point at the venue's Join QR</p>}
+      <button type="button" className="auth-back" onClick={onCancel}>← Back</button>
+    </div>
+  );
+}
+
+// A big "Join this venue" QR of the venue address, for others to scan.
+function JoinQR({ url, onClose }) {
+  const qr = useQrDataUrl(url);
+  return (
+    <div className="join-qr">
+      {qr ? <img src={qr} alt="Join QR" /> : <div className="qr-load">QR…</div>}
+      <span>Scan to join</span>
+      <small>{url}</small>
+      <button type="button" className="auth-back" onClick={onClose}>Done</button>
+    </div>
+  );
+}
+
 // Connect this device to a venue backend at RUNTIME — scan its QR or paste the
 // URL. No rebuild. The venue's own device is the server (LAN, no cloud); this
 // just points the app at it and pulls its config (name, PayPal.me, Zelle).
@@ -935,14 +985,17 @@ function ConnectVenue() {
   const cfg = venueConfig();
   const connected = apiEnabled();
   const [open, setOpen] = useState(false);
+  const [scan, setScan] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const go = async () => {
+  const connectTo = async (u) => {
     setBusy(true); setErr('');
-    try { await connectVenue(url); window.location.reload(); }
-    catch (e) { setErr(e.message || 'Could not connect'); } finally { setBusy(false); }
+    try { await connectVenue(u); window.location.reload(); }
+    catch (e) { setErr(e.message || 'Could not connect'); setScan(false); } finally { setBusy(false); }
   };
+  const base = apiBase();
   if (hubOn()) {
     return (
       <div className="venue-connected">
@@ -953,27 +1006,34 @@ function ConnectVenue() {
   }
   if (connected) {
     return (
-      <div className="venue-connected">
-        <span>● Connected to <b>{cfg.venue || 'venue'}</b></span>
-        <button type="button" onClick={() => { disconnectVenue(); window.location.reload(); }}>Disconnect</button>
+      <div className="venue-connected-wrap">
+        <div className="venue-connected">
+          <span>● Connected to <b>{cfg.venue || 'venue'}</b></span>
+          <button type="button" onClick={() => setShowQR((v) => !v)}>Show join QR</button>
+          <button type="button" onClick={() => { disconnectVenue(); window.location.reload(); }}>Disconnect</button>
+        </div>
+        {showQR && <JoinQR url={base} onClose={() => setShowQR(false)} />}
       </div>
     );
   }
   return (
     <div className="venue-connect">
       <button type="button" className="venue-connect-toggle" onClick={() => setOpen((v) => !v)}>📡 Connect to venue ▾</button>
-      {open && (
+      {open && (scan ? (
+        <QrScan onDecode={(text) => { if (/^https?:\/\//.test(text)) connectTo(text); else { setUrl(text); setScan(false); } }} onCancel={() => setScan(false)} />
+      ) : (
         <div className="venue-connect-form">
-          <p>Enter the venue's HVAS address (or scan its QR).</p>
+          <button type="button" className="venue-scan-btn" onClick={() => setScan(true)}>📷 Scan venue QR</button>
+          <p className="venue-connect-note">or enter the address</p>
           <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setErr(''); }}
-            placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && go()} />
+            placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && connectTo(url)} />
           {err && <p className="gate-err">{err}</p>}
-          <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={go}>{busy ? 'Connecting…' : 'Connect'}</button>
+          <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={() => connectTo(url)}>{busy ? 'Connecting…' : 'Connect'}</button>
           <button type="button" className="venue-hub-btn" onClick={async () => { await startHub(); window.location.reload(); }}>
             ✦ Be the venue hub (no server, this device)
           </button>
         </div>
-      )}
+      ))}
     </div>
   );
 }
