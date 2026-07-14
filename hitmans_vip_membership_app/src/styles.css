@@ -3196,3 +3196,7 @@ button {
 .auth-back { align-self: flex-start; background: none; border: none; color: #b79ae6; font-size: 14px; cursor: pointer; padding: 2px 0; }
 .gate-lead { color: #e7dcff; font-size: 14px; line-height: 1.5; margin: 0; }
 .gate-err { color: #ff6b8a; font-size: 13px; font-weight: 700; margin: -4px 0 0; }
+
+/* — PayPal subscription button container — */
+.paypal-box { width: 100%; max-width: 320px; margin: 0 auto; }
+.paypal-btns { min-height: 46px; }

@@ -6,6 +6,7 @@ import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
 import { apiEnabled, apiToken, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase } from './api.js';
+import { paypalConfigured, tierPayable, planFor, loadPayPal } from './paypal.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -1267,13 +1268,45 @@ function BuyMembership() {
 
       <div className="buy-checkout">
         <p className="buy-summary">{tier} membership · <b>{fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {pay}</p>
-        <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay)} aria-label={`Buy ${tier} plan`}>
-          <img src={ui.buttons.selectPlan} alt="Select plan" />
-        </button>
+        {pay === 'PayPal' && tierPayable(tier) ? (
+          <PayPalSubscribe tier={tier} onPaid={() => purchaseTier(tier, 'PayPal')} />
+        ) : (
+          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay)} aria-label={`Buy ${tier} plan`}>
+            <img src={ui.buttons.selectPlan} alt="Select plan" />
+          </button>
+        )}
       </div>
-      <p className="mem-fineprint">Demo checkout — no real charge. Buying mints your card + QR instantly.</p>
+      <p className="mem-fineprint">
+        {pay === 'PayPal' && tierPayable(tier)
+          ? 'Secure recurring billing through PayPal. Your card + QR activate on payment.'
+          : paypalConfigured()
+            ? 'Choose PayPal above to pay for real. Other methods are demo — buying mints your card + QR.'
+            : 'Demo checkout — no real charge. Buying mints your card + QR instantly.'}
+      </p>
     </div>
   );
+}
+
+// Real PayPal subscription button — bills the member on the tier's plan to the
+// venue's PayPal, then activates the membership on approval.
+function PayPalSubscribe({ tier, onPaid }) {
+  const ref = useRef(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    loadPayPal().then((paypal) => {
+      if (cancelled || !ref.current) return;
+      ref.current.innerHTML = '';
+      paypal.Buttons({
+        style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'subscribe' },
+        createSubscription: (data, actions) => actions.subscription.create({ plan_id: planFor(tier) }),
+        onApprove: () => onPaid(),
+        onError: () => setErr('PayPal had a problem — try again.'),
+      }).render(ref.current).catch(() => setErr('Could not load PayPal.'));
+    }).catch(() => setErr('Could not load PayPal.'));
+    return () => { cancelled = true; };
+  }, [tier]);
+  return <div className="paypal-box"><div ref={ref} className="paypal-btns" />{err && <p className="gate-err">{err}</p>}</div>;
 }
 
 // Step 2 — you are a member. This is your card, number, QR, status + actions.
