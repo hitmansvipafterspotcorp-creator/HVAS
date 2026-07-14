@@ -8,14 +8,15 @@ import { GAME_FIGHTERS } from './game/venues.js';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
-import { hubOn, startHub, stopHub } from './hub.js';
+import { hubOn, startHub, stopHub, hubNode } from './hub.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
 // tier mints a member number + QR; that pass is what shows on their pass/
 // profile and what Security scans/enters to verify. No fake sample data.
 export const TIERS = [
-  { name: 'Daily', price: 20, days: 1 },
+  // Daily is an OPEN contribution — pay whatever you want, 0.00 is allowed.
+  { name: 'Daily', price: 0, days: 1, open: true },
   { name: 'Weekly', price: 100, days: 7 },
   { name: 'Monthly', price: 300, days: 30 },
   { name: 'Yearly', price: 1850, days: 365 },
@@ -47,21 +48,30 @@ function genMemberNumber() {
   const block = () => Math.floor(1000 + Math.random() * 9000);
   return `HV-${block()}-${block()}`;
 }
-export function purchaseTier(tierName, payment) {
+export function purchaseTier(tierName, payment, amount) {
   const t = TIER_BY[tierName]; if (!t) return;
   const now = Date.now();
   const prev = memberState || {};
   const perk = TIER_PERKS[tierName] || TIER_PERKS.Daily;
   const nk = nightKey();
+  const paid = t.open ? Math.max(0, Number(amount) || 0) : t.price;
+  const number = prev.number || genMemberNumber();
   commitMember({
-    tier: tierName, vip: !!t.vip, number: prev.number || genMemberNumber(), payment,
+    tier: tierName, vip: !!t.vip, number, payment, paid,
     purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
     // loyalty carries over across renew/upgrade
     entries: prev.entries || 0, loyalty: prev.loyalty || 0, lastEntryNight: prev.lastEntryNight || null,
     // tonight's perks
     tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
   });
-  // Mirror to the backend when connected, so the server mints the real
+  // Come onto the network: write the membership onto the in-browser hub op-log
+  // so this member is live in the mesh the moment they join (no server needed).
+  const hub = hubNode();
+  if (hub) {
+    hub.apply('member.upsert', { id: number, name: prev.name || 'Member', number });
+    hub.apply('membership.upsert', { member_id: number, tier: tierName, vip: !!t.vip, paid, expiresAt: now + t.days * 86400000 });
+  }
+  // Also mirror to a real backend if one is connected, so the server mints the
   // membership and the rolling QR pass is server-verifiable at the door.
   if (apiEnabled() && apiToken()) apiPurchase(tierName, payment).catch(() => {});
 }
@@ -702,7 +712,10 @@ function App() {
 
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
-    if (hubOn()) startHub();   // resume in-browser hub if this device is the host
+    // The app IS the backend: it always runs its own in-browser hub in the
+    // background — no "connect to venue", no server. Members come onto the
+    // network the moment they buy a membership (see purchaseTier).
+    if (!apiEnabled()) startHub();
   }, []);
 
   function phaseFor(progress) {
@@ -922,7 +935,6 @@ function RoleLanding({ onPick, auth, onSignOut }) {
           })}
         </div>
         <p className="role-landing-note">Members sign in with their phone or email. Door staff and hosts need the venue access code.</p>
-        <ConnectVenue />
       </div>
     </section>
   );
@@ -967,7 +979,7 @@ function QrScan({ onDecode, onCancel }) {
 
 // A big "Join this venue" QR of the venue address, for others to scan.
 function JoinQR({ url, onClose }) {
-  const qr = useQrDataUrl(url);
+  const qr = useQrDataUrl(url, ui.logo);
   return (
     <div className="join-qr">
       {qr ? <img src={qr} alt="Join QR" /> : <div className="qr-load">QR…</div>}
@@ -1329,15 +1341,45 @@ function ScanAlert({ result, onDismiss }) {
   );
 }
 
-function useQrDataUrl(text) {
+// Renders a QR of `text`. If `logo` is given, it's composited into the center on
+// a canvas — the QR uses high error correction (30% recovery) so it still scans
+// with the badge over the middle. Logo load failure falls back to the plain QR.
+function useQrDataUrl(text, logo) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     let live = true;
     if (!text) { setUrl(''); return undefined; }
-    QRCode.toDataURL(text, { margin: 1, width: 260, color: { dark: '#1b0b2e', light: '#f7ecff' } })
-      .then((u) => { if (live) setUrl(u); }).catch(() => {});
+    const W = 260;
+    QRCode.toDataURL(text, { margin: 1, width: W, errorCorrectionLevel: logo ? 'H' : 'M', color: { dark: '#1b0b2e', light: '#f7ecff' } })
+      .then((qrUrl) => {
+        if (!logo) { if (live) setUrl(qrUrl); return; }
+        const qrImg = new Image();
+        qrImg.onload = () => {
+          const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = W;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(qrImg, 0, 0, W, W);
+          const badge = new Image();
+          badge.onload = () => {
+            const s = Math.round(W * 0.24), x = (W - s) / 2, y = (W - s) / 2, pad = Math.round(s * 0.14), r = 12;
+            const px = x - pad, py = y - pad, pw = s + pad * 2, ph = s + pad * 2;
+            ctx.fillStyle = '#f7ecff';                 // clear plate so modules don't fight the logo
+            ctx.beginPath();
+            ctx.moveTo(px + r, py);
+            ctx.arcTo(px + pw, py, px + pw, py + ph, r);
+            ctx.arcTo(px + pw, py + ph, px, py + ph, r);
+            ctx.arcTo(px, py + ph, px, py, r);
+            ctx.arcTo(px, py, px + pw, py, r);
+            ctx.closePath(); ctx.fill();
+            ctx.drawImage(badge, x, y, s, s);
+            if (live) setUrl(canvas.toDataURL('image/png'));
+          };
+          badge.onerror = () => { if (live) setUrl(qrUrl); };
+          badge.src = logo;
+        };
+        qrImg.onerror = () => { if (live) setUrl(qrUrl); };
+        qrImg.src = qrUrl;
+      }).catch(() => {});
     return () => { live = false; };
-  }, [text]);
+  }, [text, logo]);
   return url;
 }
 
@@ -1351,7 +1393,10 @@ function MembershipScreen({ checkedIn }) {
 function BuyMembership() {
   const [tier, setTier] = useState('Monthly');
   const [pay, setPay] = useState('PayPal');   // real payable method up front
+  const [give, setGive] = useState('');        // open Daily contribution ('' = 0.00)
   const t = TIER_BY[tier];
+  const amount = t.open ? Math.max(0, Math.round((Number(give) || 0) * 100) / 100) : t.price;
+  const free = t.open && amount <= 0;
   return (
     <div className="mem-screen">
       <div className="mem-intro">
@@ -1371,6 +1416,18 @@ function BuyMembership() {
         ))}
       </div>
 
+      {t.open && (
+        <div className="mem-give">
+          <span className="mem-pay-label">Name your contribution</span>
+          <div className="mem-give-row">
+            <span className="mem-give-cur">$</span>
+            <input className="mem-give-input" type="number" min="0" step="0.01" inputMode="decimal"
+              value={give} onChange={(e) => setGive(e.target.value)} placeholder="0.00" />
+          </div>
+          <p className="mem-give-note">Pay what you want — even $0.00. Every bit helps keep the door open.</p>
+        </div>
+      )}
+
       <div className="mem-pay">
         <span className="mem-pay-label">Pay with</span>
         <div className="mem-pay-grid">
@@ -1383,28 +1440,37 @@ function BuyMembership() {
       </div>
 
       <div className="buy-checkout">
-        <p className="buy-summary">{tier} membership · <b>{fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {pay}</p>
-        {pay === 'PayPal' && tierPayable(tier) ? (
+        <p className="buy-summary">
+          {tier} membership · <b>{t.open ? (free ? 'Free' : fmtUSD(amount)) : fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {free ? 'no charge' : pay}
+        </p>
+        {free ? (
+          // Open contribution set to $0 — join free, straight onto the network.
+          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, 'Free', 0)} aria-label="Join free">
+            <img src={ui.buttons.selectPlan} alt="Join free" />
+          </button>
+        ) : pay === 'PayPal' && tierPayable(tier) && !t.open ? (
           // Recurring subscription buttons (card / Apple Pay / Venmo / balance)
-          <PayPalSubscribe tier={tier} onPaid={() => purchaseTier(tier, 'PayPal')} />
+          <PayPalSubscribe tier={tier} onPaid={() => purchaseTier(tier, 'PayPal', amount)} />
         ) : pay === 'PayPal' && paypalMeEnabled() ? (
           // Instant PayPal.me — buyer pays with card / Apple Pay / Venmo / balance
-          <PayPalMeButton price={t.price} onPaid={() => purchaseTier(tier, 'PayPal')} />
+          <PayPalMeButton price={amount} onPaid={() => purchaseTier(tier, 'PayPal', amount)} />
         ) : (
-          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay)} aria-label={`Buy ${tier} plan`}>
+          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay, amount)} aria-label={`Buy ${tier} plan`}>
             <img src={ui.buttons.selectPlan} alt="Select plan" />
           </button>
         )}
       </div>
       <p className="mem-fineprint">
-        {pay === 'PayPal' && tierPayable(tier)
-          ? 'Recurring billing through PayPal — pay with card, Apple Pay, Venmo, or balance. Your card + QR activate on payment.'
-          : pay === 'PayPal' && paypalMeEnabled()
-            ? 'Opens PayPal to pay — card, Apple Pay, Venmo, or balance, straight to HITMANS VIP. Your card + QR activate after you pay.'
-            : 'Pick PayPal above to pay for real (card, Apple Pay, Venmo, or balance). Other methods are demo.'}
+        {free
+          ? 'Free membership — your card + QR activate instantly and you come onto the network.'
+          : pay === 'PayPal' && tierPayable(tier) && !t.open
+            ? 'Recurring billing through PayPal — pay with card, Apple Pay, Venmo, or balance. Your card + QR activate on payment.'
+            : pay === 'PayPal' && paypalMeEnabled()
+              ? 'Opens PayPal to pay — card, Apple Pay, Venmo, or balance, straight to HITMANS VIP. Your card + QR activate after you pay.'
+              : 'Pick PayPal above to pay for real (card, Apple Pay, Venmo, or balance). Other methods are demo.'}
       </p>
 
-      <HvasPayOptions tier={tier} price={t.price} />
+      <HvasPayOptions tier={tier} price={amount} />
     </div>
   );
 }
@@ -1514,7 +1580,7 @@ function RenewsIn({ expiresAt }) {
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
 function MemberPass({ member, checkedIn }) {
-  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`);
+  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.logo);
   const isVip = member.vip;
   const verified = member.status === 'verified';
   const entries = member.entries || 0;
