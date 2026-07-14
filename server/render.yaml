@@ -1,0 +1,20 @@
+# Render.com deploy for the HVAS backend. New → Blueprint → point at this repo.
+services:
+  - type: web
+    name: hvas-backend
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    plan: starter            # SSE + always-live: do NOT use a plan that sleeps
+    healthCheckPath: /health
+    envVars:
+      - key: HVAS_DATA_DIR
+        value: /data
+      - key: HVAS_STAFF_CODE
+        sync: false          # set in the dashboard
+      - key: HVAS_HOST_CODE
+        sync: false
+    disk:
+      name: hvas-data
+      mountPath: /data
+      sizeGB: 1

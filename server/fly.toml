@@ -1,0 +1,28 @@
+# Fly.io deploy for the HVAS backend. `fly launch --no-deploy` then `fly deploy`.
+app = "hvas-backend"
+primary_region = "mia"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8787"
+  HVAS_DATA_DIR = "/data"
+  # MESH_PORT = "9944"          # uncomment to accept peer nodes
+  # MESH_PEERS = "other:9944"   # comma-separated host:port of peers
+
+# Always-on: SSE + "always live" means the machine must not auto-stop.
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Persist the SQLite DB + venue signing key across restarts.
+[[mounts]]
+  source = "hvas_data"
+  destination = "/data"
+
+# Set the venue codes as secrets, not here:
+#   fly secrets set HVAS_STAFF_CODE=... HVAS_HOST_CODE=...

@@ -5,6 +5,7 @@ import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
+import { apiEnabled, memberOtpStart, memberOtpVerify, apiSignOut } from './api.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -175,7 +176,7 @@ function commitAuth(a) {
   authListeners.forEach((fn) => fn());
 }
 export function memberSignIn(name, contact) { commitAuth({ ...authState, member: { name: name.trim(), contact: contact.trim(), since: Date.now() } }); }
-export function memberSignOut() { commitAuth({ ...authState, member: null }); }
+export function memberSignOut() { commitAuth({ ...authState, member: null }); apiSignOut(); }
 export function checkRoleCode(role, code) { return (ROLE_CODES[role] || '').toUpperCase() === (code || '').trim().toUpperCase(); }
 function useAuth() {
   const [, force] = useState(0);
@@ -917,23 +918,72 @@ function RoleLanding({ onPick, auth, onSignOut }) {
   );
 }
 
-// Member self-serve sign in / sign up (phone or email identity). Client-side
-// demo — a real build verifies the contact with an SMS/email code server-side.
+// Member self-serve sign in / sign up. With a backend configured (VITE_HVAS_API)
+// this runs a real OTP: enter name + contact → a code is sent → verify → a
+// backend session is minted (so the in-venue social layer comes alive). With no
+// backend it's the local demo (single step, no code).
 function MemberAuthScreen({ onBack, onDone }) {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
-  const ok = name.trim().length >= 2 && contact.trim().length >= 5;
+  const [stage, setStage] = useState('id');   // 'id' | 'code'
+  const [code, setCode] = useState('');
+  const [devCode, setDevCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const backend = apiEnabled();
+  const idOk = name.trim().length >= 2 && contact.trim().length >= 5;
+
+  const finishLocal = () => { memberSignIn(name, contact); onDone(); };
+
+  const sendCode = async () => {
+    if (!idOk) return;
+    if (!backend) return finishLocal();          // no backend → local demo
+    setBusy(true); setErr('');
+    try {
+      const r = await memberOtpStart(contact.trim());
+      setDevCode(r.devCode || '');               // demo backends echo the code
+      setStage('code');
+    } catch (e) { setErr('Could not send a code — check the connection.'); }
+    finally { setBusy(false); }
+  };
+  const verify = async () => {
+    setBusy(true); setErr('');
+    try {
+      await memberOtpVerify(contact.trim(), code.trim(), name.trim());
+      memberSignIn(name, contact);               // keep the local account in sync
+      onDone();
+    } catch (e) { setErr('Wrong or expired code — try again.'); }
+    finally { setBusy(false); }
+  };
+
   return (
     <section className="screen screen-landing">
       <div className="home-dashboard auth-screen">
-        <section className="sheet-title-banner"><div><span>MEMBER ACCESS</span><h1>Sign in</h1></div></section>
+        <section className="sheet-title-banner"><div><span>MEMBER ACCESS</span><h1>{stage === 'code' ? 'Enter code' : 'Sign in'}</h1></div></section>
         <div className="auth-card">
-          <label>Your name<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="name" /></label>
-          <label>Phone or email<input type="text" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="(850) 000-0000 or you@email.com" autoComplete="tel" /></label>
-          <button type="button" className="auth-continue" disabled={!ok} onClick={() => { memberSignIn(name, contact); onDone(); }}>
-            Continue →
-          </button>
-          <p className="auth-fine">New here? This creates your member account. Buy a membership inside to get your card + QR. Demo only — no code is actually sent.</p>
+          {stage === 'id' ? (
+            <>
+              <label>Your name<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="First name" autoComplete="name" /></label>
+              <label>Phone or email<input type="text" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="(850) 000-0000 or you@email.com" autoComplete="tel" /></label>
+              {err && <p className="gate-err">{err}</p>}
+              <button type="button" className="auth-continue" disabled={!idOk || busy} onClick={sendCode}>
+                {busy ? 'Sending…' : backend ? 'Send code →' : 'Continue →'}
+              </button>
+              <p className="auth-fine">{backend
+                ? 'We’ll send a one-time code to confirm it’s you, then create your member account.'
+                : 'New here? This creates your member account. Demo mode — no code is sent.'}</p>
+            </>
+          ) : (
+            <>
+              <label>6-digit code<input type="text" inputMode="numeric" value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="000000" autoComplete="one-time-code" onKeyDown={(e) => e.key === 'Enter' && verify()} /></label>
+              {devCode && <p className="auth-fine">Demo code: <code>{devCode}</code> (a real build sends this by SMS/email).</p>}
+              {err && <p className="gate-err">{err}</p>}
+              <button type="button" className="auth-continue" disabled={code.trim().length < 4 || busy} onClick={verify}>
+                {busy ? 'Verifying…' : 'Verify →'}
+              </button>
+              <button type="button" className="auth-back" onClick={() => { setStage('id'); setErr(''); }}>← Change details</button>
+            </>
+          )}
           <button type="button" className="auth-back" onClick={onBack}>← Back</button>
         </div>
       </div>
