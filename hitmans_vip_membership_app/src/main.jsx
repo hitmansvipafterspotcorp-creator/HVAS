@@ -5,8 +5,8 @@ import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
-import { apiEnabled, apiToken, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase } from './api.js';
-import { paypalConfigured, tierPayable, planFor, loadPayPal } from './paypal.js';
+import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase } from './api.js';
+import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -1234,7 +1234,7 @@ function MembershipScreen({ checkedIn }) {
 // Step 1 — you are not a member yet. Pick a tier, pick how you pay, purchase.
 function BuyMembership() {
   const [tier, setTier] = useState('Monthly');
-  const [pay, setPay] = useState('Credit / Debit');
+  const [pay, setPay] = useState('PayPal');   // real payable method up front
   const t = TIER_BY[tier];
   return (
     <div className="mem-screen">
@@ -1269,7 +1269,11 @@ function BuyMembership() {
       <div className="buy-checkout">
         <p className="buy-summary">{tier} membership · <b>{fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {pay}</p>
         {pay === 'PayPal' && tierPayable(tier) ? (
+          // Recurring subscription buttons (card / Apple Pay / Venmo / balance)
           <PayPalSubscribe tier={tier} onPaid={() => purchaseTier(tier, 'PayPal')} />
+        ) : pay === 'PayPal' && paypalMeEnabled() ? (
+          // Instant PayPal.me — buyer pays with card / Apple Pay / Venmo / balance
+          <PayPalMeButton price={t.price} onPaid={() => purchaseTier(tier, 'PayPal')} />
         ) : (
           <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay)} aria-label={`Buy ${tier} plan`}>
             <img src={ui.buttons.selectPlan} alt="Select plan" />
@@ -1278,11 +1282,29 @@ function BuyMembership() {
       </div>
       <p className="mem-fineprint">
         {pay === 'PayPal' && tierPayable(tier)
-          ? 'Secure recurring billing through PayPal. Your card + QR activate on payment.'
-          : paypalConfigured()
-            ? 'Choose PayPal above to pay for real. Other methods are demo — buying mints your card + QR.'
-            : 'Demo checkout — no real charge. Buying mints your card + QR instantly.'}
+          ? 'Recurring billing through PayPal — pay with card, Apple Pay, Venmo, or balance. Your card + QR activate on payment.'
+          : pay === 'PayPal' && paypalMeEnabled()
+            ? 'Opens PayPal to pay — card, Apple Pay, Venmo, or balance, straight to HITMANS VIP. Your card + QR activate after you pay.'
+            : 'Pick PayPal above to pay for real (card, Apple Pay, Venmo, or balance). Other methods are demo.'}
       </p>
+    </div>
+  );
+}
+
+// PayPal.me — opens the venue's PayPal for a one-tap payment, then activates
+// the membership. On the PayPal page the buyer chooses card / Apple Pay / Venmo
+// / balance; it all lands in the venue PayPal. No merchant setup needed.
+function PayPalMeButton({ price, onPaid }) {
+  const [opened, setOpened] = useState(false);
+  const pay = () => { window.open(paypalMeLink(price), '_blank', 'noopener'); setOpened(true); };
+  return (
+    <div className="paypal-box">
+      <button type="button" className="paypalme-cta" onClick={pay}>Pay {`$${price}`} with PayPal</button>
+      {opened && (
+        <button type="button" className="paypalme-confirm" onClick={onPaid}>
+          ✓ I paid — activate my membership
+        </button>
+      )}
     </div>
   );
 }
@@ -1299,7 +1321,10 @@ function PayPalSubscribe({ tier, onPaid }) {
       ref.current.innerHTML = '';
       paypal.Buttons({
         style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'subscribe' },
-        createSubscription: (data, actions) => actions.subscription.create({ plan_id: planFor(tier) }),
+        createSubscription: (data, actions) => actions.subscription.create({
+          plan_id: planFor(tier),
+          custom_id: apiMemberId() || undefined,   // ties the payment to the member (for the webhook)
+        }),
         onApprove: () => onPaid(),
         onError: () => setErr('PayPal had a problem — try again.'),
       }).render(ref.current).catch(() => setErr('Could not load PayPal.'));

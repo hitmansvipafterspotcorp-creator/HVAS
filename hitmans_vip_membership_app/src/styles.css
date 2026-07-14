@@ -3200,3 +3200,7 @@ button {
 /* — PayPal subscription button container — */
 .paypal-box { width: 100%; max-width: 320px; margin: 0 auto; }
 .paypal-btns { min-height: 46px; }
+
+/* — PayPal.me one-tap pay — */
+.paypalme-cta { width: 100%; padding: 15px; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffc439, #f0a500); color: #0a1a2f; font-size: 17px; font-weight: 800; cursor: pointer; }
+.paypalme-confirm { width: 100%; margin-top: 10px; padding: 13px; border: 1px solid #2f8f52; border-radius: 12px; background: #123a1f; color: #52ffa8; font-size: 15px; font-weight: 700; cursor: pointer; }

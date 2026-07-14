@@ -24,6 +24,42 @@ const TIERS = {
 const STAFF_CODES = { staff: process.env.HVAS_STAFF_CODE || 'DOOR850', host: process.env.HVAS_HOST_CODE || 'HOST850' };
 const SESSION_TTL = 12 * 3600 * 1000;
 
+// PayPal plan id → tier (from the same env the app uses), so a verified
+// subscription activation maps to the right membership.
+const PAYPAL_PLAN_TIER = Object.fromEntries([
+  [process.env.VITE_PAYPAL_PLAN_DAILY || process.env.PAYPAL_PLAN_DAILY, 'Daily'],
+  [process.env.VITE_PAYPAL_PLAN_WEEKLY || process.env.PAYPAL_PLAN_WEEKLY, 'Weekly'],
+  [process.env.VITE_PAYPAL_PLAN_MONTHLY || process.env.PAYPAL_PLAN_MONTHLY, 'Monthly'],
+  [process.env.VITE_PAYPAL_PLAN_YEARLY || process.env.PAYPAL_PLAN_YEARLY, 'Yearly'],
+  [process.env.VITE_PAYPAL_PLAN_VIP || process.env.PAYPAL_PLAN_VIP, 'VIP'],
+].filter(([id]) => id));
+const PAYPAL = {
+  env: (process.env.PAYPAL_ENV || 'live') === 'sandbox' ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com',
+  clientId: process.env.PAYPAL_CLIENT_ID, secret: process.env.PAYPAL_SECRET, webhookId: process.env.PAYPAL_WEBHOOK_ID,
+};
+
+// Verify a webhook came from PayPal (only when configured; otherwise refuse to
+// activate, so a misconfigured server can't be spoofed into granting access).
+async function paypalVerify(headers, rawBody) {
+  if (!PAYPAL.clientId || !PAYPAL.secret || !PAYPAL.webhookId) return false;
+  const auth = await fetch(`${PAYPAL.env}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: { Authorization: `Basic ${Buffer.from(`${PAYPAL.clientId}:${PAYPAL.secret}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials',
+  }).then((r) => r.json()).catch(() => ({}));
+  if (!auth.access_token) return false;
+  const v = await fetch(`${PAYPAL.env}/v1/notifications/verify-webhook-signature`, {
+    method: 'POST', headers: { Authorization: `Bearer ${auth.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      auth_algo: headers['paypal-auth-algo'], cert_url: headers['paypal-cert-url'],
+      transmission_id: headers['paypal-transmission-id'], transmission_sig: headers['paypal-transmission-sig'],
+      transmission_time: headers['paypal-transmission-time'], webhook_id: PAYPAL.webhookId,
+      webhook_event: JSON.parse(rawBody),
+    }),
+  }).then((r) => r.json()).catch(() => ({}));
+  return v.verification_status === 'SUCCESS';
+}
+
 const memNumber = () => `HV-${1000 + Math.floor(Math.random() * 9000)}-${1000 + Math.floor(Math.random() * 9000)}`;
 const json = (res, code, obj) => {
   const body = JSON.stringify(obj);
@@ -38,6 +74,10 @@ const json = (res, code, obj) => {
 const readBody = (req) => new Promise((resolve) => {
   let d = ''; req.on('data', (c) => { d += c; if (d.length > 1e6) req.destroy(); });
   req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch { resolve({}); } });
+});
+const readRaw = (req) => new Promise((resolve) => {
+  let d = ''; req.on('data', (c) => { d += c; if (d.length > 1e6) req.destroy(); });
+  req.on('end', () => resolve(d));
 });
 
 export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('hex')}`, meshPort = null, peers = [] } = {}) {
@@ -133,6 +173,28 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ── routes ──
   const routes = {
     'GET /health': (req, res) => json(res, 200, { ok: true, service: 'hvas', time: Date.now() }),
+
+    // PayPal subscription webhook — verified server-side activation. On a
+    // confirmed BILLING.SUBSCRIPTION.ACTIVATED, map plan → tier and activate the
+    // member's membership (custom_id = member id, set on the button). Only
+    // activates when the webhook signature verifies, so it can't be spoofed.
+    'POST /paypal/webhook': async (req, res) => {
+      const raw = await readRaw(req);
+      let event; try { event = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad body' }); }
+      const okSig = await paypalVerify(req.headers, raw);
+      if (!okSig) return json(res, 202, { received: true, verified: false }); // ack but do nothing
+      if (event.event_type === 'BILLING.SUBSCRIPTION.ACTIVATED' || event.event_type === 'PAYMENT.SALE.COMPLETED') {
+        const r = event.resource || {};
+        const memberId = r.custom_id || r.custom || null;
+        const tier = PAYPAL_PLAN_TIER[r.plan_id] || null;
+        const t = tier && TIERS[tier];
+        if (memberId && t && db.prepare('SELECT 1 FROM members WHERE id=?').get(memberId)) {
+          const now = Date.now();
+          commit('membership.upsert', { member_id: memberId, tier, vip: t.vip, payment: 'PayPal', purchased_at: now, expires_at: now + t.days * 86400000, status: 'active' });
+        }
+      }
+      json(res, 200, { received: true, verified: true });
+    },
     'GET /keys/pub': (req, res) => json(res, 200, { alg: 'Ed25519', publicKey: publicKeyRaw(keys.publicKey), rollTtlMs: 45000 }),
 
     // Member self-serve auth (mock OTP — dev code returned; wire a real SMS
