@@ -8,6 +8,7 @@ import { GAME_FIGHTERS } from './game/venues.js';
 import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
+import { hubOn, startHub, stopHub } from './hub.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -701,6 +702,7 @@ function App() {
 
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
+    if (hubOn()) startHub();   // resume in-browser hub if this device is the host
   }, []);
 
   function phaseFor(progress) {
@@ -941,6 +943,14 @@ function ConnectVenue() {
     try { await connectVenue(url); window.location.reload(); }
     catch (e) { setErr(e.message || 'Could not connect'); } finally { setBusy(false); }
   };
+  if (hubOn()) {
+    return (
+      <div className="venue-connected">
+        <span>● This device is the <b>venue hub</b> — no server</span>
+        <button type="button" onClick={() => { stopHub(); window.location.reload(); }}>Stop hosting</button>
+      </div>
+    );
+  }
   if (connected) {
     return (
       <div className="venue-connected">
@@ -959,6 +969,9 @@ function ConnectVenue() {
             placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && go()} />
           {err && <p className="gate-err">{err}</p>}
           <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={go}>{busy ? 'Connecting…' : 'Connect'}</button>
+          <button type="button" className="venue-hub-btn" onClick={async () => { await startHub(); window.location.reload(); }}>
+            ✦ Be the venue hub (no server, this device)
+          </button>
         </div>
       )}
     </div>

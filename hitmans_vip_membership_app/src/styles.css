@@ -3234,3 +3234,6 @@ button {
 .venue-connect-go:disabled { opacity: 0.45; }
 .venue-connected { display: flex; align-items: center; justify-content: center; gap: 12px; color: #52ffa8; font-size: 13px; }
 .venue-connected button { background: none; border: none; color: #ff9ae0; font-weight: 700; cursor: pointer; }
+
+/* — Be the venue hub (in-browser, no server) — */
+.venue-hub-btn { margin-top: 8px; padding: 12px; border: 1px solid #6a3cff; border-radius: 10px; background: rgba(60,20,120,0.4); color: #d7c8ff; font-size: 13px; font-weight: 700; cursor: pointer; }
