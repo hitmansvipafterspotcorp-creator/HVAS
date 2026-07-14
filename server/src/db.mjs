@@ -71,6 +71,20 @@ export function openDb(path) {
       at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(from_id, to_id, at);
+    -- ── HVAS Pay: rail-agnostic membership settlement ledger ──
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL,
+      tier TEXT NOT NULL,
+      rail TEXT NOT NULL,                     -- paypal | zelle | cash | other
+      amount INTEGER NOT NULL,                -- USD
+      reference TEXT,                         -- what the member entered (last4, note, cashtag)
+      status TEXT NOT NULL,                   -- pending | paid | void
+      at INTEGER NOT NULL,
+      confirmed_by TEXT,
+      confirmed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_pay_status ON payments(status, at);
   `);
   return db;
 }

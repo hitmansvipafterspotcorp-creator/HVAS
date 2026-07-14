@@ -5,7 +5,8 @@ import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
-import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase } from './api.js';
+import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
+  ZELLE_HANDLE, payClaim, payPending, payConfirm, payVoid } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
@@ -605,8 +606,9 @@ const ROLES = [
     menu: [
       { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
+      { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
     ],
-    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry'],
+    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments'],
   },
   {
     id: 'host',
@@ -868,6 +870,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
+  if (activeScreen === 'payments') return <PaymentsScreen />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
   if (activeScreen === 'checkInLog') return <HistoryScreen />;
   if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
@@ -1287,6 +1290,57 @@ function BuyMembership() {
             ? 'Opens PayPal to pay — card, Apple Pay, Venmo, or balance, straight to HITMANS VIP. Your card + QR activate after you pay.'
             : 'Pick PayPal above to pay for real (card, Apple Pay, Venmo, or balance). Other methods are demo.'}
       </p>
+
+      <HvasPayOptions tier={tier} price={t.price} />
+    </div>
+  );
+}
+
+// HVAS Pay — pay by any rail the venue owns (Zelle → Navy Federal, or cash),
+// then the app files a claim the owner confirms. Only shown when a backend is
+// connected (that's what records + reconciles claims across the mesh).
+function HvasPayOptions({ tier, price }) {
+  const [open, setOpen] = useState(false);
+  const [rail, setRail] = useState(null);
+  const [ref, setRef] = useState('');
+  const [claim, setClaim] = useState(null);
+  const [busy, setBusy] = useState(false);
+  if (!apiEnabled() || !apiToken()) return null;   // needs the ledger backend
+  const file = async () => {
+    setBusy(true);
+    try { const r = await payClaim(tier, rail, ref); setClaim(r); } catch { /* ignore */ }
+    finally { setBusy(false); }
+  };
+  const RAILS = [
+    { id: 'zelle', label: 'Zelle', note: ZELLE_HANDLE ? `Send $${price} to ${ZELLE_HANDLE}` : 'Ask the venue for the Zelle handle' },
+    { id: 'cash', label: 'Cash at the door', note: `Bring $${price} — staff confirms you in` },
+  ];
+  return (
+    <div className="hvaspay">
+      <button type="button" className="hvaspay-toggle" onClick={() => setOpen((v) => !v)}>Other ways to pay ▾</button>
+      {open && (claim ? (
+        <div className="hvaspay-done">
+          <strong>Claim filed · {claim.id}</strong>
+          <p>Pay ${claim.amount} by {claim.rail}. Your membership activates once the venue confirms it — you'll see your card update.</p>
+        </div>
+      ) : rail ? (
+        <div className="hvaspay-form">
+          <p className="hvaspay-note">{RAILS.find((r) => r.id === rail).note}</p>
+          <input type="text" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Reference (last 4, Zelle name, note)" />
+          <div className="hvaspay-row">
+            <button type="button" className="auth-back" onClick={() => setRail(null)}>← Back</button>
+            <button type="button" className="hvaspay-file" disabled={busy} onClick={file}>{busy ? 'Filing…' : 'I sent it — file claim'}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="hvaspay-rails">
+          {RAILS.map((r) => (
+            <button key={r.id} type="button" className="hvaspay-rail" onClick={() => setRail(r.id)}>
+              <strong>{r.label}</strong><span>{r.note}</span>
+            </button>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -1509,6 +1563,40 @@ function MemberPass({ member, checkedIn }) {
 // Staff door dashboard — live status driven by the shared member store: who's
 // signalled on the way, who's been verified inside tonight, and the last door
 // decision. Ticks every 30s so the "on the way" age stays fresh.
+// Owner reconciliation — the HVAS Pay board. Pending Zelle/cash claims stream
+// here (converged over the mesh); confirm activates the membership, void drops it.
+function PaymentsScreen() {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => {
+    if (!apiEnabled() || !apiToken()) { setErr('Connect a backend to reconcile payments.'); setRows([]); return; }
+    payPending().then((r) => setRows(r.pending || [])).catch(() => setErr('Could not load payments.'));
+  };
+  useEffect(() => { load(); const id = setInterval(load, 8000); return () => clearInterval(id); }, []);
+  const act = async (id, kind) => { try { await (kind === 'confirm' ? payConfirm(id) : payVoid(id)); load(); } catch { /* ignore */ } };
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Payments" subtitle="Pending Zelle / cash claims">
+        {err && <p className="dash-empty">{err}</p>}
+        {rows && rows.length === 0 && !err && <p className="dash-empty">No pending payments — you're all caught up.</p>}
+        {rows && rows.map((p) => (
+          <div key={p.id} className="pay-claim">
+            <div className="pay-claim-info">
+              <strong>{p.name} · {p.tier} · ${p.amount}</strong>
+              <span className="dash-num">{p.number} · {p.rail}{p.reference ? ` · ${p.reference}` : ''}</span>
+            </div>
+            <div className="pay-claim-actions">
+              <button type="button" className="pay-confirm" onClick={() => act(p.id, 'confirm')}>✓ Confirm</button>
+              <button type="button" className="pay-void" onClick={() => act(p.id, 'void')}>Void</button>
+            </div>
+          </div>
+        ))}
+      </AppPanel>
+      <p className="mem-fineprint">A member's card activates the moment you confirm their payment. PayPal payments auto-activate and don't show here.</p>
+    </div>
+  );
+}
+
 function StaffDashboardScreen({ navigate }) {
   const member = useMember();
   const [, tick] = useState(0);

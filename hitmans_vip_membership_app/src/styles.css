@@ -3204,3 +3204,22 @@ button {
 /* — PayPal.me one-tap pay — */
 .paypalme-cta { width: 100%; padding: 15px; border: none; border-radius: 999px; background: linear-gradient(135deg, #ffc439, #f0a500); color: #0a1a2f; font-size: 17px; font-weight: 800; cursor: pointer; }
 .paypalme-confirm { width: 100%; margin-top: 10px; padding: 13px; border: 1px solid #2f8f52; border-radius: 12px; background: #123a1f; color: #52ffa8; font-size: 15px; font-weight: 700; cursor: pointer; }
+
+/* — HVAS Pay (member claim + owner reconciliation) — */
+.hvaspay { margin-top: 14px; border-top: 1px solid #2f2350; padding-top: 12px; }
+.hvaspay-toggle { background: none; border: none; color: #c9a8ff; font-size: 14px; font-weight: 700; cursor: pointer; padding: 0; }
+.hvaspay-rails { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.hvaspay-rail { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 11px 14px; border: 1px solid #3a2860; border-radius: 12px; background: rgba(30,16,52,0.5); color: #f4ecff; cursor: pointer; text-align: left; }
+.hvaspay-rail span { color: #b79ae6; font-size: 12px; }
+.hvaspay-form { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.hvaspay-note { color: #e7dcff; font-size: 13px; margin: 0; }
+.hvaspay-form input { padding: 12px 14px; border-radius: 12px; border: 1px solid #4a3a72; background: #140a26; color: #f4ecff; font-size: 15px; }
+.hvaspay-row { display: flex; align-items: center; justify-content: space-between; }
+.hvaspay-file { padding: 12px 16px; border: none; border-radius: 12px; background: linear-gradient(135deg,#b06bff,#ff2bd6); color: #fff; font-weight: 800; cursor: pointer; }
+.hvaspay-done { margin-top: 10px; padding: 12px 14px; border: 1px solid #2f8f52; border-radius: 12px; background: #123a1f; color: #baf7d4; }
+.hvaspay-done strong { color: #52ffa8; }
+.pay-claim { display: flex; align-items: center; gap: 10px; padding: 10px 4px; }
+.pay-claim-info { flex: 1; display: flex; flex-direction: column; }
+.pay-claim-actions { display: flex; gap: 8px; }
+.pay-confirm { padding: 9px 12px; border: 1px solid #2f8f52; border-radius: 10px; background: #123a1f; color: #52ffa8; font-weight: 800; cursor: pointer; }
+.pay-void { padding: 9px 12px; border: 1px solid #6a2a3a; border-radius: 10px; background: #2a1018; color: #ff9ab0; cursor: pointer; }

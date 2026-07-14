@@ -38,3 +38,11 @@ export function apiSignOut() {
 // Optional: mirror a membership purchase to the backend so the pass is real.
 export function apiPurchase(tier, payment) { return call('POST', '/membership/purchase', { tier, payment }, apiToken()); }
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
+
+// ── HVAS Pay ledger — pay by any rail, owner reconciles ──
+export const ZELLE_HANDLE = import.meta.env.VITE_ZELLE_HANDLE || '';   // your Navy Federal Zelle email/phone
+export const PAYPAL_ME_HANDLE = import.meta.env.VITE_PAYPAL_ME || 'hitmanmusicworldwide';
+export function payClaim(tier, rail, reference) { return call('POST', '/pay/claim', { tier, rail, reference }, apiToken()); }
+export function payPending() { return call('GET', '/pay/pending', null, apiToken()); }
+export function payConfirm(id) { return call('POST', '/pay/confirm', { id }, apiToken()); }
+export function payVoid(id) { return call('POST', '/pay/void', { id }, apiToken()); }

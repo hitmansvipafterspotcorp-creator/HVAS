@@ -17,9 +17,9 @@ import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
 
 const TIERS = {
-  Daily: { days: 1, vip: false }, Weekly: { days: 7, vip: false },
-  Monthly: { days: 30, vip: false }, Yearly: { days: 365, vip: false },
-  VIP: { days: 365, vip: true },
+  Daily: { days: 1, vip: false, price: 20 }, Weekly: { days: 7, vip: false, price: 100 },
+  Monthly: { days: 30, vip: false, price: 300 }, Yearly: { days: 365, vip: false, price: 1850 },
+  VIP: { days: 365, vip: true, price: 5000 },
 };
 const STAFF_CODES = { staff: process.env.HVAS_STAFF_CODE || 'DOOR850', host: process.env.HVAS_HOST_CODE || 'HOST850' };
 const SESSION_TTL = 12 * 3600 * 1000;
@@ -243,6 +243,42 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       });
       json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
     },
+
+    // ── HVAS Pay: rail-agnostic settlement ledger ──
+    // A member pays by ANY rail (paypal/zelle/cash/other) to an account the
+    // venue owns, then files a signed claim. PayPal.me is fast; the rest wait on
+    // an owner confirm. Claims + confirmations converge across the mesh.
+    'POST /pay/claim': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { tier, rail, reference } = await readBody(req);
+      const t = TIERS[tier]; if (!t) return json(res, 400, { error: 'bad tier' });
+      if (!['paypal', 'zelle', 'cash', 'other'].includes(rail)) return json(res, 400, { error: 'bad rail' });
+      const id = `PMT-${randomBytes(4).toString('hex').toUpperCase()}`;
+      commit('payment.claim', { id, member_id: c.sub, tier, rail, amount: t.price, reference: (reference || '').slice(0, 120), at: Date.now() });
+      json(res, 200, { id, tier, rail, amount: t.price, status: 'pending' });
+    },
+    'GET /pay/pending': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT p.*, m.name, m.number FROM payments p JOIN members m ON m.id=p.member_id WHERE p.status='pending' ORDER BY p.at ASC`).all();
+      json(res, 200, { pending: rows });
+    },
+    'POST /pay/confirm': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { id } = await readBody(req);
+      const p = db.prepare(`SELECT * FROM payments WHERE id=? AND status='pending'`).get(id);
+      if (!p) return json(res, 404, { error: 'no pending payment' });
+      const t = TIERS[p.tier]; const now = Date.now();
+      commit('payment.confirm', { id, by: c.sub, at: now });
+      commit('membership.upsert', { member_id: p.member_id, tier: p.tier, vip: t.vip, payment: p.rail, purchased_at: now, expires_at: now + t.days * 86400000, status: 'active' });
+      json(res, 200, { ok: true, activated: p.tier });
+    },
+    'POST /pay/void': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { id } = await readBody(req);
+      commit('payment.void', { id, by: c.sub, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+
     // Rolling signed pass — the member's app fetches this every ~30s and renders
     // it as a QR. Valid 45s, so a screenshot is useless.
     'GET /pass/current': (req, res) => {

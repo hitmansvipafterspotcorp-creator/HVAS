@@ -68,6 +68,20 @@ export function applyOp(db, op) {
         VALUES(?,?,?,?,?,?)`).run(op.id, d.from, d.to ?? null, d.venue ?? null, d.body, d.at ?? ts);
       break;
 
+    // ── HVAS Pay ledger ──
+    case 'payment.claim':
+      db.prepare(`INSERT OR IGNORE INTO payments(id,member_id,tier,rail,amount,reference,status,at)
+        VALUES(?,?,?,?,?,?,'pending',?)`).run(d.id, d.member_id, d.tier, d.rail, d.amount, d.reference ?? null, d.at ?? ts);
+      break;
+    case 'payment.confirm':
+      db.prepare(`UPDATE payments SET status='paid', confirmed_by=?, confirmed_at=? WHERE id=? AND status='pending'`)
+        .run(d.by ?? null, d.at ?? ts, d.id);
+      break;
+    case 'payment.void':
+      db.prepare(`UPDATE payments SET status='void', confirmed_by=?, confirmed_at=? WHERE id=? AND status='pending'`)
+        .run(d.by ?? null, d.at ?? ts, d.id);
+      break;
+
     default:
       break;
   }
