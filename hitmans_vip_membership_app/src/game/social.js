@@ -4,15 +4,17 @@
 // dormant, so the game runs solo with zero backend and the static build works.
 //
 // SSE is read via fetch streaming (EventSource can't send auth headers).
-const API = import.meta.env.VITE_HVAS_API || '';
+// Backend base URL is resolved at runtime (connected venue → build env).
+import { apiBase } from '../api.js';
+const API = () => apiBase();
 const token = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_token')) || '';
-export const socialEnabled = () => !!(API && token());
+export const socialEnabled = () => !!(API() && token());
 
 const headers = () => ({ Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' });
 
 async function streamSSE(path, onEvent, signal) {
   try {
-    const res = await fetch(API + path, { headers: headers(), signal });
+    const res = await fetch(API() + path, { headers: headers(), signal });
     if (!res.ok || !res.body) return;
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
     for (;;) {
@@ -37,7 +39,7 @@ export function joinVenue(venueId, { onMembers, onChat, onLink } = {}) {
     if (e.kind === 'chat' && onChat) onChat(e);
     else if ((e.kind === 'link.request' || e.kind === 'link.accept') && onLink) onLink(e);
   }, ac.signal);
-  const post = (path, body) => fetch(API + path, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).catch(() => {});
+  const post = (path, body) => fetch(API() + path, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).catch(() => {});
   return {
     ping: (avatar, x, y) => post('/presence', { venue: venueId, avatar, x, y }),
     say: (body, to) => post('/chat', to ? { to, body } : { venue: venueId, body }),

@@ -6,7 +6,7 @@ import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
 import { apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
-  ZELLE_HANDLE, payClaim, payPending, payConfirm, payVoid } from './api.js';
+  zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
@@ -920,8 +920,48 @@ function RoleLanding({ onPick, auth, onSignOut }) {
           })}
         </div>
         <p className="role-landing-note">Members sign in with their phone or email. Door staff and hosts need the venue access code.</p>
+        <ConnectVenue />
       </div>
     </section>
+  );
+}
+
+// Connect this device to a venue backend at RUNTIME — scan its QR or paste the
+// URL. No rebuild. The venue's own device is the server (LAN, no cloud); this
+// just points the app at it and pulls its config (name, PayPal.me, Zelle).
+function ConnectVenue() {
+  const cfg = venueConfig();
+  const connected = apiEnabled();
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    setBusy(true); setErr('');
+    try { await connectVenue(url); window.location.reload(); }
+    catch (e) { setErr(e.message || 'Could not connect'); } finally { setBusy(false); }
+  };
+  if (connected) {
+    return (
+      <div className="venue-connected">
+        <span>● Connected to <b>{cfg.venue || 'venue'}</b></span>
+        <button type="button" onClick={() => { disconnectVenue(); window.location.reload(); }}>Disconnect</button>
+      </div>
+    );
+  }
+  return (
+    <div className="venue-connect">
+      <button type="button" className="venue-connect-toggle" onClick={() => setOpen((v) => !v)}>📡 Connect to venue ▾</button>
+      {open && (
+        <div className="venue-connect-form">
+          <p>Enter the venue's HVAS address (or scan its QR).</p>
+          <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setErr(''); }}
+            placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && go()} />
+          {err && <p className="gate-err">{err}</p>}
+          <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={go}>{busy ? 'Connecting…' : 'Connect'}</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1312,7 +1352,7 @@ function HvasPayOptions({ tier, price }) {
     finally { setBusy(false); }
   };
   const RAILS = [
-    { id: 'zelle', label: 'Zelle', note: ZELLE_HANDLE ? `Send $${price} to ${ZELLE_HANDLE}` : 'Ask the venue for the Zelle handle' },
+    { id: 'zelle', label: 'Zelle', note: zelleHandle() ? `Send $${price} to ${zelleHandle()}` : 'Ask the venue for the Zelle handle' },
     { id: 'cash', label: 'Cash at the door', note: `Bring $${price} — staff confirms you in` },
   ];
   return (

@@ -3223,3 +3223,14 @@ button {
 .pay-claim-actions { display: flex; gap: 8px; }
 .pay-confirm { padding: 9px 12px; border: 1px solid #2f8f52; border-radius: 10px; background: #123a1f; color: #52ffa8; font-weight: 800; cursor: pointer; }
 .pay-void { padding: 9px 12px; border: 1px solid #6a2a3a; border-radius: 10px; background: #2a1018; color: #ff9ab0; cursor: pointer; }
+
+/* — Connect to venue (runtime, no rebuild) — */
+.venue-connect, .venue-connected { margin-top: 16px; text-align: center; }
+.venue-connect-toggle { background: none; border: none; color: #7fb0ff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.venue-connect-form { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; max-width: 340px; margin-left: auto; margin-right: auto; }
+.venue-connect-form p { color: #9a7ac0; font-size: 12px; margin: 0; }
+.venue-connect-form input { padding: 11px 13px; border-radius: 10px; border: 1px solid #3a4a72; background: #0e1426; color: #e7f0ff; font-size: 15px; }
+.venue-connect-go { padding: 12px; border: none; border-radius: 10px; background: linear-gradient(135deg,#4c9cff,#7f3cff); color: #fff; font-weight: 800; cursor: pointer; }
+.venue-connect-go:disabled { opacity: 0.45; }
+.venue-connected { display: flex; align-items: center; justify-content: center; gap: 12px; color: #52ffa8; font-size: 13px; }
+.venue-connected button { background: none; border: none; color: #ff9ae0; font-weight: 700; cursor: pointer; }

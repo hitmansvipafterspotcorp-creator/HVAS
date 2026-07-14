@@ -7,11 +7,12 @@
 // Plans, or the REST API — see PAYPAL_SETUP.md), then paste each plan id below.
 const CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || '';
 
-// PayPal.me — the instant path (no setup, real money to your PayPal). On the
-// PayPal.me page the buyer can pay with card, Apple Pay, Venmo, or balance.
-const PAYPAL_ME = import.meta.env.VITE_PAYPAL_ME || 'hitmanmusicworldwide';
-export const paypalMeEnabled = () => !!PAYPAL_ME;
-export const paypalMeLink = (usd) => `https://www.paypal.com/paypalme/${PAYPAL_ME}/${usd}USD`;
+// PayPal.me — the instant path (no setup, real money to your PayPal). The handle
+// comes from the connected venue's config, else the build env. On the PayPal.me
+// page the buyer can pay with card, Apple Pay, Venmo, or balance.
+import { paypalMeHandle } from './api.js';
+export const paypalMeEnabled = () => !!paypalMeHandle();
+export const paypalMeLink = (usd) => `https://www.paypal.com/paypalme/${paypalMeHandle()}/${usd}USD`;
 
 // tier name -> PayPal plan id (P-XXXXXXXX). Leave blank to keep a tier on demo.
 export const PLAN_IDS = {

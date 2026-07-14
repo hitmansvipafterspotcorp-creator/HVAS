@@ -197,6 +197,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     'GET /keys/pub': (req, res) => json(res, 200, { alg: 'Ed25519', publicKey: publicKeyRaw(keys.publicKey), rollTtlMs: 45000 }),
 
+    // Config-over-the-air: an app that knows only this node's URL pulls the
+    // venue name + receiving handles from here, so config lives in one place
+    // (the backend) and every device picks it up — no per-device rebuild.
+    'GET /config': (req, res) => json(res, 200, {
+      venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
+      paypalMe: process.env.PAYPAL_ME || process.env.VITE_PAYPAL_ME || '',
+      zelle: process.env.HVAS_ZELLE || process.env.VITE_ZELLE_HANDLE || '',
+      features: { social: true, pay: true, mesh: !!meshPort },
+    }),
+
     // Member self-serve auth (mock OTP — dev code returned; wire a real SMS
     // provider here in production).
     'POST /auth/member/start': async (req, res) => {

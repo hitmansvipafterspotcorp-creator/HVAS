@@ -2,14 +2,32 @@
 // When VITE_HVAS_API is set at build time, the app authenticates real member
 // sessions (OTP), and the game's social layer (presence/chat/link) comes alive.
 // When it's unset, the app runs fully local (demo auth, solo game) — unchanged.
-const API = import.meta.env.VITE_HVAS_API || '';
-export const apiEnabled = () => !!API;
+// Backend base URL is resolved at RUNTIME: a venue you connected to (scanned
+// QR / pasted URL) wins, else the build-time env. This lets the same deployed
+// static site connect to any backend with no rebuild.
+const ls = (k) => (typeof localStorage !== 'undefined' && localStorage.getItem(k)) || '';
+export const apiBase = () => (ls('hvas_api_base') || import.meta.env.VITE_HVAS_API || '').replace(/\/+$/, '');
+export const apiEnabled = () => !!apiBase();
 
-export const apiToken = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_token')) || '';
-export const apiMemberId = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_member_id')) || '';
+export const apiToken = () => ls('hvas_api_token');
+export const apiMemberId = () => ls('hvas_api_member_id');
+
+// Connect the app to a venue backend at runtime: validate it, cache its config.
+export async function connectVenue(url) {
+  const base = String(url || '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(base)) throw new Error('Enter a full https:// URL');
+  const cfg = await fetch(base + '/config').then((r) => { if (!r.ok) throw new Error('not an HVAS backend'); return r.json(); });
+  localStorage.setItem('hvas_api_base', base);
+  localStorage.setItem('hvas_cfg', JSON.stringify(cfg));
+  return cfg;
+}
+export const venueConfig = () => { try { return JSON.parse(ls('hvas_cfg') || '{}'); } catch { return {}; } };
+export function disconnectVenue() {
+  ['hvas_api_base', 'hvas_cfg', 'hvas_api_token', 'hvas_api_member_id'].forEach((k) => localStorage.removeItem(k));
+}
 
 async function call(method, path, body, token) {
-  const res = await fetch(API + path, {
+  const res = await fetch(apiBase() + path, {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body ? JSON.stringify(body) : undefined,
@@ -40,8 +58,9 @@ export function apiPurchase(tier, payment) { return call('POST', '/membership/pu
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
 
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
-export const ZELLE_HANDLE = import.meta.env.VITE_ZELLE_HANDLE || '';   // your Navy Federal Zelle email/phone
-export const PAYPAL_ME_HANDLE = import.meta.env.VITE_PAYPAL_ME || 'hitmanmusicworldwide';
+// Handles prefer the connected venue's config (config-over-the-air), then env.
+export const zelleHandle = () => venueConfig().zelle || import.meta.env.VITE_ZELLE_HANDLE || '';
+export const paypalMeHandle = () => venueConfig().paypalMe || import.meta.env.VITE_PAYPAL_ME || 'hitmanmusicworldwide';
 export function payClaim(tier, rail, reference) { return call('POST', '/pay/claim', { tier, rail, reference }, apiToken()); }
 export function payPending() { return call('GET', '/pay/pending', null, apiToken()); }
 export function payConfirm(id) { return call('POST', '/pay/confirm', { id }, apiToken()); }
