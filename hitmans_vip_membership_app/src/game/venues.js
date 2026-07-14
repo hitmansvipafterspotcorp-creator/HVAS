@@ -75,37 +75,45 @@ export const VENUES = {
     doors: [{ x: 0.5, y: 0.93, to: 'outta_pocket_exterior', label: 'Exit' }],
   },
 
-  // ── Tally Row hub → 5 interiors ──
+  // ── Tally Row: street → top-down commons → the 5 spots ──
+  // You walk the street (brawler), enter the Tally Row commons (a walkable
+  // top-down plaza — the networking hub), then pick a venue from the plaza.
   tally_row_exterior: {
     name: 'Tally Row', mode: 'brawler', bg: 'tally_row_exterior',
     floorY: 0.9, laneDepth: 0.07,
+    doors: [{ x: 0.5, to: 'tally_row_topdown', label: 'Enter Tally Row' }],
+  },
+  tally_row_topdown: {
+    name: 'Tally Row Commons', mode: 'topdown', bg: 'tally_row_topdown',
+    spawn: { x: 0.5, y: 0.88 },
     doors: [
-      { x: 0.14, to: 'public_hall', label: 'Public Hall' },
-      { x: 0.31, to: 'rave_13', label: '13 Rave' },
-      { x: 0.5, to: 'sammys_stage', label: "Sammy's" },
-      { x: 0.68, to: 'the_itus_pizza', label: 'The Itus' },
-      { x: 0.85, to: 'the_den', label: 'The Den' },
+      { x: 0.26, y: 0.16, to: 'sammys_stage', label: "Sammy's" },
+      { x: 0.53, y: 0.16, to: 'the_itus_pizza', label: 'The Itus' },
+      { x: 0.79, y: 0.16, to: 'the_den', label: 'The Den' },
+      { x: 0.19, y: 0.46, to: 'public_hall', label: 'Public Hall' },
+      { x: 0.37, y: 0.46, to: 'rave_13', label: '13 Rave' },
+      { x: 0.60, y: 0.95, to: 'tally_row_exterior', label: 'Exit to street' },
     ],
   },
   public_hall: {
     name: 'Public Hall', mode: 'topdown', bg: 'public_hall',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   rave_13: {
     name: '13 Rave Club', mode: 'topdown', bg: 'rave_13',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   sammys_stage: {
     name: "Sammy's Stage", mode: 'topdown', bg: 'sammys_stage',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   the_itus_pizza: {
     name: 'The Itus Pizza', mode: 'topdown', bg: 'the_itus_pizza',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   the_den: {
     name: 'The Den', mode: 'topdown', bg: 'the_den',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
 
   // ── Dukes & Dimes ──
@@ -137,7 +145,7 @@ export const ZONE_ORDER = [
   'kingdom_come_exterior', 'kingdom_come_interior',
   'social_gaines_exterior', 'social_gaines_interior', 'success_rooftop',
   'outta_pocket_exterior', 'outta_pocket_interior',
-  'tally_row_exterior', 'public_hall', 'rave_13', 'sammys_stage', 'the_itus_pizza', 'the_den',
+  'tally_row_exterior', 'tally_row_topdown', 'public_hall', 'rave_13', 'sammys_stage', 'the_itus_pizza', 'the_den',
   'dukes_dimes_exterior', 'dukes_dimes_interior',
   'quick_hit_fuel_exterior', 'quick_hit_fuel_interior',
 ];

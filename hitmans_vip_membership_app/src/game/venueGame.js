@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { VENUES, VENUE_ASSET } from './venues.js';
+import { joinVenue, socialEnabled } from './social.js';
 
 const BASE = import.meta.env.BASE_URL;
 const FIG = (id, anim, i) => `${BASE}assets/game/fighters/${id}/${anim}_${i}.png`;
+const selfMemberId = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_member_id')) || '';
 
 // Shared: load a fighter's idle/walk/atk frames and build the anims.
 function loadFighter(scene, fighterId) {
@@ -167,7 +169,82 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       titleCard(this, V.name);
       this.canPortal = false; this.time.delayedCall(500, () => { this.canPortal = true; });
       this.scale.on('resize', this.layout, this);
-      this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
+      this.events.once('shutdown', () => { this.scale.off('resize', this.layout, this); this.social?.leave(); });
+      this.initSocial();
+    }
+    // ── member networking: other members appear here as their characters ──
+    initSocial() {
+      this.remotes = new Map();       // memberId -> { sprite, label, target, bubble }
+      this.selfId = selfMemberId();
+      this.lastPing = 0;
+      if (!socialEnabled()) return;
+      this.social = joinVenue(venueId, {
+        onMembers: (list) => this.syncRemotes(list),
+        onChat: (m) => this.showBubble(m.from, m.body),
+      });
+    }
+    remoteFrac(x, y) { return { sx: this.rx0 + x * this.roomW, sy: this.ry0 + y * this.roomH }; }
+    syncRemotes(list) {
+      const seen = new Set();
+      for (const m of list) {
+        if (!m.id || m.id === this.selfId) continue;
+        seen.add(m.id);
+        const { sx, sy } = this.remoteFrac(m.x ?? 0.5, m.y ?? 0.5);
+        let r = this.remotes.get(m.id);
+        if (!r) {
+          const label = this.add.text(0, 0, m.name || 'Member', {
+            fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(this.scale.height * 0.02)}px`,
+            color: m.vip ? '#ffd66b' : '#e7dcff', stroke: '#20102e', strokeThickness: 4,
+          }).setOrigin(0.5, 1).setDepth(1e5);
+          const dot = this.add.circle(0, 0, Math.max(6, this.scale.height * 0.012), m.vip ? 0xffd66b : 0x8f6bff, 0.9).setDepth(1);
+          r = { dot, label, target: { sx, sy }, avatar: m.avatar, bubble: null };
+          this.remotes.set(m.id, r);
+          this.loadRemoteAvatar(r, m.avatar);
+        }
+        r.target = { sx, sy };
+      }
+      for (const [id, r] of this.remotes) if (!seen.has(id)) { r.dot.destroy(); r.label.destroy(); r.sprite?.destroy(); r.bubble?.destroy(); this.remotes.delete(id); }
+    }
+    loadRemoteAvatar(r, avatar) {
+      if (!avatar) return;
+      const key = `rf_${avatar}_idle0`;
+      const attach = () => {
+        if (r.dot?.active) r.dot.destroy();
+        r.sprite = this.add.image(0, 0, key).setOrigin(0.5, 1).setDepth(1);
+        r.sprite.setScale((this.scale.height * 0.13) / r.sprite.height);
+      };
+      if (this.textures.exists(key)) return attach();
+      this.load.image(key, FIG(avatar, 'idle', 0));
+      this.load.once('complete', () => { if (this.remotes.has([...this.remotes].find(([, v]) => v === r)?.[0])) attach(); });
+      this.load.start();
+    }
+    showBubble(fromId, text) {
+      const r = this.remotes.get(fromId); if (!r) return;
+      r.bubble?.destroy();
+      r.bubble = this.add.text(0, 0, String(text).slice(0, 80), {
+        fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(this.scale.height * 0.02)}px`,
+        color: '#fff', backgroundColor: '#20102ee6', padding: { x: 7, y: 4 }, wordWrap: { width: this.scale.width * 0.3 },
+      }).setOrigin(0.5, 1).setDepth(1e5);
+      this.time.delayedCall(5000, () => { if (r.bubble) { r.bubble.destroy(); r.bubble = null; } });
+    }
+    drawRemotes() {
+      for (const r of this.remotes.values()) {
+        const node = r.sprite || r.dot;
+        node.x += (r.target.sx - node.x) * 0.2;
+        node.y += (r.target.sy - node.y) * 0.2;
+        node.setDepth(node.y);
+        r.label.setPosition(node.x, node.y - (r.sprite ? r.sprite.displayHeight : 14) - 2).setDepth(node.y + 1);
+        if (r.bubble) r.bubble.setPosition(node.x, r.label.y - r.label.height - 2).setDepth(1e5);
+      }
+    }
+    nearestRemote() {
+      let best = null, bd = this.scale.width * 0.09;
+      for (const [id, r] of this.remotes) {
+        const node = r.sprite || r.dot;
+        const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, node.x, node.y);
+        if (d < bd) { bd = d; best = { id, label: r.label.text }; }
+      }
+      return best;
     }
     update() {
       const k = this.kbd();
@@ -182,10 +259,22 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       this.player.x = Phaser.Math.Clamp(this.player.x + vx, this.walk.x0, this.walk.x1);
       this.player.y = Phaser.Math.Clamp(this.player.y + vy, this.walk.y0, this.walk.y1);
       this.player.setDepth(this.player.y);
+      // networking: animate other members + ping my position (throttled)
+      this.drawRemotes();
+      if (this.social && this.time.now - this.lastPing > 350) {
+        this.lastPing = this.time.now;
+        const fx = (this.player.x - this.rx0) / this.roomW, fy = (this.player.y - this.ry0) / this.roomH;
+        this.social.ping(fighterId, +fx.toFixed(3), +fy.toFixed(3));
+      }
+      // prompt: a door takes priority; otherwise a nearby member to link with
       let near = null;
       for (const d of this.doorPts) if (Phaser.Math.Distance.Between(this.player.x, this.player.y, d.sx, d.sy) < this.scale.width * 0.11) near = d;
       if (near) { this.prompt.setText(`Y — ${near.label}`).setVisible(true); if (this.canPortal && k.interact) { this.consume(); fire(near.to); } }
-      else this.prompt.setVisible(false);
+      else {
+        const peer = this.social ? this.nearestRemote() : null;
+        if (peer) { this.prompt.setText(`Y — link with ${peer.label}`).setVisible(true); if (k.interact) { this.consume(); this.social.link(peer.id); } }
+        else this.prompt.setVisible(false);
+      }
       this.consume();
     }
   }
