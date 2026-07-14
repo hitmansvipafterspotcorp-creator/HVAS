@@ -5,7 +5,7 @@ import jsQR from 'jsqr';
 import './styles.css';
 import GameCanvas from './game/GameCanvas.jsx';
 import { GAME_FIGHTERS } from './game/venues.js';
-import { apiEnabled, memberOtpStart, memberOtpVerify, apiSignOut } from './api.js';
+import { apiEnabled, apiToken, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase } from './api.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -58,6 +58,9 @@ export function purchaseTier(tierName, payment) {
     // tonight's perks
     tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
   });
+  // Mirror to the backend when connected, so the server mints the real
+  // membership and the rolling QR pass is server-verifiable at the door.
+  if (apiEnabled() && apiToken()) apiPurchase(tierName, payment).catch(() => {});
 }
 
 // Reissue tonight's hospitality tickets / meal if we've crossed 3AM.
