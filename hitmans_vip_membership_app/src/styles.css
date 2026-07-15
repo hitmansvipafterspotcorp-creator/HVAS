@@ -2949,6 +2949,7 @@ button {
 
 /* ── Membership system (buy · pass · verify) ──────────────────────── */
 .mem-screen { max-width: 960px; margin: 0 auto; padding: 8px 4px 40px; }
+.mem-selector-back { background: none; border: none; color: #7fb0ff; font-weight: 700; font-size: 14px; cursor: pointer; padding: 4px 0 10px; }
 .mem-intro { text-align: center; margin-bottom: 18px; }
 .mem-intro h2 { color: #ffe8a3; font-size: 26px; margin: 0 0 6px; }
 .mem-intro p { color: #c9b8ff; max-width: 640px; margin: 0 auto; line-height: 1.5; }
@@ -2959,7 +2960,16 @@ button {
 .tier-buy-card:hover { transform: translateY(-4px); filter: brightness(1.08); }
 .tier-buy-card.picked { filter: drop-shadow(0 0 11px rgba(255,214,107,.9)); }
 .tier-buy-card.picked .tier-buy-art { transform: scale(1.04); }
-.tier-buy-card img { width: 100%; max-width: 120px; height: auto; transition: transform .15s ease; }
+.tier-buy-card > img.tier-buy-art { width: 100%; max-width: 120px; height: auto; transition: transform .15s ease; }
+/* Professional price plate — covers the card's baked (pasted-looking) price,
+   showing a clean price built from the gold digit strips. */
+.tier-price-plate { position: absolute; left: 14%; right: 14%; bottom: 6.5%; height: 23%; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #1d1032, #110819); border: 1px solid #52306e; border-radius: 8px; box-shadow: 0 2px 9px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4) inset; overflow: hidden; }
+.tier-buy-card.picked .tier-price-plate { border-color: #ffd66b; }
+.price-digits { display: flex; align-items: center; justify-content: center; gap: 0; }
+.pd-cur { color: #ffd66b; font-weight: 900; font-size: 13px; margin-right: 2px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.pd-digit { height: 22px; width: auto; display: block; }
+.tpp-open { display: flex; flex-direction: column; align-items: center; color: #7dffb4; font-weight: 900; font-size: 15px; letter-spacing: .08em; line-height: 1; }
+.tpp-open small { color: #b9a6d8; font-size: 7px; font-weight: 700; letter-spacing: .02em; margin-top: 3px; text-transform: uppercase; }
 .tier-buy-price { color: #fff; font-size: 20px; font-weight: 800; }
 .tier-buy-status { color: #7dffb0; font-size: 10px; letter-spacing: .12em; font-weight: 700; }
 
@@ -2979,6 +2989,49 @@ button {
 .daily-window.open .daily-window-clock { color: #7dffb4; }
 .daily-window.closed .daily-window-clock { color: #ffd66b; }
 .daily-window-sub { color: #b9a6d8; font-size: 11.5px; }
+/* Promo code field on the buy screen */
+.mem-promo { margin-bottom: 18px; }
+.mem-promo-input { width: 100%; max-width: 340px; padding: 11px 14px; border-radius: 10px; border: 1px solid #3a4a72; background: #0e1426; color: #e7f0ff; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; }
+.mem-promo-on { color: #7dffb4; font-size: 13px; margin: 8px 0 0; }
+.mem-promo-on b { letter-spacing: .06em; }
+.buy-was { color: #9a7ac0; text-decoration: line-through; margin-right: 8px; font-weight: 600; }
+
+/* Members With Motion — referral / promoter screen */
+.motion-screen .mem-intro p { max-width: 640px; margin-left: auto; margin-right: auto; }
+.motion-generate { text-align: center; margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.motion-generate p { color: #b9a6d8; font-size: 14px; }
+.motion-gen-btn { padding: 15px 26px; border: none; border-radius: 12px; background: linear-gradient(135deg,#4c9cff,#7f3cff); color: #fff; font-weight: 800; font-size: 16px; cursor: pointer; }
+.motion-card { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; background: rgba(20,10,32,.6); border: 1px solid #3a2350; border-radius: 16px; padding: 20px; margin-top: 8px; }
+.motion-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.motion-qr img { width: 190px; height: 190px; border-radius: 12px; background: #fff; padding: 8px; }
+.motion-qr .qr-load { width: 190px; height: 190px; display: grid; place-items: center; color: #9a7ac0; background: #0e1426; border-radius: 12px; }
+.motion-qr span { color: #9a7ac0; font-size: 12px; }
+.motion-code-box { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.motion-code-label { color: #9a7ac0; font-size: 11px; letter-spacing: .16em; }
+.motion-code { color: #ffd66b; font-size: 30px; font-weight: 900; letter-spacing: .1em; }
+.motion-code-actions { display: flex; gap: 8px; }
+.motion-code-actions button { padding: 9px 16px; border: 1px solid #4c9cff; border-radius: 9px; background: rgba(20,50,120,.4); color: #cfe4ff; font-weight: 700; cursor: pointer; font-size: 13px; }
+.motion-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 16px; }
+.motion-stat { background: rgba(20,10,32,.6); border: 1px solid #3a2350; border-radius: 12px; padding: 14px 10px; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.motion-stat.hot { border-color: #ffd66b; box-shadow: 0 0 0 1px rgba(255,214,107,.3) inset; }
+.ms-num { color: #fff; font-size: 24px; font-weight: 900; }
+.motion-stat.hot .ms-num { color: #ffd66b; }
+.ms-lbl { color: #b9a6d8; font-size: 11.5px; }
+.motion-week { display: flex; flex-direction: column; gap: 4px; align-items: center; margin-top: 12px; color: #cfe0ff; font-size: 13px; text-align: center; }
+.motion-payout-note { color: #7dffb4; font-size: 12.5px; }
+.motion-how { margin-top: 20px; background: rgba(20,10,32,.5); border: 1px solid #2f1a4a; border-radius: 14px; padding: 16px 20px; }
+.motion-how h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 10px; }
+.motion-how ol { margin: 0; padding-left: 20px; color: #cbb8e8; font-size: 13.5px; line-height: 1.7; }
+.motion-people { margin-top: 18px; background: rgba(20,10,32,.5); border: 1px solid #2f1a4a; border-radius: 14px; padding: 14px 18px; }
+.motion-people h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 8px; }
+.motion-people h3 small { color: #9a7ac0; font-weight: 600; font-size: 12px; }
+.motion-people ul { list-style: none; margin: 0; padding: 0; }
+.motion-people li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #241436; font-size: 13px; }
+.motion-people li:last-child { border-bottom: none; }
+.mp-who { color: #e7ddff; }
+.mp-who b { color: #fff; }
+.mp-amt { color: #7dffb4; white-space: nowrap; }
+
 .mem-pay { margin-bottom: 18px; }
 .mem-pay-label { display: block; color: #9a7ac0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; }
 .mem-pay-grid { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -3073,8 +3126,19 @@ button {
 .qr-framed.lg { width: 240px; margin: 0 auto; }
 .qr-framed .qr-frame { width: 100%; display: block; }
 .qr-framed .qr-code { position: absolute; left: 18%; top: 12%; width: 64%; height: auto; border-radius: 4px; }
-.qr-framed.lg .qr-code.cam { object-fit: cover; height: 46%; background: #000; }
-.qr-framed .qr-load { position: absolute; left: 18%; top: 12%; width: 64%; aspect-ratio: 1; display: grid; place-items: center; color: #9a7ac0; font-size: 12px; }
+/* Camera feed fills the whole bracket window (the frame's center is transparent). */
+.qr-framed.lg .qr-code.cam { left: 5%; top: 11%; width: 90%; height: 72%; object-fit: cover; border-radius: 8px; background: #000; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+.qr-framed.lg .qr-code.cam.live { opacity: 1; }
+.qr-framed .qr-frame { position: relative; z-index: 1; }
+.qr-framed.lg .qr-load { position: absolute; left: 5%; top: 11%; width: 90%; height: 72%; display: grid; place-items: center; color: #9a7ac0; font-size: 13px; z-index: 2; }
+.qr-framed .qr-load { position: absolute; left: 18%; top: 12%; width: 64%; aspect-ratio: 1; display: grid; place-items: center; color: #9a7ac0; font-size: 12px; z-index: 2; }
+.qr-framed .qr-load.starting { color: #7dffb4; }
+/* Neon scanning line + transparent logo watermark over the live feed */
+.qr-scan-overlay { position: absolute; left: 5%; top: 11%; width: 90%; height: 72%; overflow: hidden; pointer-events: none; z-index: 2; border-radius: 8px; }
+.qr-scanline { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, #52ffe0 20%, #b06bff 50%, #52ffe0 80%, transparent); box-shadow: 0 0 12px #52ffe0, 0 0 26px #7f3cff; animation: qr-scan-sweep 2.6s cubic-bezier(.5,0,.5,1) infinite; }
+@keyframes qr-scan-sweep { 0% { top: 3%; opacity: .3; } 15% { opacity: 1; } 50% { top: 93%; opacity: 1; } 85% { opacity: 1; } 100% { top: 3%; opacity: .3; } }
+.qr-scan-logo { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; font-weight: 900; font-size: 17px; letter-spacing: .16em; color: rgba(130,255,230,.32); text-shadow: 0 0 10px rgba(127,60,255,.6), 0 0 4px rgba(82,255,224,.5); }
+.qr-scan-logo small { font-size: 9px; letter-spacing: .3em; color: rgba(255,120,220,.3); }
 .mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .mem-qr span { color: #9a7ac0; font-size: 11px; }
 
@@ -3123,10 +3187,12 @@ button {
 .loyalty-warn { color: #ffcf8f; font-size: 12.5px; line-height: 1.4; background: rgba(120,70,20,.28); border: 1px solid #7a5a2a; border-radius: 10px; padding: 9px 12px; margin: 0 0 12px; }
 .loyalty-warn b { color: #ffe3b0; }
 .loyalty-badges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-.loyalty-badge { display: grid; place-items: center; padding: 8px 4px; border-radius: 12px; border: 1px solid #2a1a40; background: #150a24; opacity: .38; filter: grayscale(.5); transition: all .15s; }
+/* Badges have their own art — no dark box around them (matches the tier cards). */
+.loyalty-badge { display: grid; place-items: center; padding: 6px 4px; border: none; background: none; opacity: .4; filter: grayscale(.55); transition: opacity .15s, filter .15s, transform .15s; }
 .loyalty-badge.earned { opacity: 1; filter: none; }
-.loyalty-badge.current { border-color: #ffd66b; box-shadow: 0 0 0 1px #ffd66b inset, 0 6px 18px rgba(255,214,107,.25); background: #201038; }
-.loyalty-badge img { width: 100%; max-width: 72px; height: auto; }
+.loyalty-badge.current { opacity: 1; filter: drop-shadow(0 0 9px rgba(255,214,107,.9)); }
+.loyalty-badge.current img { transform: scale(1.06); }
+.loyalty-badge img { width: 100%; max-width: 72px; height: auto; transition: transform .15s; }
 .loyalty-progress { margin: 12px 0 10px; }
 .loyalty-bar { height: 8px; border-radius: 999px; background: #20102e; overflow: hidden; border: 1px solid #3a2350; }
 .loyalty-bar span { display: block; height: 100%; background: linear-gradient(90deg, #b06bff, #ffd66b); border-radius: 999px; transition: width .35s; }

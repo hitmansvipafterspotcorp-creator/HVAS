@@ -75,6 +75,65 @@ export function enforceMembership() {
   }
 }
 
+// ── Members With Motion — referral / promoter program ────────────────────
+// Any member or staffer can generate a promo code + shareable QR. People who
+// buy a package with that code get a discount; the promoter earns a 1/4 (25%)
+// payout of what their referred headcount pays, tallied per night and paid out
+// weekly. Everything rides the hub op-log so it works serverless + cross-device.
+const PROMO_KEY = 'hvas_promo_v1';            // my own promoter code
+const PROMO_ACTIVE_KEY = 'hvas_promo_active'; // a code I'm currently redeeming
+export const PROMO_DISCOUNT = 0.15;           // buyer saves 15% on paid tiers
+export const PROMO_PAYOUT = 0.25;             // promoter earns 25% of referred spend
+function promoSlug(name, number) {
+  const base = (String(name || '').replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase()) || 'HVAS';
+  const tail = (String(number || '').replace(/\D/g, '').slice(-3)) || String(Math.floor(100 + Math.random() * 900));
+  const rnd = Math.random().toString(36).slice(2, 4).toUpperCase();
+  return `${base}${tail}${rnd}`;
+}
+export function myPromo() { try { return JSON.parse(localStorage.getItem(PROMO_KEY)); } catch { return null; } }
+export function generatePromo(owner) {
+  const existing = myPromo(); if (existing) return existing;
+  const rec = { code: promoSlug(owner?.name, owner?.number), owner: owner?.number || owner?.name || 'me', name: owner?.name || 'Promoter', createdAt: Date.now() };
+  try { localStorage.setItem(PROMO_KEY, JSON.stringify(rec)); } catch { /* ignore */ }
+  hubNode()?.apply('promo.create', rec);
+  return rec;
+}
+export const activePromo = () => (typeof localStorage !== 'undefined' && localStorage.getItem(PROMO_ACTIVE_KEY)) || '';
+export function setActivePromo(code) { if (code) try { localStorage.setItem(PROMO_ACTIVE_KEY, String(code).toUpperCase().trim()); } catch { /* ignore */ } }
+export function clearActivePromo() { try { localStorage.removeItem(PROMO_ACTIVE_KEY); } catch { /* ignore */ } }
+export function redeemPromo(code, paid) {
+  if (!code) return;
+  const who = (authState && authState.member) || {};
+  hubNode()?.apply('promo.redeem', {
+    code: String(code).toUpperCase().trim(),
+    buyer: (memberState && memberState.number) || 'guest',
+    name: who.name || (memberState && memberState.name) || 'Member',
+    contact: who.contact || (memberState && memberState.contact) || '',
+    paid: Math.max(0, Number(paid) || 0), night: nightKey(), at: Date.now(),
+  });
+}
+function startOfWeek(now = Date.now()) {              // Monday 00:00
+  const d = new Date(now); const day = d.getDay();
+  d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d.getTime();
+}
+export function promoStats(code) {
+  const hub = hubNode();
+  const rs = hub ? [...hub.ops.values()].filter((o) => o.t === 'promo.redeem' && o.data.code === code) : [];
+  const night = nightKey(), wk = startOfWeek();
+  const sum = (arr) => arr.reduce((s, r) => s + (r.data.paid || 0), 0);
+  const tonight = rs.filter((r) => r.data.night === night);
+  const week = rs.filter((r) => r.data.at >= wk);
+  const people = rs.sort((a, b) => b.at - a.at).map((r) => ({ name: r.data.name || 'Member', contact: r.data.contact || '', paid: r.data.paid || 0, at: r.data.at, night: r.data.night }));
+  return {
+    tonightHeads: tonight.length, tonightRevenue: sum(tonight),
+    weekHeads: week.length, weekRevenue: sum(week),
+    weekPayout: Math.round(sum(week) * PROMO_PAYOUT * 100) / 100,
+    allHeads: rs.length, allRevenue: sum(rs),
+    people,
+  };
+}
+
 function loadMember() { try { return JSON.parse(localStorage.getItem(MEMBER_KEY)); } catch { return null; } }
 const memberListeners = new Set();
 let memberState = loadMember();
@@ -95,8 +154,13 @@ export function purchaseTier(tierName, payment, amount) {
   const nk = nightKey();
   const paid = t.open ? Math.max(0, Number(amount) || 0) : t.price;
   const number = prev.number || genMemberNumber();
+  // Real identity from sign-in — stored on the card so every entry, payment, and
+  // referral is provable (name + email/phone, not just a code).
+  const who = (authState && authState.member) || {};
+  const name = who.name || prev.name || 'Member';
+  const contact = who.contact || prev.contact || '';
   commitMember({
-    tier: tierName, vip: !!t.vip, number, payment, paid,
+    tier: tierName, vip: !!t.vip, number, payment, paid, name, contact,
     purchasedAt: now, expiresAt: now + t.days * 86400000, status: 'active', verifiedAt: null,
     // loyalty carries over across renew/upgrade
     entries: prev.entries || 0, loyalty: prev.loyalty || 0, lastEntryNight: prev.lastEntryNight || null,
@@ -107,8 +171,8 @@ export function purchaseTier(tierName, payment, amount) {
   // so this member is live in the mesh the moment they join (no server needed).
   const hub = hubNode();
   if (hub) {
-    hub.apply('member.upsert', { id: number, name: prev.name || 'Member', number });
-    hub.apply('membership.upsert', { member_id: number, tier: tierName, vip: !!t.vip, paid, expiresAt: now + t.days * 86400000 });
+    hub.apply('member.upsert', { id: number, name, contact, number });
+    hub.apply('membership.upsert', { member_id: number, tier: tierName, vip: !!t.vip, paid, name, contact, expiresAt: now + t.days * 86400000 });
   }
   // Also mirror to a real backend if one is connected, so the server mints the
   // membership and the rolling QR pass is server-verifiable at the door.
@@ -272,12 +336,12 @@ const ui = {
     { label: 'Upgrade To VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_01_130_286x53.png' },
     { label: 'Renew Plan', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_01_154_286x52.png' },
   ],
+  // PayPal already covers Apple Pay / Venmo / Cash App at checkout, so those
+  // aren't listed separately.
   paymentMethods: [
     { label: 'Credit / Debit', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_019_190x46.png' },
-    { label: 'Apple Pay', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_022_190x48.png' },
     { label: 'Google Pay', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_033_190x47.png' },
     { label: 'PayPal', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_040_189x47.png' },
-    { label: 'Cash App', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_046_189x46.png' },
   ],
   tiers: [
     { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338.png', price: '$ --', status: 'Available' },
@@ -385,7 +449,7 @@ const ui = {
     rejectCard: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_11_147_192x53.png',
     keypad: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_11_088_237x351.png',
     result: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_11_089_312x286.png',
-    qrFrame: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_11_087_239x270.png',
+    qrFrame: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_11_087_open.png',
     checkInPanel: '/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_11_064_393x351.png',
   },
   queue: {
@@ -484,6 +548,13 @@ const screens = [
     eyebrow: 'Member Access',
     title: 'Membership',
     detail: 'Your pass, QR, renewal, loyalty rank, and profile — all in one.',
+  },
+  {
+    id: 'motion',
+    label: 'Members With Motion',
+    eyebrow: 'Promote & Earn',
+    title: 'Members With Motion',
+    detail: 'Your promo code, share QR, referred headcount, and weekly payout.',
   },
   {
     id: 'eventAccess',
@@ -644,8 +715,9 @@ const ROLES = [
     menu: [
       { title: 'Membership & Pass', detail: 'Pass, QR, verify at the door, renewal, loyalty & access', chip: ui.chips.vip, target: 'membership' },
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
+      { title: 'Members With Motion', detail: 'Promote packages, earn 25% of your headcount, paid weekly', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout'],
+    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'motion'],
   },
   {
     id: 'staff',
@@ -657,8 +729,9 @@ const ROLES = [
       { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
+      { title: 'Members With Motion', detail: 'Your promo code, referred headcount, and weekly payout', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments'],
+    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments', 'motion'],
   },
   {
     id: 'host',
@@ -752,6 +825,8 @@ function App() {
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
     enforceMembership();       // keep a paid membership or stats start over
+    // A shared promo link (?promo=CODE) applies the referrer's code for checkout.
+    try { const c = new URLSearchParams(window.location.search).get('promo'); if (c) setActivePromo(c); } catch { /* ignore */ }
     // The app IS the backend: it always runs its own in-browser hub in the
     // background — no "connect to venue", no server. Members come onto the
     // network the moment they buy a membership (see purchaseTier).
@@ -924,6 +999,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
+  if (activeScreen === 'motion') return <MembersWithMotionScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
@@ -1350,6 +1426,18 @@ function PayVerifyScreen() {
 
 // Tier name -> pricing-card artwork (buy screen, has the $ price slot).
 const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
+// Price rendered from the gold digit strips (ui.digits[d] is the art for digit d)
+// so every price uses the same clean, professional numerals.
+function PriceDigits({ value }) {
+  return (
+    <span className="price-digits">
+      <span className="pd-cur">$</span>
+      {String(Math.round(value)).split('').map((c, i) => (
+        <img key={i} className="pd-digit" src={ui.digits[+c]} alt={c} />
+      ))}
+    </span>
+  );
+}
 // Tier name -> member PASS-card artwork (the pass; "MONTHLY PASS", no price).
 const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
@@ -1453,14 +1541,25 @@ function useCountdown(target) {
 }
 
 // THE single membership screen: not a member -> buy a tier; member -> your pass.
+// "Renew plan" from the pass opens the same tier selector (renew mode).
 function MembershipScreen({ checkedIn }) {
   const member = useMember();
-  return member ? <MemberPass member={member} checkedIn={checkedIn} /> : <BuyMembership />;
+  const [renew, setRenew] = useState(false);
+  const boughtAt = useRef(member?.purchasedAt);
+  useEffect(() => {                                   // purchased in renew mode -> back to pass
+    if (renew && member && member.purchasedAt !== boughtAt.current) setRenew(false);
+  }, [member?.purchasedAt, renew]);
+  if (member && !renew) {
+    return <MemberPass member={member} checkedIn={checkedIn}
+      onRenew={() => { boughtAt.current = member.purchasedAt; setRenew(true); }} />;
+  }
+  return <BuyMembership renewMode={!!member} currentTier={member?.tier} onBack={member ? () => setRenew(false) : undefined} />;
 }
 
-// Step 1 — you are not a member yet. Pick a tier, pick how you pay, purchase.
-function BuyMembership() {
-  const [tier, setTier] = useState('Monthly');
+// Step 1 — you are not a member yet (or you're renewing). Pick a tier, pick how
+// you pay, purchase.
+function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
+  const [tier, setTier] = useState(currentTier || 'Monthly');
   const [pay, setPay] = useState('PayPal');   // real payable method up front
   const [give, setGive] = useState('');        // open Daily contribution ('' = 0.00)
   const t = TIER_BY[tier];
@@ -1471,11 +1570,22 @@ function BuyMembership() {
     ? (openFree ? Math.max(0, Math.round((Number(give) || 0) * 100) / 100) : DAILY_LATE_PRICE)
     : t.price;
   const free = openFree && amount <= 0;              // $0 contribution → join free
+  // Members With Motion: a referral code gives the buyer a discount and credits
+  // the promoter. Applied to any real (non-free) charge.
+  const [promoField, setPromoField] = useState(activePromo());
+  const promo = (promoField || activePromo()).toUpperCase().trim();
+  const payAmount = (promo && !free) ? Math.round(amount * (1 - PROMO_DISCOUNT) * 100) / 100 : amount;
+  const finalize = (via, amt) => { purchaseTier(tier, via, amt); if (promo) redeemPromo(promo, amt); clearActivePromo(); };
   return (
     <div className="mem-screen">
+      {renewMode && onBack && (
+        <button type="button" className="mem-selector-back" onClick={onBack}>← Back to your pass</button>
+      )}
       <div className="mem-intro">
-        <h2>Become a member</h2>
-        <p>You must hold a membership to get in. Buy a tier and you’ll get a member card, a number, and a QR code security scans at the door.</p>
+        <h2>{renewMode ? 'Renew or change your plan' : 'Become a member'}</h2>
+        <p>{renewMode
+          ? 'Pick the tier you want to renew or switch to. Your member number and loyalty carry over.'
+          : 'You must hold a membership to get in. Buy a tier and you’ll get a member card, a number, and a QR code security scans at the door.'}</p>
       </div>
       <div className="tier-buy-grid">
         {TIERS.map((row) => (
@@ -1485,7 +1595,11 @@ function BuyMembership() {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={`${row.name} — ${fmtUSD(row.price)}`} />
+            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
+            {/* clean price plate covers the card's baked-in (pasted) price */}
+            <span className="tier-price-plate">
+              {row.open ? <span className="tpp-open">OPEN<small>pay what you want</small></span> : <PriceDigits value={row.price} />}
+            </span>
           </button>
         ))}
       </div>
@@ -1516,6 +1630,14 @@ function BuyMembership() {
         </div>
       )}
 
+      <div className="mem-promo">
+        <span className="mem-pay-label">Promo code <small>(optional)</small></span>
+        <input className="mem-promo-input" type="text" value={promoField}
+          onChange={(e) => { setPromoField(e.target.value); setActivePromo(e.target.value); }}
+          placeholder="Friend's code — save 15%" autoComplete="off" />
+        {promo && !free && <p className="mem-promo-on">✓ Code <b>{promo}</b> applied — {Math.round(PROMO_DISCOUNT * 100)}% off</p>}
+      </div>
+
       <div className="mem-pay">
         <span className="mem-pay-label">Pay with</span>
         <div className="mem-pay-grid">
@@ -1529,21 +1651,22 @@ function BuyMembership() {
 
       <div className="buy-checkout">
         <p className="buy-summary">
-          {tier} membership · <b>{t.open ? (free ? 'Free' : fmtUSD(amount)) : fmtUSD(t.price)}</b>{t.vip ? ' · VIP' : ''} · {free ? 'no charge' : pay}
+          {tier} membership · {promo && !free && <s className="buy-was">{fmtUSD(amount)}</s>}
+          <b>{free ? 'Free' : fmtUSD(payAmount)}</b>{t.vip ? ' · VIP' : ''} · {free ? 'no charge' : pay}
         </p>
         {free ? (
           // Open contribution set to $0 — join free, straight onto the network.
-          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, 'Free', 0)} aria-label="Join free">
+          <button type="button" className="asset-cta" onClick={() => finalize('Free', 0)} aria-label="Join free">
             <img src={ui.buttons.selectPlan} alt="Join free" />
           </button>
-        ) : pay === 'PayPal' && tierPayable(tier) && !t.open ? (
+        ) : pay === 'PayPal' && tierPayable(tier) && !t.open && !promo ? (
           // Recurring subscription buttons (card / Apple Pay / Venmo / balance)
-          <PayPalSubscribe tier={tier} onPaid={() => purchaseTier(tier, 'PayPal', amount)} />
+          <PayPalSubscribe tier={tier} onPaid={() => finalize('PayPal', payAmount)} />
         ) : pay === 'PayPal' && paypalMeEnabled() ? (
           // Instant PayPal.me — buyer pays with card / Apple Pay / Venmo / balance
-          <PayPalMeButton price={amount} onPaid={() => purchaseTier(tier, 'PayPal', amount)} />
+          <PayPalMeButton price={payAmount} onPaid={() => finalize('PayPal', payAmount)} />
         ) : (
-          <button type="button" className="asset-cta" onClick={() => purchaseTier(tier, pay, amount)} aria-label={`Buy ${tier} plan`}>
+          <button type="button" className="asset-cta" onClick={() => finalize(pay, payAmount)} aria-label={`Buy ${tier} plan`}>
             <img src={ui.buttons.selectPlan} alt="Select plan" />
           </button>
         )}
@@ -1558,7 +1681,7 @@ function BuyMembership() {
               : 'Pick PayPal above to pay for real (card, Apple Pay, Venmo, or balance). Other methods are demo.'}
       </p>
 
-      <HvasPayOptions tier={tier} price={amount} />
+      <HvasPayOptions tier={tier} price={payAmount} />
     </div>
   );
 }
@@ -1667,7 +1790,7 @@ function RenewsIn({ expiresAt }) {
 
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
-function MemberPass({ member, checkedIn }) {
+function MemberPass({ member, checkedIn, onRenew }) {
   const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.logo);
   const isVip = member.vip;
   const verified = member.status === 'verified';
@@ -1702,7 +1825,9 @@ function MemberPass({ member, checkedIn }) {
             {isVip && <img className="mem-chip" src={ui.chips.vip} alt="VIP" />}
           </div>
           <dl className="mem-pass-meta">
+            {member.name && <div><dt>Name</dt><dd>{member.name}</dd></div>}
             <div><dt>Member #</dt><dd className="mem-number">{member.number}</dd></div>
+            {member.contact && <div><dt>Contact</dt><dd>{member.contact}</dd></div>}
             <div><dt>Valid until</dt><dd>{fmtDate(member.expiresAt)}</dd></div>
             <div><dt>Paid with</dt><dd>{member.payment}</dd></div>
           </dl>
@@ -1803,10 +1928,10 @@ function MemberPass({ member, checkedIn }) {
             <span className="up-price">{fmtUSD(nextUp.price)}</span>
           </button>
         )}
-        <button type="button" className={`asset-cta wide${expired ? ' renew-hot' : ''}`} onClick={() => purchaseTier(member.tier, member.payment)}
-          aria-label={`Renew ${member.tier} ${fmtUSD(TIER_BY[member.tier].price)}`}>
+        <button type="button" className={`asset-cta wide${expired ? ' renew-hot' : ''}`} onClick={onRenew}
+          aria-label="Renew or change plan">
           <img src={ui.buttons.renewPlan} alt="Renew plan" />
-          <span className="asset-cta-note">{fmtUSD(TIER_BY[member.tier].price)}</span>
+          <span className="asset-cta-note">Choose a plan</span>
         </button>
         {nextUp && nextUp.name !== 'VIP' && (
           <button type="button" className="jump-vip" onClick={() => purchaseTier('VIP', member.payment)}>or jump to VIP · {fmtUSD(TIER_BY.VIP.price)}</button>
@@ -1826,6 +1951,93 @@ function MemberPass({ member, checkedIn }) {
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
+    </div>
+  );
+}
+
+// Members With Motion — the referral / promoter program. Generate a promo code
+// + share QR; anyone who buys a package with it saves 15% and you earn 25% of
+// what your referred headcount pays, tallied per night and paid out weekly.
+function MembersWithMotionScreen() {
+  const member = useMember();
+  const auth = useAuth();
+  const [promo, setPromo] = useState(myPromo());
+  const [, tick] = useState(0);
+  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(id); }, []);
+  const name = auth?.member?.name || member?.name || 'Promoter';
+  const base = (typeof window !== 'undefined') ? window.location.origin + import.meta.env.BASE_URL : '';
+  const shareUrl = promo ? `${base}?promo=${promo.code}` : '';
+  const qr = useQrDataUrl(shareUrl, ui.logo);
+  const stats = promo ? promoStats(promo.code) : null;
+  const [copied, setCopied] = useState('');
+  const copy = (text, what) => { try { navigator.clipboard?.writeText(text); setCopied(what); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ } };
+
+  return (
+    <div className="mem-screen motion-screen">
+      <div className="mem-intro">
+        <h2>Members With Motion</h2>
+        <p>Share your code, put people on the guest list, and get paid. They save {Math.round(PROMO_DISCOUNT * 100)}% — you earn {Math.round(PROMO_PAYOUT * 100)}% of everything your headcount pays. Tallied each night, paid out weekly.</p>
+      </div>
+
+      {!promo ? (
+        <div className="motion-generate">
+          <p>Generate your personal promo code and share QR. It never expires.</p>
+          <button type="button" className="motion-gen-btn" onClick={() => setPromo(generatePromo({ name, number: member?.number }))}>
+            ✦ Generate my promo code
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="motion-card">
+            <div className="motion-qr">
+              {qr ? <img src={qr} alt="Promo QR" /> : <div className="qr-load">QR…</div>}
+              <span>Scan to join with your code</span>
+            </div>
+            <div className="motion-code-box">
+              <span className="motion-code-label">YOUR CODE</span>
+              <strong className="motion-code">{promo.code}</strong>
+              <div className="motion-code-actions">
+                <button type="button" onClick={() => copy(promo.code, 'code')}>{copied === 'code' ? 'Copied ✓' : 'Copy code'}</button>
+                <button type="button" onClick={() => copy(shareUrl, 'link')}>{copied === 'link' ? 'Copied ✓' : 'Copy link'}</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="motion-stats">
+            <div className="motion-stat"><span className="ms-num">{stats.tonightHeads}</span><span className="ms-lbl">tonight’s headcount</span></div>
+            <div className="motion-stat"><span className="ms-num">{fmtUSD(stats.tonightRevenue)}</span><span className="ms-lbl">referred tonight</span></div>
+            <div className="motion-stat hot"><span className="ms-num">{fmtUSD(stats.weekPayout)}</span><span className="ms-lbl">this week’s payout ({Math.round(PROMO_PAYOUT * 100)}%)</span></div>
+          </div>
+          <div className="motion-week">
+            <span>This week: <b>{stats.weekHeads}</b> people · <b>{fmtUSD(stats.weekRevenue)}</b> referred</span>
+            <span className="motion-payout-note">💸 Paid out every Monday. All-time: {stats.allHeads} joins.</span>
+          </div>
+
+          {stats.people.length > 0 && (
+            <div className="motion-people">
+              <h3>Who used your code <small>(your proof)</small></h3>
+              <ul>
+                {stats.people.slice(0, 30).map((r, i) => (
+                  <li key={i}>
+                    <span className="mp-who"><b>{r.name}</b>{r.contact ? ` · ${r.contact}` : ''}</span>
+                    <span className="mp-amt">{r.paid > 0 ? fmtUSD(r.paid) : 'free'} · {fmtDate(r.at)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="motion-how">
+            <h3>How it works</h3>
+            <ol>
+              <li>Share your QR or code — text it, post it, show it at the door.</li>
+              <li>They scan or type it at checkout and save {Math.round(PROMO_DISCOUNT * 100)}%.</li>
+              <li>You earn {Math.round(PROMO_PAYOUT * 100)}% of what they pay — auto-tallied here.</li>
+              <li>Payouts go out weekly to your PayPal.</li>
+            </ol>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1890,8 +2102,8 @@ function StaffDashboardScreen({ navigate }) {
           <div className="dash-row incoming">
             <span className="dash-dot amber" />
             <div>
-              <strong>{member.tier}{member.vip ? ' VIP' : ''} Member</strong>
-              <span className="dash-num">{member.number}</span>
+              <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
+              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
             </div>
             <span className="dash-when">{ago(member.onTheWayAt)}</span>
           </div>
@@ -1905,8 +2117,8 @@ function StaffDashboardScreen({ navigate }) {
           <div className="dash-row inside">
             <span className="dash-dot green" />
             <div>
-              <strong>{member.tier}{member.vip ? ' VIP' : ''} Member</strong>
-              <span className="dash-num">{member.number}</span>
+              <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
+              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
             </div>
             <span className="dash-when">entry #{member.entries}</span>
           </div>
@@ -1920,8 +2132,8 @@ function StaffDashboardScreen({ navigate }) {
           <div className={`dash-row ${lastDecision.status}`}>
             <img className="dash-chip" src={STATUS_CHIP[lastDecision.status]} alt={lastDecision.status} />
             <div>
-              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'}</strong>
-              <span className="dash-num">{member.number}</span>
+              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'} · {member.name || 'Member'}</strong>
+              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
             </div>
             <span className="dash-when">{ago(lastDecision.when)}</span>
           </div>
@@ -1944,6 +2156,7 @@ function SecurityVerifyScreen() {
   const [num, setNum] = useState('');
   const [result, setResult] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [ready, setReady] = useState(false);        // first camera frame arrived
   const videoRef = useRef(null);
   const rafRef = useRef(0);
   const streamRef = useRef(null);
@@ -1952,20 +2165,27 @@ function SecurityVerifyScreen() {
     cancelAnimationFrame(rafRef.current);
     if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
-    setScanning(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setScanning(false); setReady(false);
   }
   useEffect(() => () => stopScan(), []);
 
   async function startScan() {
-    setResult(null);
+    setResult(null); setReady(false);
     if (!navigator.mediaDevices?.getUserMedia) { setResult({ info: true, reason: 'No camera on this device — type the member number below instead.' }); return; }
+    setScanning(true);                              // show the live view + "starting" immediately
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      streamRef.current = stream; setScanning(true);
-      const video = videoRef.current; video.srcObject = stream; await video.play();
+      streamRef.current = stream;
+      const video = videoRef.current;               // always mounted now — ref is valid
+      if (!video) { stream.getTracks().forEach((t) => t.stop()); setScanning(false); return; }
+      video.srcObject = stream;
+      await video.play().catch(() => {});
       const canvas = document.createElement('canvas');
+      let gotFrame = false;
       const tick = () => {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
+          if (!gotFrame) { gotFrame = true; setReady(true); }
           canvas.width = video.videoWidth; canvas.height = video.videoHeight;
           const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -1978,7 +2198,7 @@ function SecurityVerifyScreen() {
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
-    } catch { setResult({ info: true, reason: 'Camera permission is blocked. Allow camera access in your browser, or type the member number below.' }); setScanning(false); }
+    } catch { setResult({ info: true, reason: 'Camera permission is blocked. Allow camera access in your browser, or type the member number below.' }); stopScan(); }
   }
 
   const dismiss = () => setResult(null);
@@ -1990,10 +2210,20 @@ function SecurityVerifyScreen() {
 
         <div className="verify-scanbox">
           <div className="qr-framed lg">
+            {/* Feed sits BEHIND the frame; the frame's center is transparent so
+                the live feed fills the whole window and the purple brackets
+                frame it to help staff center the member's QR. Video is always
+                mounted so the ref exists the moment the stream arrives. */}
+            <video className={`qr-code cam${scanning ? ' live' : ''}`} ref={videoRef} playsInline muted autoPlay />
             <img className="qr-frame" src={ui.verify.qrFrame} alt="" />
-            {scanning
-              ? <video className="qr-code cam" ref={videoRef} playsInline muted />
-              : <div className="qr-load">Camera off</div>}
+            {scanning && ready && (
+              <div className="qr-scan-overlay" aria-hidden="true">
+                <div className="qr-scanline" />
+                <span className="qr-scan-logo">HITMANS VIP<small>AFTER SPOT</small></span>
+              </div>
+            )}
+            {!scanning && <div className="qr-load">Camera off</div>}
+            {scanning && !ready && <div className="qr-load starting">Starting camera…</div>}
           </div>
           {scanning
             ? <button type="button" className="mem-cancel" onClick={stopScan}>Stop camera</button>
