@@ -60,6 +60,15 @@ button {
   pointer-events: none;
   overflow: hidden;
 }
+/* Scrim: keeps the animated gold-H / hitkoin backdrop from washing out page
+   content at its bright peak, while the animation still shows through. */
+.dynamic-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8,4,16,.52) 0%, rgba(8,4,16,.44) 32%, rgba(8,4,16,.6) 100%);
+  pointer-events: none;
+}
 
 .dynamic-bg-layer {
   position: absolute;
@@ -2945,10 +2954,12 @@ button {
 .mem-intro p { color: #c9b8ff; max-width: 640px; margin: 0 auto; line-height: 1.5; }
 
 .tier-buy-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
-.tier-buy-card { position: relative; background: #150a24; border: 2px solid #2f1a4a; border-radius: 14px; padding: 8px 6px 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: border-color .15s, transform .15s; }
-.tier-buy-card:hover { transform: translateY(-3px); }
-.tier-buy-card.picked { border-color: #ffd66b; box-shadow: 0 0 0 1px #ffd66b inset, 0 8px 24px rgba(176,107,255,.3); }
-.tier-buy-card img { width: 100%; max-width: 120px; height: auto; }
+/* The card art already has its own neon frame — no dark box around it. */
+.tier-buy-card { position: relative; background: none; border: none; border-radius: 14px; padding: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .15s ease, filter .15s ease; }
+.tier-buy-card:hover { transform: translateY(-4px); filter: brightness(1.08); }
+.tier-buy-card.picked { filter: drop-shadow(0 0 11px rgba(255,214,107,.9)); }
+.tier-buy-card.picked .tier-buy-art { transform: scale(1.04); }
+.tier-buy-card img { width: 100%; max-width: 120px; height: auto; transition: transform .15s ease; }
 .tier-buy-price { color: #fff; font-size: 20px; font-weight: 800; }
 .tier-buy-status { color: #7dffb0; font-size: 10px; letter-spacing: .12em; font-weight: 700; }
 
@@ -3083,6 +3094,9 @@ button {
 @keyframes alertfade { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
 
 /* scan result row + verdict (real status chips drive the color) */
+.scan-alert.info { border-color: #3a4a72; gap: 10px; }
+.scan-alert-info-icon { font-size: 34px; line-height: 1; }
+.scan-alert.info .scan-alert-sub { color: #cfe0ff; font-size: 14px; line-height: 1.45; }
 .scan-alert.valid { border-color: #2f7d55; }
 .scan-alert.expired, .scan-alert.trespass { border-color: #7d2f3f; }
 .scan-result-row { display: flex; flex-direction: column; gap: 2px; }

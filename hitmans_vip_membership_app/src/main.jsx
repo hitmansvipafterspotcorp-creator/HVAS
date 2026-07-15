@@ -43,7 +43,7 @@ function nightKey(ts = Date.now()) { return new Date(ts - 3 * 3600000).toISOStri
 // evening when doors open.
 const DAILY_CUTOFF_HOUR = 2;    // 2:00 AM — free/open contribution window closes
 const DAILY_REOPEN_HOUR = 6;    // 6:00 AM — free window reopens after the late $15 hours
-export const DAILY_LATE_PRICE = 15;
+export const DAILY_LATE_PRICE = 20;
 function nextHourMark(hour, now = Date.now()) {
   const d = new Date(now); d.setHours(hour, 0, 0, 0);
   if (d.getTime() <= now) d.setDate(d.getDate() + 1);
@@ -1360,6 +1360,19 @@ const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespa
 // GRANTED / DENIED with the matching VALID / EXPIRED / TRESPASS chip.
 function ScanAlert({ result, onDismiss }) {
   if (!result) return null;
+  // Scanner/camera messages are NOT a membership denial — show a neutral note,
+  // no ACCESS DENIED banner and no "DO NOT ADMIT" verdict.
+  if (result.info) {
+    return (
+      <div className="scan-alert-overlay" onClick={onDismiss}>
+        <div className="scan-alert info" onClick={(e) => e.stopPropagation()}>
+          <span className="scan-alert-info-icon">📷</span>
+          <p className="scan-alert-sub">{result.reason}</p>
+          <button type="button" className="scan-alert-dismiss" onClick={onDismiss}>Got it</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="scan-alert-overlay" onClick={onDismiss}>
       <div className={`scan-alert ${result.status}`} onClick={(e) => e.stopPropagation()}>
@@ -1945,7 +1958,7 @@ function SecurityVerifyScreen() {
 
   async function startScan() {
     setResult(null);
-    if (!navigator.mediaDevices?.getUserMedia) { setResult({ ok: false, reason: 'No camera here — type the member number instead.' }); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { setResult({ info: true, reason: 'No camera on this device — type the member number below instead.' }); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream; setScanning(true);
@@ -1965,7 +1978,7 @@ function SecurityVerifyScreen() {
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
-    } catch { setResult({ ok: false, reason: 'Camera blocked — type the member number instead.' }); setScanning(false); }
+    } catch { setResult({ info: true, reason: 'Camera permission is blocked. Allow camera access in your browser, or type the member number below.' }); setScanning(false); }
   }
 
   const dismiss = () => setResult(null);
