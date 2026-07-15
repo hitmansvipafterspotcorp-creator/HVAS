@@ -366,6 +366,7 @@ const ui = {
     '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_8.png',
     '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_9.png',
   ],
+  pdollar: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_dollar.png',
   titles: {
     membership: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_01_001_897x135.png',
     entry: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_001_905x140.png',
@@ -1447,7 +1448,7 @@ const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
 function PriceDigits({ value }) {
   return (
     <span className="price-digits">
-      <span className="pd-cur">$</span>
+      <img className="pd-digit pd-cur" src={ui.pdollar} alt="$" />
       {String(Math.round(value)).split('').map((c, i) => (
         <img key={i} className="pd-digit" src={ui.pdigits[+c]} alt={c} />
       ))}
