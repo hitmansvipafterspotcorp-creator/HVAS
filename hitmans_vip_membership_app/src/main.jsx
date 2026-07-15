@@ -1448,7 +1448,7 @@ const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
 function PriceDigits({ value }) {
   const digits = String(Math.round(value)).split('');
   const n = digits.length + 1;                 // + the $ box
-  const h = Math.min(38, Math.floor(98 / (0.62 * n)));   // scale so all boxes fit the slot
+  const h = Math.min(36, Math.floor(96 / (0.76 * n)));   // 47x63 boxes (aspect .75); fit the slot width
   const st = { height: `${h}px` };
   return (
     <span className="price-digits">
