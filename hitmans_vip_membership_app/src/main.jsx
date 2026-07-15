@@ -1446,11 +1446,15 @@ const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
 // Price rendered from the gold digit strips (ui.digits[d] is the art for digit d)
 // so every price uses the same clean, professional numerals.
 function PriceDigits({ value }) {
+  const digits = String(Math.round(value)).split('');
+  const n = digits.length + 1;                 // + the $ box
+  const h = Math.min(38, Math.floor(98 / (0.62 * n)));   // scale so all boxes fit the slot
+  const st = { height: `${h}px` };
   return (
     <span className="price-digits">
-      <img className="pd-digit pd-cur" src={ui.pdollar} alt="$" />
-      {String(Math.round(value)).split('').map((c, i) => (
-        <img key={i} className="pd-digit" src={ui.pdigits[+c]} alt={c} />
+      <img className="pd-digit pd-cur" style={st} src={ui.pdollar} alt="$" />
+      {digits.map((c, i) => (
+        <img key={i} className="pd-digit" style={st} src={ui.pdigits[+c]} alt={c} />
       ))}
     </span>
   );
