@@ -1620,7 +1620,7 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
                 drop into the slot (matches the membership sheet) */}
             <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
             <span className="tier-price-slot">
-              {row.open ? <span className="tpp-open">OPEN<small>pay what you want</small></span> : <PriceDigits value={row.price} />}
+              <PriceDigits value={row.open ? 0 : row.price} />
             </span>
           </button>
         ))}

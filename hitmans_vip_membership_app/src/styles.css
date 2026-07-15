@@ -2963,7 +2963,7 @@ button {
 .tier-buy-card > img.tier-buy-art { width: 100%; max-width: 120px; height: auto; transition: transform .15s ease; }
 /* Price sits IN the card's empty PRICE slot — purple modular digits from the
    sheet, sized (inline) so the whole price fits without overflowing. */
-.tier-price-slot { position: absolute; left: 6%; right: 6%; bottom: 6.5%; height: 17%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.tier-price-slot { position: absolute; left: 7%; right: 7%; top: 74%; height: 17%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .price-digits { display: flex; align-items: center; justify-content: center; gap: 0; max-width: 100%; }
 .pd-digit { width: auto; display: block; }
 .pd-cur { margin-right: 1px; }
