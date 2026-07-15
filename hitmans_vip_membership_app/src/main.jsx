@@ -343,13 +343,17 @@ const ui = {
     { label: 'Google Pay', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_033_190x47.png' },
     { label: 'PayPal', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_040_189x47.png' },
   ],
+  // Tier cards with the PRICE slot emptied — the price is dropped in from the
+  // purple modular digits (see pdigits), matching the membership sheet.
   tiers: [
-    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338.png', price: '$ --', status: 'Available' },
-    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338.png', price: '$ --', status: 'Available' },
-    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337.png', price: '$ --', status: 'Active' },
-    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337.png', price: '$ --', status: 'Available' },
-    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337.png', price: '$ --', status: 'Verified' },
+    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338_empty.png' },
+    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338_empty.png' },
+    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337_empty.png' },
+    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337_empty.png' },
+    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337_empty.png' },
   ],
+  // Purple modular price digits (0-9) — used to build any price on the cards.
+  pdigits: Array.from({ length: 10 }, (_, d) => `/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_${d}.png`),
   titles: {
     membership: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_01_001_897x135.png',
     entry: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_001_905x140.png',
@@ -1433,7 +1437,7 @@ function PriceDigits({ value }) {
     <span className="price-digits">
       <span className="pd-cur">$</span>
       {String(Math.round(value)).split('').map((c, i) => (
-        <img key={i} className="pd-digit" src={ui.digits[+c]} alt={c} />
+        <img key={i} className="pd-digit" src={ui.pdigits[+c]} alt={c} />
       ))}
     </span>
   );
@@ -1595,10 +1599,10 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            {/* clean no-price pass card + a price built from the gold digit
-                strips BELOW it — no baked price, no drawn box */}
-            <img className="tier-buy-art" src={PASS_SRC[row.name]} alt={row.name} />
-            <span className="tier-price-line">
+            {/* tier card with an empty PRICE slot; the purple modular digits
+                drop into the slot (matches the membership sheet) */}
+            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
+            <span className="tier-price-slot">
               {row.open ? <span className="tpp-open">OPEN<small>pay what you want</small></span> : <PriceDigits value={row.price} />}
             </span>
           </button>
