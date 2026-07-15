@@ -343,30 +343,16 @@ const ui = {
     { label: 'Google Pay', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_033_190x47.png' },
     { label: 'PayPal', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_14_040_189x47.png' },
   ],
-  // Tier cards with the PRICE slot emptied — the price is dropped in from the
-  // purple modular digits (see pdigits), matching the membership sheet.
+  // Tier cards with the purple modular price digits baked directly into the
+  // PRICE slot (from the membership sheet) — pixel-exact, no runtime overlay,
+  // no ghost boxes. Daily shows $0 (pay-what-you-want / open contribution).
   tiers: [
-    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338_empty.png' },
-    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338_empty.png' },
-    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337_empty.png' },
-    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337_empty.png' },
-    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337_empty.png' },
+    { name: 'Daily', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_025_183x338_priced.png' },
+    { name: 'Weekly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_026_183x338_priced.png' },
+    { name: 'Monthly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_027_181x337_priced.png' },
+    { name: 'Yearly', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_028_181x337_priced.png' },
+    { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337_priced.png' },
   ],
-  // Purple modular price digits (0-9) — used to build any price on the cards.
-  // Listed as explicit literals so the deploy asset-trimmer keeps them.
-  pdigits: [
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_0.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_1.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_2.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_3.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_4.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_5.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_6.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_7.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_8.png',
-    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_9.png',
-  ],
-  pdollar: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_dollar.png',
   titles: {
     membership: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_01_001_897x135.png',
     entry: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_001_905x140.png',
@@ -1441,24 +1427,9 @@ function PayVerifyScreen() {
   );
 }
 
-// Tier name -> pricing-card artwork (buy screen, has the $ price slot).
+// Tier name -> pricing-card artwork (buy screen). The purple price digits are
+// baked into each card's PRICE slot at build time — no runtime overlay needed.
 const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
-// Price rendered from the gold digit strips (ui.digits[d] is the art for digit d)
-// so every price uses the same clean, professional numerals.
-function PriceDigits({ value }) {
-  const digits = String(Math.round(value)).split('');
-  const n = digits.length + 1;                 // + the $ box
-  const h = Math.min(36, Math.floor(96 / (0.76 * n)));   // 47x63 boxes (aspect .75); fit the slot width
-  const st = { height: `${h}px` };
-  return (
-    <span className="price-digits">
-      <img className="pd-digit pd-cur" style={st} src={ui.pdollar} alt="$" />
-      {digits.map((c, i) => (
-        <img key={i} className="pd-digit" style={st} src={ui.pdigits[+c]} alt={c} />
-      ))}
-    </span>
-  );
-}
 // Tier name -> member PASS-card artwork (the pass; "MONTHLY PASS", no price).
 const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
@@ -1616,12 +1587,8 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            {/* tier card with an empty PRICE slot; the purple modular digits
-                drop into the slot (matches the membership sheet) */}
+            {/* tier card with the purple price digits baked into the slot */}
             <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
-            <span className="tier-price-slot">
-              <PriceDigits value={row.open ? 0 : row.price} />
-            </span>
           </button>
         ))}
       </div>
