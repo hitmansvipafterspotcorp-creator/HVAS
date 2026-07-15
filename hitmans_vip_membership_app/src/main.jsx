@@ -1595,9 +1595,10 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
             onClick={() => setTier(row.name)}
           >
-            <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
-            {/* clean price plate covers the card's baked-in (pasted) price */}
-            <span className="tier-price-plate">
+            {/* clean no-price pass card + a price built from the gold digit
+                strips BELOW it — no baked price, no drawn box */}
+            <img className="tier-buy-art" src={PASS_SRC[row.name]} alt={row.name} />
+            <span className="tier-price-line">
               {row.open ? <span className="tpp-open">OPEN<small>pay what you want</small></span> : <PriceDigits value={row.price} />}
             </span>
           </button>
