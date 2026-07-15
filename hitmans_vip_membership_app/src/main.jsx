@@ -353,7 +353,19 @@ const ui = {
     { name: 'VIP', src: '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_01_029_179x337_empty.png' },
   ],
   // Purple modular price digits (0-9) — used to build any price on the cards.
-  pdigits: Array.from({ length: 10 }, (_, d) => `/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_${d}.png`),
+  // Listed as explicit literals so the deploy asset-trimmer keeps them.
+  pdigits: [
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_0.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_1.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_2.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_3.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_4.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_5.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_6.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_7.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_8.png',
+    '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/digit_p_9.png',
+  ],
   titles: {
     membership: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_01_001_897x135.png',
     entry: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_001_905x140.png',
