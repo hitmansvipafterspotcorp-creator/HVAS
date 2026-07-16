@@ -91,7 +91,7 @@ button {
 }
 
 .dynamic-bg-hitkoin {
-  background-image: url("/HVAS/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png");
+  background-image: url("/HVAS/assets/ui/source_sheets/ui_05_HITKOIN_LOGO.png");
   background-position: center;
   background-size: auto 112%;
   animation: hitkoin-cycle 26s cubic-bezier(0.42, 0, 0.24, 1) infinite;

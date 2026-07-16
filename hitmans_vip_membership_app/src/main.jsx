@@ -306,7 +306,7 @@ const fmtUSD = (n) => `$${n.toLocaleString('en-US')}`;
 const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const ui = {
-  logo: '/assets/ui/source_sheets/ui_05_HITKOIN LOGO.png',
+  logo: '/assets/ui/source_sheets/ui_05_HITKOIN_LOGO.png',
   mainMenuBackground: '/assets/ui/main-menu-background.png',
   loading: '/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png',
   banners: {
