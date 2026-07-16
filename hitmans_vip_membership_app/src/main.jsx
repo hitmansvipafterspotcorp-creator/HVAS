@@ -262,6 +262,14 @@ export function verifyByNumber(number) {
   if (!m || !m.number || m.number.toUpperCase() !== clean) {
     return { ok: false, status: 'trespass', reason: 'No matching member — unauthorized. Do not admit.' };
   }
+  // A trespass/ban flag beats everything else — do not admit, no matter the tier.
+  const pen = memberPenalty(clean);
+  if (pen) {
+    return {
+      ok: false, status: pen.kind === 'banned' ? 'banned' : 'trespass', member: m,
+      reason: `${PENALTY_LABEL[pen.kind] || 'FLAGGED'} — ${pen.reason || 'do not admit'}${pen.by ? ` · flagged by ${pen.by}` : ''}`,
+    };
+  }
   if (Date.now() > m.expiresAt) {
     commitMember({ ...m, status: 'expired' });
     return { ok: false, status: 'expired', member: memberState, reason: 'Membership expired — renewal required.' };
@@ -272,6 +280,55 @@ export function verifyByNumber(number) {
   return { ok: true, status: 'valid', member: memberState, reason: 'Member verified — grant entry. Night logged.' };
 }
 export function resetMembership() { commitMember(null); }
+
+// ── Member penalties: trespass / ban ────────────────────────────────────
+// Door staff can flag a member. The flag rides the hub op-log so it converges
+// to every device — the member sees it on their own profile, and any door that
+// scans them is warned. Latest op per member number wins; 'cleared' lifts it.
+export const PENALTY_LABEL = { trespass: 'TRESPASSED', banned: 'BANNED' };
+export function penalizeMember(number, name, kind, reason) {
+  const num = String(number || '').trim().toUpperCase();
+  if (!num) return;
+  const who = (authState && authState.member) || {};
+  hubNode()?.apply('member.penalty', {
+    number: num, name: name || 'Member', kind, reason: reason || '',
+    by: who.name || 'Door staff', at: Date.now(),
+  });
+  // reflect immediately on the local member record if this is them
+  if (memberState && memberState.number && memberState.number.toUpperCase() === num) {
+    commitMember({ ...memberState, penalty: kind === 'cleared' ? null : { kind, reason: reason || '', at: Date.now() } });
+  }
+  memberListeners.forEach((fn) => fn());
+}
+export function memberPenalty(number) {
+  const num = String(number || '').trim().toUpperCase();
+  if (!num) return null;
+  const hub = hubNode();
+  if (hub) {
+    const rs = [...hub.ops.values()]
+      .filter((o) => o.t === 'member.penalty' && String(o.data.number).toUpperCase() === num)
+      .sort((a, b) => (a.data.at || 0) - (b.data.at || 0));
+    const last = rs[rs.length - 1];
+    if (last) return last.data.kind === 'cleared' ? null : { kind: last.data.kind, reason: last.data.reason, by: last.data.by, at: last.data.at };
+  }
+  // offline fallback: the member's own stored flag
+  if (memberState && memberState.number && memberState.number.toUpperCase() === num) return memberState.penalty || null;
+  return null;
+}
+export function penalizedMembers() {
+  const hub = hubNode();
+  if (!hub) {
+    return memberState && memberState.penalty
+      ? [{ number: memberState.number, name: memberState.name, ...memberState.penalty }] : [];
+  }
+  const latest = new Map();
+  [...hub.ops.values()].filter((o) => o.t === 'member.penalty')
+    .sort((a, b) => (a.data.at || 0) - (b.data.at || 0))
+    .forEach((o) => latest.set(String(o.data.number).toUpperCase(), o.data));
+  return [...latest.values()].filter((d) => d.kind !== 'cleared')
+    .map((d) => ({ number: d.number, name: d.name, kind: d.kind, reason: d.reason, by: d.by, at: d.at }))
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+}
 function useMember() {
   const [, force] = useState(0);
   useEffect(() => { const fn = () => force((n) => n + 1); memberListeners.add(fn); return () => memberListeners.delete(fn); }, []);
@@ -304,9 +361,13 @@ function useAuth() {
 }
 const fmtUSD = (n) => `$${n.toLocaleString('en-US')}`;
 const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDateTime = (ms) => new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 const ui = {
   logo: '/assets/ui/source_sheets/ui_05_HITKOIN_LOGO.png',
+  // The HITMANS VIP AFTER SPOT badge (crown + shield) — the real brand mark used
+  // in QR centers and the pass brand stamp (NOT the HITKOIN coin).
+  brandBadge: '/assets/ui/complete_ui_set/new_main_menu/new_main_menu/brand/mm_logo_badge.png',
   mainMenuBackground: '/assets/ui/main-menu-background.png',
   loading: '/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png',
   banners: {
@@ -731,10 +792,11 @@ const ROLES = [
     menu: [
       { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
+      { title: 'Watchlist', detail: 'Trespassed & banned members — flag or lift', chip: ui.chips.vip, target: 'watchlist' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
       { title: 'Members With Motion', detail: 'Your promo code, referred headcount, and weekly payout', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['verification', 'staffDashboard', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments', 'motion'],
+    allowed: ['verification', 'staffDashboard', 'watchlist', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments', 'motion'],
   },
   {
     id: 'host',
@@ -1004,6 +1066,7 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'motion') return <MembersWithMotionScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
+  if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
   if (activeScreen === 'checkInLog') return <HistoryScreen />;
@@ -1098,7 +1161,7 @@ function QrScan({ onDecode, onCancel }) {
 
 // A big "Join this venue" QR of the venue address, for others to scan.
 function JoinQR({ url, onClose }) {
-  const qr = useQrDataUrl(url, ui.logo);
+  const qr = useQrDataUrl(url, ui.brandBadge);
   return (
     <div className="join-qr">
       {qr ? <img src={qr} alt="Join QR" /> : <div className="qr-load">QR…</div>}
@@ -1433,7 +1496,19 @@ const TIER_SRC = Object.fromEntries(ui.tiers.map((t) => [t.name, t.src]));
 // Tier name -> member PASS-card artwork (the pass; "MONTHLY PASS", no price).
 const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
-const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass };
+const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass, banned: ui.verify.trespass };
+
+// Brand stamp shown UNDER every generated QR: the HITMANS VIP logo with the
+// neon-pink "AFTER SPOT" wordmark, matching the logo art. Makes each pass
+// unmistakably ours (the QR payload itself is already unique per member).
+function BrandStamp({ compact = false }) {
+  return (
+    <div className={`qr-brand${compact ? ' compact' : ''}`}>
+      <img className="qr-brand-logo" src={ui.brandBadge} alt="HITMANS VIP" />
+      <span className="qr-brand-after">AFTER SPOT</span>
+    </div>
+  );
+}
 
 // The pop-up alert shown when a membership is verified — the same overlay on
 // the staff door screen and on the member's own "Verify Membership" tap.
@@ -1460,9 +1535,17 @@ function ScanAlert({ result, onDismiss }) {
         {STATUS_CHIP[result.status] && <img className="scan-alert-chip" src={STATUS_CHIP[result.status]} alt={result.status} />}
         {result.member ? (
           <div className="scan-result-row">
-            <strong>{result.member.tier}{result.member.vip ? ' VIP' : ''} Member</strong>
+            <strong className="scan-result-name">{result.member.name || 'Member'}</strong>
+            <span className="scan-result-tier">{result.member.tier}{result.member.vip ? ' VIP' : ''} Member</span>
             <span className="scan-result-num">{result.member.number}</span>
-            <small>{result.status === 'valid' ? `Valid until ${fmtDate(result.member.expiresAt)}` : `Expired ${fmtDate(result.member.expiresAt)}`}</small>
+            <small>
+              {result.status === 'valid'
+                ? `Valid until ${fmtDate(result.member.expiresAt)}`
+                : (result.status === 'banned' || result.status === 'trespass')
+                  ? result.reason
+                  : `Expired ${fmtDate(result.member.expiresAt)}`}
+            </small>
+            <small className="scan-result-date">Scanned {fmtDateTime(Date.now())}</small>
           </div>
         ) : (
           <p className="scan-alert-sub">{result.reason}</p>
@@ -1780,7 +1863,7 @@ function RenewsIn({ expiresAt }) {
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
 function MemberPass({ member, checkedIn, onRenew }) {
-  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.logo);
+  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.brandBadge);
   const isVip = member.vip;
   const verified = member.status === 'verified';
   const entries = member.entries || 0;
@@ -1801,8 +1884,16 @@ function MemberPass({ member, checkedIn, onRenew }) {
   // Member self-verify: same gate the door uses — pops GRANTED / DENIED / etc.
   const [verifyResult, setVerifyResult] = useState(null);
 
+  const penalty = memberPenalty(member.number);
   return (
     <div className="mem-screen mem-pass">
+      {penalty && (
+        <div className={`mem-penalty ${penalty.kind}`}>
+          <strong>{PENALTY_LABEL[penalty.kind]}</strong>
+          <span>{penalty.reason || 'Flagged by the venue'}{penalty.by ? ` · ${penalty.by}` : ''}</span>
+          <small>Your access is suspended. See a manager at the door.</small>
+        </div>
+      )}
       {/* — the pass card — */}
       <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
         <img className="mem-pass-art" src={PASS_SRC[member.tier]} alt={`${member.tier} pass`} />
@@ -1826,6 +1917,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <div className="qr-clean">
             {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
           </div>
+          <BrandStamp />
           <span>Show at the door to get scanned</span>
           <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(verifyByNumber(member.number))} aria-label="Verify membership">
             <img src={ui.verify.verifyCard} alt="Verify membership" />
@@ -1956,7 +2048,7 @@ function MembersWithMotionScreen() {
   const name = auth?.member?.name || member?.name || 'Promoter';
   const base = (typeof window !== 'undefined') ? window.location.origin + import.meta.env.BASE_URL : '';
   const shareUrl = promo ? `${base}?promo=${promo.code}` : '';
-  const qr = useQrDataUrl(shareUrl, ui.logo);
+  const qr = useQrDataUrl(shareUrl, ui.brandBadge);
   const stats = promo ? promoStats(promo.code) : null;
   const [copied, setCopied] = useState('');
   const copy = (text, what) => { try { navigator.clipboard?.writeText(text); setCopied(what); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ } };
@@ -1980,6 +2072,7 @@ function MembersWithMotionScreen() {
           <div className="motion-card">
             <div className="motion-qr">
               {qr ? <img src={qr} alt="Promo QR" /> : <div className="qr-load">QR…</div>}
+              <BrandStamp compact />
               <span>Scan to join with your code</span>
             </div>
             <div className="motion-code-box">
@@ -2068,6 +2161,28 @@ function PaymentsScreen() {
   );
 }
 
+// Trespass / Ban / Clear controls for a member row. Writes to the hub op-log so
+// the flag lands on the member's profile and every door instantly.
+function PenaltyControls({ member }) {
+  const [, force] = useState(0);
+  const pen = memberPenalty(member.number);
+  const flag = (kind, reason) => { penalizeMember(member.number, member.name, kind, reason); force((n) => n + 1); };
+  if (pen) {
+    return (
+      <div className="dash-actions">
+        <span className={`dash-flag ${pen.kind}`}>{PENALTY_LABEL[pen.kind]}</span>
+        <button type="button" className="dash-pen clear" onClick={() => flag('cleared', '')}>Lift flag</button>
+      </div>
+    );
+  }
+  return (
+    <div className="dash-actions">
+      <button type="button" className="dash-pen trespass" onClick={() => flag('trespass', 'Trespassed at the door')}>Trespass</button>
+      <button type="button" className="dash-pen ban" onClick={() => flag('banned', 'Banned from the venue')}>Ban</button>
+    </div>
+  );
+}
+
 function StaffDashboardScreen({ navigate }) {
   const member = useMember();
   const [, tick] = useState(0);
@@ -2090,9 +2205,10 @@ function StaffDashboardScreen({ navigate }) {
         {incoming ? (
           <div className="dash-row incoming">
             <span className="dash-dot amber" />
-            <div>
+            <div className="dash-info">
               <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
               <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
+              <PenaltyControls member={member} />
             </div>
             <span className="dash-when">{ago(member.onTheWayAt)}</span>
           </div>
@@ -2105,9 +2221,10 @@ function StaffDashboardScreen({ navigate }) {
         {inside ? (
           <div className="dash-row inside">
             <span className="dash-dot green" />
-            <div>
+            <div className="dash-info">
               <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
               <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
+              <PenaltyControls member={member} />
             </div>
             <span className="dash-when">entry #{member.entries}</span>
           </div>
@@ -2134,6 +2251,39 @@ function StaffDashboardScreen({ navigate }) {
       <button type="button" className="asset-cta wide" onClick={() => navigate('verification')} aria-label="Verify at the door">
         <img src={ui.verify.verifyCard} alt="Verify at the door" />
       </button>
+      <button type="button" className="dash-watchlist-link" onClick={() => navigate('watchlist')}>
+        ⚠ Watchlist — trespassed &amp; banned members
+      </button>
+    </div>
+  );
+}
+
+// The venue watchlist: every member currently flagged trespass/banned, pulled
+// from the hub op-log so it's the same list on every staff device. Staff can
+// lift a flag here; that too converges everywhere.
+function WatchlistScreen() {
+  const [, tick] = useState(0);
+  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(id); }, []);
+  const rows = penalizedMembers();
+  const lift = (m) => { penalizeMember(m.number, m.name, 'cleared', ''); tick((n) => n + 1); };
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Watchlist" subtitle="Trespassed & banned — visible to all staff">
+        {rows.length === 0 ? (
+          <p className="dash-empty">No flagged members. The list is clear.</p>
+        ) : rows.map((m) => (
+          <div key={m.number} className={`dash-row ${m.kind}`}>
+            <img className="dash-chip" src={STATUS_CHIP[m.kind]} alt={m.kind} />
+            <div className="dash-info">
+              <strong>{m.name || 'Member'} <span className={`dash-flag ${m.kind}`}>{PENALTY_LABEL[m.kind]}</span></strong>
+              <span className="dash-num">{m.number}</span>
+              <span className="dash-reason">{m.reason || '—'}{m.by ? ` · by ${m.by}` : ''} · {fmtDateTime(m.at)}</span>
+            </div>
+            <button type="button" className="dash-pen clear" onClick={() => lift(m)}>Lift</button>
+          </div>
+        ))}
+      </AppPanel>
+      <p className="mem-fineprint">Flagging a member at the door adds them here and warns every scanner. Lifting a flag restores their access everywhere.</p>
     </div>
   );
 }
@@ -2208,7 +2358,7 @@ function SecurityVerifyScreen() {
             {scanning && ready && (
               <div className="qr-scan-overlay" aria-hidden="true">
                 <div className="qr-scanline" />
-                <span className="qr-scan-logo">HITMANS VIP<small>AFTER SPOT</small></span>
+                <img className="qr-scan-logo-img" src={ui.brandBadge} alt="" />
               </div>
             )}
             {!scanning && <div className="qr-load">Camera off</div>}
