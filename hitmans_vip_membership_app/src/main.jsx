@@ -33,6 +33,16 @@ export const TIER_PERKS = {
   Yearly: { tickets: 3, meal: true, drinks: false, blurb: '3 tickets daily + a free Cafe8Fifty meal' },
   VIP: { tickets: 3, meal: true, drinks: true, blurb: 'Free drinks all night + a free meal daily' },
 };
+
+// What each tier comes with — shown when a member taps a card on the buy screen
+// so they can choose wisely.
+export const TIER_BENEFITS = {
+  Daily: ['Entry for the night', 'Pay what you want until 2 AM — even $0', 'Member card, number & door QR', 'Loyalty rank starts counting'],
+  Weekly: ['7 days of entry', '1 hospitality ticket every night (before 3 AM)', 'Member card, number & door QR', 'Event & venue access once you check in'],
+  Monthly: ['30 days of entry', '3 hospitality tickets every night', 'Event & venue access', 'Faster loyalty rank climb'],
+  Yearly: ['365 days of entry', '3 hospitality tickets every night', 'A free Cafe8Fifty meal daily', 'Priority event & venue access'],
+  VIP: ['365 days of entry', 'Free drinks all night', 'A free meal daily', 'VIP lounge & VIP areas', 'Priority door entry', 'Top loyalty status'],
+};
 // The "night" resets at 3AM — shift the clock back 3h and take the date.
 function nightKey(ts = Date.now()) { return new Date(ts - 3 * 3600000).toISOString().slice(0, 10); }
 
@@ -1060,10 +1070,10 @@ function TransitionOverlay({ transition }) {
         <div className="transition-bg" />
         {/* animated warp/teleport layers — speed rays + expanding rings */}
         <div className="transition-warp" aria-hidden="true">
-          <span className="warp-rays" />
+          <span className="warp-rays a" />
+          <span className="warp-rays b" />
           <span className="warp-ring r1" />
           <span className="warp-ring r2" />
-          <span className="warp-ring r3" />
         </div>
         <div className="source-progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={transition.progress}>
           <span />
@@ -1716,6 +1726,19 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
             <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
           </button>
         ))}
+      </div>
+
+      {/* what the tapped tier comes with, so members choose wisely */}
+      <div className="tier-benefits">
+        <div className="tier-benefits-head">
+          <strong>{tier}{t.vip && tier !== 'VIP' ? ' VIP' : ''} — what you get</strong>
+          <span>{t.open ? 'Pay what you want' : t.days >= 365 ? `${fmtUSD(t.price)} / year` : `${fmtUSD(t.price)} · ${t.days} days`}</span>
+        </div>
+        <ul>
+          {(TIER_BENEFITS[tier] || []).map((b) => (
+            <li key={b}><span className="tb-check">✓</span>{b}</li>
+          ))}
+        </ul>
       </div>
 
       {t.open && openFree && (

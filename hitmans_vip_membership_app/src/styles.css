@@ -2548,40 +2548,40 @@ button {
   position: absolute; inset: 0; z-index: 1; pointer-events: none;
   mix-blend-mode: screen; overflow: hidden;
 }
-/* radial speed rays that rush outward past the viewer (warp-forward) */
+/* soft radial speed rays gliding outward — two layers cross-fade so the flow
+   is continuous (no restart jump), no rotation, steady linear motion */
 .warp-rays {
   position: absolute; left: 50%; top: 44%; width: 240%; aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(0.3); transform-origin: center;
   background: repeating-conic-gradient(from 0deg at 50% 50%,
-    transparent 0deg 1.5deg, rgba(200, 130, 255, 0.55) 1.5deg 2.1deg,
-    transparent 2.1deg 3.3deg, rgba(120, 235, 255, 0.4) 3.3deg 3.7deg, transparent 3.7deg 5deg);
-  -webkit-mask: radial-gradient(circle, transparent 7%, #000 24%, #000 58%, transparent 80%);
-          mask: radial-gradient(circle, transparent 7%, #000 24%, #000 58%, transparent 80%);
-  animation: warp-zoom 1.15s linear infinite;
+    transparent 0deg 2.2deg, rgba(190, 130, 255, 0.32) 2.2deg 2.7deg, transparent 2.7deg 4.4deg);
+  -webkit-mask: radial-gradient(circle, transparent 10%, #000 30%, transparent 72%);
+          mask: radial-gradient(circle, transparent 10%, #000 30%, transparent 72%);
+  opacity: 0; will-change: transform, opacity;
+  animation: warp-glide 2.8s linear infinite;
 }
-@keyframes warp-zoom {
-  0%   { transform: translate(-50%, -50%) scale(0.30) rotate(0deg);  opacity: 0.15; }
-  35%  { opacity: 0.9; }
-  100% { transform: translate(-50%, -50%) scale(1.55) rotate(9deg);  opacity: 0; }
+.warp-rays.b { animation-delay: 1.4s; }   /* half-cycle offset → seamless flow */
+@keyframes warp-glide {
+  0%   { transform: translate(-50%, -50%) scale(0.30); opacity: 0; }
+  30%  { opacity: 0.7; }
+  70%  { opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
 }
-/* teleport rings blasting out from the center */
+/* gentle teleport rings easing outward */
 .warp-ring {
   position: absolute; left: 50%; top: 44%; width: 16%; aspect-ratio: 1 / 1;
   transform: translate(-50%, -50%); border-radius: 50%;
-  border: 2px solid rgba(130, 240, 255, 0.7);
-  box-shadow: 0 0 20px rgba(130, 240, 255, 0.6), inset 0 0 18px rgba(210, 130, 255, 0.5);
-  opacity: 0; animation: warp-ring 1.4s ease-out infinite;
+  border: 1.5px solid rgba(150, 230, 255, 0.55);
+  box-shadow: 0 0 16px rgba(150, 230, 255, 0.4), inset 0 0 14px rgba(200, 140, 255, 0.35);
+  opacity: 0; will-change: transform, opacity;
+  animation: warp-ring 2.8s cubic-bezier(.22,.61,.36,1) infinite;
 }
-.warp-ring.r2 { animation-delay: 0.46s; }
-.warp-ring.r3 { animation-delay: 0.92s; }
+.warp-ring.r2 { animation-delay: 1.4s; }
 @keyframes warp-ring {
-  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
-  75%  { opacity: 0.28; }
-  100% { transform: translate(-50%, -50%) scale(6.5); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0; }
+  20%  { opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(5.5); opacity: 0; }
 }
-/* subtle forward-push zoom on the whole scene while warping */
-.transition-overlay.active .transition-frame { animation: warp-push 2.1s ease-in-out infinite; }
-@keyframes warp-push { 0%,100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
 
 .source-progress-shell {
   position: absolute;
@@ -3001,6 +3001,14 @@ button {
 .tier-buy-card.picked { filter: drop-shadow(0 0 11px rgba(255,214,107,.9)); }
 .tier-buy-card.picked .tier-buy-art { transform: scale(1.04); }
 .tier-buy-card > img.tier-buy-art { width: 100%; max-width: 120px; height: auto; transition: transform .15s ease; }
+/* "what you get" panel — reveals the tapped tier's benefits */
+.tier-benefits { background: linear-gradient(180deg, rgba(40,16,64,.65), rgba(18,8,30,.75)); border: 1px solid #4a2f6b; border-radius: 14px; padding: 16px 18px; margin: 0 0 18px; }
+.tier-benefits-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.tier-benefits-head strong { color: #ffe8a3; font-size: 16px; letter-spacing: .01em; }
+.tier-benefits-head span { color: #c98bff; font-weight: 800; font-size: 14px; white-space: nowrap; }
+.tier-benefits ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tier-benefits li { display: flex; align-items: flex-start; gap: 10px; color: #e8dcff; font-size: 14px; line-height: 1.35; }
+.tb-check { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: rgba(80,255,170,.16); color: #6dffb0; font-size: 12px; font-weight: 900; margin-top: 1px; }
 .tpp-open { display: flex; flex-direction: column; align-items: center; color: #c98bff; font-weight: 900; font-size: 15px; letter-spacing: .06em; line-height: 1; text-shadow: 0 0 10px rgba(180,100,255,.6); }
 .tpp-open small { color: #a98fd0; font-size: 6.5px; font-weight: 700; letter-spacing: .03em; margin-top: 3px; text-transform: uppercase; }
 .tier-buy-price { color: #fff; font-size: 20px; font-weight: 800; }
