@@ -585,6 +585,20 @@ const ui = {
     reaction3: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_15_131_61x68.png',
     reaction4: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_15_132_61x68.png',
   },
+  // Role chips (from the MEMBER ENTRY / STAFF VERIFICATION sheet).
+  roleChips: {
+    member: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_04_196_135x50.png',
+    staff: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_04_197_130x50.png',
+    host: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_04_198_131x50.png',
+    security: '/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_04_199_165x50.png',
+  },
+  // Staff dashboard stat widgets with the baked number cropped out — live gold
+  // digits are overlaid at runtime (GoldStat).
+  widgets: {
+    entries: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_135_192x131_empty.png',
+    event: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_136_192x131_empty.png',
+    venue: '/assets/ui/complete_ui_set/sliced_clean/by_type/components/source_04_137_192x131_empty.png',
+  },
   digits: [
     '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_16_001_198x257.png',
     '/assets/ui/complete_ui_set/sliced_clean/by_type/cards/source_16_002_131x262.png',
@@ -1375,8 +1389,11 @@ function RoleBadge({ role, onTheWay, inside, hasMember, onToggleOtw, onSwitch })
   return (
     <header className="role-badge">
       <div className="role-badge-id">
-        <span className="eyebrow">{role.eyebrow}</span>
-        <h1>{role.label}</h1>
+        {ui.roleChips[role.id] && <img className="role-badge-chip" src={ui.roleChips[role.id]} alt="" />}
+        <div>
+          <span className="eyebrow">{role.eyebrow}</span>
+          <h1>{role.label}</h1>
+        </div>
       </div>
       <div className="role-badge-actions">
         {role.id === 'member' && hasMember && (
@@ -1544,6 +1561,49 @@ function BrandStamp({ compact = false }) {
     <div className={`qr-brand${compact ? ' compact' : ''}`}>
       <img className="qr-brand-logo" src={ui.brandBadge} alt="HITMANS VIP" />
       <span className="qr-brand-after">AFTER SPOT</span>
+    </div>
+  );
+}
+
+// A dashboard stat widget (frame + icon art only) with all text and the bottom
+// bar rebuilt live: neon label + number (the logo's pink-neon look), and either
+// a live sparkline tracker (entries) or a dynamic capacity meter (event/venue).
+function Meter({ pct }) {
+  return <div className="stat-meter"><span style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} /></div>;
+}
+function Sparkline({ data }) {
+  const n = data.length;
+  const W = 160, H = 22;
+  if (n < 2) return <div className="stat-meter"><span style={{ width: '4%' }} /></div>;
+  const max = Math.max(...data), min = Math.min(...data);
+  const rng = Math.max(1, max - min);
+  const pts = data.map((v, i) => [(i / (n - 1)) * W, H - 2 - ((v - min) / rng) * (H - 5)]);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  const [ex, ey] = pts[n - 1];
+  return (
+    <svg className="stat-spark" viewBox={`0 0 ${W} ${H}`} width="100%" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="hv-spark" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ff3ccb" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#ff3ccb" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L ${W} ${H} L 0 ${H} Z`} fill="url(#hv-spark)" />
+      <path d={line} fill="none" stroke="#ff7ae6" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={ex} cy={ey} r="2" fill="#fff" stroke="#ff3ccb" strokeWidth="1.4" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+function StatWidget({ src, label, value, sub, cap, series }) {
+  return (
+    <div className="stat-w">
+      <img className="stat-w-art" src={src} alt="" />
+      <span className="stat-w-label">{label}</span>
+      <span className="stat-w-num">{Math.max(0, Math.round(value || 0))}</span>
+      <span className="stat-w-sub">{sub}</span>
+      <div className="stat-w-track">
+        {series ? <Sparkline data={series} /> : <Meter pct={cap ? (value / cap) * 100 : 0} />}
+      </div>
     </div>
   );
 }
@@ -2264,8 +2324,22 @@ function StaffDashboardScreen({ navigate }) {
     ? { status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt }
     : null;
 
+  const entriesTotal = member?.entries || 0;
+  const insideCount = inside ? 1 : 0;
+  // live tracker: append tonight's entry count to a rolling series every 4s
+  const [spark, setSpark] = useState(() => Array.from({ length: 14 }, () => entriesTotal));
+  useEffect(() => {
+    const id = setInterval(() => setSpark((s) => [...s.slice(1), (memberState?.entries || 0)]), 4000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => { setSpark((s) => [...s.slice(1), entriesTotal]); }, [entriesTotal]);
   return (
     <div className="staff-dash">
+      <div className="stat-widgets">
+        <StatWidget src={ui.widgets.entries} label="TODAY’S ENTRIES" sub="TOTAL CHECK-INS" value={entriesTotal} series={spark} />
+        <StatWidget src={ui.widgets.event} label="EVENT ACCESS" sub="THIS EVENT" value={entriesTotal} cap={150} />
+        <StatWidget src={ui.widgets.venue} label="VENUE ACCESS" sub="CURRENTLY INSIDE" value={insideCount} cap={100} />
+      </div>
       <AppPanel title="On the way" subtitle="Members heading over">
         {incoming ? (
           <div className="dash-row incoming">

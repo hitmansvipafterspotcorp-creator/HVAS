@@ -2743,6 +2743,8 @@ button {
   text-align: center;
 }
 
+.role-badge-id { display: flex; align-items: center; gap: 12px; }
+.role-badge-chip { height: 38px; width: auto; display: block; filter: drop-shadow(0 0 6px rgba(150,60,255,.4)); }
 .role-badge {
   display: flex;
   align-items: center;
@@ -3349,6 +3351,32 @@ button {
 
 /* — staff door dashboard — */
 .staff-dash { display: flex; flex-direction: column; gap: 14px; }
+/* Dashboard stat widgets — real art with live gold digits overlaid */
+.stat-widgets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-w { position: relative; width: 100%; container-type: inline-size; }
+.stat-w-art { width: 100%; display: block; }
+.stat-w-label, .stat-w-num, .stat-w-sub {
+  position: absolute; font-family: 'Trebuchet MS', 'Segoe UI', system-ui, sans-serif; font-style: italic;
+  color: #ff8bec; text-align: center; pointer-events: none; white-space: nowrap;
+}
+/* top label */
+.stat-w-label { left: 26%; right: 2%; top: 9%; font-weight: 800; font-size: 6.6cqi; letter-spacing: 0;
+  text-shadow: 0 0 4px #ff3ccb, 0 0 9px rgba(255,18,176,.7); }
+/* big live number */
+.stat-w-num { left: 30%; right: 3%; top: 22%; font-weight: 900; font-size: 22cqi; line-height: 1;
+  text-shadow: 0 0 5px #ff3ccb, 0 0 12px #ff12b0, 0 0 22px rgba(180,60,255,.7), 0 0 34px rgba(255,0,150,.4); }
+/* sub-label */
+.stat-w-sub { left: 4%; right: 3%; top: 60%; font-weight: 700; font-size: 7cqi; color: #c99be6;
+  text-shadow: 0 0 5px rgba(200,90,255,.5); }
+/* dynamic track (meter or sparkline) along the bottom */
+.stat-w-track { position: absolute; left: 6%; right: 6%; bottom: 9%; height: 15%; display: flex; align-items: center; }
+.stat-meter { position: relative; width: 100%; height: 42%; border-radius: 999px; overflow: hidden;
+  background: rgba(120,40,180,.28); box-shadow: inset 0 0 4px rgba(0,0,0,.5); }
+.stat-meter span { position: absolute; inset: 0 auto 0 0; border-radius: 999px;
+  background: linear-gradient(90deg, #a13cff, #ff3ccb 70%, #ff8be0);
+  box-shadow: 0 0 8px rgba(255,60,200,.85); transition: width .5s ease; }
+.stat-spark { display: block; width: 100%; height: 100%; overflow: visible; }
+@media (max-width: 520px) { .stat-widgets { gap: 6px; } }
 .dash-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; }
 .dash-row > div { flex: 1; display: flex; flex-direction: column; }
 .dash-row strong { color: #f4ecff; font-size: 15px; }
