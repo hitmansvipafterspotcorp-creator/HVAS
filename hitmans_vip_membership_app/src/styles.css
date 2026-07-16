@@ -2543,6 +2543,46 @@ button {
   background-repeat: no-repeat;
 }
 
+/* ── Warp / teleport motion layers over the loading art ── */
+.transition-warp {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  mix-blend-mode: screen; overflow: hidden;
+}
+/* radial speed rays that rush outward past the viewer (warp-forward) */
+.warp-rays {
+  position: absolute; left: 50%; top: 44%; width: 240%; aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(from 0deg at 50% 50%,
+    transparent 0deg 1.5deg, rgba(200, 130, 255, 0.55) 1.5deg 2.1deg,
+    transparent 2.1deg 3.3deg, rgba(120, 235, 255, 0.4) 3.3deg 3.7deg, transparent 3.7deg 5deg);
+  -webkit-mask: radial-gradient(circle, transparent 7%, #000 24%, #000 58%, transparent 80%);
+          mask: radial-gradient(circle, transparent 7%, #000 24%, #000 58%, transparent 80%);
+  animation: warp-zoom 1.15s linear infinite;
+}
+@keyframes warp-zoom {
+  0%   { transform: translate(-50%, -50%) scale(0.30) rotate(0deg);  opacity: 0.15; }
+  35%  { opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(1.55) rotate(9deg);  opacity: 0; }
+}
+/* teleport rings blasting out from the center */
+.warp-ring {
+  position: absolute; left: 50%; top: 44%; width: 16%; aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  border: 2px solid rgba(130, 240, 255, 0.7);
+  box-shadow: 0 0 20px rgba(130, 240, 255, 0.6), inset 0 0 18px rgba(210, 130, 255, 0.5);
+  opacity: 0; animation: warp-ring 1.4s ease-out infinite;
+}
+.warp-ring.r2 { animation-delay: 0.46s; }
+.warp-ring.r3 { animation-delay: 0.92s; }
+@keyframes warp-ring {
+  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
+  75%  { opacity: 0.28; }
+  100% { transform: translate(-50%, -50%) scale(6.5); opacity: 0; }
+}
+/* subtle forward-push zoom on the whole scene while warping */
+.transition-overlay.active .transition-frame { animation: warp-push 2.1s ease-in-out infinite; }
+@keyframes warp-push { 0%,100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.05); } }
+
 .source-progress-shell {
   position: absolute;
   z-index: 2;

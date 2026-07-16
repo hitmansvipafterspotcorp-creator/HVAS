@@ -924,7 +924,7 @@ function App() {
   }
 
   function runTransition(from, to, commit) {
-    const duration = from === 'Boot' ? 1550 : 1050;
+    const duration = from === 'Boot' ? 2800 : 2100;
     let committed = false;
     let rafId = 0;
     const startedAt = performance.now();
@@ -1058,6 +1058,13 @@ function TransitionOverlay({ transition }) {
     <div className={transition.active ? 'transition-overlay active' : 'transition-overlay'} style={overlayStyle} aria-hidden={!transition.active}>
       <div className="transition-frame">
         <div className="transition-bg" />
+        {/* animated warp/teleport layers — speed rays + expanding rings */}
+        <div className="transition-warp" aria-hidden="true">
+          <span className="warp-rays" />
+          <span className="warp-ring r1" />
+          <span className="warp-ring r2" />
+          <span className="warp-ring r3" />
+        </div>
         <div className="source-progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={transition.progress}>
           <span />
         </div>
