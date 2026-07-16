@@ -1074,19 +1074,23 @@ function App() {
   );
 }
 
-// Jagged purple lightning bolt across the frame (canvas points).
+// Bold purple lightning that flanks the logo — mostly vertical zig-zags down a
+// side, occasionally arcing across, matching the target art.
 function makeBolt(S) {
-  const edge = () => (Math.random() < 0.5
-    ? [Math.random() * S, Math.random() < 0.5 ? 0 : S]
-    : [Math.random() < 0.5 ? 0 : S, Math.random() * S]);
-  const a = edge(), b = edge(), n = 7, pts = [a];
+  const side = Math.random();
+  let ax, ay, bx, by;
+  if (side < 0.42) { ax = S * (0.06 + Math.random() * 0.14); ay = 0; bx = ax + (Math.random() - 0.5) * S * 0.14; by = S * (0.75 + Math.random() * 0.25); }
+  else if (side < 0.84) { ax = S * (0.80 + Math.random() * 0.14); ay = 0; bx = ax + (Math.random() - 0.5) * S * 0.14; by = S * (0.75 + Math.random() * 0.25); }
+  else { ax = 0; ay = S * (0.2 + Math.random() * 0.5); bx = S; by = ay + (Math.random() - 0.5) * S * 0.3; }
+  const n = 9, pts = [[ax, ay]], jit = S * 0.06;
   for (let i = 1; i < n; i++) {
     const tt = i / n;
-    pts.push([a[0] + (b[0] - a[0]) * tt + (Math.random() - 0.5) * S * 0.13,
-              a[1] + (b[1] - a[1]) * tt + (Math.random() - 0.5) * S * 0.13]);
+    pts.push([ax + (bx - ax) * tt + (Math.random() - 0.5) * jit, ay + (by - ay) * tt + (Math.random() - 0.5) * jit]);
   }
-  pts.push(b);
-  return { pts, life: 1 };
+  pts.push([bx, by]);
+  // occasional forked branch
+  const branch = Math.random() < 0.5 ? (() => { const k = 2 + (Math.random() * (n - 3) | 0); const p0 = pts[k]; return [p0, [p0[0] + (Math.random() - 0.5) * S * 0.18, p0[1] + S * 0.1]]; })() : null;
+  return { pts, branch, life: 1 };
 }
 
 // The logo materialises out of darkness pixel-by-pixel (center-out) as loading
@@ -1100,7 +1104,7 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 78;
+      const GW = 96;
       const scale = GW / img.width;
       const GH = Math.max(1, Math.round(img.height * scale));
       const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
@@ -1111,11 +1115,12 @@ function PixelAssembly({ progress, active }) {
       const maxD = Math.hypot(Math.max(cx, GW - cx), Math.max(cy, GH - cy));
       const cells = [];
       for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-        const i = (y * GW + x) * 4; const a = data[i + 3]; if (a < 36) continue;
+        const i = (y * GW + x) * 4;
         const r = data[i], g = data[i + 1], b = data[i + 2];
-        if (0.3 * r + 0.6 * g + 0.1 * b < 18) continue;
+        const lum = 0.3 * r + 0.6 * g + 0.1 * b;
+        if (lum < 7) continue;                          // drop only the pure-black corners
         const dist = Math.hypot(x - cx, y - cy) / maxD;
-        cells.push({ x, y, r, g, b, th: Math.min(0.985, dist * 0.66 + Math.random() * 0.3) });
+        cells.push({ x, y, r, g, b, bright: lum > 78, th: Math.min(0.985, dist * 0.62 + Math.random() * 0.32) });
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.ready = true;
     };
@@ -1142,43 +1147,50 @@ function PixelAssembly({ progress, active }) {
         const p = s.progress / 100;
         const bx = buf.getContext('2d'); const px = pink.getContext('2d');
         bx.clearRect(0, 0, S, S); px.clearRect(0, 0, S, S);
-        const gp = Math.max(1, cell * 0.14);
+        const gp = Math.max(1, cell * 0.16);              // the dot-grid gap
         for (const c of cells) {
           if (c.th > p) continue;
           const age = p - c.th;
           let r = c.r, g = c.g, b = c.b, ig = 0;
-          if (age < 0.05) { ig = 1 - age / 0.05; r += (255 - r) * ig * 0.85; g += (255 - g) * ig * 0.85; b += (255 - b) * ig * 0.85; }
+          if (age < 0.06) { ig = 1 - age / 0.06; r += (255 - r) * ig * 0.9; g += (255 - g) * ig * 0.9; b += (255 - b) * ig * 0.9; }
           const X = c.x * cell, Y = originY + c.y * cell;
           bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, cell - gp, cell - gp);
-          px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, cell - gp, cell - gp);
-          if (ig > 0.55 && Math.random() < 0.05) {
-            s.sparks.push({ x: X + cell / 2, y: Y + cell / 2, vx: (Math.random() - 0.5) * 2.6, vy: (Math.random() - 1.5) * 2.6, life: 1, gold: Math.random() < 0.6 });
+          if (c.bright || ig > 0.3) { px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, cell - gp, cell - gp); }   // pink halo from bright pixels only
+          if (c.bright && Math.random() < (ig > 0.5 ? 0.06 : 0.006)) {   // ambient + frontier sparks
+            s.sparks.push({ x: X + cell / 2, y: Y + cell / 2, vx: (Math.random() - 0.5) * 2.8, vy: (Math.random() - 1.4) * 2.8, life: 1, gold: Math.random() < 0.62 });
           }
         }
         ctx.clearRect(0, 0, S, S);
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${cell * 2.3}px)`; ctx.globalAlpha = 0.5; ctx.drawImage(pink, 0, 0);
-        ctx.filter = `blur(${cell * 1.1}px)`; ctx.globalAlpha = 0.7; ctx.drawImage(buf, 0, 0);
+        ctx.filter = `blur(${cell * 2.6}px)`; ctx.globalAlpha = 0.62; ctx.drawImage(pink, 0, 0);   // neon-pink outer bloom
+        ctx.filter = `blur(${cell * 1.2}px)`; ctx.globalAlpha = 0.85; ctx.drawImage(buf, 0, 0);     // colored bloom
         ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
-        ctx.globalCompositeOperation = 'lighter';
+        // lightning — bold, flanking, frequent
+        if (t - s.lastBolt > 90 + Math.random() * 150 && p > 0.1) {
+          s.lastBolt = t; s.bolts.push(makeBolt(S)); if (Math.random() < 0.5) s.bolts.push(makeBolt(S));
+        }
+        s.bolts = s.bolts.filter((bl) => bl.life > 0);
+        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (const bl of s.bolts) {
+          bl.life -= 0.16; const al = Math.max(0, bl.life);
+          const stroke = (pts, w, color, blur) => {
+            ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur;
+            ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
+          };
+          stroke(bl.pts, Math.max(3, cell * 0.5), 'rgba(150,60,255,.65)', cell * 3);   // glow halo
+          stroke(bl.pts, Math.max(1.4, cell * 0.2), '#e6c2ff', cell * 1.2);            // white-hot core
+          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.16), '#d6a6ff', cell);
+        }
+        ctx.shadowBlur = 0;
+        // sparks on top
         s.sparks = s.sparks.filter((sp) => sp.life > 0);
         for (const sp of s.sparks) {
-          sp.x += sp.vx; sp.y += sp.vy; sp.vy += 0.07; sp.life -= 0.035;
+          sp.x += sp.vx; sp.y += sp.vy; sp.vy += 0.07; sp.life -= 0.032;
           ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0';
-          const sz = Math.max(1.5, cell * 0.42); ctx.fillRect(sp.x, sp.y, sz, sz);
+          const sz = Math.max(1.5, cell * 0.5); ctx.fillRect(sp.x, sp.y, sz, sz);
         }
-        ctx.globalAlpha = 1;
-        if (t - s.lastBolt > 240 + Math.random() * 460 && p > 0.12 && p < 0.99) { s.lastBolt = t; s.bolts.push(makeBolt(S)); }
-        s.bolts = s.bolts.filter((bl) => bl.life > 0);
-        for (const bl of s.bolts) {
-          bl.life -= 0.13; ctx.globalAlpha = Math.max(0, bl.life) * 0.9;
-          ctx.strokeStyle = '#c46bff'; ctx.lineWidth = Math.max(1.4, cell * 0.16);
-          ctx.shadowColor = '#a13cff'; ctx.shadowBlur = cell * 2.2;
-          ctx.beginPath(); ctx.moveTo(bl.pts[0][0], bl.pts[0][1]);
-          for (let i = 1; i < bl.pts.length; i++) ctx.lineTo(bl.pts[i][0], bl.pts[i][1]);
-          ctx.stroke();
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
       }
       raf = requestAnimationFrame(draw);
     };
