@@ -315,6 +315,25 @@ export function memberPenalty(number) {
   if (memberState && memberState.number && memberState.number.toUpperCase() === num) return memberState.penalty || null;
   return null;
 }
+// Search the shared member registry (hub member.upsert ops) by name or number,
+// so door staff can look someone up without a scan. Falls back to the local
+// member when there's no hub/backend.
+export function searchMembers(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return [];
+  const hub = hubNode();
+  let rows = [];
+  if (hub) {
+    const latest = new Map();
+    [...hub.ops.values()].filter((o) => o.t === 'member.upsert')
+      .forEach((o) => latest.set(String(o.data.number || o.data.id).toUpperCase(), o.data));
+    rows = [...latest.values()].map((d) => ({ number: d.number || d.id, name: d.name || 'Member', contact: d.contact || '' }));
+  }
+  if (memberState && memberState.number && !rows.some((r) => String(r.number).toUpperCase() === memberState.number.toUpperCase())) {
+    rows.push({ number: memberState.number, name: memberState.name || 'Member', contact: memberState.contact || '' });
+  }
+  return rows.filter((r) => `${r.name} ${r.number} ${r.contact}`.toLowerCase().includes(q)).slice(0, 6);
+}
 export function penalizedMembers() {
   const hub = hubNode();
   if (!hub) {
@@ -777,11 +796,12 @@ const ROLES = [
     eyebrow: 'MEMBER APP',
     chip: 'vip',
     menu: [
-      { title: 'Membership & Pass', detail: 'Pass, QR, verify at the door, renewal, loyalty & access', chip: ui.chips.vip, target: 'membership' },
+      { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
+      { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
       { title: 'Members With Motion', detail: 'Promote packages, earn 25% of your headcount, paid weekly', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'motion'],
+    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'motion', 'history'],
   },
   {
     id: 'staff',
@@ -793,6 +813,7 @@ const ROLES = [
       { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
       { title: 'Watchlist', detail: 'Trespassed & banned members — flag or lift', chip: ui.chips.vip, target: 'watchlist' },
+      { title: 'Check-In Log', detail: 'Tonight’s entries & door history', chip: ui.chips.checkedIn, target: 'checkInLog' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
       { title: 'Members With Motion', detail: 'Your promo code, referred headcount, and weekly payout', chip: ui.chips.active, target: 'motion' },
     ],
@@ -1513,7 +1534,7 @@ function BrandStamp({ compact = false }) {
 // The pop-up alert shown when a membership is verified — the same overlay on
 // the staff door screen and on the member's own "Verify Membership" tap.
 // GRANTED / DENIED with the matching VALID / EXPIRED / TRESPASS chip.
-function ScanAlert({ result, onDismiss }) {
+function ScanAlert({ result, onDismiss, onRescan, onGrant, onDeny }) {
   if (!result) return null;
   // Scanner/camera messages are NOT a membership denial — show a neutral note,
   // no ACCESS DENIED banner and no "DO NOT ADMIT" verdict.
@@ -1551,6 +1572,20 @@ function ScanAlert({ result, onDismiss }) {
           <p className="scan-alert-sub">{result.reason}</p>
         )}
         <p className={`scan-alert-verdict ${result.ok ? 'go' : 'no'}`}>{result.ok ? 'GRANT ENTRY' : 'DO NOT ADMIT'}</p>
+        {/* Door action buttons (real style-kit assets) — shown for staff scans */}
+        {(onGrant || onDeny || onRescan) && (
+          <div className="scan-actions">
+            {onGrant && result.ok && (
+              <button type="button" className="asset-cta" onClick={onGrant} aria-label="Grant entry"><img src={ui.buttons.grant} alt="Grant entry" /></button>
+            )}
+            {onDeny && (
+              <button type="button" className="asset-cta" onClick={onDeny} aria-label="Deny entry"><img src={ui.buttons.deny} alt="Deny entry" /></button>
+            )}
+            {onRescan && (
+              <button type="button" className="asset-cta" onClick={onRescan} aria-label="Rescan"><img src={ui.buttons.rescan} alt="Rescan" /></button>
+            )}
+          </div>
+        )}
         <button type="button" className="scan-alert-dismiss" onClick={onDismiss}>Dismiss</button>
       </div>
     </div>
@@ -2296,6 +2331,8 @@ function SecurityVerifyScreen() {
   const [result, setResult] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [ready, setReady] = useState(false);        // first camera frame arrived
+  const [query, setQuery] = useState('');           // "search member" box
+  const hits = query ? searchMembers(query) : [];
   const videoRef = useRef(null);
   const rafRef = useRef(0);
   const streamRef = useRef(null);
@@ -2345,7 +2382,24 @@ function SecurityVerifyScreen() {
     <div className="verify-screen">
       <div className="verify-panel">
         <h2>Door verification</h2>
-        <p>Scan the member’s QR or type their number. No valid membership = no entry.</p>
+        <p>Search, scan the member’s QR, or type their number. No valid membership = no entry.</p>
+
+        <div className="verify-search">
+          <label htmlFor="memsearch">Search member</label>
+          <input id="memsearch" type="text" placeholder="Search by name or ID…" value={query}
+            onChange={(e) => setQuery(e.target.value)} autoComplete="off" />
+          {hits.length > 0 && (
+            <div className="verify-hits">
+              {hits.map((h) => (
+                <button type="button" key={h.number} className="verify-hit"
+                  onClick={() => { setNum(h.number); setQuery(''); setResult(verifyByNumber(h.number)); }}>
+                  <strong>{h.name}</strong>
+                  <span>{h.number}{h.contact ? ` · ${h.contact}` : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="verify-scanbox">
           {/* Clean full SQUARE scan window (matches the Master Style Kit's
@@ -2388,7 +2442,10 @@ function SecurityVerifyScreen() {
         <p className="verify-hint">{member ? `A member card is on file (${member.number}) — scan or type it to test a pass.` : 'No membership on file yet. Buy one as a Member first, then verify it here.'}</p>
       </div>
 
-      <ScanAlert result={result} onDismiss={dismiss} />
+      <ScanAlert result={result} onDismiss={dismiss}
+        onRescan={() => { setResult(null); startScan(); }}
+        onGrant={result?.member ? () => setResult(null) : undefined}
+        onDeny={result?.member ? () => setResult(null) : undefined} />
     </div>
   );
 }

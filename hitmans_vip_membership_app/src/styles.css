@@ -3071,6 +3071,20 @@ button {
 .verify-cam { position: relative; border-radius: 12px; overflow: hidden; background: #000; }
 .verify-cam video { width: 100%; display: block; max-height: 300px; object-fit: cover; }
 .verify-cam-stop { position: absolute; top: 8px; right: 8px; background: #000a; color: #fff; border: 1px solid #fff5; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+/* Search member (door verification) */
+.verify-search { margin: 0 0 18px; position: relative; }
+.verify-search label { display: block; color: #9a7ac0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+.verify-search input { width: 100%; background: #0f0820; border: 1px solid #3a2350; border-radius: 10px; padding: 13px 14px; color: #fff; font-size: 15px; }
+.verify-search input:focus { outline: none; border-color: #b06bff; }
+.verify-hits { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.verify-hit { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; background: #1b0f2e; border: 1px solid #4a2f6b; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+.verify-hit:hover { border-color: #b06bff; background: #241338; }
+.verify-hit strong { color: #f4ecff; font-size: 15px; }
+.verify-hit span { color: #9a7ac0; font-size: 12px; }
+/* Door action buttons under a scan result */
+.scan-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.scan-actions .asset-cta img { height: 44px; width: auto; }
+
 .verify-manual { margin: 18px 0; }
 .verify-manual label { display: block; color: #9a7ac0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
 .verify-manual-row { display: flex; gap: 8px; }
