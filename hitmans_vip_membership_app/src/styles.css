@@ -3136,22 +3136,27 @@ button {
   filter: drop-shadow(0 0 10px rgba(255,26,168,.85)) drop-shadow(0 0 22px rgba(255,0,150,.55)); animation: qr-logo-pulse 2.6s ease-in-out infinite; }
 @keyframes qr-logo-pulse { 0%,100% { opacity: .22; } 50% { opacity: .38; } }
 
-/* ── Door scanner: original QR_SCAN_FRAME art over a full-bleed camera feed ── */
-.qr-scanframe { position: relative; width: 264px; max-width: 82vw; aspect-ratio: 239 / 270; margin: 0 auto; }
-/* camera fills the ENTIRE frame rectangle → shows through every bracket gap */
-.qr-scanframe .qr-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
-  border-radius: 14px; background: #05030a; opacity: 0; transition: opacity .25s ease; z-index: 1; }
-.qr-scanframe .qr-cam.live { opacity: 1; }
-/* the ornate neon frame (brackets, crown, ALIGN label) sits on top */
-.qr-frameart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 3; pointer-events: none;
-  filter: drop-shadow(0 0 8px rgba(150,60,255,.35)); }
+/* ── Door scanner: clean full SQUARE, camera fills it, neon brackets on top ── */
+.qr-scanframe.sq { position: relative; width: 272px; max-width: 82vw; aspect-ratio: 1 / 1; margin: 0 auto; border-radius: 16px; overflow: hidden;
+  background: #05030a; box-shadow: 0 0 0 2px rgba(150,70,230,.4), 0 0 32px rgba(150,60,255,.32), inset 0 0 40px rgba(0,0,0,.5); }
+.qr-scanframe.sq .qr-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity .25s ease; z-index: 1; }
+.qr-scanframe.sq .qr-cam.live { opacity: 1; }
 .qr-cam-off { position: absolute; inset: 0; display: grid; place-items: center; color: #9a7ac0; font-size: 14px; z-index: 2; }
 .qr-cam-off.starting { color: #7dffb4; }
-/* sweeping scan line, confined to the transparent window (y 10%–84%) */
-.qr-scanline2 { position: absolute; left: 8%; right: 8%; height: 3px; z-index: 2;
+/* thin neon-purple corner brackets */
+.qr-br { position: absolute; width: 42px; height: 42px; z-index: 4; border: 3px solid #c56bff;
+  box-shadow: 0 0 10px rgba(180,90,255,.95), inset 0 0 8px rgba(220,140,255,.5); }
+.qr-br.tl { top: 14px; left: 14px; border-right: none; border-bottom: none; border-radius: 10px 0 0 0; }
+.qr-br.tr { top: 14px; right: 14px; border-left: none; border-bottom: none; border-radius: 0 10px 0 0; }
+.qr-br.bl { bottom: 14px; left: 14px; border-right: none; border-top: none; border-radius: 0 0 0 10px; }
+.qr-br.br { bottom: 14px; right: 14px; border-left: none; border-top: none; border-radius: 0 0 10px 0; }
+/* sweeping scan line */
+.qr-scanline2 { position: absolute; left: 10%; right: 10%; height: 3px; z-index: 3;
   background: linear-gradient(90deg, transparent, #52ffe0 20%, #ff4acc 50%, #52ffe0 80%, transparent);
-  box-shadow: 0 0 12px #ff4acc, 0 0 26px #7f3cff; animation: qr-scan-sweep2 2.6s cubic-bezier(.5,0,.5,1) infinite; }
-@keyframes qr-scan-sweep2 { 0% { top: 14%; opacity: .3; } 15% { opacity: 1; } 50% { top: 78%; opacity: 1; } 85% { opacity: 1; } 100% { top: 14%; opacity: .3; } }
+  box-shadow: 0 0 12px #ff4acc, 0 0 26px #7f3cff; animation: qr-scan-sweep 2.6s cubic-bezier(.5,0,.5,1) infinite; }
+/* ALIGN label pinned to the bottom */
+.qr-align { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; z-index: 4;
+  color: #ff7ae0; font-weight: 800; font-size: 11px; letter-spacing: .14em; text-shadow: 0 0 8px rgba(255,60,200,.85); }
 
 .mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .mem-qr span { color: #9a7ac0; font-size: 11px; }

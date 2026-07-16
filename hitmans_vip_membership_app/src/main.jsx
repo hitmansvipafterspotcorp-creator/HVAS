@@ -2348,11 +2348,12 @@ function SecurityVerifyScreen() {
         <p>Scan the member’s QR or type their number. No valid membership = no entry.</p>
 
         <div className="verify-scanbox">
-          {/* Original QR_SCAN_FRAME art (brackets + crown + ALIGN label) sits ON
-              TOP; the live camera fills the ENTIRE frame rectangle behind it, so
-              the feed shows through every bracket gap — no empty corners. Video
-              is always mounted so the ref exists the moment the stream arrives. */}
-          <div className="qr-scanframe">
+          {/* Clean full SQUARE scan window (matches the Master Style Kit's
+              SCAN MEMBER QR CODE frame): camera fills the whole square, with a
+              crown, thin neon-purple corner brackets, scanline, ALIGN label and
+              the logo watermark on top. Video is always mounted so the ref
+              exists the moment the stream arrives. */}
+          <div className="qr-scanframe sq">
             <video className={`qr-cam${scanning && ready ? ' live' : ''}`} ref={videoRef} playsInline muted autoPlay />
             {scanning && ready && (
               <>
@@ -2360,7 +2361,11 @@ function SecurityVerifyScreen() {
                 <img className="qr-scan-logo-img" src={ui.brandBadge} alt="" aria-hidden="true" />
               </>
             )}
-            <img className="qr-frameart" src={ui.verify.qrFrame} alt="" aria-hidden="true" />
+            <span className="qr-br tl" aria-hidden="true" />
+            <span className="qr-br tr" aria-hidden="true" />
+            <span className="qr-br bl" aria-hidden="true" />
+            <span className="qr-br br" aria-hidden="true" />
+            <span className="qr-align">★ ALIGN QR CODE HERE ★</span>
             {!scanning && <div className="qr-cam-off">Camera off</div>}
             {scanning && !ready && <div className="qr-cam-off starting">Starting camera…</div>}
           </div>
