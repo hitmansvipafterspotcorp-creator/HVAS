@@ -1076,38 +1076,36 @@ function App() {
   );
 }
 
-// Pixel lightning that flanks the logo — mostly vertical zig-zags down a side.
-function makeBolt(S) {
+// Pixel lightning across the full screen — mostly vertical zig-zags down a side.
+function makeBolt(W, H) {
   const side = Math.random();
   let ax, ay, bx, by;
-  if (side < 0.42) { ax = S * (0.06 + Math.random() * 0.14); ay = 0; bx = ax + (Math.random() - 0.5) * S * 0.14; by = S * (0.75 + Math.random() * 0.25); }
-  else if (side < 0.84) { ax = S * (0.80 + Math.random() * 0.14); ay = 0; bx = ax + (Math.random() - 0.5) * S * 0.14; by = S * (0.75 + Math.random() * 0.25); }
-  else { ax = 0; ay = S * (0.2 + Math.random() * 0.5); bx = S; by = ay + (Math.random() - 0.5) * S * 0.3; }
-  const n = 9, pts = [[ax, ay]], jit = S * 0.06;
-  for (let i = 1; i < n; i++) { const tt = i / n; pts.push([ax + (bx - ax) * tt + (Math.random() - 0.5) * jit, ay + (by - ay) * tt + (Math.random() - 0.5) * jit]); }
+  if (side < 0.42) { ax = W * (0.05 + Math.random() * 0.18); ay = 0; bx = ax + (Math.random() - 0.5) * W * 0.16; by = H; }
+  else if (side < 0.84) { ax = W * (0.77 + Math.random() * 0.18); ay = 0; bx = ax + (Math.random() - 0.5) * W * 0.16; by = H; }
+  else { ax = 0; ay = H * (0.2 + Math.random() * 0.5); bx = W; by = ay + (Math.random() - 0.5) * H * 0.3; }
+  const n = 10, pts = [[ax, ay]], jx = W * 0.05, jy = H * 0.04;
+  for (let i = 1; i < n; i++) { const tt = i / n; pts.push([ax + (bx - ax) * tt + (Math.random() - 0.5) * jx, ay + (by - ay) * tt + (Math.random() - 0.5) * jy]); }
   pts.push([bx, by]);
-  const branch = Math.random() < 0.5 ? (() => { const k = 2 + (Math.random() * (n - 3) | 0); const p0 = pts[k]; return [p0, [p0[0] + (Math.random() - 0.5) * S * 0.18, p0[1] + S * 0.1]]; })() : null;
+  const branch = Math.random() < 0.5 ? (() => { const k = 2 + (Math.random() * (n - 3) | 0); const p0 = pts[k]; return [p0, [p0[0] + (Math.random() - 0.5) * W * 0.16, p0[1] + H * 0.1]]; })() : null;
   return { pts, branch, life: 1 };
 }
 
-// Easing with a small overshoot so flying pixels "snap" into place.
 function easeOutBack(t) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
 
-// Arcade attract-mode loader — combines the three refs: the ORIGINAL logo
-// reveals from black with energy, then its hard components DISSOLVE INTO chunky
-// arcade pixel blocks (the smooth art crossfades under the growing pixel grid),
-// with gold pixel-sparks, purple pixel-lightning, camera shake, white flash, a
-// segmented pixel bar and a blinking PRESS START. Chunky blocks (not a fine dot
-// screen) so it reads as "original → pixel". Driven by `progress` (0–100).
+// Full-screen arcade loader. The original logo is shown whole, BREAKS DOWN into a
+// field of glowing magenta energy pixels (scattered outward), then those pixels
+// fly back in and regain their gold/purple colours — settling into the detailed
+// retro pixel logo with a purple energy haze, drifting gold sparkle-dust, pixel
+// lightning and gold impact sparks. White flash at 100%. Driven by `progress`.
 function PixelAssembly({ progress, active }) {
   const canvasRef = useRef(null);
-  const st = useRef({ cells: null, GW: 0, GH: 0, img: null, sparks: [], bolts: [], lastBolt: 0, progress: 0, ready: false, shake: 0, flash: 0 });
+  const st = useRef({ cells: null, GW: 0, GH: 0, img: null, sparks: [], dust: [], bolts: [], lastBolt: 0, progress: 0, ready: false, shake: 0, flash: 0 });
   st.current.progress = progress;
 
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 48;                                    // CHUNKY arcade pixels (few, big)
+      const GW = 76;                                    // detailed pixel grid (matches the target end state)
       const scale = GW / img.width;
       const GH = Math.max(1, Math.round(img.height * scale));
       const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
@@ -1120,10 +1118,12 @@ function PixelAssembly({ progress, active }) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const lum = 0.3 * r + 0.6 * g + 0.1 * b;
         if (lum < 8) continue;
-        const crown = y < GH * 0.28;                    // crown pixelates last
-        const base = crown ? 0.72 + (y / (GH * 0.28)) * 0.18 : 0.14 + (1 - y / GH) * 0.56;
-        const th = Math.min(0.965, base + (Math.random() - 0.5) * 0.1);
-        cells.push({ x, y, r, g, b, bright: lum > 78, th, snapped: false });
+        const crown = y < GH * 0.28;
+        const th = crown ? 0.5 + Math.random() * 0.16 : 0.22 + (1 - y / GH) * 0.3 + (Math.random() - 0.5) * 0.08;
+        const dx = x - GW / 2, dy = y - GH * 0.5, dl = Math.hypot(dx, dy) || 1;
+        const smag = 3 + Math.random() * 8;
+        cells.push({ x, y, r, g, b, bright: lum > 78, th,
+          ox: (dx / dl) * smag + (Math.random() - 0.5) * 4, oy: (dy / dl) * smag + (Math.random() - 0.5) * 4, snapped: false });
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.img = img; st.current.ready = true;
     };
@@ -1133,87 +1133,92 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     if (!active) return undefined;
     const s = st.current;
-    s.sparks = []; s.bolts = []; s.shake = 0; s.flash = 0;
+    s.sparks = []; s.dust = []; s.bolts = []; s.shake = 0; s.flash = 0;
     if (s.cells) for (const c of s.cells) c.snapped = false;
     const buf = document.createElement('canvas');
     const pink = document.createElement('canvas');
-    const POP = 0.13;                                   // per-pixel pop-in window
+    const SETTLE = 0.3;
     let raf = 0, last = 0;
     const draw = (t) => {
       const cv = canvasRef.current;
       if (cv && s.ready) {
         const dt = last ? Math.min(2, (t - last) / 16.7) : 1; last = t;
-        const cssW = cv.clientWidth || 320; const DPR = Math.min(2, window.devicePixelRatio || 1);
-        const S = Math.round(cssW * DPR);
-        if (cv.width !== S) { cv.width = S; cv.height = S; }
-        if (buf.width !== S) { buf.width = S; buf.height = S; pink.width = S; pink.height = S; }
+        const DPR = Math.min(2, window.devicePixelRatio || 1);
+        const W = Math.round((cv.clientWidth || 320) * DPR);
+        const H = Math.round((cv.clientHeight || 480) * DPR);
+        if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+        if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; pink.width = W; pink.height = H; }
         const ctx = cv.getContext('2d');
         const { cells, GW, GH, img } = s;
-        const cell = S / GW;
         const p = s.progress / 100;
-        const zoom = 1 + Math.max(0, p - 0.9) * 0.4;
-        const cxS = S / 2, cyS = S / 2;
-        const originY = (S - GH * cell) / 2;
+        const cell = Math.min((W * 0.92) / GW, (H * 0.66) / GH);
+        const logoW = GW * cell, logoH = GH * cell;
+        const originX = (W - logoW) / 2;
+        const originY = Math.max(H * 0.03, H * 0.45 - logoH / 2);
+        const zoom = 1 + Math.max(0, p - 0.9) * 0.3;
+        const cx = W / 2, cy = originY + logoH / 2;
         s.shake *= Math.pow(0.86, dt);
         const shx = (Math.random() - 0.5) * s.shake, shy = (Math.random() - 0.5) * s.shake;
-        const Z = (X, Y) => [cxS + (X - cxS) * zoom + shx, cyS + (Y - cyS) * zoom + shy];
-        // chunky pixel blocks -> buffers
+        const Z = (X, Y) => [cx + (X - cx) * zoom + shx, cy + (Y - cy) * zoom + shy];
         const bx = buf.getContext('2d'); const px = pink.getContext('2d');
-        bx.clearRect(0, 0, S, S); px.clearRect(0, 0, S, S);
-        const gp = Math.max(1, cell * 0.14);
+        bx.clearRect(0, 0, W, H); px.clearRect(0, 0, W, H);
+        const gp = Math.max(1, cell * 0.18);            // dot-grid gap
         for (const c of cells) {
-          const localT = (p - (c.th - POP)) / POP;
-          if (localT <= 0) continue;
-          let sc = 1, r = c.r, g = c.g, b = c.b;
-          if (localT < 1) {
-            sc = easeOutBack(Math.max(0, localT));       // pop into being
-            const fl = 1 - localT; r += (255 - r) * fl * 0.7; g += (255 - g) * fl * 0.7; b += (255 - b) * fl * 0.7;
-          } else if (!c.snapped) {
-            c.snapped = true; s.shake = Math.min(5, s.shake + 0.4);
-            if (Math.random() < 0.45) s.sparks.push({ x: c.x * cell + cell / 2, y: originY + c.y * cell + cell / 2, vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 1.4) * 3, life: 1, gold: Math.random() < 0.7 });
+          if (p < c.th) continue;                        // still part of the smooth logo
+          const a = Math.max(0, Math.min(1, (p - c.th) / SETTLE));   // scatter → settled
+          const e = easeOutBack(a), off = 1 - e;
+          const X = originX + c.x * cell + c.ox * cell * off;
+          const Y = originY + c.y * cell + c.oy * cell * off;
+          const sm = a * a * (3 - 2 * a);                // pink energy → real colour
+          let r = 255 * (1 - sm) + c.r * sm, g = 46 * (1 - sm) + c.g * sm, b = 200 * (1 - sm) + c.b * sm;
+          const en = 1 - a; r += (255 - r) * en * 0.25; g += (255 - g) * en * 0.25; b += (255 - b) * en * 0.25;
+          if (a >= 1 && !c.snapped) {
+            c.snapped = true; s.shake = Math.min(5, s.shake + 0.35);
+            if (Math.random() < 0.4) s.sparks.push({ x: originX + c.x * cell + cell / 2, y: originY + c.y * cell + cell / 2, vx: (Math.random() - 0.5) * 3.4, vy: (Math.random() - 1.4) * 3.4, life: 1, gold: Math.random() < 0.72 });
           }
-          const bs = (cell - gp) * Math.max(0, sc);
-          const inset = ((cell - gp) - bs) / 2;
-          const [zx, zy] = Z(c.x * cell + inset, originY + c.y * cell + inset);
+          const sc = 0.62 + 0.38 * e;
+          const bs = (cell - gp) * Math.max(0, sc), inset = ((cell - gp) - bs) / 2;
+          const [zx, zy] = Z(X + inset, Y + inset);
           bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(zx, zy, bs * zoom, bs * zoom);
-          if (c.bright) { px.fillStyle = '#ff2ec4'; px.fillRect(zx, zy, bs * zoom, bs * zoom); }
+          if (c.bright || a < 0.6) { px.fillStyle = '#ff2ec4'; px.fillRect(zx, zy, bs * zoom, bs * zoom); }
         }
-        // compose: smooth original underneath (fades as pixels take over)
-        ctx.clearRect(0, 0, S, S);
-        let smooth = p < 0.14 ? p / 0.14 : (p < 0.6 ? 1 - (p - 0.14) / 0.46 : 0);
-        smooth = Math.max(0, Math.min(1, smooth)) * 0.9;
-        if (smooth > 0.01 && img) {
-          const [rx, ry] = Z(0, originY);
-          ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true;
-          ctx.drawImage(img, rx, ry, S * zoom, GH * cell * zoom);
-          ctx.globalAlpha = 1;
-        }
+        ctx.clearRect(0, 0, W, H);
+        // purple energy haze behind the logo
+        const hz = Math.min(1, p * 2) * (p > 0.55 ? 1 : 0.7);
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, logoW * 0.72);
+        grd.addColorStop(0, `rgba(150,50,220,${0.28 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.12 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
+        // smooth original underneath (whole first, then breaks/fades)
+        let smooth = p < 0.07 ? p / 0.07 : (p < 0.22 ? 1 : (p < 0.5 ? 1 - (p - 0.22) / 0.28 : 0));
+        smooth = Math.max(0, Math.min(1, smooth)) * 0.95;
+        if (smooth > 0.01 && img) { const [rx, ry] = Z(originX, originY); ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true; ctx.drawImage(img, rx, ry, logoW * zoom, logoH * zoom); ctx.globalAlpha = 1; }
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${cell * 1.4}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(pink, 0, 0);
+        ctx.filter = `blur(${cell * 1.6}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(pink, 0, 0);
         ctx.filter = `blur(${cell * 0.6}px)`; ctx.globalAlpha = 0.8; ctx.drawImage(buf, 0, 0);
         ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
-        // pixel lightning (more at the finish)
-        const boltGap = p > 0.9 ? 60 : 120;
-        if (t - s.lastBolt > boltGap + Math.random() * 140 && p > 0.15) { s.lastBolt = t; s.bolts.push(makeBolt(S)); if (Math.random() < (p > 0.9 ? 0.9 : 0.35)) s.bolts.push(makeBolt(S)); }
+        // pixel lightning
+        const boltGap = p > 0.85 ? 55 : 110;
+        if (t - s.lastBolt > boltGap + Math.random() * 130 && p > 0.2) { s.lastBolt = t; s.bolts.push(makeBolt(W, H)); if (Math.random() < (p > 0.85 ? 0.9 : 0.4)) s.bolts.push(makeBolt(W, H)); }
         s.bolts = s.bolts.filter((bl) => bl.life > 0);
         ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
         for (const bl of s.bolts) {
           bl.life -= 0.16 * dt; const al = Math.max(0, bl.life);
           const stroke = (pts, w, color, blur) => { ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); };
-          stroke(bl.pts, Math.max(3, cell * 0.32), 'rgba(150,60,255,.6)', cell * 2);
-          stroke(bl.pts, Math.max(1.4, cell * 0.14), '#e6c2ff', cell * 0.8);
-          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7);
+          stroke(bl.pts, Math.max(3, cell * 0.32), 'rgba(150,60,255,.55)', cell * 2.4);
+          stroke(bl.pts, Math.max(1.4, cell * 0.14), '#e6c2ff', cell * 0.9);
+          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.8);
         }
         ctx.shadowBlur = 0;
+        // drifting gold sparkle-dust (ambient) once the logo starts forming
+        if (p > 0.45 && Math.random() < 0.6) s.dust.push({ x: originX + Math.random() * logoW, y: originY + Math.random() * logoH, vy: -0.3 - Math.random() * 0.5, vx: (Math.random() - 0.5) * 0.4, life: 1, gold: Math.random() < 0.7 });
+        s.dust = s.dust.filter((d) => d.life > 0).slice(-120);
+        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.life -= 0.012 * dt; ctx.globalAlpha = Math.max(0, d.life) * 0.9; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(1.5, cell * 0.22); ctx.fillRect(d.x, d.y, ds, ds); }
+        // gold impact sparks
         s.sparks = s.sparks.filter((sp) => sp.life > 0);
-        for (const sp of s.sparks) {
-          sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt;
-          ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0';
-          const sz = Math.max(2, cell * 0.34); ctx.fillRect(sp.x, sp.y, sz, sz);
-        }
+        for (const sp of s.sparks) { sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt; ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0'; const sz = Math.max(2, cell * 0.34); ctx.fillRect(sp.x, sp.y, sz, sz); }
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
         if (p >= 0.995 && s.flash === 0) s.flash = 1;
-        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, S, S); s.flash = Math.max(0, s.flash - 0.06 * dt); ctx.globalCompositeOperation = 'source-over'; }
+        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.06 * dt); ctx.globalCompositeOperation = 'source-over'; }
       }
       raf = requestAnimationFrame(draw);
     };
@@ -1223,6 +1228,7 @@ function PixelAssembly({ progress, active }) {
 
   return <canvas ref={canvasRef} className="pixel-assembly" aria-hidden="true" />;
 }
+
 
 const BAR_SEGMENTS = 18;
 function TransitionOverlay({ transition }) {
