@@ -397,6 +397,8 @@ const ui = {
   // The HITMANS VIP AFTER SPOT badge (crown + shield) — the real brand mark used
   // in QR centers and the pass brand stamp (NOT the HITKOIN coin).
   brandBadge: '/assets/ui/complete_ui_set/new_main_menu/new_main_menu/brand/mm_logo_badge.png',
+  // Full high-res HITMANS VIP AFTER SPOT logo — the pixel-assembly loading art.
+  fullLogo: '/assets/ui/hvas_logo.png',
   mainMenuBackground: '/assets/ui/main-menu-background.png',
   loading: '/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png',
   banners: {
@@ -1072,25 +1074,134 @@ function App() {
   );
 }
 
-function TransitionOverlay({ transition }) {
-  const overlayStyle = {
-    '--progress': transition.progress,
-    '--progress-pct': `${transition.progress}%`,
-  };
+// Jagged purple lightning bolt across the frame (canvas points).
+function makeBolt(S) {
+  const edge = () => (Math.random() < 0.5
+    ? [Math.random() * S, Math.random() < 0.5 ? 0 : S]
+    : [Math.random() < 0.5 ? 0 : S, Math.random() * S]);
+  const a = edge(), b = edge(), n = 7, pts = [a];
+  for (let i = 1; i < n; i++) {
+    const tt = i / n;
+    pts.push([a[0] + (b[0] - a[0]) * tt + (Math.random() - 0.5) * S * 0.13,
+              a[1] + (b[1] - a[1]) * tt + (Math.random() - 0.5) * S * 0.13]);
+  }
+  pts.push(b);
+  return { pts, life: 1 };
+}
 
+// The logo materialises out of darkness pixel-by-pixel (center-out) as loading
+// progresses — glowing neon-pink bloom, gold sparks at the assembling frontier,
+// and purple lightning arcs. Driven by `progress` (0–100).
+function PixelAssembly({ progress, active }) {
+  const canvasRef = useRef(null);
+  const st = useRef({ cells: null, GW: 0, GH: 0, sparks: [], bolts: [], lastBolt: 0, progress: 0, ready: false });
+  st.current.progress = progress;
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const GW = 78;
+      const scale = GW / img.width;
+      const GH = Math.max(1, Math.round(img.height * scale));
+      const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
+      const octx = oc.getContext('2d');
+      octx.clearRect(0, 0, GW, GH); octx.drawImage(img, 0, 0, GW, GH);
+      const data = octx.getImageData(0, 0, GW, GH).data;
+      const cx = GW / 2, cy = GH * 0.46;
+      const maxD = Math.hypot(Math.max(cx, GW - cx), Math.max(cy, GH - cy));
+      const cells = [];
+      for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+        const i = (y * GW + x) * 4; const a = data[i + 3]; if (a < 36) continue;
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        if (0.3 * r + 0.6 * g + 0.1 * b < 18) continue;
+        const dist = Math.hypot(x - cx, y - cy) / maxD;
+        cells.push({ x, y, r, g, b, th: Math.min(0.985, dist * 0.66 + Math.random() * 0.3) });
+      }
+      st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.ready = true;
+    };
+    img.src = ui.fullLogo;
+  }, []);
+
+  useEffect(() => {
+    if (!active) return undefined;
+    st.current.sparks = []; st.current.bolts = [];
+    const buf = document.createElement('canvas');
+    const pink = document.createElement('canvas');
+    let raf = 0;
+    const draw = (t) => {
+      const cv = canvasRef.current; const s = st.current;
+      if (cv && s.ready) {
+        const cssW = cv.clientWidth || 320; const DPR = Math.min(2, window.devicePixelRatio || 1);
+        const S = Math.round(cssW * DPR);
+        if (cv.width !== S) { cv.width = S; cv.height = S; }
+        if (buf.width !== S) { buf.width = S; buf.height = S; pink.width = S; pink.height = S; }
+        const ctx = cv.getContext('2d');
+        const { cells, GW, GH } = s;
+        const cell = S / GW;
+        const originY = (S - GH * cell) / 2;
+        const p = s.progress / 100;
+        const bx = buf.getContext('2d'); const px = pink.getContext('2d');
+        bx.clearRect(0, 0, S, S); px.clearRect(0, 0, S, S);
+        const gp = Math.max(1, cell * 0.14);
+        for (const c of cells) {
+          if (c.th > p) continue;
+          const age = p - c.th;
+          let r = c.r, g = c.g, b = c.b, ig = 0;
+          if (age < 0.05) { ig = 1 - age / 0.05; r += (255 - r) * ig * 0.85; g += (255 - g) * ig * 0.85; b += (255 - b) * ig * 0.85; }
+          const X = c.x * cell, Y = originY + c.y * cell;
+          bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, cell - gp, cell - gp);
+          px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, cell - gp, cell - gp);
+          if (ig > 0.55 && Math.random() < 0.05) {
+            s.sparks.push({ x: X + cell / 2, y: Y + cell / 2, vx: (Math.random() - 0.5) * 2.6, vy: (Math.random() - 1.5) * 2.6, life: 1, gold: Math.random() < 0.6 });
+          }
+        }
+        ctx.clearRect(0, 0, S, S);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.filter = `blur(${cell * 2.3}px)`; ctx.globalAlpha = 0.5; ctx.drawImage(pink, 0, 0);
+        ctx.filter = `blur(${cell * 1.1}px)`; ctx.globalAlpha = 0.7; ctx.drawImage(buf, 0, 0);
+        ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
+        ctx.globalCompositeOperation = 'lighter';
+        s.sparks = s.sparks.filter((sp) => sp.life > 0);
+        for (const sp of s.sparks) {
+          sp.x += sp.vx; sp.y += sp.vy; sp.vy += 0.07; sp.life -= 0.035;
+          ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0';
+          const sz = Math.max(1.5, cell * 0.42); ctx.fillRect(sp.x, sp.y, sz, sz);
+        }
+        ctx.globalAlpha = 1;
+        if (t - s.lastBolt > 240 + Math.random() * 460 && p > 0.12 && p < 0.99) { s.lastBolt = t; s.bolts.push(makeBolt(S)); }
+        s.bolts = s.bolts.filter((bl) => bl.life > 0);
+        for (const bl of s.bolts) {
+          bl.life -= 0.13; ctx.globalAlpha = Math.max(0, bl.life) * 0.9;
+          ctx.strokeStyle = '#c46bff'; ctx.lineWidth = Math.max(1.4, cell * 0.16);
+          ctx.shadowColor = '#a13cff'; ctx.shadowBlur = cell * 2.2;
+          ctx.beginPath(); ctx.moveTo(bl.pts[0][0], bl.pts[0][1]);
+          for (let i = 1; i < bl.pts.length; i++) ctx.lineTo(bl.pts[i][0], bl.pts[i][1]);
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
+
+  return <canvas ref={canvasRef} className="pixel-assembly" aria-hidden="true" />;
+}
+
+function TransitionOverlay({ transition }) {
+  const pct = Math.round(transition.progress);
   return (
-    <div className={transition.active ? 'transition-overlay active' : 'transition-overlay'} style={overlayStyle} aria-hidden={!transition.active}>
-      <div className="transition-frame">
-        <div className="transition-bg" />
-        {/* animated warp/teleport layers — speed rays + expanding rings */}
-        <div className="transition-warp" aria-hidden="true">
-          <span className="warp-rays a" />
-          <span className="warp-rays b" />
-          <span className="warp-ring r1" />
-          <span className="warp-ring r2" />
-        </div>
-        <div className="source-progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={transition.progress}>
-          <span />
+    <div className={transition.active ? 'transition-overlay active' : 'transition-overlay'} aria-hidden={!transition.active}>
+      <div className="assembly-wrap">
+        <PixelAssembly progress={transition.progress} active={transition.active} />
+        <div className="assembly-hud">
+          <span className="assembly-title">ASSEMBLING VIP ACCESS…</span>
+          <div className="assembly-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
+            <span style={{ width: `${pct}%` }} />
+          </div>
+          <span className="assembly-pct">{pct}%</span>
+          <span className="assembly-sub">◆ PREPARING THE ULTIMATE EXPERIENCE ◆</span>
         </div>
       </div>
     </div>
