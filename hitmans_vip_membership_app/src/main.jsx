@@ -1089,14 +1089,15 @@ function makeBolt(W, H) {
   const branch = Math.random() < 0.5 ? (() => { const k = 2 + (Math.random() * (n - 3) | 0); const p0 = pts[k]; return [p0, [p0[0] + (Math.random() - 0.5) * W * 0.16, p0[1] + H * 0.1]]; })() : null;
   return { pts, branch, life: 1 };
 }
-
 function easeOutBack(t) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
 
-// Full-screen arcade loader. The original logo is shown whole, BREAKS DOWN into a
-// field of glowing magenta energy pixels (scattered outward), then those pixels
-// fly back in and regain their gold/purple colours — settling into the detailed
-// retro pixel logo with a purple energy haze, drifting gold sparkle-dust, pixel
-// lightning and gold impact sparks. White flash at 100%. Driven by `progress`.
+// keep the full logo (purple frame included) — tiny trim of the dead black margin
+const LOGO_CROP = { x: 0.012, y: 0.012, w: 0.976, h: 0.976 };
+
+// Full-screen arcade loader. Original logo (frame cropped) breaks down into a
+// field of magenta energy pixels, which fly back in and regain their colours,
+// settling into a CRISP retro pixel logo. Purple haze, gold dust, pixel lightning
+// & sparks, white flash, PRESS START. Crisp integer-aligned pixels (no blur mush).
 function PixelAssembly({ progress, active }) {
   const canvasRef = useRef(null);
   const st = useRef({ cells: null, GW: 0, GH: 0, img: null, sparks: [], dust: [], bolts: [], lastBolt: 0, progress: 0, ready: false, shake: 0, flash: 0 });
@@ -1105,20 +1106,21 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 76;                                    // detailed pixel grid (matches the target end state)
-      const scale = GW / img.width;
-      const GH = Math.max(1, Math.round(img.height * scale));
+      const GW = 74;
+      const iw = img.width, ih = img.height;
+      const sx = LOGO_CROP.x * iw, sy = LOGO_CROP.y * ih, sw = LOGO_CROP.w * iw, sh = LOGO_CROP.h * ih;
+      const GH = Math.max(1, Math.round(GW * sh / sw));
       const oc = document.createElement('canvas'); oc.width = GW; oc.height = GH;
       const octx = oc.getContext('2d');
-      octx.clearRect(0, 0, GW, GH); octx.drawImage(img, 0, 0, GW, GH);
+      octx.clearRect(0, 0, GW, GH); octx.drawImage(img, sx, sy, sw, sh, 0, 0, GW, GH);
       const data = octx.getImageData(0, 0, GW, GH).data;
       const cells = [];
       for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
         const i = (y * GW + x) * 4;
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const lum = 0.3 * r + 0.6 * g + 0.1 * b;
-        if (lum < 8) continue;
-        const crown = y < GH * 0.28;
+        if (lum < 10) continue;
+        const crown = y < GH * 0.24;
         const th = crown ? 0.5 + Math.random() * 0.16 : 0.22 + (1 - y / GH) * 0.3 + (Math.random() - 0.5) * 0.08;
         const dx = x - GW / 2, dy = y - GH * 0.5, dl = Math.hypot(dx, dy) || 1;
         const smag = 3 + Math.random() * 8;
@@ -1136,7 +1138,7 @@ function PixelAssembly({ progress, active }) {
     s.sparks = []; s.dust = []; s.bolts = []; s.shake = 0; s.flash = 0;
     if (s.cells) for (const c of s.cells) c.snapped = false;
     const buf = document.createElement('canvas');
-    const pink = document.createElement('canvas');
+    const pinkc = document.createElement('canvas');
     const SETTLE = 0.3;
     let raf = 0, last = 0;
     const draw = (t) => {
@@ -1147,55 +1149,64 @@ function PixelAssembly({ progress, active }) {
         const W = Math.round((cv.clientWidth || 320) * DPR);
         const H = Math.round((cv.clientHeight || 480) * DPR);
         if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-        if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; pink.width = W; pink.height = H; }
+        if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; pinkc.width = W; pinkc.height = H; }
         const ctx = cv.getContext('2d');
         const { cells, GW, GH, img } = s;
         const p = s.progress / 100;
-        const cell = Math.min((W * 0.92) / GW, (H * 0.66) / GH);
+        const cell = Math.round(Math.min((W * 0.94) / GW, (H * 0.66) / GH));
         const logoW = GW * cell, logoH = GH * cell;
-        const originX = (W - logoW) / 2;
-        const originY = Math.max(H * 0.03, H * 0.45 - logoH / 2);
-        const zoom = 1 + Math.max(0, p - 0.9) * 0.3;
+        const originX = Math.round((W - logoW) / 2);
+        const originY = Math.round(Math.max(H * 0.03, H * 0.44 - logoH / 2));
+        const zoom = 1 + Math.max(0, p - 0.9) * 0.22;
         const cx = W / 2, cy = originY + logoH / 2;
         s.shake *= Math.pow(0.86, dt);
         const shx = (Math.random() - 0.5) * s.shake, shy = (Math.random() - 0.5) * s.shake;
-        const Z = (X, Y) => [cx + (X - cx) * zoom + shx, cy + (Y - cy) * zoom + shy];
-        const bx = buf.getContext('2d'); const px = pink.getContext('2d');
+        const bx = buf.getContext('2d'); const px = pinkc.getContext('2d');
         bx.clearRect(0, 0, W, H); px.clearRect(0, 0, W, H);
-        const gp = Math.max(1, cell * 0.18);            // dot-grid gap
+        bx.imageSmoothingEnabled = false;
+        const gp = Math.max(2, Math.round(cell * 0.2));   // crisp dot-grid gap
+        const blk = cell - gp;
         for (const c of cells) {
-          if (p < c.th) continue;                        // still part of the smooth logo
-          const a = Math.max(0, Math.min(1, (p - c.th) / SETTLE));   // scatter → settled
+          if (p < c.th) continue;
+          const a = Math.max(0, Math.min(1, (p - c.th) / SETTLE));
           const e = easeOutBack(a), off = 1 - e;
-          const X = originX + c.x * cell + c.ox * cell * off;
-          const Y = originY + c.y * cell + c.oy * cell * off;
-          const sm = a * a * (3 - 2 * a);                // pink energy → real colour
+          const sm = a * a * (3 - 2 * a);
           let r = 255 * (1 - sm) + c.r * sm, g = 46 * (1 - sm) + c.g * sm, b = 200 * (1 - sm) + c.b * sm;
-          const en = 1 - a; r += (255 - r) * en * 0.25; g += (255 - g) * en * 0.25; b += (255 - b) * en * 0.25;
+          const en = 1 - a; r += (255 - r) * en * 0.22; g += (255 - g) * en * 0.22; b += (255 - b) * en * 0.22;
+          // integer-aligned position (with zoom+shake+scatter) — crisp squares
+          let X = originX + c.x * cell + c.ox * cell * off;
+          let Y = originY + c.y * cell + c.oy * cell * off;
+          X = Math.round(cx + (X - cx) * zoom + shx);
+          Y = Math.round(cy + (Y - cy) * zoom + shy);
+          const bs = Math.max(1, Math.round(blk * zoom * (a < 1 ? (0.6 + 0.4 * e) : 1)));
+          bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, bs, bs);
+          if (c.bright || a < 0.6) { px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, bs, bs); }
           if (a >= 1 && !c.snapped) {
-            c.snapped = true; s.shake = Math.min(5, s.shake + 0.35);
-            if (Math.random() < 0.4) s.sparks.push({ x: originX + c.x * cell + cell / 2, y: originY + c.y * cell + cell / 2, vx: (Math.random() - 0.5) * 3.4, vy: (Math.random() - 1.4) * 3.4, life: 1, gold: Math.random() < 0.72 });
+            c.snapped = true; s.shake = Math.min(4.5, s.shake + 0.3);
+            if (Math.random() < 0.35) s.sparks.push({ x: X + bs / 2, y: Y + bs / 2, vx: (Math.random() - 0.5) * 3.2, vy: (Math.random() - 1.4) * 3.2, life: 1, gold: Math.random() < 0.72 });
           }
-          const sc = 0.62 + 0.38 * e;
-          const bs = (cell - gp) * Math.max(0, sc), inset = ((cell - gp) - bs) / 2;
-          const [zx, zy] = Z(X + inset, Y + inset);
-          bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(zx, zy, bs * zoom, bs * zoom);
-          if (c.bright || a < 0.6) { px.fillStyle = '#ff2ec4'; px.fillRect(zx, zy, bs * zoom, bs * zoom); }
         }
         ctx.clearRect(0, 0, W, H);
-        // purple energy haze behind the logo
-        const hz = Math.min(1, p * 2) * (p > 0.55 ? 1 : 0.7);
-        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, logoW * 0.72);
-        grd.addColorStop(0, `rgba(150,50,220,${0.28 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.12 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
+        // purple energy haze
+        const hz = Math.min(1, p * 2);
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, logoW * 0.7);
+        grd.addColorStop(0, `rgba(150,50,220,${0.26 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.1 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
-        // smooth original underneath (whole first, then breaks/fades)
+        // smooth original (frame cropped) — whole first, then breaks/fades
         let smooth = p < 0.07 ? p / 0.07 : (p < 0.22 ? 1 : (p < 0.5 ? 1 - (p - 0.22) / 0.28 : 0));
         smooth = Math.max(0, Math.min(1, smooth)) * 0.95;
-        if (smooth > 0.01 && img) { const [rx, ry] = Z(originX, originY); ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true; ctx.drawImage(img, rx, ry, logoW * zoom, logoH * zoom); ctx.globalAlpha = 1; }
+        if (smooth > 0.01 && img) {
+          const iw = img.width, ih = img.height;
+          const rx = cx + (originX - cx) * zoom + shx, ry = cy + (originY - cy) * zoom + shy;
+          ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(img, LOGO_CROP.x * iw, LOGO_CROP.y * ih, LOGO_CROP.w * iw, LOGO_CROP.h * ih, rx, ry, logoW * zoom, logoH * zoom);
+          ctx.globalAlpha = 1;
+        }
+        // subtle glow then CRISP pixels on top (no heavy blur → no mush)
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${cell * 1.6}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(pink, 0, 0);
-        ctx.filter = `blur(${cell * 0.6}px)`; ctx.globalAlpha = 0.8; ctx.drawImage(buf, 0, 0);
-        ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
+        ctx.filter = `blur(${Math.max(2, cell * 0.7)}px)`; ctx.globalAlpha = 0.5; ctx.drawImage(pinkc, 0, 0);
+        ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+        ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
         // pixel lightning
         const boltGap = p > 0.85 ? 55 : 110;
         if (t - s.lastBolt > boltGap + Math.random() * 130 && p > 0.2) { s.lastBolt = t; s.bolts.push(makeBolt(W, H)); if (Math.random() < (p > 0.85 ? 0.9 : 0.4)) s.bolts.push(makeBolt(W, H)); }
@@ -1204,18 +1215,16 @@ function PixelAssembly({ progress, active }) {
         for (const bl of s.bolts) {
           bl.life -= 0.16 * dt; const al = Math.max(0, bl.life);
           const stroke = (pts, w, color, blur) => { ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); };
-          stroke(bl.pts, Math.max(3, cell * 0.32), 'rgba(150,60,255,.55)', cell * 2.4);
-          stroke(bl.pts, Math.max(1.4, cell * 0.14), '#e6c2ff', cell * 0.9);
-          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.8);
+          stroke(bl.pts, Math.max(3, cell * 0.28), 'rgba(150,60,255,.5)', cell * 2);
+          stroke(bl.pts, Math.max(1.4, cell * 0.12), '#e6c2ff', cell * 0.8);
+          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7);
         }
         ctx.shadowBlur = 0;
-        // drifting gold sparkle-dust (ambient) once the logo starts forming
         if (p > 0.45 && Math.random() < 0.6) s.dust.push({ x: originX + Math.random() * logoW, y: originY + Math.random() * logoH, vy: -0.3 - Math.random() * 0.5, vx: (Math.random() - 0.5) * 0.4, life: 1, gold: Math.random() < 0.7 });
         s.dust = s.dust.filter((d) => d.life > 0).slice(-120);
-        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.life -= 0.012 * dt; ctx.globalAlpha = Math.max(0, d.life) * 0.9; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(1.5, cell * 0.22); ctx.fillRect(d.x, d.y, ds, ds); }
-        // gold impact sparks
+        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.life -= 0.012 * dt; ctx.globalAlpha = Math.max(0, d.life) * 0.9; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(2, Math.round(cell * 0.2)); ctx.fillRect(Math.round(d.x), Math.round(d.y), ds, ds); }
         s.sparks = s.sparks.filter((sp) => sp.life > 0);
-        for (const sp of s.sparks) { sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt; ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0'; const sz = Math.max(2, cell * 0.34); ctx.fillRect(sp.x, sp.y, sz, sz); }
+        for (const sp of s.sparks) { sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt; ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0'; const sz = Math.max(2, Math.round(cell * 0.32)); ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sz, sz); }
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
         if (p >= 0.995 && s.flash === 0) s.flash = 1;
         if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.06 * dt); ctx.globalCompositeOperation = 'source-over'; }
