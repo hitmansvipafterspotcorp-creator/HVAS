@@ -2524,29 +2524,38 @@ button {
   visibility: visible;
 }
 
-/* ── Pixel-assembly loading screen ── */
-.assembly-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-/* faint CRT dot-grid so the whole scene reads as glowing pixels */
+/* ── Arcade attract-mode loading screen ── */
+.assembly-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+/* CRT scanlines + dot-grid over the whole scene */
 .assembly-wrap::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .5;
-  background-image: radial-gradient(rgba(0,0,0,.55) 1px, transparent 1.4px);
-  background-size: 4px 4px; mix-blend-mode: multiply;
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: .5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.5) 0 1px, transparent 1px 3px),
+    radial-gradient(rgba(0,0,0,.4) 1px, transparent 1.4px);
+  background-size: 100% 3px, 4px 4px; mix-blend-mode: multiply;
 }
-.pixel-assembly { width: min(84vw, 380px); aspect-ratio: 1 / 1; display: block; image-rendering: pixelated;
+.pixel-assembly { width: min(86vw, 400px); aspect-ratio: 1 / 1; display: block; image-rendering: pixelated;
   filter: drop-shadow(0 0 18px rgba(255,26,168,.35)); }
-.assembly-hud { display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(84vw, 380px); margin-top: 6px; z-index: 2; }
-.assembly-title { font-family: 'Courier New', ui-monospace, monospace; font-weight: 800; font-size: 14px; letter-spacing: .28em; text-indent: .28em;
+.assembly-hud { display: flex; flex-direction: column; align-items: center; gap: 10px; width: min(78vw, 340px); margin-top: 2px; z-index: 2; }
+.assembly-title { font-family: 'Courier New', ui-monospace, monospace; font-weight: 800; font-size: 13px; letter-spacing: .26em; text-indent: .26em;
   color: #ff7ae0; text-shadow: 0 0 8px rgba(255,26,168,.9), 0 0 18px rgba(180,60,255,.5); text-transform: uppercase; }
-.assembly-bar { width: 100%; height: 16px; border-radius: 4px; border: 2px solid rgba(200,110,255,.85); overflow: hidden;
-  background: repeating-linear-gradient(90deg, rgba(80,20,120,.5) 0 5px, rgba(30,8,50,.6) 5px 7px);
-  box-shadow: 0 0 12px rgba(180,60,255,.5), inset 0 0 8px rgba(0,0,0,.6); padding: 2px; }
-.assembly-bar span { display: block; height: 100%; border-radius: 2px; transition: width .18s linear;
-  background: repeating-linear-gradient(90deg, #ffd66b 0 4px, transparent 4px 5px), linear-gradient(90deg, #a13cff, #ff2ec4 70%, #ff8be0);
-  box-shadow: 0 0 10px rgba(255,60,200,.9), 0 0 18px rgba(255,214,107,.4); }
+.assembly-title.win { color: #ffe27a; font-size: 16px; text-shadow: 0 0 10px rgba(255,190,60,.9), 0 0 22px rgba(255,90,40,.5); }
+/* segmented pixel loading bar */
+.pixbar { width: 100%; display: flex; gap: 3px; padding: 4px; border: 2px solid #c46bff; border-radius: 2px;
+  background: #12061f; box-shadow: 0 0 12px rgba(180,60,255,.5), inset 0 0 10px rgba(0,0,0,.7); }
+.pixbar-seg { flex: 1 1 0; height: 16px; border-radius: 1px; background: #24103a; box-shadow: inset 0 0 3px rgba(0,0,0,.6); }
+.pixbar-seg.on { background: linear-gradient(180deg, #ff8be0, #ff2ec4 55%, #a13cff);
+  box-shadow: 0 0 8px rgba(255,60,200,.9), inset 0 0 4px rgba(255,220,140,.5); }
+.pixbar-seg.flash { background: linear-gradient(180deg, #fff3c4, #ffd66b 60%, #ff9a3c);
+  box-shadow: 0 0 12px rgba(255,214,107,1), 0 0 20px rgba(255,140,40,.7); }
 .assembly-pct { font-family: 'Courier New', ui-monospace, monospace; font-weight: 900; font-size: 26px; letter-spacing: .08em;
   color: #ffd66b; text-shadow: 0 0 8px rgba(255,180,60,.8), 0 0 18px rgba(255,120,40,.4); }
-.assembly-sub { font-family: 'Courier New', ui-monospace, monospace; font-weight: 700; font-size: 11px; letter-spacing: .22em; text-indent: .22em;
+.assembly-sub { font-family: 'Courier New', ui-monospace, monospace; font-weight: 700; font-size: 10px; letter-spacing: .2em; text-indent: .2em;
   color: #c98bff; text-shadow: 0 0 6px rgba(180,60,255,.6); text-transform: uppercase; }
+/* PRESS START — classic 2-on/2-off arcade blink */
+.press-start { font-family: 'Courier New', ui-monospace, monospace; font-weight: 900; font-size: 22px; letter-spacing: .18em;
+  color: #fff; text-shadow: 0 0 8px rgba(120,240,255,.9), 0 0 18px rgba(60,120,255,.6); animation: press-blink .5s steps(1) infinite; }
+@keyframes press-blink { 0%,50% { opacity: 1; } 50.01%,100% { opacity: 0; } }
 
 .transition-frame {
   position: absolute;
