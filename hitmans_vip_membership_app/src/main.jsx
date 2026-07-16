@@ -2348,21 +2348,21 @@ function SecurityVerifyScreen() {
         <p>Scan the member’s QR or type their number. No valid membership = no entry.</p>
 
         <div className="verify-scanbox">
-          <div className="qr-framed lg">
-            {/* Feed sits BEHIND the frame; the frame's center is transparent so
-                the live feed fills the whole window and the purple brackets
-                frame it to help staff center the member's QR. Video is always
-                mounted so the ref exists the moment the stream arrives. */}
-            <video className={`qr-code cam${scanning ? ' live' : ''}`} ref={videoRef} playsInline muted autoPlay />
-            <img className="qr-frame" src={ui.verify.qrFrame} alt="" />
+          {/* Original QR_SCAN_FRAME art (brackets + crown + ALIGN label) sits ON
+              TOP; the live camera fills the ENTIRE frame rectangle behind it, so
+              the feed shows through every bracket gap — no empty corners. Video
+              is always mounted so the ref exists the moment the stream arrives. */}
+          <div className="qr-scanframe">
+            <video className={`qr-cam${scanning && ready ? ' live' : ''}`} ref={videoRef} playsInline muted autoPlay />
             {scanning && ready && (
-              <div className="qr-scan-overlay" aria-hidden="true">
-                <div className="qr-scanline" />
-                <img className="qr-scan-logo-img" src={ui.brandBadge} alt="" />
-              </div>
+              <>
+                <div className="qr-scanline2" aria-hidden="true" />
+                <img className="qr-scan-logo-img" src={ui.brandBadge} alt="" aria-hidden="true" />
+              </>
             )}
-            {!scanning && <div className="qr-load">Camera off</div>}
-            {scanning && !ready && <div className="qr-load starting">Starting camera…</div>}
+            <img className="qr-frameart" src={ui.verify.qrFrame} alt="" aria-hidden="true" />
+            {!scanning && <div className="qr-cam-off">Camera off</div>}
+            {scanning && !ready && <div className="qr-cam-off starting">Starting camera…</div>}
           </div>
           {scanning
             ? <button type="button" className="mem-cancel" onClick={stopScan}>Stop camera</button>

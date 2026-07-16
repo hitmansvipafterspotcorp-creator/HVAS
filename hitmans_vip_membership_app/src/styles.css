@@ -3132,9 +3132,27 @@ button {
 @keyframes qr-scan-sweep { 0% { top: 3%; opacity: .3; } 15% { opacity: 1; } 50% { top: 93%; opacity: 1; } 85% { opacity: 1; } 100% { top: 3%; opacity: .3; } }
 /* The real HITMANS VIP AFTER SPOT logo badge, hovering transparent over the
    live camera feed as a neon-pink watermark (its own pink AFTER SPOT font). */
-.qr-scan-logo-img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 62%; max-width: 200px; opacity: .28; pointer-events: none;
+.qr-scan-logo-img { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); width: 58%; max-width: 190px; opacity: .28; pointer-events: none; z-index: 2;
   filter: drop-shadow(0 0 10px rgba(255,26,168,.85)) drop-shadow(0 0 22px rgba(255,0,150,.55)); animation: qr-logo-pulse 2.6s ease-in-out infinite; }
 @keyframes qr-logo-pulse { 0%,100% { opacity: .22; } 50% { opacity: .38; } }
+
+/* ── Door scanner: original QR_SCAN_FRAME art over a full-bleed camera feed ── */
+.qr-scanframe { position: relative; width: 264px; max-width: 82vw; aspect-ratio: 239 / 270; margin: 0 auto; }
+/* camera fills the ENTIRE frame rectangle → shows through every bracket gap */
+.qr-scanframe .qr-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block;
+  border-radius: 14px; background: #05030a; opacity: 0; transition: opacity .25s ease; z-index: 1; }
+.qr-scanframe .qr-cam.live { opacity: 1; }
+/* the ornate neon frame (brackets, crown, ALIGN label) sits on top */
+.qr-frameart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; z-index: 3; pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(150,60,255,.35)); }
+.qr-cam-off { position: absolute; inset: 0; display: grid; place-items: center; color: #9a7ac0; font-size: 14px; z-index: 2; }
+.qr-cam-off.starting { color: #7dffb4; }
+/* sweeping scan line, confined to the transparent window (y 10%–84%) */
+.qr-scanline2 { position: absolute; left: 8%; right: 8%; height: 3px; z-index: 2;
+  background: linear-gradient(90deg, transparent, #52ffe0 20%, #ff4acc 50%, #52ffe0 80%, transparent);
+  box-shadow: 0 0 12px #ff4acc, 0 0 26px #7f3cff; animation: qr-scan-sweep2 2.6s cubic-bezier(.5,0,.5,1) infinite; }
+@keyframes qr-scan-sweep2 { 0% { top: 14%; opacity: .3; } 15% { opacity: 1; } 50% { top: 78%; opacity: 1; } 85% { opacity: 1; } 100% { top: 14%; opacity: .3; } }
+
 .mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .mem-qr span { color: #9a7ac0; font-size: 11px; }
 
