@@ -1106,7 +1106,7 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 74;
+      const GW = 40;                                    // BIG chunky pixel blocks
       const iw = img.width, ih = img.height;
       const sx = LOGO_CROP.x * iw, sy = LOGO_CROP.y * ih, sw = LOGO_CROP.w * iw, sh = LOGO_CROP.h * ih;
       const GH = Math.max(1, Math.round(GW * sh / sw));
@@ -1125,7 +1125,7 @@ function PixelAssembly({ progress, active }) {
         const dx = x - GW / 2, dy = y - GH * 0.5, dl = Math.hypot(dx, dy) || 1;
         const smag = 3 + Math.random() * 8;
         cells.push({ x, y, r, g, b, bright: lum > 78, th,
-          fall: 6 + Math.random() * 16, drift: (Math.random() - 0.5) * 3, snapped: false });
+          fall: 2.5 + Math.random() * 8, drift: (Math.random() - 0.5) * 1.6, snapped: false });
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.img = img; st.current.ready = true;
     };
