@@ -1125,7 +1125,7 @@ function PixelAssembly({ progress, active }) {
         const dx = x - GW / 2, dy = y - GH * 0.5, dl = Math.hypot(dx, dy) || 1;
         const smag = 3 + Math.random() * 8;
         cells.push({ x, y, r, g, b, bright: lum > 78, th,
-          ox: (dx / dl) * smag + (Math.random() - 0.5) * 4, oy: (dy / dl) * smag + (Math.random() - 0.5) * 4, snapped: false });
+          fall: 6 + Math.random() * 16, drift: (Math.random() - 0.5) * 3, snapped: false });
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.img = img; st.current.ready = true;
     };
@@ -1169,21 +1169,24 @@ function PixelAssembly({ progress, active }) {
         for (const c of cells) {
           if (p < c.th) continue;
           const a = Math.max(0, Math.min(1, (p - c.th) / SETTLE));
-          const e = easeOutBack(a), off = 1 - e;
-          const sm = a * a * (3 - 2 * a);
+          // break-down: detach & FALL straight down into a pile (gravity), then snap back up
+          let fx, fy;
+          if (a < 0.55) { const k = a / 0.55; fy = c.fall * cell * k * k; fx = c.drift * cell * k; }
+          else { const k = (a - 0.55) / 0.45, e2 = easeOutBack(k); fy = c.fall * cell * (1 - e2); fx = c.drift * cell * (1 - k); }
+          // magenta energy while broken → real colour on settle
+          const sm0 = Math.max(0, Math.min(1, (a - 0.45) / 0.55)); const sm = sm0 * sm0 * (3 - 2 * sm0);
           let r = 255 * (1 - sm) + c.r * sm, g = 46 * (1 - sm) + c.g * sm, b = 200 * (1 - sm) + c.b * sm;
-          const en = 1 - a; r += (255 - r) * en * 0.22; g += (255 - g) * en * 0.22; b += (255 - b) * en * 0.22;
-          // integer-aligned position (with zoom+shake+scatter) — crisp squares
-          let X = originX + c.x * cell + c.ox * cell * off;
-          let Y = originY + c.y * cell + c.oy * cell * off;
+          const en = 1 - a; r += (255 - r) * en * 0.2; g += (255 - g) * en * 0.2; b += (255 - b) * en * 0.2;
+          let X = originX + c.x * cell + fx;
+          let Y = originY + c.y * cell + fy;
           X = Math.round(cx + (X - cx) * zoom + shx);
           Y = Math.round(cy + (Y - cy) * zoom + shy);
-          const bs = Math.max(1, Math.round(blk * zoom * (a < 1 ? (0.6 + 0.4 * e) : 1)));
+          const bs = Math.max(1, Math.round(blk * zoom));
           bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, bs, bs);
-          if (c.bright || a < 0.6) { px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, bs, bs); }
+          if (c.bright || a < 0.55) { px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, bs, bs); }
           if (a >= 1 && !c.snapped) {
             c.snapped = true; s.shake = Math.min(4.5, s.shake + 0.3);
-            if (Math.random() < 0.35) s.sparks.push({ x: X + bs / 2, y: Y + bs / 2, vx: (Math.random() - 0.5) * 3.2, vy: (Math.random() - 1.4) * 3.2, life: 1, gold: Math.random() < 0.72 });
+            if (Math.random() < 0.4) s.sparks.push({ x: X + bs / 2, y: Y + bs / 2, vx: (Math.random() - 0.5) * 3.2, vy: (Math.random() - 1.5) * 3.2, life: 1, gold: Math.random() < 0.72 });
           }
         }
         ctx.clearRect(0, 0, W, H);
@@ -1202,9 +1205,12 @@ function PixelAssembly({ progress, active }) {
           ctx.drawImage(img, LOGO_CROP.x * iw, LOGO_CROP.y * ih, LOGO_CROP.w * iw, LOGO_CROP.h * ih, rx, ry, logoW * zoom, logoH * zoom);
           ctx.globalAlpha = 1;
         }
-        // subtle glow then CRISP pixels on top (no heavy blur → no mush)
+        // rich neon glow (colored + pink) BEHIND, then CRISP pixels on top so the
+        // logo stays sharp while the bloom is lush like the reference
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${Math.max(2, cell * 0.7)}px)`; ctx.globalAlpha = 0.5; ctx.drawImage(pinkc, 0, 0);
+        ctx.filter = `blur(${Math.max(3, cell * 2.4)}px)`; ctx.globalAlpha = 0.45; ctx.drawImage(buf, 0, 0);   // wide colored halo
+        ctx.filter = `blur(${Math.max(2, cell * 0.9)}px)`; ctx.globalAlpha = 0.7; ctx.drawImage(pinkc, 0, 0);   // pink neon
+        ctx.filter = `blur(${Math.max(1, cell * 0.35)}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(buf, 0, 0);    // tight colored glow
         ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
         ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
         // pixel lightning
@@ -1220,9 +1226,12 @@ function PixelAssembly({ progress, active }) {
           if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7);
         }
         ctx.shadowBlur = 0;
-        if (p > 0.45 && Math.random() < 0.6) s.dust.push({ x: originX + Math.random() * logoW, y: originY + Math.random() * logoH, vy: -0.3 - Math.random() * 0.5, vx: (Math.random() - 0.5) * 0.4, life: 1, gold: Math.random() < 0.7 });
-        s.dust = s.dust.filter((d) => d.life > 0).slice(-120);
-        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.life -= 0.012 * dt; ctx.globalAlpha = Math.max(0, d.life) * 0.9; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(2, Math.round(cell * 0.2)); ctx.fillRect(Math.round(d.x), Math.round(d.y), ds, ds); }
+        // dense gold ember shower spraying off the logo (the "last video" atmosphere)
+        if (p > 0.35) { const nE = 4 + (Math.random() * 5 | 0); for (let k = 0; k < nE; k++) { const ex = originX + Math.random() * logoW, ey = originY + Math.random() * logoH * 0.9; const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, spd = 1 + Math.random() * 3.2; s.dust.push({ x: ex, y: ey, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1, gold: Math.random() < 0.78 }); } }
+        s.dust = s.dust.filter((d) => d.life > 0).slice(-260);
+        ctx.shadowColor = '#ffb648';
+        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 0.05 * dt; d.vx *= 0.985; d.life -= 0.02 * dt; const al = Math.max(0, d.life); ctx.globalAlpha = al; ctx.shadowBlur = cell * 0.6; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(2, Math.round(cell * (0.14 + al * 0.16))); ctx.fillRect(Math.round(d.x), Math.round(d.y), ds, ds); }
+        ctx.shadowBlur = 0;
         s.sparks = s.sparks.filter((sp) => sp.life > 0);
         for (const sp of s.sparks) { sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt; ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0'; const sz = Math.max(2, Math.round(cell * 0.32)); ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sz, sz); }
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
