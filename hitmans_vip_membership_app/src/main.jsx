@@ -1106,7 +1106,7 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 60;
+      const GW = 74;
       const iw = img.width, ih = img.height;
       const sx = LOGO_CROP.x * iw, sy = LOGO_CROP.y * ih, sw = LOGO_CROP.w * iw, sh = LOGO_CROP.h * ih;
       const GH = Math.max(1, Math.round(GW * sh / sw));
@@ -1121,8 +1121,9 @@ function PixelAssembly({ progress, active }) {
         const lum = 0.3 * r + 0.6 * g + 0.1 * b;
         if (lum < 10) continue;
         cells.push({ x, y, r, g, b, bright: lum > 78,
-          phase: (y / GH) * 0.34 + Math.random() * 0.16,     // top dissolves first (sweep)
-          dx: (Math.random() - 0.5) * 10, dy: 2 + Math.random() * 9 });  // spread + fall (no swirl)
+          hot: Math.random() < 0.4,                           // ~40% burn white-hot in the cloud (ember cores)
+          phase: (y / GH) * 0.30 + Math.random() * 0.20,     // top dissolves first (sweep)
+          dx: (Math.random() - 0.5) * 8, dy: 1 + Math.random() * 7 });  // spread + fall (no swirl)
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.img = img; st.current.ready = true;
     };
@@ -1136,7 +1137,8 @@ function PixelAssembly({ progress, active }) {
     const buf = document.createElement('canvas');
     let raf = 0, last = 0;
     // dissolve envelope: 0 (solid) → 1 (full glowing cloud) → 0 (reformed)
-    const cloud = (p) => (p < 0.2 ? 0 : p < 0.44 ? (p - 0.2) / 0.24 : p < 0.54 ? 1 : p < 0.84 ? 1 - (p - 0.54) / 0.30 : 0);
+    // solid → dissolve → cloud → REFORM BY ~50% → hold the retro logo while the bar finishes
+    const cloud = (p) => (p < 0.12 ? 0 : p < 0.26 ? (p - 0.12) / 0.14 : p < 0.34 ? 1 : p < 0.50 ? 1 - (p - 0.34) / 0.16 : 0);
     const draw = (t) => {
       const cv = canvasRef.current;
       if (cv && s.ready) {
@@ -1159,11 +1161,12 @@ function PixelAssembly({ progress, active }) {
         const gp = Math.max(2, Math.round(cell * 0.2)), blk = cell - gp;
         for (const c of cells) {
           const d = Math.max(0, Math.min(1, cloudAmt * 1.45 - c.phase));   // per-cell dissolve amount
-          // colour: real → hot magenta as it dissolves
-          const r = c.r + (255 - c.r) * d, g = c.g + (60 - c.g) * d, b = c.b + (235 - c.b) * d;
+          // colour: real → hot magenta (or white-hot ember core) as it dissolves — stays granular, no blob
+          const tr = c.hot ? 255 : 255, tg = c.hot ? 190 : 60, tb = c.hot ? 250 : 235;
+          const r = c.r + (tr - c.r) * d, g = c.g + (tg - c.g) * d, b = c.b + (tb - c.b) * d;
           const X = Math.round(originX + c.x * cell + c.dx * cell * d + shx);
           const Y = Math.round(originY + c.y * cell + c.dy * cell * d + shy);
-          const bs = Math.max(1, Math.round(blk * (1 + d * 1.1)));   // squares swell into soft blobs when dissolved
+          const bs = Math.max(1, Math.round(blk * (1 + d * 0.3)));   // barely swells — pixels stay distinct like embers
           bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, bs, bs);
         }
         ctx.clearRect(0, 0, W, H);
@@ -1172,8 +1175,12 @@ function PixelAssembly({ progress, active }) {
         const hz = Math.min(1, p * 3) * (0.5 + cloudAmt * 0.5);
         grd.addColorStop(0, `rgba(150,50,220,${0.3 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.12 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
-        // smooth original logo — visible before the dissolve (fades as the cloud rises)
-        const smooth = Math.max(0, Math.min(1, (p < 0.18 ? p / 0.08 : 1 - (p - 0.18) / 0.16))) * 0.95;
+        // clean logo — visible BEFORE the dissolve, then fades back IN after the pixels
+        // reform so the held loading state is the glowing retro logo (not raw pixels)
+        let smooth = 0;
+        if (p < 0.20) smooth = Math.min(1, p < 0.05 ? p / 0.05 : 1 - (p - 0.10) / 0.10) * 0.95;
+        else if (p > 0.47) smooth = Math.min(1, (p - 0.47) / 0.12) * 0.92;
+        smooth = Math.max(0, smooth);
         if (smooth > 0.01 && img) {
           const iw = img.width, ih = img.height;
           ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true;
@@ -1183,10 +1190,11 @@ function PixelAssembly({ progress, active }) {
         // GLOW (strong, especially while dissolved) then crisp pixels on top (crisp
         // fades out when it's a cloud so the cloud stays soft & glowing)
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${Math.max(4, cell * (2 + cloudAmt * 2.5))}px)`; ctx.globalAlpha = 0.5 + cloudAmt * 0.4; ctx.drawImage(buf, 0, 0);
-        ctx.filter = `blur(${Math.max(2, cell * 0.8)}px)`; ctx.globalAlpha = 0.55; ctx.drawImage(buf, 0, 0);
+        ctx.filter = `blur(${Math.max(3, cell * (1 + cloudAmt * 1.1))}px)`; ctx.globalAlpha = 0.35 + cloudAmt * 0.3; ctx.drawImage(buf, 0, 0);
+        ctx.filter = `blur(${Math.max(1, cell * 0.5)}px)`; ctx.globalAlpha = 0.45; ctx.drawImage(buf, 0, 0);
         ctx.filter = 'none'; ctx.imageSmoothingEnabled = false;
-        ctx.globalAlpha = 1 - cloudAmt * 0.85; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
+        // keep the sharp pixels strongly visible even mid-cloud so it reads as distinct embers, not a blob
+        ctx.globalAlpha = 1 - cloudAmt * 0.3; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
         ctx.globalAlpha = 1;
         // gold sparks + purple lightning (heavier during the dissolve) — no swirl
         if (p > 0.18) { const nE = (1 + cloudAmt * 6) | 0; for (let k = 0; k < nE; k++) { const ex = originX + Math.random() * logoW, ey = originY + Math.random() * logoH; const ang = Math.random() * Math.PI * 2, spd = 0.6 + Math.random() * 2.6; s.dust.push({ x: ex, y: ey, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 0.4, life: 1, gold: Math.random() < 0.72 }); } }
@@ -1200,7 +1208,7 @@ function PixelAssembly({ progress, active }) {
         for (const bl of s.bolts) { bl.life -= 0.15 * dt; const al = Math.max(0, bl.life); const stroke = (pts, w, color, blur) => { ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); }; stroke(bl.pts, Math.max(3, cell * 0.3), 'rgba(150,60,255,.5)', cell * 2.2); stroke(bl.pts, Math.max(1.4, cell * 0.12), '#e6c2ff', cell * 0.9); if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7); }
         ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
         if (p >= 0.995 && s.flash === 0) { s.flash = 1; s.shake = 4; }
-        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.05 * dt); ctx.globalCompositeOperation = 'source-over'; }
+        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,220,255,${s.flash * 0.4})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.1 * dt); ctx.globalCompositeOperation = 'source-over'; }
       }
       raf = requestAnimationFrame(draw);
     };
