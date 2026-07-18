@@ -951,7 +951,7 @@ function App() {
 
   function runTransition(from, to, commit) {
     const isBoot = from === 'Boot';
-    const duration = isBoot ? 3600 : 2200;
+    const duration = isBoot ? 6000 : 3600;
     let committed = false;
     let rafId = 0;
     const startedAt = performance.now();
@@ -1106,7 +1106,7 @@ function PixelAssembly({ progress, active }) {
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
-      const GW = 40;                                    // BIG chunky pixel blocks
+      const GW = 60;
       const iw = img.width, ih = img.height;
       const sx = LOGO_CROP.x * iw, sy = LOGO_CROP.y * ih, sw = LOGO_CROP.w * iw, sh = LOGO_CROP.h * ih;
       const GH = Math.max(1, Math.round(GW * sh / sw));
@@ -1120,12 +1120,9 @@ function PixelAssembly({ progress, active }) {
         const r = data[i], g = data[i + 1], b = data[i + 2];
         const lum = 0.3 * r + 0.6 * g + 0.1 * b;
         if (lum < 10) continue;
-        const crown = y < GH * 0.24;
-        const th = crown ? 0.5 + Math.random() * 0.16 : 0.22 + (1 - y / GH) * 0.3 + (Math.random() - 0.5) * 0.08;
-        const dx = x - GW / 2, dy = y - GH * 0.5, dl = Math.hypot(dx, dy) || 1;
-        const smag = 3 + Math.random() * 8;
-        cells.push({ x, y, r, g, b, bright: lum > 78, th,
-          fall: 2.5 + Math.random() * 8, drift: (Math.random() - 0.5) * 1.6, snapped: false });
+        cells.push({ x, y, r, g, b, bright: lum > 78,
+          phase: (y / GH) * 0.34 + Math.random() * 0.16,     // top dissolves first (sweep)
+          dx: (Math.random() - 0.5) * 10, dy: 2 + Math.random() * 9 });  // spread + fall (no swirl)
       }
       st.current.cells = cells; st.current.GW = GW; st.current.GH = GH; st.current.img = img; st.current.ready = true;
     };
@@ -1136,107 +1133,74 @@ function PixelAssembly({ progress, active }) {
     if (!active) return undefined;
     const s = st.current;
     s.sparks = []; s.dust = []; s.bolts = []; s.shake = 0; s.flash = 0;
-    if (s.cells) for (const c of s.cells) c.snapped = false;
     const buf = document.createElement('canvas');
-    const pinkc = document.createElement('canvas');
-    const SETTLE = 0.3;
     let raf = 0, last = 0;
+    // dissolve envelope: 0 (solid) → 1 (full glowing cloud) → 0 (reformed)
+    const cloud = (p) => (p < 0.2 ? 0 : p < 0.44 ? (p - 0.2) / 0.24 : p < 0.54 ? 1 : p < 0.84 ? 1 - (p - 0.54) / 0.30 : 0);
     const draw = (t) => {
       const cv = canvasRef.current;
       if (cv && s.ready) {
         const dt = last ? Math.min(2, (t - last) / 16.7) : 1; last = t;
         const DPR = Math.min(2, window.devicePixelRatio || 1);
-        const W = Math.round((cv.clientWidth || 320) * DPR);
-        const H = Math.round((cv.clientHeight || 480) * DPR);
+        const W = Math.round((cv.clientWidth || 320) * DPR), H = Math.round((cv.clientHeight || 480) * DPR);
         if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-        if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; pinkc.width = W; pinkc.height = H; }
+        if (buf.width !== W || buf.height !== H) { buf.width = W; buf.height = H; }
         const ctx = cv.getContext('2d');
         const { cells, GW, GH, img } = s;
         const p = s.progress / 100;
-        const cell = Math.round(Math.min((W * 0.94) / GW, (H * 0.66) / GH));
+        const cell = Math.round(Math.min((W * 0.92) / GW, (H * 0.64) / GH));
         const logoW = GW * cell, logoH = GH * cell;
-        const originX = Math.round((W - logoW) / 2);
-        const originY = Math.round(Math.max(H * 0.03, H * 0.44 - logoH / 2));
-        const zoom = 1 + Math.max(0, p - 0.9) * 0.22;
+        const originX = Math.round((W - logoW) / 2), originY = Math.round(Math.max(H * 0.03, H * 0.44 - logoH / 2));
         const cx = W / 2, cy = originY + logoH / 2;
-        s.shake *= Math.pow(0.86, dt);
+        const cloudAmt = cloud(p);
+        s.shake *= Math.pow(0.85, dt);
         const shx = (Math.random() - 0.5) * s.shake, shy = (Math.random() - 0.5) * s.shake;
-        const bx = buf.getContext('2d'); const px = pinkc.getContext('2d');
-        bx.clearRect(0, 0, W, H); px.clearRect(0, 0, W, H);
-        bx.imageSmoothingEnabled = false;
-        const gp = Math.max(2, Math.round(cell * 0.2));   // crisp dot-grid gap
-        const blk = cell - gp;
+        const bx = buf.getContext('2d'); bx.clearRect(0, 0, W, H); bx.imageSmoothingEnabled = false;
+        const gp = Math.max(2, Math.round(cell * 0.2)), blk = cell - gp;
         for (const c of cells) {
-          if (p < c.th) continue;
-          const a = Math.max(0, Math.min(1, (p - c.th) / SETTLE));
-          // break-down: detach & FALL straight down into a pile (gravity), then snap back up
-          let fx, fy;
-          if (a < 0.55) { const k = a / 0.55; fy = c.fall * cell * k * k; fx = c.drift * cell * k; }
-          else { const k = (a - 0.55) / 0.45, e2 = easeOutBack(k); fy = c.fall * cell * (1 - e2); fx = c.drift * cell * (1 - k); }
-          // magenta energy while broken → real colour on settle
-          const sm0 = Math.max(0, Math.min(1, (a - 0.45) / 0.55)); const sm = sm0 * sm0 * (3 - 2 * sm0);
-          let r = 255 * (1 - sm) + c.r * sm, g = 46 * (1 - sm) + c.g * sm, b = 200 * (1 - sm) + c.b * sm;
-          const en = 1 - a; r += (255 - r) * en * 0.2; g += (255 - g) * en * 0.2; b += (255 - b) * en * 0.2;
-          let X = originX + c.x * cell + fx;
-          let Y = originY + c.y * cell + fy;
-          X = Math.round(cx + (X - cx) * zoom + shx);
-          Y = Math.round(cy + (Y - cy) * zoom + shy);
-          const bs = Math.max(1, Math.round(blk * zoom));
+          const d = Math.max(0, Math.min(1, cloudAmt * 1.45 - c.phase));   // per-cell dissolve amount
+          // colour: real → hot magenta as it dissolves
+          const r = c.r + (255 - c.r) * d, g = c.g + (60 - c.g) * d, b = c.b + (235 - c.b) * d;
+          const X = Math.round(originX + c.x * cell + c.dx * cell * d + shx);
+          const Y = Math.round(originY + c.y * cell + c.dy * cell * d + shy);
+          const bs = Math.max(1, Math.round(blk * (1 + d * 1.1)));   // squares swell into soft blobs when dissolved
           bx.fillStyle = `rgb(${r | 0},${g | 0},${b | 0})`; bx.fillRect(X, Y, bs, bs);
-          if (c.bright || a < 0.55) { px.fillStyle = '#ff2ec4'; px.fillRect(X, Y, bs, bs); }
-          if (a >= 1 && !c.snapped) {
-            c.snapped = true; s.shake = Math.min(4.5, s.shake + 0.3);
-            if (Math.random() < 0.4) s.sparks.push({ x: X + bs / 2, y: Y + bs / 2, vx: (Math.random() - 0.5) * 3.2, vy: (Math.random() - 1.5) * 3.2, life: 1, gold: Math.random() < 0.72 });
-          }
         }
         ctx.clearRect(0, 0, W, H);
         // purple energy haze
-        const hz = Math.min(1, p * 2);
-        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, logoW * 0.7);
-        grd.addColorStop(0, `rgba(150,50,220,${0.26 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.1 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, logoW * 0.72);
+        const hz = Math.min(1, p * 3) * (0.5 + cloudAmt * 0.5);
+        grd.addColorStop(0, `rgba(150,50,220,${0.3 * hz})`); grd.addColorStop(0.6, `rgba(120,30,200,${0.12 * hz})`); grd.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
-        // smooth original (frame cropped) — whole first, then breaks/fades
-        let smooth = p < 0.07 ? p / 0.07 : (p < 0.22 ? 1 : (p < 0.5 ? 1 - (p - 0.22) / 0.28 : 0));
-        smooth = Math.max(0, Math.min(1, smooth)) * 0.95;
+        // smooth original logo — visible before the dissolve (fades as the cloud rises)
+        const smooth = Math.max(0, Math.min(1, (p < 0.18 ? p / 0.08 : 1 - (p - 0.18) / 0.16))) * 0.95;
         if (smooth > 0.01 && img) {
           const iw = img.width, ih = img.height;
-          const rx = cx + (originX - cx) * zoom + shx, ry = cy + (originY - cy) * zoom + shy;
           ctx.globalAlpha = smooth; ctx.imageSmoothingEnabled = true;
-          ctx.drawImage(img, LOGO_CROP.x * iw, LOGO_CROP.y * ih, LOGO_CROP.w * iw, LOGO_CROP.h * ih, rx, ry, logoW * zoom, logoH * zoom);
+          ctx.drawImage(img, LOGO_CROP.x * iw, LOGO_CROP.y * ih, LOGO_CROP.w * iw, LOGO_CROP.h * ih, originX + shx, originY + shy, logoW, logoH);
           ctx.globalAlpha = 1;
         }
-        // rich neon glow (colored + pink) BEHIND, then CRISP pixels on top so the
-        // logo stays sharp while the bloom is lush like the reference
+        // GLOW (strong, especially while dissolved) then crisp pixels on top (crisp
+        // fades out when it's a cloud so the cloud stays soft & glowing)
         ctx.globalCompositeOperation = 'lighter';
-        ctx.filter = `blur(${Math.max(3, cell * 2.4)}px)`; ctx.globalAlpha = 0.45; ctx.drawImage(buf, 0, 0);   // wide colored halo
-        ctx.filter = `blur(${Math.max(2, cell * 0.9)}px)`; ctx.globalAlpha = 0.7; ctx.drawImage(pinkc, 0, 0);   // pink neon
-        ctx.filter = `blur(${Math.max(1, cell * 0.35)}px)`; ctx.globalAlpha = 0.6; ctx.drawImage(buf, 0, 0);    // tight colored glow
-        ctx.filter = 'none'; ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
-        ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
-        // pixel lightning
-        const boltGap = p > 0.85 ? 55 : 110;
-        if (t - s.lastBolt > boltGap + Math.random() * 130 && p > 0.2) { s.lastBolt = t; s.bolts.push(makeBolt(W, H)); if (Math.random() < (p > 0.85 ? 0.9 : 0.4)) s.bolts.push(makeBolt(W, H)); }
-        s.bolts = s.bolts.filter((bl) => bl.life > 0);
-        ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
-        for (const bl of s.bolts) {
-          bl.life -= 0.16 * dt; const al = Math.max(0, bl.life);
-          const stroke = (pts, w, color, blur) => { ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); };
-          stroke(bl.pts, Math.max(3, cell * 0.28), 'rgba(150,60,255,.5)', cell * 2);
-          stroke(bl.pts, Math.max(1.4, cell * 0.12), '#e6c2ff', cell * 0.8);
-          if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7);
-        }
-        ctx.shadowBlur = 0;
-        // dense gold ember shower spraying off the logo (the "last video" atmosphere)
-        if (p > 0.35) { const nE = 4 + (Math.random() * 5 | 0); for (let k = 0; k < nE; k++) { const ex = originX + Math.random() * logoW, ey = originY + Math.random() * logoH * 0.9; const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, spd = 1 + Math.random() * 3.2; s.dust.push({ x: ex, y: ey, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1, gold: Math.random() < 0.78 }); } }
+        ctx.filter = `blur(${Math.max(4, cell * (2 + cloudAmt * 2.5))}px)`; ctx.globalAlpha = 0.5 + cloudAmt * 0.4; ctx.drawImage(buf, 0, 0);
+        ctx.filter = `blur(${Math.max(2, cell * 0.8)}px)`; ctx.globalAlpha = 0.55; ctx.drawImage(buf, 0, 0);
+        ctx.filter = 'none'; ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = 1 - cloudAmt * 0.85; ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(buf, 0, 0);
+        ctx.globalAlpha = 1;
+        // gold sparks + purple lightning (heavier during the dissolve) — no swirl
+        if (p > 0.18) { const nE = (1 + cloudAmt * 6) | 0; for (let k = 0; k < nE; k++) { const ex = originX + Math.random() * logoW, ey = originY + Math.random() * logoH; const ang = Math.random() * Math.PI * 2, spd = 0.6 + Math.random() * 2.6; s.dust.push({ x: ex, y: ey, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 0.4, life: 1, gold: Math.random() < 0.72 }); } }
         s.dust = s.dust.filter((d) => d.life > 0).slice(-260);
-        ctx.shadowColor = '#ffb648';
-        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 0.05 * dt; d.vx *= 0.985; d.life -= 0.02 * dt; const al = Math.max(0, d.life); ctx.globalAlpha = al; ctx.shadowBlur = cell * 0.6; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff9ae6'; const ds = Math.max(2, Math.round(cell * (0.14 + al * 0.16))); ctx.fillRect(Math.round(d.x), Math.round(d.y), ds, ds); }
+        for (const d of s.dust) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 0.03 * dt; d.life -= 0.018 * dt; const al = Math.max(0, d.life); ctx.globalAlpha = al; ctx.globalCompositeOperation = 'lighter'; ctx.shadowColor = d.gold ? '#ffb648' : '#ff4ad2'; ctx.shadowBlur = cell * 0.7; ctx.fillStyle = d.gold ? '#ffe08a' : '#ff8be6'; const ds = Math.max(2, Math.round(cell * 0.24 * al)); ctx.fillRect(Math.round(d.x), Math.round(d.y), ds, ds); }
         ctx.shadowBlur = 0;
-        s.sparks = s.sparks.filter((sp) => sp.life > 0);
-        for (const sp of s.sparks) { sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.vy += 0.08 * dt; sp.life -= 0.03 * dt; ctx.globalAlpha = Math.max(0, sp.life); ctx.fillStyle = sp.gold ? '#ffd66b' : '#ff7ae0'; const sz = Math.max(2, Math.round(cell * 0.32)); ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sz, sz); }
-        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-        if (p >= 0.995 && s.flash === 0) s.flash = 1;
-        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.06 * dt); ctx.globalCompositeOperation = 'source-over'; }
+        const boltGap = cloudAmt > 0.3 ? 60 : 150;
+        if (t - s.lastBolt > boltGap + Math.random() * 120 && p > 0.18) { s.lastBolt = t; s.bolts.push(makeBolt(W, H)); if (Math.random() < 0.5 + cloudAmt * 0.4) s.bolts.push(makeBolt(W, H)); }
+        s.bolts = s.bolts.filter((bl) => bl.life > 0);
+        ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+        for (const bl of s.bolts) { bl.life -= 0.15 * dt; const al = Math.max(0, bl.life); const stroke = (pts, w, color, blur) => { ctx.globalAlpha = al; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.shadowColor = '#a13cff'; ctx.shadowBlur = blur; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); }; stroke(bl.pts, Math.max(3, cell * 0.3), 'rgba(150,60,255,.5)', cell * 2.2); stroke(bl.pts, Math.max(1.4, cell * 0.12), '#e6c2ff', cell * 0.9); if (bl.branch) stroke(bl.branch, Math.max(1.2, cell * 0.1), '#d6a6ff', cell * 0.7); }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        if (p >= 0.995 && s.flash === 0) { s.flash = 1; s.shake = 4; }
+        if (s.flash > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,255,255,${s.flash * 0.8})`; ctx.fillRect(0, 0, W, H); s.flash = Math.max(0, s.flash - 0.05 * dt); ctx.globalCompositeOperation = 'source-over'; }
       }
       raf = requestAnimationFrame(draw);
     };
@@ -1246,7 +1210,6 @@ function PixelAssembly({ progress, active }) {
 
   return <canvas ref={canvasRef} className="pixel-assembly" aria-hidden="true" />;
 }
-
 
 const BAR_SEGMENTS = 18;
 function TransitionOverlay({ transition }) {
