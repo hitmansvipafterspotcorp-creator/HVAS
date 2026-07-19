@@ -399,6 +399,10 @@ const ui = {
   brandBadge: '/assets/ui/complete_ui_set/new_main_menu/new_main_menu/brand/mm_logo_badge.png',
   // Full high-res HITMANS VIP AFTER SPOT logo — the pixel-assembly loading art.
   fullLogo: '/assets/ui/hvas_logo.png',
+  // Boot loading screen: logo shatters + vortex, reforms/bursts into the retro
+  // logo, bar 0→100 baked in. Full-screen pure-black overlay (no box).
+  loadingVideo: '/assets/ui/loading_screen.mp4',
+  loadingVideoWebm: '/assets/ui/loading_screen.webm',
   mainMenuBackground: '/assets/ui/main-menu-background.png',
   loading: '/assets/ui/complete_ui_set/sliced_clean/by_type/screens/source_17_001_1672x941.png',
   banners: {
@@ -951,7 +955,8 @@ function App() {
 
   function runTransition(from, to, commit) {
     const isBoot = from === 'Boot';
-    const duration = isBoot ? 6000 : 3600;
+    // boot rides the loading film to the frame; ~9.7s clip → hold until it lands
+    const duration = isBoot ? 9550 : 3600;
     let committed = false;
     let rafId = 0;
     const startedAt = performance.now();
@@ -989,7 +994,7 @@ function App() {
         // hold on the WELCOME VIP MEMBER / PRESS START beat, longer on boot
         window.setTimeout(() => {
           setTransition((state) => ({ ...state, active: false, progress: 100 }));
-        }, isBoot ? 1300 : 320);
+        }, isBoot ? 500 : 320);
         return;
       }
 
@@ -1224,6 +1229,21 @@ function TransitionOverlay({ transition }) {
   const pct = Math.round(transition.progress);
   const done = pct >= 100;
   const filled = Math.round((pct / 100) * BAR_SEGMENTS);
+  const isBoot = transition.from === 'Boot';
+  // Boot: the branded loading film (logo shatters → vortex → reforms/bursts into the
+  // retro logo, bar 0→100 baked in) plays edge-to-edge on pure black, so it reads as
+  // one connected screen — not a video pasted into a page.
+  if (isBoot) {
+    return (
+      <div className={transition.active ? 'transition-overlay boot active' : 'transition-overlay boot'} aria-hidden={!transition.active}>
+        <video className="boot-film" autoPlay muted playsInline preload="auto" disablePictureInPicture>
+          <source src={ui.loadingVideoWebm} type="video/webm" />
+          <source src={ui.loadingVideo} type="video/mp4" />
+        </video>
+      </div>
+    );
+  }
+  // Page-to-page: quick lightweight branded loader (kept short).
   return (
     <div className={transition.active ? 'transition-overlay active' : 'transition-overlay'} aria-hidden={!transition.active}>
       <div className="assembly-wrap">

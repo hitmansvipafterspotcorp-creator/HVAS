@@ -2524,6 +2524,18 @@ button {
   visibility: visible;
 }
 
+/* Boot loading film — pure black, edge-to-edge, no box. Reads as one connected screen. */
+.transition-overlay.boot { background: #000; }
+.transition-overlay.boot .boot-film {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;      /* fill the viewport; the film's black edges keep it seamless */
+  background: #000;
+  display: block;
+}
+
 /* ── Arcade attract-mode loading screen ── */
 .assembly-wrap { position: absolute; inset: 0; }
 /* CRT scanlines + dot-grid over the whole scene */
