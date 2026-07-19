@@ -2531,7 +2531,8 @@ button {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;      /* fill the viewport; the film's black edges keep it seamless */
+  object-fit: contain;    /* show the WHOLE film on any aspect (phone + laptop); black bg
+                             matches the film's black so the letterbox is invisible */
   background: #000;
   display: block;
 }
