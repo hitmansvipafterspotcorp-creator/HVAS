@@ -2807,7 +2807,7 @@ button {
 .door-crest:active { transform: scale(0.97); }
 .door-crest.holding { animation: none; filter: drop-shadow(0 0 34px rgba(255, 70, 214, 0.85)); transform: scale(1.03); }
 .door-crest-ring { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); transform: rotate(-90deg); pointer-events: none; }
-.door-crest-ring circle {
+.door-crest-ring rect {
   fill: none; stroke: #ff3cd0; stroke-width: 3; stroke-linecap: round;
   stroke-dasharray: 1; opacity: 0.95; filter: drop-shadow(0 0 6px rgba(255, 60, 208, 0.9));
   transition: stroke-dashoffset 0.05s linear;

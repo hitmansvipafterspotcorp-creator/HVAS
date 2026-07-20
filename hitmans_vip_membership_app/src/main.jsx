@@ -1331,9 +1331,9 @@ function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
         <button type="button" className={`door-crest${hold > 0 ? ' holding' : ''}`} aria-label="HITMANS VIP AFTER SPOT"
           onPointerDown={startHold} onPointerUp={stopHold} onPointerLeave={stopHold} onPointerCancel={stopHold}
           onContextMenu={(e) => e.preventDefault()}>
-          <img src={ui.brandBadge} alt="HITMANS VIP AFTER SPOT" draggable="false" />
+          <img src={ui.fullLogo} alt="HITMANS VIP AFTER SPOT" draggable="false" />
           <svg className="door-crest-ring" viewBox="0 0 100 100" aria-hidden="true">
-            <circle cx="50" cy="50" r="46" pathLength="1" style={{ strokeDashoffset: 1 - hold }} />
+            <rect x="3" y="3" width="94" height="94" rx="22" pathLength="1" style={{ strokeDashoffset: 1 - hold }} />
           </svg>
         </button>
         <h1 className="door-title">HITMANS VIP<span>AFTER SPOT</span></h1>
