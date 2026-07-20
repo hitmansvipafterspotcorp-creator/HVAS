@@ -2464,22 +2464,30 @@ function PaymentsScreen() {
 
 // Trespass / Ban / Clear controls for a member row. Writes to the hub op-log so
 // the flag lands on the member's profile and every door instantly.
+// The door-decision action row: Grant / Deny / Trespass / Ban. Grant admits +
+// logs the night; Deny turns them away (clears inside/verified); Trespass & Ban
+// write penalty flags that ride the hub to every device.
 function PenaltyControls({ member }) {
   const [, force] = useState(0);
   const pen = memberPenalty(member.number);
-  const flag = (kind, reason) => { penalizeMember(member.number, member.name, kind, reason); force((n) => n + 1); };
+  const rerender = () => force((n) => n + 1);
+  const flag = (kind, reason) => { penalizeMember(member.number, member.name, kind, reason); rerender(); };
+  const grant = () => { commitMember(admitTonight({ ...member, status: 'verified', verifiedAt: Date.now() })); rerender(); };
+  const deny = () => { commitMember({ ...member, verifiedAt: null, lastEntryNight: null }); rerender(); };
   if (pen) {
     return (
-      <div className="dash-actions">
+      <div className="door-acts flagged">
         <span className={`dash-flag ${pen.kind}`}>{PENALTY_LABEL[pen.kind]}</span>
-        <button type="button" className="dash-pen clear" onClick={() => flag('cleared', '')}>Lift flag</button>
+        <button type="button" className="door-act clear" onClick={() => flag('cleared', '')}>Lift flag</button>
       </div>
     );
   }
   return (
-    <div className="dash-actions">
-      <button type="button" className="dash-pen trespass" onClick={() => flag('trespass', 'Trespassed at the door')}>Trespass</button>
-      <button type="button" className="dash-pen ban" onClick={() => flag('banned', 'Banned from the venue')}>Ban</button>
+    <div className="door-acts">
+      <button type="button" className="door-act grant" onClick={grant}><span className="door-act-ic" aria-hidden="true">🛡</span>Grant</button>
+      <button type="button" className="door-act deny" onClick={deny}><span className="door-act-ic" aria-hidden="true">✋</span>Deny</button>
+      <button type="button" className="door-act trespass" onClick={() => flag('trespass', 'Trespassed at the door')}><span className="door-act-ic" aria-hidden="true">⚠️</span>Trespass</button>
+      <button type="button" className="door-act ban" onClick={() => flag('banned', 'Banned from the venue')}><span className="door-act-ic" aria-hidden="true">⛔</span>Ban</button>
     </div>
   );
 }

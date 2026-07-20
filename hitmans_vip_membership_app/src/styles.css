@@ -3590,6 +3590,28 @@ button {
 
 /* ── Staff dashboard: penalty controls ── */
 .dash-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+/* Door-decision action row — Grant / Deny / Trespass / Ban (neon buttons) */
+.door-acts { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.door-act {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 11px 18px; border-radius: 12px; font-weight: 900; font-size: 13.5px; letter-spacing: .04em;
+  background: rgba(10, 4, 18, 0.85); color: #fff;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+}
+.door-act-ic { font-size: 15px; line-height: 1; filter: drop-shadow(0 0 4px currentColor); }
+.door-act:hover { transform: translateY(-2px); }
+.door-act:active { transform: translateY(0); }
+.door-act.grant    { border: 2px solid #57ff9d; color: #b6ffd4; box-shadow: 0 0 14px rgba(87,255,157,.35), inset 0 0 12px rgba(87,255,157,.12); }
+.door-act.grant:hover    { box-shadow: 0 0 22px rgba(87,255,157,.6); }
+.door-act.deny     { border: 2px solid #ffb14a; color: #ffdca6; box-shadow: 0 0 14px rgba(255,177,74,.35), inset 0 0 12px rgba(255,177,74,.12); }
+.door-act.deny:hover     { box-shadow: 0 0 22px rgba(255,177,74,.6); }
+.door-act.trespass { border: 2px solid #ffd23a; color: #fff0a8; box-shadow: 0 0 14px rgba(255,210,58,.35), inset 0 0 12px rgba(255,210,58,.12); }
+.door-act.trespass:hover { box-shadow: 0 0 22px rgba(255,210,58,.6); }
+.door-act.ban      { border: 2px solid #ff5470; color: #ffc2cd; box-shadow: 0 0 14px rgba(255,84,112,.4), inset 0 0 12px rgba(255,84,112,.14); }
+.door-act.ban:hover      { box-shadow: 0 0 22px rgba(255,84,112,.7); }
+.door-act.clear    { border: 2px solid #6a4a9a; color: #cdb6f2; }
+.door-acts.flagged { gap: 12px; }
+
 .dash-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .dash-pen { border: none; border-radius: 999px; padding: 6px 14px; font-weight: 800; font-size: 12px; cursor: pointer; letter-spacing: .02em; }
 .dash-pen.trespass { background: linear-gradient(180deg,#ff9f45,#e0761a); color: #2a1400; }
