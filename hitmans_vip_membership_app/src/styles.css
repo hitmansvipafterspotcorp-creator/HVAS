@@ -3566,6 +3566,9 @@ button {
 .qr-brand .qr-brand-logo { width: 72px; height: auto; background: none; padding: 0; border-radius: 0;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,.5)); }
 .qr-brand.compact .qr-brand-logo { width: 54px; }
+/* full-logo brand stamp (logo already reads AFTER SPOT) */
+.qr-brand-full .qr-brand-logo { width: 132px; filter: drop-shadow(0 0 10px rgba(150,60,255,.45)); }
+.qr-brand-full.compact .qr-brand-logo { width: 104px; }
 .qr-brand-after { font-weight: 900; font-size: 13px; letter-spacing: .42em; text-indent: .42em; color: #ff3ac4;
   text-shadow: 0 0 8px rgba(255,26,168,.9), 0 0 18px rgba(255,0,150,.55); }
 .qr-brand.compact .qr-brand-after { font-size: 11px; }

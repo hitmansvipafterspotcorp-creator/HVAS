@@ -399,6 +399,8 @@ const ui = {
   brandBadge: '/assets/ui/complete_ui_set/new_main_menu/new_main_menu/brand/mm_logo_badge.png',
   // Full high-res HITMANS VIP AFTER SPOT logo — the pixel-assembly loading art.
   fullLogo: '/assets/ui/hvas_logo.png',
+  // Same full logo, background keyed out (transparent) — clean on any surface.
+  fullLogoClear: '/assets/ui/hvas_logo_clear.png',
   // Boot loading screen: logo shatters + vortex, reforms/bursts into the retro
   // logo, bar 0→100 baked in. Full-screen pure-black overlay (no box).
   loadingVideo: '/assets/ui/loading_screen.mp4',
@@ -1418,7 +1420,7 @@ function QrScan({ onDecode, onCancel }) {
 
 // A big "Join this venue" QR of the venue address, for others to scan.
 function JoinQR({ url, onClose }) {
-  const qr = useQrDataUrl(url, ui.brandBadge);
+  const qr = useQrDataUrl(url, ui.fullLogoClear);
   return (
     <div className="join-qr">
       {qr ? <img src={qr} alt="Join QR" /> : <div className="qr-load">QR…</div>}
@@ -1762,10 +1764,10 @@ const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespa
 // neon-pink "AFTER SPOT" wordmark, matching the logo art. Makes each pass
 // unmistakably ours (the QR payload itself is already unique per member).
 function BrandStamp({ compact = false }) {
+  // The full logo already reads "HITMANS VIP AFTER SPOT" — no separate text needed.
   return (
-    <div className={`qr-brand${compact ? ' compact' : ''}`}>
-      <img className="qr-brand-logo" src={ui.brandBadge} alt="HITMANS VIP" />
-      <span className="qr-brand-after">AFTER SPOT</span>
+    <div className={`qr-brand qr-brand-full${compact ? ' compact' : ''}`}>
+      <img className="qr-brand-logo" src={ui.fullLogoClear} alt="HITMANS VIP AFTER SPOT" />
     </div>
   );
 }
@@ -2193,7 +2195,7 @@ function RenewsIn({ expiresAt }) {
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
 function MemberPass({ member, checkedIn, onRenew }) {
-  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.brandBadge);
+  const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.fullLogoClear);
   const isVip = member.vip;
   const verified = member.status === 'verified';
   const entries = member.entries || 0;
@@ -2378,7 +2380,7 @@ function MembersWithMotionScreen() {
   const name = auth?.member?.name || member?.name || 'Promoter';
   const base = (typeof window !== 'undefined') ? window.location.origin + import.meta.env.BASE_URL : '';
   const shareUrl = promo ? `${base}?promo=${promo.code}` : '';
-  const qr = useQrDataUrl(shareUrl, ui.brandBadge);
+  const qr = useQrDataUrl(shareUrl, ui.fullLogoClear);
   const stats = promo ? promoStats(promo.code) : null;
   const [copied, setCopied] = useState('');
   const copy = (text, what) => { try { navigator.clipboard?.writeText(text); setCopied(what); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ } };
@@ -2721,7 +2723,7 @@ function SecurityVerifyScreen() {
             {scanning && ready && (
               <>
                 <div className="qr-scanline2" aria-hidden="true" />
-                <img className="qr-scan-logo-img" src={ui.brandBadge} alt="" aria-hidden="true" />
+                <img className="qr-scan-logo-img" src={ui.fullLogoClear} alt="" aria-hidden="true" />
               </>
             )}
             <span className="qr-br tl" aria-hidden="true" />
