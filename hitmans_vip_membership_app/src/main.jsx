@@ -923,6 +923,7 @@ function App() {
   const auth = useAuth();                         // member account (self-serve identity)
   const [unlocked, setUnlocked] = useState({ staff: false, host: false }); // per-session code unlock
   const [gate, setGate] = useState(null);        // role awaiting auth: 'member' | 'staff' | 'host'
+  const [team, setTeam] = useState(false);       // hidden Team Access screen (reached by holding the crest)
   const member = useMember();                    // subscribe: door verification updates this
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
@@ -1051,10 +1052,13 @@ function App() {
         gate === 'member' ? (
           <MemberAuthScreen onBack={() => setGate(null)} onDone={() => chooseRole('member')} />
         ) : gate ? (
-          <CodeGateScreen role={gate} onBack={() => setGate(null)}
+          // staff/host code gate — back returns to the hidden Team Access, not the public door
+          <CodeGateScreen role={gate} onBack={() => { setGate(null); setTeam(true); }}
             onDone={() => { setUnlocked((u) => ({ ...u, [gate]: true })); chooseRole(gate); }} />
+        ) : team ? (
+          <TeamAccessScreen onPick={(id) => { setTeam(false); setGate(id); }} onBack={() => setTeam(false)} />
         ) : (
-          <RoleLanding onPick={requestRole} auth={auth} onSignOut={memberSignOut} />
+          <MemberDoor onMember={() => requestRole('member')} onStaff={() => setTeam(true)} auth={auth} onSignOut={memberSignOut} />
         )
       ) : (
         <section className={`screen screen-${current.id}`}>
@@ -1303,39 +1307,73 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
 
 // Landing role picker — the app entry gate. A user is one of three things,
 // and each sees a completely separate surface after this.
-function RoleLanding({ onPick, auth, onSignOut }) {
-  const lockFor = (id) => (id === 'member' ? (auth?.member ? null : 'account') : 'code');
+// The public front door — MEMBER ONLY. Staff/host tools are never shown here, so
+// nobody browsing the app can see (or poke at) the door system. Venue team gets in
+// with a "secret handshake": press-and-hold the crest (~1.4s) to reveal Team Access.
+function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
+  const [hold, setHold] = useState(0);            // 0..1 hold progress ring
+  const t0 = useRef(0); const raf = useRef(0);
+  const stopHold = () => { cancelAnimationFrame(raf.current); setHold(0); };
+  const startHold = () => {
+    t0.current = performance.now();
+    const tick = () => {
+      const p = Math.min(1, (performance.now() - t0.current) / 1400);
+      setHold(p);
+      if (p >= 1) { cancelAnimationFrame(raf.current); setHold(0); onStaff(); return; }
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
   return (
-    <section className="screen screen-landing">
-      <div className="home-dashboard">
-        <section className="sheet-title-banner">
-          <div>
-            <span>HITMANS VIP AFTER SPOT CORP.</span>
-            <h1>Choose Access</h1>
+    <section className="screen screen-door">
+      <div className="door-wrap">
+        <button type="button" className={`door-crest${hold > 0 ? ' holding' : ''}`} aria-label="HITMANS VIP AFTER SPOT"
+          onPointerDown={startHold} onPointerUp={stopHold} onPointerLeave={stopHold} onPointerCancel={stopHold}
+          onContextMenu={(e) => e.preventDefault()}>
+          <img src={ui.brandBadge} alt="HITMANS VIP AFTER SPOT" draggable="false" />
+          <svg className="door-crest-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="46" pathLength="1" style={{ strokeDashoffset: 1 - hold }} />
+          </svg>
+        </button>
+        <h1 className="door-title">HITMANS VIP<span>AFTER SPOT</span></h1>
+        <p className="door-tag">Tallahassee’s members-only after spot</p>
+        {auth?.member ? (
+          <div className="door-actions">
+            <button type="button" className="door-primary" onClick={onMember}>Enter · {auth.member.name} →</button>
+            <button type="button" className="door-ghost" onClick={onSignOut}>Not you? Sign out</button>
           </div>
-        </section>
-        {auth?.member && (
-          <div className="landing-account">
-            <span>Signed in · <b>{auth.member.name}</b></span>
-            <button type="button" onClick={onSignOut}>Sign out</button>
+        ) : (
+          <div className="door-actions">
+            <button type="button" className="door-primary" onClick={onMember}>Member Sign In →</button>
+            <button type="button" className="door-secondary" onClick={onMember}>New here? Become a member</button>
           </div>
         )}
-        <div className="role-landing">
-          {ROLES.map((r) => {
-            const lock = lockFor(r.id);
-            return (
-              <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
-                <span className="role-card-eyebrow">{r.eyebrow}</span>
-                <strong className="role-card-label">{r.label}</strong>
-                <span className="role-card-tagline">{r.tagline}</span>
-                <span className="role-card-go">
-                  {lock === 'account' ? 'Sign in →' : lock === 'code' ? '🔒 Staff code →' : 'Enter →'}
-                </span>
-              </button>
-            );
-          })}
+        <p className="door-fine">Members only · verified at the door</p>
+      </div>
+    </section>
+  );
+}
+
+// Hidden Team Access — only reachable by holding the crest on the member door.
+// Staff & Host still each need the venue access code (next step).
+function TeamAccessScreen({ onPick, onBack }) {
+  return (
+    <section className="screen screen-landing">
+      <div className="home-dashboard auth-screen">
+        <section className="sheet-title-banner"><div><span>VENUE TEAM · RESTRICTED</span><h1>Team Access</h1></div></section>
+        <div className="team-grid">
+          {ROLES.filter((r) => r.id !== 'member').map((r) => (
+            <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
+              <span className="role-card-eyebrow">{r.eyebrow}</span>
+              <strong className="role-card-label">{r.label}</strong>
+              <span className="role-card-tagline">{r.tagline}</span>
+              <span className="role-card-go">🔒 Access code →</span>
+            </button>
+          ))}
         </div>
-        <p className="role-landing-note">Members sign in with their phone or email. Door staff and hosts need the venue access code.</p>
+        <p className="role-landing-note">Door staff and hosts only. Each needs the venue access code.</p>
+        <button type="button" className="auth-back" onClick={onBack}>← Back to member door</button>
       </div>
     </section>
   );
