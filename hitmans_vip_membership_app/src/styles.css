@@ -249,6 +249,9 @@ button {
 
 .screen {
   min-width: 0;
+  width: 100%;
+  max-width: 720px;      /* mobile-first app column — centered on desktop, never stretched edge-to-edge */
+  margin-inline: auto;
   padding: 34px;
   overflow: auto;
 }
@@ -2813,6 +2816,11 @@ button {
   transition: stroke-dashoffset 0.05s linear;
 }
 @keyframes door-breathe { 0%, 100% { filter: drop-shadow(0 0 18px rgba(150, 60, 255, 0.5)); } 50% { filter: drop-shadow(0 0 30px rgba(255, 70, 214, 0.6)); } }
+.door-eyebrow { font-size: 12px; letter-spacing: 0.5em; text-indent: 0.5em; color: #ff5ce0;
+  font-weight: 800; text-shadow: 0 0 12px rgba(255, 43, 214, 0.7); margin-bottom: 4px; }
+.door-rule { width: 120px; height: 2px; margin: 16px auto 20px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #ff3cd0, #ffd66b, transparent);
+  box-shadow: 0 0 12px rgba(255, 60, 208, 0.6); }
 .door-title {
   margin: 6px 0 0; font-family: 'Orbitron', ui-sans-serif, sans-serif; font-weight: 900;
   font-size: clamp(30px, 9vw, 44px); line-height: 0.92; letter-spacing: 0.02em; color: #ffd66b;
@@ -2837,7 +2845,8 @@ button {
 }
 .door-secondary:hover { border-color: #ff3cd0; color: #ffd6f6; }
 .door-ghost { background: none; border: 0; color: #9a86c8; font-size: 13px; cursor: pointer; padding: 6px; }
-.door-fine { margin-top: 18px; font-size: 11px; letter-spacing: 0.14em; color: #6f5f9a; text-transform: uppercase; }
+.door-fine { margin-top: 22px; font-size: 11px; letter-spacing: 0.14em; color: #6f5f9a; text-transform: uppercase;
+  background: none; border: 0; cursor: default; -webkit-tap-highlight-color: transparent; user-select: none; }
 
 /* ── Hidden Team Access ── */
 .team-grid { display: grid; gap: 14px; margin-top: 8px; }

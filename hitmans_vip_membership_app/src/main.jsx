@@ -1230,42 +1230,24 @@ function PixelAssembly({ progress, active }) {
   return <canvas ref={canvasRef} className="pixel-assembly" aria-hidden="true" />;
 }
 
-const BAR_SEGMENTS = 18;
+// One loading screen everywhere: the branded film (logo shatters → vortex → reforms
+// into the retro logo, bar 0→100 baked in), full-screen on pure black. Boot plays at
+// 1×; page-to-page plays the SAME film sped up so a nav stays quick but looks identical.
 function TransitionOverlay({ transition }) {
-  const pct = Math.round(transition.progress);
-  const done = pct >= 100;
-  const filled = Math.round((pct / 100) * BAR_SEGMENTS);
   const isBoot = transition.from === 'Boot';
-  // Boot: the branded loading film (logo shatters → vortex → reforms/bursts into the
-  // retro logo, bar 0→100 baked in) plays edge-to-edge on pure black, so it reads as
-  // one connected screen — not a video pasted into a page.
-  if (isBoot) {
-    return (
-      <div className={transition.active ? 'transition-overlay boot active' : 'transition-overlay boot'} aria-hidden={!transition.active}>
-        <video className="boot-film" autoPlay muted playsInline preload="auto" disablePictureInPicture>
-          <source src={ui.loadingVideoWebm} type="video/webm" />
-          <source src={ui.loadingVideo} type="video/mp4" />
-        </video>
-      </div>
-    );
-  }
-  // Page-to-page: quick lightweight branded loader (kept short).
+  const vref = useRef(null);
+  useEffect(() => {
+    const v = vref.current; if (!v) return undefined;
+    v.playbackRate = isBoot ? 1 : 2.7;
+    if (transition.active) { try { v.currentTime = 0; const p = v.play(); if (p?.catch) p.catch(() => {}); } catch { /* ignore */ } }
+    return undefined;
+  }, [transition.active, isBoot]);
   return (
-    <div className={transition.active ? 'transition-overlay active' : 'transition-overlay'} aria-hidden={!transition.active}>
-      <div className="assembly-wrap">
-        <PixelAssembly progress={transition.progress} active={transition.active} />
-        <div className="assembly-hud">
-          <span className={`assembly-title${done ? ' win' : ''}`}>{done ? 'WELCOME VIP MEMBER' : 'ASSEMBLING VIP ACCESS'}</span>
-          <div className="pixbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct}>
-            {Array.from({ length: BAR_SEGMENTS }, (_, i) => (
-              <span key={i} className={`pixbar-seg${i < filled ? ' on' : ''}${i === filled - 1 ? ' flash' : ''}`} />
-            ))}
-          </div>
-          {done
-            ? <span className="press-start">PRESS&nbsp;START</span>
-            : <><span className="assembly-pct">{pct}%</span><span className="assembly-sub">◆ PREPARING THE ULTIMATE EXPERIENCE ◆</span></>}
-        </div>
-      </div>
+    <div className={transition.active ? 'transition-overlay boot active' : 'transition-overlay boot'} aria-hidden={!transition.active}>
+      <video ref={vref} className="boot-film" autoPlay muted playsInline preload="auto" disablePictureInPicture>
+        <source src={ui.loadingVideoWebm} type="video/webm" />
+        <source src={ui.loadingVideo} type="video/mp4" />
+      </video>
     </div>
   );
 }
@@ -1311,35 +1293,21 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
 // and each sees a completely separate surface after this.
 // The public front door — MEMBER ONLY. Staff/host tools are never shown here, so
 // nobody browsing the app can see (or poke at) the door system. Venue team gets in
-// with a "secret handshake": press-and-hold the crest (~1.4s) to reveal Team Access.
+// with a hidden trigger: 5 quick taps on the year/footer mark opens Team Access.
 function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
-  const [hold, setHold] = useState(0);            // 0..1 hold progress ring
-  const t0 = useRef(0); const raf = useRef(0);
-  const stopHold = () => { cancelAnimationFrame(raf.current); setHold(0); };
-  const startHold = () => {
-    t0.current = performance.now();
-    const tick = () => {
-      const p = Math.min(1, (performance.now() - t0.current) / 1400);
-      setHold(p);
-      if (p >= 1) { cancelAnimationFrame(raf.current); setHold(0); onStaff(); return; }
-      raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
+  const taps = useRef([]);
+  const secretTap = () => {
+    const now = Date.now();
+    taps.current = taps.current.filter((t) => now - t < 1800).concat(now);
+    if (taps.current.length >= 5) { taps.current = []; onStaff(); }
   };
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
   return (
     <section className="screen screen-door">
       <div className="door-wrap">
-        <button type="button" className={`door-crest${hold > 0 ? ' holding' : ''}`} aria-label="HITMANS VIP AFTER SPOT"
-          onPointerDown={startHold} onPointerUp={stopHold} onPointerLeave={stopHold} onPointerCancel={stopHold}
-          onContextMenu={(e) => e.preventDefault()}>
-          <img src={ui.fullLogo} alt="HITMANS VIP AFTER SPOT" draggable="false" />
-          <svg className="door-crest-ring" viewBox="0 0 100 100" aria-hidden="true">
-            <rect x="3" y="3" width="94" height="94" rx="22" pathLength="1" style={{ strokeDashoffset: 1 - hold }} />
-          </svg>
-        </button>
+        <span className="door-eyebrow">TALLAHASSEE</span>
         <h1 className="door-title">HITMANS VIP<span>AFTER SPOT</span></h1>
-        <p className="door-tag">Tallahassee’s members-only after spot</p>
+        <p className="door-tag">The members-only after spot</p>
+        <div className="door-rule" aria-hidden="true" />
         {auth?.member ? (
           <div className="door-actions">
             <button type="button" className="door-primary" onClick={onMember}>Enter · {auth.member.name} →</button>
@@ -1351,7 +1319,8 @@ function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
             <button type="button" className="door-secondary" onClick={onMember}>New here? Become a member</button>
           </div>
         )}
-        <p className="door-fine">Members only · verified at the door</p>
+        {/* hidden staff/security entry — 5 quick taps here */}
+        <button type="button" className="door-fine" onClick={secretTap}>Members only · verified at the door</button>
       </div>
     </section>
   );
