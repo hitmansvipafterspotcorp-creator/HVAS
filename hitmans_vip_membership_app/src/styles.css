@@ -3439,8 +3439,11 @@ button {
 .perk-body { flex: 1; min-width: 0; }
 .perk-body p { color: #c9b8ff; margin: 0 0 8px; font-size: 13px; }
 .perk-body p b, .perk-none b { color: #ffd66b; }
-.perk-use { background: linear-gradient(90deg,#b06bff,#ff3b8b); color: #fff; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 800; cursor: pointer; }
+.perk-use { background: linear-gradient(90deg,#b06bff,#ff3b8b); color: #fff; border: none; border-radius: 10px; padding: 10px 16px; font-weight: 800; cursor: pointer; }
 .perk-use:disabled { opacity: .45; cursor: default; }
+.perk-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.perk-use.meal { background: linear-gradient(90deg,#ffb347,#ff7a3c); color: #2a1400; }
+.perk-choices .perk-use { flex: 1 1 auto; }
 .perk-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #150a24; border: 1px solid #2f1a4a; border-radius: 10px; padding: 12px 16px; margin-top: 8px; color: #e8dcff; font-weight: 600; }
 .perk-claim { background: #7dffb0; color: #052913; border: none; border-radius: 8px; padding: 8px 16px; font-weight: 800; cursor: pointer; }
 .perk-done { color: #7dffb0; font-size: 13px; white-space: nowrap; }

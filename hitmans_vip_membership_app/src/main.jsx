@@ -27,21 +27,21 @@ const MEMBER_KEY = 'hvas_member_v1';
 
 // Tier perks. Hospitality tickets are issued per night and expire at 3AM.
 export const TIER_PERKS = {
-  Daily: { tickets: 0, meal: false, drinks: false, blurb: 'Entry access' },
-  Weekly: { tickets: 1, meal: false, drinks: false, blurb: '1 hospitality ticket a night (before 3AM)' },
-  Monthly: { tickets: 3, meal: false, drinks: false, blurb: '3 hospitality tickets daily (expire 3AM)' },
-  Yearly: { tickets: 3, meal: true, drinks: false, blurb: '3 tickets daily + a free Cafe8Fifty meal' },
-  VIP: { tickets: 3, meal: true, drinks: true, blurb: 'Free drinks all night + a free meal daily' },
+  Daily: { tickets: 0, drinks: false, blurb: 'Entry access' },
+  Weekly: { tickets: 1, drinks: false, blurb: '1 hospitality ticket a night — entry or a Cafe8Fifty meal' },
+  Monthly: { tickets: 3, drinks: false, blurb: '3 hospitality tickets a night — entry or a Cafe8Fifty meal' },
+  Yearly: { tickets: 3, drinks: false, blurb: '3 hospitality tickets a night — entry or a Cafe8Fifty meal' },
+  VIP: { tickets: 3, drinks: true, blurb: '3 tickets a night (entry or a meal) + free drinks all night' },
 };
 
 // What each tier comes with — shown when a member taps a card on the buy screen
 // so they can choose wisely.
 export const TIER_BENEFITS = {
   Daily: ['Entry for the night', 'Pay what you want until 2 AM — even $0', 'Member card, number & door QR', 'Loyalty rank starts counting'],
-  Weekly: ['7 days of entry', '1 hospitality ticket every night (before 3 AM)', 'Member card, number & door QR', 'Event & venue access once you check in'],
-  Monthly: ['30 days of entry', '3 hospitality tickets every night', 'Event & venue access', 'Faster loyalty rank climb'],
-  Yearly: ['365 days of entry', '3 hospitality tickets every night', 'A free Cafe8Fifty meal daily', 'Priority event & venue access'],
-  VIP: ['365 days of entry', 'Free drinks all night', 'A free meal daily', 'VIP lounge & VIP areas', 'Priority door entry', 'Top loyalty status'],
+  Weekly: ['7 days of entry', '1 hospitality ticket a night — use for entry or a Cafe8Fifty meal', 'Member card, number & door QR', 'Event & venue access once you check in'],
+  Monthly: ['30 days of entry', '3 hospitality tickets a night — entry or a Cafe8Fifty meal', 'Event & venue access', 'Faster loyalty rank climb'],
+  Yearly: ['365 days of entry', '3 hospitality tickets a night — entry or a Cafe8Fifty meal', 'Priority event & venue access', 'Faster loyalty rank climb'],
+  VIP: ['365 days of entry', '3 hospitality tickets a night — entry or a Cafe8Fifty meal', 'Free drinks all night', 'VIP lounge & VIP areas', 'Priority door entry', 'Top loyalty status'],
 };
 // The "night" resets at 3AM — shift the clock back 3h and take the date.
 function nightKey(ts = Date.now()) { return new Date(ts - 3 * 3600000).toISOString().slice(0, 10); }
@@ -198,13 +198,15 @@ export function refreshNight() {
     commitMember({ ...memberState, tickets: perk.tickets, ticketsNight: nk, mealUsed: false });
   }
 }
+// A hospitality ticket is spent EITHER on entry inside OR on a free Cafe8Fifty
+// meal — one ticket, either use. Both just decrement the nightly ticket count.
 export function useTicket() {
   if (!memberState || (memberState.tickets || 0) <= 0) return;
   commitMember({ ...memberState, tickets: memberState.tickets - 1 });
 }
 export function claimMeal() {
-  if (!memberState) return;
-  commitMember({ ...memberState, mealUsed: true });
+  if (!memberState || (memberState.tickets || 0) <= 0) return;
+  commitMember({ ...memberState, tickets: memberState.tickets - 1 });
 }
 
 // Loyalty ranks — earned by nights attended (entries) + loyalty, not bought.
@@ -665,13 +667,6 @@ const screens = [
     detail: 'Your pass, QR, renewal, loyalty rank, and profile — all in one.',
   },
   {
-    id: 'motion',
-    label: 'Members With Motion',
-    eyebrow: 'Promote & Earn',
-    title: 'Members With Motion',
-    detail: 'Your promo code, share QR, referred headcount, and weekly payout.',
-  },
-  {
     id: 'eventAccess',
     label: 'Event Access',
     eyebrow: 'Member Access',
@@ -831,9 +826,8 @@ const ROLES = [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
       { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
-      { title: 'Members With Motion', detail: 'Promote packages, earn 25% of your headcount, paid weekly', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'motion', 'history'],
+    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'history'],
   },
   {
     id: 'staff',
@@ -847,9 +841,8 @@ const ROLES = [
       { title: 'Watchlist', detail: 'Trespassed & banned members — flag or lift', chip: ui.chips.vip, target: 'watchlist' },
       { title: 'Check-In Log', detail: 'Tonight’s entries & door history', chip: ui.chips.checkedIn, target: 'checkInLog' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
-      { title: 'Members With Motion', detail: 'Your promo code, referred headcount, and weekly payout', chip: ui.chips.active, target: 'motion' },
     ],
-    allowed: ['verification', 'staffDashboard', 'watchlist', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments', 'motion'],
+    allowed: ['verification', 'staffDashboard', 'watchlist', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments'],
   },
   {
     id: 'host',
@@ -944,8 +937,6 @@ function App() {
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
     enforceMembership();       // keep a paid membership or stats start over
-    // A shared promo link (?promo=CODE) applies the referrer's code for checkout.
-    try { const c = new URLSearchParams(window.location.search).get('promo'); if (c) setActivePromo(c); } catch { /* ignore */ }
     // The app IS the backend: it always runs its own in-browser hub in the
     // background — no "connect to venue", no server. Members come onto the
     // network the moment they buy a membership (see purchaseTier).
@@ -1271,7 +1262,6 @@ function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
   if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
-  if (activeScreen === 'motion') return <MembersWithMotionScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -1933,12 +1923,8 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
     ? (openFree ? Math.max(0, Math.round((Number(give) || 0) * 100) / 100) : DAILY_LATE_PRICE)
     : t.price;
   const free = openFree && amount <= 0;              // $0 contribution → join free
-  // Members With Motion: a referral code gives the buyer a discount and credits
-  // the promoter. Applied to any real (non-free) charge.
-  const [promoField, setPromoField] = useState(activePromo());
-  const promo = (promoField || activePromo()).toUpperCase().trim();
-  const payAmount = (promo && !free) ? Math.round(amount * (1 - PROMO_DISCOUNT) * 100) / 100 : amount;
-  const finalize = (via, amt) => { purchaseTier(tier, via, amt); if (promo) redeemPromo(promo, amt); clearActivePromo(); };
+  const payAmount = amount;
+  const finalize = (via, amt) => { purchaseTier(tier, via, amt); };
   return (
     <div className="mem-screen">
       {renewMode && onBack && (
@@ -2003,14 +1989,6 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
         </div>
       )}
 
-      <div className="mem-promo">
-        <span className="mem-pay-label">Promo code <small>(optional)</small></span>
-        <input className="mem-promo-input" type="text" value={promoField}
-          onChange={(e) => { setPromoField(e.target.value); setActivePromo(e.target.value); }}
-          placeholder="Friend's code — save 15%" autoComplete="off" />
-        {promo && !free && <p className="mem-promo-on">✓ Code <b>{promo}</b> applied — {Math.round(PROMO_DISCOUNT * 100)}% off</p>}
-      </div>
-
       <div className="mem-pay">
         <span className="mem-pay-label">Pay with</span>
         <div className="mem-pay-grid">
@@ -2024,15 +2002,14 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
 
       <div className="buy-checkout">
         <p className="buy-summary">
-          {tier} membership · {promo && !free && <s className="buy-was">{fmtUSD(amount)}</s>}
-          <b>{free ? 'Free' : fmtUSD(payAmount)}</b>{t.vip ? ' · VIP' : ''} · {free ? 'no charge' : pay}
+          {tier} membership · <b>{free ? 'Free' : fmtUSD(payAmount)}</b>{t.vip ? ' · VIP' : ''} · {free ? 'no charge' : pay}
         </p>
         {free ? (
           // Open contribution set to $0 — join free, straight onto the network.
           <button type="button" className="asset-cta" onClick={() => finalize('Free', 0)} aria-label="Join free">
             <img src={ui.buttons.selectPlan} alt="Join free" />
           </button>
-        ) : pay === 'PayPal' && tierPayable(tier) && !t.open && !promo ? (
+        ) : pay === 'PayPal' && tierPayable(tier) && !t.open ? (
           // Recurring subscription buttons (card / Apple Pay / Venmo / balance)
           <PayPalSubscribe tier={tier} onPaid={() => finalize('PayPal', payAmount)} />
         ) : pay === 'PayPal' && paypalMeEnabled() ? (
@@ -2226,26 +2203,25 @@ function MemberPass({ member, checkedIn, onRenew }) {
         </div>
       </div>
 
-      {/* — tonight's perks: hospitality tickets / meal / drinks — */}
+      {/* — tonight's perks: hospitality tickets (entry OR a Cafe8Fifty meal) — */}
       <section className="perks">
         <h3>Tonight’s perks</h3>
         {perk.tickets > 0 && (
           <div className="perk-tickets">
             <div className="ticket-stub"><b>{tickets}</b><span>hospitality<br />{tickets === 1 ? 'ticket' : 'tickets'}</span></div>
             <div className="perk-body">
-              <p>Use inside before <b>3AM</b> · resets nightly.</p>
-              <button type="button" className="perk-use" disabled={tickets <= 0} onClick={useTicket}>
-                {tickets > 0 ? 'Use a ticket' : 'Used up tonight'}
-              </button>
+              <p>Use each ticket for <b>entry inside</b> <i>or</i> a <b>free Cafe8Fifty meal</b>. Resets nightly at 3AM.</p>
+              {tickets > 0 ? (
+                <div className="perk-choices">
+                  <button type="button" className="perk-use" onClick={useTicket}>🎟 Use for entry</button>
+                  <button type="button" className="perk-use meal" onClick={claimMeal}>🍽 Cafe8Fifty meal</button>
+                </div>
+              ) : <span className="perk-done">Used up tonight</span>}
             </div>
           </div>
         )}
-        {perk.meal && (
-          <div className="perk-row"><span>🍽 Free Cafe8Fifty meal daily</span>
-            {member.mealUsed ? <span className="perk-done">Claimed tonight</span> : <button type="button" className="perk-claim" onClick={claimMeal}>Claim</button>}</div>
-        )}
         {perk.drinks && <div className="perk-row"><span>🥂 Drinks free all night</span><span className="perk-vip">VIP</span></div>}
-        {perk.tickets === 0 && !perk.meal && !perk.drinks && <p className="perk-none">Entry access only. Upgrade for nightly hospitality tickets.</p>}
+        {perk.tickets === 0 && !perk.drinks && <p className="perk-none">Entry access only. Upgrade for nightly hospitality tickets.</p>}
       </section>
 
       {/* — renewal countdown — */}
@@ -2337,97 +2313,6 @@ function MemberPass({ member, checkedIn, onRenew }) {
   );
 }
 
-// Members With Motion — the referral / promoter program. Generate a promo code
-// + share QR; anyone who buys a package with it saves 15% and you earn 25% of
-// what your referred headcount pays, tallied per night and paid out weekly.
-function MembersWithMotionScreen() {
-  const member = useMember();
-  const auth = useAuth();
-  const [promo, setPromo] = useState(myPromo());
-  const [, tick] = useState(0);
-  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(id); }, []);
-  const name = auth?.member?.name || member?.name || 'Promoter';
-  const base = (typeof window !== 'undefined') ? window.location.origin + import.meta.env.BASE_URL : '';
-  const shareUrl = promo ? `${base}?promo=${promo.code}` : '';
-  const qr = useQrDataUrl(shareUrl, ui.fullLogoClear);
-  const stats = promo ? promoStats(promo.code) : null;
-  const [copied, setCopied] = useState('');
-  const copy = (text, what) => { try { navigator.clipboard?.writeText(text); setCopied(what); setTimeout(() => setCopied(''), 1500); } catch { /* ignore */ } };
-
-  return (
-    <div className="mem-screen motion-screen">
-      <div className="mem-intro">
-        <h2>Members With Motion</h2>
-        <p>Share your code, put people on the guest list, and get paid. They save {Math.round(PROMO_DISCOUNT * 100)}% — you earn {Math.round(PROMO_PAYOUT * 100)}% of everything your headcount pays. Tallied each night, paid out weekly.</p>
-      </div>
-
-      {!promo ? (
-        <div className="motion-generate">
-          <p>Generate your personal promo code and share QR. It never expires.</p>
-          <button type="button" className="motion-gen-btn" onClick={() => setPromo(generatePromo({ name, number: member?.number }))}>
-            ✦ Generate my promo code
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="motion-card">
-            <div className="motion-qr">
-              {qr ? <img src={qr} alt="Promo QR" /> : <div className="qr-load">QR…</div>}
-              <BrandStamp compact />
-              <span>Scan to join with your code</span>
-            </div>
-            <div className="motion-code-box">
-              <span className="motion-code-label">YOUR CODE</span>
-              <strong className="motion-code">{promo.code}</strong>
-              <div className="motion-code-actions">
-                <button type="button" onClick={() => copy(promo.code, 'code')}>{copied === 'code' ? 'Copied ✓' : 'Copy code'}</button>
-                <button type="button" onClick={() => copy(shareUrl, 'link')}>{copied === 'link' ? 'Copied ✓' : 'Copy link'}</button>
-              </div>
-            </div>
-          </div>
-
-          <div className="motion-stats">
-            <div className="motion-stat"><span className="ms-num">{stats.tonightHeads}</span><span className="ms-lbl">tonight’s headcount</span></div>
-            <div className="motion-stat"><span className="ms-num">{fmtUSD(stats.tonightRevenue)}</span><span className="ms-lbl">referred tonight</span></div>
-            <div className="motion-stat hot"><span className="ms-num">{fmtUSD(stats.weekPayout)}</span><span className="ms-lbl">this week’s payout ({Math.round(PROMO_PAYOUT * 100)}%)</span></div>
-          </div>
-          <div className="motion-week">
-            <span>This week: <b>{stats.weekHeads}</b> people · <b>{fmtUSD(stats.weekRevenue)}</b> referred</span>
-            <span className="motion-payout-note">💸 Paid out every Monday. All-time: {stats.allHeads} joins.</span>
-          </div>
-
-          {stats.people.length > 0 && (
-            <div className="motion-people">
-              <h3>Who used your code <small>(your proof)</small></h3>
-              <ul>
-                {stats.people.slice(0, 30).map((r, i) => (
-                  <li key={i}>
-                    <span className="mp-who"><b>{r.name}</b>{r.contact ? ` · ${r.contact}` : ''}</span>
-                    <span className="mp-amt">{r.paid > 0 ? fmtUSD(r.paid) : 'free'} · {fmtDate(r.at)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="motion-how">
-            <h3>How it works</h3>
-            <ol>
-              <li>Share your QR or code — text it, post it, show it at the door.</li>
-              <li>They scan or type it at checkout and save {Math.round(PROMO_DISCOUNT * 100)}%.</li>
-              <li>You earn {Math.round(PROMO_PAYOUT * 100)}% of what they pay — auto-tallied here.</li>
-              <li>Payouts go out weekly to your PayPal.</li>
-            </ol>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-// Staff door dashboard — live status driven by the shared member store: who's
-// signalled on the way, who's been verified inside tonight, and the last door
-// decision. Ticks every 30s so the "on the way" age stays fresh.
 // Owner reconciliation — the HVAS Pay board. Pending Zelle/cash claims stream
 // here (converged over the mesh); confirm activates the membership, void drops it.
 function PaymentsScreen() {
