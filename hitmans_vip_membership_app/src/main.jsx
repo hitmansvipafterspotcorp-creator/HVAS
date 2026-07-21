@@ -215,8 +215,9 @@ export const RANKS = [
   { name: 'Bronze', min: 0, src: `${A_}assets/ui/rank/bronze.png` },
   { name: 'Silver', min: 5, src: `${A_}assets/ui/rank/silver.png` },
   { name: 'Gold', min: 12, src: `${A_}assets/ui/rank/gold.png` },
-  { name: 'Platinum', min: 25, src: `${A_}assets/ui/rank/platinum.png` },
-  { name: 'VIP', min: 45, src: `${A_}assets/ui/rank/vip.png` },
+  { name: 'Platinum', min: 24, src: `${A_}assets/ui/rank/platinum.png` },
+  { name: 'Diamond', min: 40, src: `${A_}assets/ui/rank/diamond.png` },
+  { name: 'VIP', min: 60, src: `${A_}assets/ui/rank/vip.png` },
 ];
 export function rankFor(entries = 0) {
   let r = RANKS[0], next = null;

@@ -3380,7 +3380,7 @@ button {
 .loyalty h3, .prefs h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 12px; }
 .loyalty-warn { color: #ffcf8f; font-size: 12.5px; line-height: 1.4; background: rgba(120,70,20,.28); border: 1px solid #7a5a2a; border-radius: 10px; padding: 9px 12px; margin: 0 0 12px; }
 .loyalty-warn b { color: #ffe3b0; }
-.loyalty-badges { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.loyalty-badges { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 /* Badges have their own art — no dark box around them (matches the tier cards). */
 .loyalty-badge { display: grid; place-items: center; padding: 6px 4px; border: none; background: none; opacity: .4; filter: grayscale(.55); transition: opacity .15s, filter .15s, transform .15s; }
 .loyalty-badge.earned { opacity: 1; filter: none; }
