@@ -56,7 +56,11 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
     preload() {
       this.load.image('bg', VENUE_ASSET(V.bg));
       loadFighter(this, fighterId, 'f');
-      if (V.mode !== 'topdown') loadFighter(this, ENEMY_ID, 'e');  // brawler stages fight
+      if (V.mode !== 'topdown') {
+        loadFighter(this, ENEMY_ID, 'e');  // brawler stages fight
+        for (const h of ['health_bar', 'hit_flash'])
+          this.load.image(`hud_${h}`, `${BASE}assets/game/hud/hud_${h}.png`);
+      }
     }
     keys() {
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -137,10 +141,14 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
     }
     buildHud() {
       const W = this.scale.width, H = this.scale.height;
-      this.hpBg = this.add.rectangle(16, 14, W * 0.32, 14, 0x2a0f1e).setOrigin(0, 0).setScrollFactor(0).setDepth(1e6).setStrokeStyle(2, 0xba6bff);
-      this.hpFg = this.add.rectangle(18, 16, W * 0.32 - 4, 10, 0x52ffa8).setOrigin(0, 0).setScrollFactor(0).setDepth(1e6);
-      this.hpMax = W * 0.32 - 4;
-      this.banner = this.add.text(W / 2, H * 0.1, '', { fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(H * 0.03)}px`, color: '#ff6b6b', stroke: '#20102e', strokeThickness: 5 }).setOrigin(0.5).setScrollFactor(0).setDepth(1e6);
+      // real health bar art (frame + red fill baked in); deplete by masking the right of the fill
+      const bw = Math.min(W * 0.46, 430), bh = bw * (59 / 602);
+      this.add.image(10, 8, 'hud_health_bar').setOrigin(0, 0).setDisplaySize(bw, bh).setScrollFactor(0).setDepth(1e6);
+      this.hpX0 = 10 + bw * 0.175; this.hpX1 = 10 + bw * 0.955; this.hpY = 8 + bh * 0.30; this.hpH = bh * 0.42;
+      this.hpMask = this.add.rectangle(this.hpX1, this.hpY, 0, this.hpH, 0x0a0410, 0.88).setOrigin(1, 0).setScrollFactor(0).setDepth(1e6 + 1);
+      // full-screen damage flash (real art)
+      this.hitFlash = this.add.image(W / 2, H / 2, 'hud_hit_flash').setDisplaySize(W, H).setScrollFactor(0).setDepth(1e6 + 5).setAlpha(0);
+      this.banner = this.add.text(W / 2, H * 0.13, '', { fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(H * 0.032)}px`, color: '#ffd66b', stroke: '#20102e', strokeThickness: 6, fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0).setDepth(1e6);
     }
     aliveCount() { return this.enemies.filter((e) => !e.ko).length; }
     doAttack() {
@@ -188,6 +196,7 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       const dir = Math.sign(this.player.x - fromX) || 1;
       this.player.x = Phaser.Math.Clamp(this.player.x + dir * this.scale.width * 0.05, this.leftB, this.rightB);
       this.player.setTint(0xff5b5b); this.time.delayedCall(120, () => this.player.clearTint());
+      if (this.hitFlash) { this.hitFlash.setAlpha(0.7); this.tweens.add({ targets: this.hitFlash, alpha: 0, duration: 300 }); }
       if (this.hp <= 0) { this.hp = this.maxHp; this.player.setPosition(this.leftB + 40, this.floorY); this.spawnWave(); } // wipe → reset block
     }
     update() {
@@ -239,8 +248,7 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       }
 
       // ── HUD + door gating ──
-      this.hpFg.width = this.hpMax * (this.hp / this.maxHp);
-      this.hpFg.fillColor = this.hp > 40 ? 0x52ffa8 : 0xff5b5b;
+      this.hpMask.width = (this.hpX1 - this.hpX0) * (1 - Math.max(0, this.hp) / this.maxHp);
       const remaining = this.aliveCount();
       this.cleared = remaining === 0;
       let near = null;
