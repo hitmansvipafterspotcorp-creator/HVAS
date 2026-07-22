@@ -38,15 +38,19 @@ export const STAGE_UNLOCKS: Record<StageId, VenueId> = {
   tally_exterior: 'tally_public_hall_inside',
 };
 
-// The stages that have venue doors on the brawler map (in linear order).
+// The stages that have venue doors on the brawler map, in canonical quest
+// order (per the master venues doc):
+// Cafe8Fifty → HITMANS VIP → Kingdom Come Saloon → Social Gaines →
+// Success Rooftop (off Social Gaines interior) → Outta Pocket →
+// Tally Row → Dukes & Dimes → Quick Hit Fuel.
 export const STAGE_SEQUENCE: StageId[] = [
   'cafe8fifty',
-  'dukes_exterior',
   'kcs_exterior',
-  'outta_exterior',
-  'qhf_exterior',
   'social_gaines_exterior',
+  'outta_exterior',
   'tally_exterior',
+  'dukes_exterior',
+  'qhf_exterior',
 ];
 
 type SaveData = {

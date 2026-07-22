@@ -4,20 +4,23 @@ import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { UISystem, UI } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
-// All venues with display metadata. Order mirrors the quest flow.
+// All venues with display metadata. Order mirrors the canonical quest flow:
+// Cafe8Fifty → HITMANS VIP → Kingdom Come Saloon → Social Gaines →
+// Success Rooftop → Outta Pocket → Tally Row (13 Rave, Public Hall, Sammy's,
+// Itus, The Den) → Dukes & Dimes → Quick Hit Fuel.
 const ALL_VENUES = [
   { id: 'hitmans_vip_inside',       name: "Hitman's VIP After Spot", area: 'Cafe8Fifty',     always: true },
-  { id: 'dukes_inside',             name: "Duke's — Inside",         area: "Duke's",          always: false },
   { id: 'kcs_inside',               name: 'Kingdom Come Saloon',     area: 'KCS',             always: false },
-  { id: 'outta_inside',             name: 'Outta Pocket',            area: 'Outta Pocket',    always: false },
-  { id: 'qhf_inside',               name: 'Quick Hit Fuel',          area: 'QHF',             always: false },
   { id: 'social_gaines_inside',     name: 'Social Gaines',           area: 'Social Gaines',   always: false },
   { id: 'success_inside',           name: 'Success Rooftop Lounge',  area: 'Success',         always: false },
+  { id: 'outta_inside',             name: 'Outta Pocket',            area: 'Outta Pocket',    always: false },
+  { id: 'tally_13rave_inside',      name: '13Rave',                  area: 'Tally Row',       always: false },
   { id: 'tally_public_hall_inside', name: 'Public Hall',             area: 'Tally Row',       always: false },
   { id: 'tally_sammys_inside',      name: "Sammy's",                 area: 'Tally Row',       always: false },
-  { id: 'tally_13rave_inside',      name: '13Rave',                  area: 'Tally Row',       always: false },
-  { id: 'tally_den_inside',         name: 'The Den',                 area: 'Tally Row',       always: false },
   { id: 'tally_itus_inside',        name: 'Itus',                    area: 'Tally Row',       always: false },
+  { id: 'tally_den_inside',         name: 'The Den',                 area: 'Tally Row',       always: false },
+  { id: 'dukes_inside',             name: "Duke's — Inside",         area: "Duke's",          always: false },
+  { id: 'qhf_inside',               name: 'Quick Hit Fuel',          area: 'QHF',             always: false },
 ];
 
 // Venue card art keys — prefer the dedicated unlocked/locked card templates.
