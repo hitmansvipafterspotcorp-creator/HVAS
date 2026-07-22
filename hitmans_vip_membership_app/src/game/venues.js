@@ -10,6 +10,7 @@ const BASE = import.meta.env.BASE_URL;
 export const VENUE_ASSET = (id) => `${BASE}assets/game/venues/${id}.png`;
 
 export const GAME_FIGHTERS = new Set([
+  'korey',
   'creator', 'dj', 'promoter', 'dancer', 'host', 'photographer', 'vendor',
   'security', 'influencer', 'famu_female', 'famu_male', 'fsu_female', 'fsu_male',
   'kt', 'kendrick',

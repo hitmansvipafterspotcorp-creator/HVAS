@@ -871,6 +871,7 @@ const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
 // whole run (mission types, combat baseline, networking). Portraits are the
 // game's own idle frames.
 const ROSTER = [
+  { id: 'korey', name: 'Korey Da Hitman 215', role: 'Minister · producer · the boss', portrait: '/assets/fighters/korey.png', strong: 'Fire-dragon super · block · owner presence', weak: 'Moves with purpose, not in a hurry', accent: '#ff3b3b' },
   { id: 'creator', name: 'The Creator', role: 'Movement builder', portrait: '/assets/fighters/creator.png', strong: 'Networking · influence · event bonuses', weak: 'Weaker combat early', accent: '#ff2bd6' },
   { id: 'dj', name: 'The DJ', role: 'Vibe control', portrait: '/assets/fighters/dj.png', strong: 'Audio / VFX crowd boosts', weak: 'Limited street combat', accent: '#7f3cff' },
   { id: 'promoter', name: 'The Promoter', role: 'Guest list', portrait: '/assets/fighters/promoter.png', strong: 'Referrals · crowd pull', weak: 'Soft in a fight early', accent: '#ff2bd6' },
