@@ -35,12 +35,32 @@ export const VENUES = {
   kingdom_come_exterior: {
     name: 'Kingdom Come Saloon', mode: 'brawler', bg: 'kingdom_come_exterior',
     floorY: 0.9, laneDepth: 0.09,
-    doors: [{ x: 0.84, to: 'kingdom_come_interior', label: 'Saloon' }],
+    // the swinging saloon doors sit center-right of the facade
+    doors: [{ x: 0.6, to: 'kingdom_come_interior', label: 'Saloon' }],
   },
   kingdom_come_interior: {
     name: 'Kingdom Come — Inside', mode: 'topdown', bg: 'kingdom_come_interior',
-    spawn: { x: 0.5, y: 0.82 },
-    doors: [{ x: 0.5, y: 0.93, to: 'kingdom_come_exterior', label: 'Exit' }],
+    spawn: { x: 0.46, y: 0.86 },
+    // reach the dart wall up top and the whole floor
+    walk: { left: 0.07, right: 0.9, top: 0.11, bottom: 0.9 },
+    // solid furniture you walk around: central U-bar + the four pool tables
+    blockers: [
+      { x: 0.29, y: 0.25, w: 0.4, h: 0.33 },   // central U-bar island
+      { x: 0.12, y: 0.42, w: 0.12, h: 0.14 },  // pool table (left upper)
+      { x: 0.12, y: 0.58, w: 0.12, h: 0.14 },  // pool table (left lower)
+      { x: 0.77, y: 0.38, w: 0.12, h: 0.14 },  // pool table (right upper)
+      { x: 0.77, y: 0.56, w: 0.12, h: 0.14 },  // pool table (right lower)
+    ],
+    // people + points of interest, placed on the real floor plan
+    spots: [
+      { x: 0.46, y: 0.63, label: 'Bartender', line: "Kingdom Come pours 'em stiff — tip or the Hitman slaps ya." },
+      { x: 0.3, y: 0.17, label: 'Dart Stations', line: 'Bullseye buys the next round. You game?' },
+      { x: 0.55, y: 0.18, label: 'Open Mic', line: 'Live music at 10 — The Outlaws. Grab a seat.' },
+      { x: 0.24, y: 0.52, label: 'Pool Shark', line: "Rack 'em. Loser covers the sake shots." },
+      { x: 0.76, y: 0.48, label: 'Pool Table', line: 'Nine ball, corner pocket — money on the rail.' },
+      { x: 0.89, y: 0.4, label: 'Back Door', line: "Out back's the lot. Keep it moving, partner." },
+    ],
+    doors: [{ x: 0.46, y: 0.95, to: 'kingdom_come_exterior', label: 'Exit' }],
   },
 
   // ── Social Gaines → Success Rooftop ──

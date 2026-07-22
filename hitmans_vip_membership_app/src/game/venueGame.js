@@ -148,10 +148,18 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       this.bg.setScale(s).setPosition(W / 2, H / 2);
       this.roomW = img.width * s; this.roomH = img.height * s;
       this.rx0 = (W - this.roomW) / 2; this.ry0 = (H - this.roomH) / 2;
-      // walkable inset (avoid the outer wall band)
-      const mx = this.roomW * 0.1, myTop = this.roomH * 0.28, myBot = this.roomH * 0.08;
-      this.walk = { x0: this.rx0 + mx, x1: this.rx0 + this.roomW - mx, y0: this.ry0 + myTop, y1: this.ry0 + this.roomH - myBot };
-      this.doorPts = (V.doors || []).map((d) => ({ ...d, sx: this.rx0 + d.x * this.roomW, sy: this.ry0 + d.y * this.roomH }));
+      const fx = (f) => this.rx0 + f * this.roomW, fy = (f) => this.ry0 + f * this.roomH;
+      // walkable region: per-venue override, else the default outer-wall inset
+      const wk = V.walk || { left: 0.1, right: 0.9, top: 0.28, bottom: 0.92 };
+      this.walk = { x0: fx(wk.left), x1: fx(wk.right), y0: fy(wk.top), y1: fy(wk.bottom) };
+      // solid furniture rectangles the player walks around
+      this.blockRects = (V.blockers || []).map((b) => ({ x0: fx(b.x), y0: fy(b.y), x1: fx(b.x + b.w), y1: fy(b.y + b.h) }));
+      this.doorPts = (V.doors || []).map((d) => ({ ...d, sx: fx(d.x), sy: fy(d.y) }));
+      this.spotPts = (V.spots || []).map((sp) => ({ ...sp, sx: fx(sp.x), sy: fy(sp.y) }));
+      if (this.spotVis) this.spotVis.forEach((v, i) => {
+        const p = this.spotPts[i]; if (!p) return;
+        v.marker.setPosition(p.sx, p.sy); v.label.setPosition(p.sx, p.sy - H * 0.032);
+      });
       if (this.player) this.player.setScale((H * 0.16) / this.player.height);
     }
     create() {
@@ -166,6 +174,17 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       this.player.setPosition(this.rx0 + sp.x * this.roomW, this.ry0 + sp.y * this.roomH);
       // door glows
       this.glows = this.doorPts.map((d) => this.add.ellipse(d.sx, d.sy, this.scale.width * 0.1, this.scale.height * 0.03, 0xba6bff, 0.4).setDepth(0.5));
+      // interactive hotspots / NPCs (gold pulsing star + floating label)
+      this.spotVis = (this.spotPts || []).map((sp) => {
+        const r = this.scale.height * 0.018;
+        const marker = this.add.star(sp.sx, sp.sy, 5, r * 0.5, r, 0xffd66b, 0.95).setDepth(0.6);
+        const label = this.add.text(sp.sx, sp.sy - this.scale.height * 0.032, sp.label, {
+          fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(this.scale.height * 0.02)}px`,
+          color: '#ffe8a3', stroke: '#20102e', strokeThickness: 4,
+        }).setOrigin(0.5, 1).setDepth(0.7);
+        this.tweens.add({ targets: marker, scaleX: 1.35, scaleY: 1.35, yoyo: true, duration: 720, repeat: -1, ease: 'Sine.inOut' });
+        return { marker, label };
+      });
       titleCard(this, V.name);
       this.canPortal = false; this.time.delayedCall(500, () => { this.canPortal = true; });
       this.scale.on('resize', this.layout, this);
@@ -237,6 +256,21 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
         if (r.bubble) r.bubble.setPosition(node.x, r.label.y - r.label.height - 2).setDepth(1e5);
       }
     }
+    blockedAt(x, y, pad) {
+      for (const b of (this.blockRects || [])) {
+        if (x > b.x0 - pad && x < b.x1 + pad && y > b.y0 - pad && y < b.y1 + pad) return true;
+      }
+      return false;
+    }
+    sayLine(spot) {
+      this.lineBubble?.destroy();
+      this.lineBubble = this.add.text(this.player.x, this.player.y - this.player.displayHeight - 6, `${spot.label}: ${spot.line}`, {
+        fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(this.scale.height * 0.021)}px`,
+        color: '#fff', backgroundColor: '#20102ee6', padding: { x: 8, y: 5 },
+        wordWrap: { width: this.scale.width * 0.44 }, align: 'center',
+      }).setOrigin(0.5, 1).setDepth(1e6);
+      this.time.delayedCall(4200, () => { if (this.lineBubble) { this.lineBubble.destroy(); this.lineBubble = null; } });
+    }
     nearestRemote() {
       let best = null, bd = this.scale.width * 0.09;
       for (const [id, r] of this.remotes) {
@@ -256,8 +290,12 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       if (k.D) vy = spd;
       this.player.setFlipX(this.facing < 0);
       this.player.play((vx || vy) ? 'walk' : 'idle', true);
-      this.player.x = Phaser.Math.Clamp(this.player.x + vx, this.walk.x0, this.walk.x1);
-      this.player.y = Phaser.Math.Clamp(this.player.y + vy, this.walk.y0, this.walk.y1);
+      // move with wall clamp + furniture collision (axis-separated so you slide)
+      const pad = this.scale.width * 0.012;
+      const nx = Phaser.Math.Clamp(this.player.x + vx, this.walk.x0, this.walk.x1);
+      if (!this.blockedAt(nx, this.player.y, pad)) this.player.x = nx;
+      const ny = Phaser.Math.Clamp(this.player.y + vy, this.walk.y0, this.walk.y1);
+      if (!this.blockedAt(this.player.x, ny, pad)) this.player.y = ny;
       this.player.setDepth(this.player.y);
       // networking: animate other members + ping my position (throttled)
       this.drawRemotes();
@@ -266,14 +304,22 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
         const fx = (this.player.x - this.rx0) / this.roomW, fy = (this.player.y - this.ry0) / this.roomH;
         this.social.ping(fighterId, +fx.toFixed(3), +fy.toFixed(3));
       }
-      // prompt: a door takes priority; otherwise a nearby member to link with
+      // prompt priority: door > hotspot/NPC > nearby member to link with
       let near = null;
       for (const d of this.doorPts) if (Phaser.Math.Distance.Between(this.player.x, this.player.y, d.sx, d.sy) < this.scale.width * 0.11) near = d;
       if (near) { this.prompt.setText(`Y — ${near.label}`).setVisible(true); if (this.canPortal && k.interact) { this.consume(); fire(near.to); } }
       else {
-        const peer = this.social ? this.nearestRemote() : null;
-        if (peer) { this.prompt.setText(`Y — link with ${peer.label}`).setVisible(true); if (k.interact) { this.consume(); this.social.link(peer.id); } }
-        else this.prompt.setVisible(false);
+        let spot = null, sd = this.scale.width * 0.1;
+        for (const sp of (this.spotPts || [])) {
+          const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, sp.sx, sp.sy);
+          if (d < sd) { sd = d; spot = sp; }
+        }
+        if (spot) { this.prompt.setText(`Y — ${spot.label}`).setVisible(true); if (k.interact) { this.consume(); this.sayLine(spot); } }
+        else {
+          const peer = this.social ? this.nearestRemote() : null;
+          if (peer) { this.prompt.setText(`Y — link with ${peer.label}`).setVisible(true); if (k.interact) { this.consume(); this.social.link(peer.id); } }
+          else this.prompt.setVisible(false);
+        }
       }
       this.consume();
     }
