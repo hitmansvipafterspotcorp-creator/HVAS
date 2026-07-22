@@ -3288,6 +3288,12 @@ button {
 .mem-verified-alert { display: block; height: 46px; width: auto; margin-top: 10px; }
 .mem-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
 .mem-cancel { background: none; border: none; color: #8a6fb0; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 8px; }
+.mem-signout { display: block; width: 100%; margin-top: 12px; padding: 12px; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(176,107,255,.16), rgba(176,107,255,.06));
+  border: 1px solid rgba(176,107,255,.5); color: #e7d6ff; font-weight: 700; font-size: 14px; letter-spacing: .04em;
+  transition: filter .15s, transform .1s; }
+.mem-signout:hover { filter: brightness(1.15); }
+.mem-signout:active { transform: translateY(1px); }
 
 /* QR inside the ornate frame asset */
 .qr-framed { position: relative; width: 150px; }

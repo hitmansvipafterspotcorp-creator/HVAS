@@ -944,6 +944,13 @@ function App() {
     if (!apiEnabled()) startHub();
   }, []);
 
+  // Signing out (from anywhere — the door or the profile) clears the member
+  // identity; whenever that happens while inside the member area, drop back to
+  // the public door so logout is one tap and never leaves a dead screen.
+  useEffect(() => {
+    if (role === 'member' && !auth.member) switchRole();
+  }, [role, auth.member]);
+
   function phaseFor(progress) {
     return loadingPhases.find((phase) => progress <= phase.until) ?? loadingPhases.at(-1);
   }
@@ -2352,6 +2359,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
             <span>{label}</span><span className="pref-toggle" aria-hidden="true" />
           </button>
         ))}
+        <button type="button" className="mem-signout" onClick={memberSignOut}>Sign out</button>
         <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
       </section>
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
