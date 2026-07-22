@@ -6,18 +6,19 @@ const BASE = import.meta.env.BASE_URL;
 const FIG = (id, anim, i) => `${BASE}assets/game/fighters/${id}/${anim}_${i}.png`;
 const selfMemberId = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_member_id')) || '';
 
-// Shared: load a fighter's idle/walk/atk frames and build the anims.
-function loadFighter(scene, fighterId) {
+// Shared: load a fighter's idle/walk/atk frames and build the anims. `p` is the
+// texture-key prefix ('f' = player, 'e' = enemy) so a stage can hold both.
+function loadFighter(scene, fighterId, p = 'f') {
   for (const anim of ['idle', 'walk', 'atk']) {
-    for (let i = 0; i < 8; i++) scene.load.image(`f_${anim}_${i}`, FIG(fighterId, anim, i));
+    for (let i = 0; i < 8; i++) scene.load.image(`${p}_${anim}_${i}`, FIG(fighterId, anim, i));
   }
 }
-function makeFighterAnims(scene) {
+function makeFighterAnims(scene, p = 'f', animPrefix = '') {
   const mk = (key, prefix, fps, repeat) => {
     if (scene.anims.exists(key)) return;
     scene.anims.create({ key, frameRate: fps, repeat, frames: Array.from({ length: 8 }, (_, i) => ({ key: `${prefix}_${i}` })) });
   };
-  mk('idle', 'f_idle', 6, -1); mk('walk', 'f_walk', 10, -1); mk('atk', 'f_atk', 16, 0);
+  mk(`${animPrefix}idle`, `${p}_idle`, 6, -1); mk(`${animPrefix}walk`, `${p}_walk`, 10, -1); mk(`${animPrefix}atk`, `${p}_atk`, 16, 0);
 }
 
 function titleCard(scene, name) {
@@ -48,9 +49,15 @@ function readInput() {
 export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
   const V = VENUES[venueId] || VENUES.cafe8fifty_exterior;
   const fire = (to) => { if (onPortal) onPortal(to); };
+  // enemies use a different fighter so the roster reads as a crowd of opps
+  const ENEMY_ID = fighterId === 'fsu_male' ? 'famu_male' : 'fsu_male';
 
   class Base extends Phaser.Scene {
-    preload() { this.load.image('bg', VENUE_ASSET(V.bg)); loadFighter(this, fighterId); }
+    preload() {
+      this.load.image('bg', VENUE_ASSET(V.bg));
+      loadFighter(this, fighterId, 'f');
+      if (V.mode !== 'topdown') loadFighter(this, ENEMY_ID, 'e');  // brawler stages fight
+    }
     keys() {
       this.cursors = this.input.keyboard.createCursorKeys();
       this.wasd = this.input.keyboard.addKeys('W,A,S,D');
@@ -75,49 +82,117 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
     layout() {
       const W = this.scale.width, H = this.scale.height;
       const img = this.textures.get('bg').getSourceImage();
-      const s = H / img.height;
-      this.bg.setScale(s).setPosition(0, 0);
+      const s = Math.max(W / img.width, H / img.height);   // COVER: fill the screen, no black bars
+      this.bg.setScale(s).setOrigin(0, 1).setPosition(0, H); // anchor the floor to the bottom, crop sky
       this.worldW = img.width * s;
       this.floorY = H * (V.floorY || 0.9);
-      this.laneDepth = H * (V.laneDepth || 0.08);
+      this.laneDepth = H * (V.laneDepth || 0.09);
       this.leftB = W * 0.04; this.rightB = this.worldW - W * 0.04;
-      // single-door exterior: the door is the end of the block — stop there so
-      // you can't overshoot past the entrance.
       const dd = V.doors || [];
       if (dd.length === 1) this.rightB = Math.min(this.rightB, this.worldW * dd[0].x + W * 0.06);
       this.cameras.main.setBounds(0, 0, Math.max(this.worldW, W), H);
-      if (this.player) this.player.setScale((H * 0.3) / this.player.height);
+      if (this.player) this.player.setScale((H * 0.17) / this.player.height);
+      if (this.enemies) this.enemies.forEach((e) => e.spr.setScale((H * 0.16) / e.spr.height));
     }
     create() {
-      makeFighterAnims(this);
+      makeFighterAnims(this, 'f', '');       // player anims: idle/walk/atk
+      makeFighterAnims(this, 'e', 'e');       // enemy anims: eidle/ewalk/eatk
       this.bg = this.add.image(0, 0, 'bg').setOrigin(0, 0);
       this.player = this.add.sprite(0, 0, 'f_idle_0').setOrigin(0.5, 1).play('idle');
       this.facing = 1; this.attacking = false;
+      this.hp = 100; this.maxHp = 100; this.invulnUntil = 0; this.freezeUntil = 0;
       this.spark = this.add.circle(0, 0, 16, 0xffd66b, 0.9).setVisible(false).setDepth(1e6);
       this.keys();
       this.prompt = promptText(this);
       this.layout();
       this.player.setPosition(this.leftB + 40, this.floorY);
       this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-      // door markers
       this.doors = (V.doors || []).map((d) => {
         const wx = this.worldW * d.x;
         const glow = this.add.ellipse(wx, this.floorY, this.scale.width * 0.16, this.scale.height * 0.04, 0xba6bff, 0.4).setDepth(1);
         return { ...d, wx, glow };
       });
+      this.spawnWave();
+      this.buildHud();
       titleCard(this, V.name);
       this.canPortal = false; this.time.delayedCall(500, () => { this.canPortal = true; });
       this.scale.on('resize', this.layout, this);
       this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
     }
+    // ── a wave of opps blocks the door until you clear them ──
+    spawnWave() {
+      const H = this.scale.height, n = 3;
+      this.enemies = [];
+      const doorX = this.doors[0] ? this.doors[0].wx : this.worldW * 0.75;
+      for (let i = 0; i < n; i++) {
+        const spr = this.add.sprite(0, 0, 'e_idle_0').setOrigin(0.5, 1).play('eidle');
+        spr.setScale((H * 0.28) / spr.height);
+        const x = Phaser.Math.Clamp(doorX - this.scale.width * (0.28 + i * 0.14), this.leftB + 120, this.rightB - 20);
+        const y = this.floorY - Phaser.Math.Between(0, this.laneDepth);
+        spr.setPosition(x, y);
+        this.enemies.push({ spr, hp: 24, x, y, facing: -1, state: 'idle', nextAtk: 0, hurtUntil: 0, ko: false });
+      }
+      this.rusher = null;
+      this.cleared = false;
+    }
+    buildHud() {
+      const W = this.scale.width, H = this.scale.height;
+      this.hpBg = this.add.rectangle(16, 14, W * 0.32, 14, 0x2a0f1e).setOrigin(0, 0).setScrollFactor(0).setDepth(1e6).setStrokeStyle(2, 0xba6bff);
+      this.hpFg = this.add.rectangle(18, 16, W * 0.32 - 4, 10, 0x52ffa8).setOrigin(0, 0).setScrollFactor(0).setDepth(1e6);
+      this.hpMax = W * 0.32 - 4;
+      this.banner = this.add.text(W / 2, H * 0.1, '', { fontFamily: 'system-ui, sans-serif', fontSize: `${Math.round(H * 0.03)}px`, color: '#ff6b6b', stroke: '#20102e', strokeThickness: 5 }).setOrigin(0.5).setScrollFactor(0).setDepth(1e6);
+    }
+    aliveCount() { return this.enemies.filter((e) => !e.ko).length; }
     doAttack() {
-      if (this.attacking) return; this.attacking = true; this.player.play('atk');
-      const reach = this.player.displayWidth * 0.55;
-      this.spark.setPosition(this.player.x + this.facing * reach, this.player.y - this.player.displayHeight * 0.5).setScale(0.4).setAlpha(0.9).setVisible(true);
+      if (this.attacking) return; this.attacking = true;
+      // aim at the fight: face the nearest standing opp so swings always land forward
+      const alive = (this.enemies || []).filter((e) => !e.ko);
+      if (alive.length) {
+        const near = alive.slice().sort((a, b) => Math.abs(a.x - this.player.x) - Math.abs(b.x - this.player.x))[0];
+        if (Math.abs(near.x - this.player.x) < this.scale.width * 0.4) this.facing = near.x < this.player.x ? -1 : 1;
+      }
+      this.player.setFlipX(this.facing < 0);
+      this.player.play('atk');
+      const reach = this.player.displayWidth * 0.62;
+      const tipX = this.player.x + this.facing * reach;
+      this.spark.setPosition(tipX, this.player.y - this.player.displayHeight * 0.5).setScale(0.4).setAlpha(0.9).setVisible(true);
       this.tweens.add({ targets: this.spark, scale: 1.6, alpha: 0, duration: 220, onComplete: () => this.spark.setVisible(false) });
+      // hit every enemy in horizontal reach AND the same floor lane (2.5D depth gate)
+      let connected = false;
+      for (const e of this.enemies) {
+        if (e.ko) continue;
+        const dx = e.x - this.player.x;
+        const inReach = Math.sign(dx || this.facing) === this.facing && Math.abs(dx) < reach + e.spr.displayWidth * 0.4;
+        const inLane = Math.abs(e.y - this.player.y) < this.laneDepth * 1.1;
+        if (inReach && inLane) { this.hitEnemy(e); connected = true; }
+      }
+      if (connected) { this.freezeUntil = this.time.now + 90; this.cameras.main.shake(120, 0.006); }
       this.player.once('animationcomplete', () => { this.attacking = false; });
     }
+    hitEnemy(e) {
+      e.hp -= 12; e.hurtUntil = this.time.now + 260; e.state = 'hurt';
+      e.spr.setTint(0xffffff); this.time.delayedCall(90, () => e.spr.clearTint());
+      e.x = Phaser.Math.Clamp(e.x + this.facing * this.scale.width * 0.04, this.leftB, this.rightB); // knockback
+      const burst = this.add.circle(e.spr.x, e.spr.y - e.spr.displayHeight * 0.5, 10, 0xffd66b, 0.9).setDepth(1e6);
+      this.tweens.add({ targets: burst, scale: 2.2, alpha: 0, duration: 240, onComplete: () => burst.destroy() });
+      if (e.hp <= 0) this.koEnemy(e);
+    }
+    koEnemy(e) {
+      e.ko = true; if (this.rusher === e) this.rusher = null;
+      this.tweens.add({ targets: e.spr, alpha: 0, angle: this.facing * 70, y: e.spr.y + 10, duration: 420, onComplete: () => e.spr.destroy() });
+    }
+    hurtPlayer(dmg, fromX) {
+      if (this.time.now < this.invulnUntil) return;
+      this.hp = Math.max(0, this.hp - dmg); this.invulnUntil = this.time.now + 650;
+      this.freezeUntil = this.time.now + 70; this.cameras.main.shake(160, 0.008);
+      const dir = Math.sign(this.player.x - fromX) || 1;
+      this.player.x = Phaser.Math.Clamp(this.player.x + dir * this.scale.width * 0.05, this.leftB, this.rightB);
+      this.player.setTint(0xff5b5b); this.time.delayedCall(120, () => this.player.clearTint());
+      if (this.hp <= 0) { this.hp = this.maxHp; this.player.setPosition(this.leftB + 40, this.floorY); this.spawnWave(); } // wipe → reset block
+    }
     update() {
+      const now = this.time.now;
+      if (now < this.freezeUntil) { this.consume(); return; }   // hit-stop
       const k = this.kbd();
       const spd = Math.max(3, this.scale.width * 0.012);
       let vx = 0, vy = 0;
@@ -131,11 +206,53 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       this.player.x = Phaser.Math.Clamp(this.player.x + vx, this.leftB, this.rightB);
       this.player.y = Phaser.Math.Clamp(this.player.y + vy, this.floorY - this.laneDepth, this.floorY);
       this.player.setDepth(this.player.y);
-      // nearest door
+      if (this.time.now < this.invulnUntil) this.player.setAlpha(0.5 + 0.5 * Math.sin(now * 0.03)); else this.player.setAlpha(1);
+
+      // ── enemy AI: crowd control — only one rusher closes at a time ──
+      const alive = this.enemies.filter((e) => !e.ko);
+      if (!this.rusher || this.rusher.ko) {
+        this.rusher = alive.slice().sort((a, b) => Math.abs(a.x - this.player.x) - Math.abs(b.x - this.player.x))[0] || null;
+      }
+      const eSpd = spd * 0.82;               // rusher keeps pace with a walking player
+      for (const e of alive) {
+        e.facing = this.player.x < e.x ? -1 : 1;
+        const dist = Math.abs(e.x - this.player.x);
+        const laned = Math.abs(e.y - this.player.y) < this.laneDepth * 1.1;
+        if (now < e.hurtUntil) { e.spr.play('eidle', true); }
+        else if (e === this.rusher && !(dist < e.spr.displayWidth * 0.7 && laned)) {
+          // close in on the player (match lane, then approach)
+          e.x += Math.sign(this.player.x - e.x) * eSpd;
+          e.y += Math.sign(this.player.y - e.y) * eSpd * 0.6;
+          e.spr.play('ewalk', true);
+        } else if (e !== this.rusher && dist > this.scale.width * 0.14) {
+          // non-rushers drift in so they don't get left behind (but hold their swing)
+          e.x += Math.sign(this.player.x - e.x) * eSpd * 0.45;
+          e.spr.play('ewalk', true);
+        } else if (e === this.rusher && dist < e.spr.displayWidth * 0.9 && laned && now > e.nextAtk) {
+          // in range: swing
+          e.spr.play('eatk', true); e.nextAtk = now + 1100;
+          this.time.delayedCall(220, () => { if (!e.ko && Math.abs(e.x - this.player.x) < e.spr.displayWidth * 1.1 && Math.abs(e.y - this.player.y) < this.laneDepth * 1.2) this.hurtPlayer(8, e.x); });
+        } else { e.spr.play('eidle', true); }
+        e.x = Phaser.Math.Clamp(e.x, this.leftB, this.rightB);
+        e.y = Phaser.Math.Clamp(e.y, this.floorY - this.laneDepth, this.floorY);
+        e.spr.setPosition(e.x, e.y).setFlipX(e.facing < 0).setDepth(e.y);
+      }
+
+      // ── HUD + door gating ──
+      this.hpFg.width = this.hpMax * (this.hp / this.maxHp);
+      this.hpFg.fillColor = this.hp > 40 ? 0x52ffa8 : 0xff5b5b;
+      const remaining = this.aliveCount();
+      this.cleared = remaining === 0;
       let near = null;
       for (const d of this.doors) if (Math.abs(this.player.x - d.wx) < this.scale.width * 0.16) near = d;
-      if (near) { this.prompt.setText(`Y — enter ${near.label}`).setVisible(true); if (this.canPortal && k.interact) { this.consume(); fire(near.to); } }
-      else this.prompt.setVisible(false);
+      if (!this.cleared) {
+        this.banner.setText(`CLEAR THE BLOCK · ${remaining} left`).setVisible(true);
+        this.prompt.setVisible(false);
+      } else {
+        this.banner.setVisible(false);
+        if (near) { this.prompt.setText(`Y — enter ${near.label}`).setVisible(true); if (this.canPortal && k.interact) { this.consume(); fire(near.to); } }
+        else this.prompt.setVisible(false);
+      }
       this.consume();
     }
   }
@@ -144,7 +261,7 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
     layout() {
       const W = this.scale.width, H = this.scale.height;
       const img = this.textures.get('bg').getSourceImage();
-      const s = Math.min(W / img.width, H / img.height);
+      const s = Math.max(W / img.width, H / img.height);   // COVER: fill the screen
       this.bg.setScale(s).setPosition(W / 2, H / 2);
       this.roomW = img.width * s; this.roomH = img.height * s;
       this.rx0 = (W - this.roomW) / 2; this.ry0 = (H - this.roomH) / 2;
@@ -160,7 +277,7 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
         const p = this.spotPts[i]; if (!p) return;
         v.marker.setPosition(p.sx, p.sy); v.label.setPosition(p.sx, p.sy - H * 0.032);
       });
-      if (this.player) this.player.setScale((H * 0.16) / this.player.height);
+      if (this.player) this.player.setScale((H * 0.13) / this.player.height);
     }
     create() {
       makeFighterAnims(this);
