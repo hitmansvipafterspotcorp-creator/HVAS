@@ -1600,6 +1600,41 @@ function HomeScreen({ role, session, navigate }) {
           </div>
         </AppPanel>
       </div>
+      {role.id === 'member' && <MemberStatsBar navigate={navigate} />}
+    </div>
+  );
+}
+
+// Live stats strip under the member menu (design 5): rewards, status, last entry,
+// loyalty points — all from the member's real record.
+function MemberStatsBar({ navigate }) {
+  const member = useMember();
+  if (!member) return null;
+  const tickets = member.tickets || 0;
+  const active = member.status !== 'expired' && (!member.expiresAt || Date.now() < member.expiresAt);
+  const lastEntry = member.verifiedAt ? fmtDate(member.verifiedAt) : '—';
+  const pts = (member.loyalty || 0).toLocaleString();
+  return (
+    <div className="member-statsbar">
+      <button type="button" className="msb-cell" onClick={() => navigate('membership')}>
+        <span className="msb-ic rewards" aria-hidden="true">★</span>
+        <span className="msb-text"><span className="msb-label">NIGHT REWARDS</span><b className="msb-val pink">{tickets} available</b></span>
+      </button>
+      <span className="msb-div" aria-hidden="true" />
+      <div className="msb-cell">
+        <span className="msb-ic status" aria-hidden="true">🛡</span>
+        <span className="msb-text"><span className="msb-label">VIP STATUS</span><b className={`msb-val ${active ? 'ok' : 'off'}`}>{active ? 'ACTIVE' : 'EXPIRED'}</b></span>
+      </div>
+      <span className="msb-div" aria-hidden="true" />
+      <div className="msb-cell">
+        <span className="msb-ic entry" aria-hidden="true">🗓</span>
+        <span className="msb-text"><span className="msb-label">LAST ENTRY</span><b className="msb-val">{lastEntry}</b></span>
+      </div>
+      <span className="msb-div" aria-hidden="true" />
+      <button type="button" className="msb-cell" onClick={() => navigate('membership')}>
+        <span className="msb-ic pts" aria-hidden="true">💎</span>
+        <span className="msb-text"><span className="msb-label">LOYALTY POINTS</span><b className="msb-val gold">{pts} PTS</b></span>
+      </button>
     </div>
   );
 }
