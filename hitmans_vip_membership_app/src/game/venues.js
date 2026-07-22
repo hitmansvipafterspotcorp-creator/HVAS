@@ -67,20 +67,51 @@ export const VENUES = {
   social_gaines_exterior: {
     name: 'Social Gaines', mode: 'brawler', bg: 'social_gaines_exterior',
     floorY: 0.92, laneDepth: 0.08,
-    doors: [{ x: 0.5, to: 'social_gaines_interior', label: 'Enter' }],
+    doors: [{ x: 0.6, to: 'social_gaines_interior', label: 'Enter' }],  // SG double doors
   },
   social_gaines_interior: {
     name: 'Social Gaines — Inside', mode: 'topdown', bg: 'social_gaines_interior',
     spawn: { x: 0.5, y: 0.82 },
+    walk: { left: 0.06, right: 0.94, top: 0.3, bottom: 0.86 },
+    blockers: [
+      { x: 0.5, y: 0.03, w: 0.47, h: 0.28 },   // long bar (top-right)
+      { x: 0.05, y: 0.3, w: 0.13, h: 0.38 },   // velvet booths (left wall)
+      { x: 0.38, y: 0.46, w: 0.22, h: 0.24 },  // center lounge sofas
+      { x: 0.66, y: 0.48, w: 0.16, h: 0.22 },  // leather lounge (right)
+      { x: 0.9, y: 0.48, w: 0.09, h: 0.22 },   // live-music corner
+    ],
+    spots: [
+      { x: 0.68, y: 0.35, label: 'Bartender', line: "Social Gaines — grown & classy. What're we sippin'?" },
+      { x: 0.28, y: 0.44, label: 'Cocktail Tables', line: 'Pull up a stool, meet somebody new.' },
+      { x: 0.2, y: 0.5, label: 'Booths', line: 'Green velvet booths — post up with your crew.' },
+      { x: 0.48, y: 0.74, label: 'VIP Lounge', line: 'Bottle service in the lounge. Very Social Gaines.' },
+      { x: 0.74, y: 0.74, label: 'Leather Lounge', line: 'Sink into the leather — networking happens here.' },
+      { x: 0.88, y: 0.74, label: 'Live Music', line: 'Smooth sounds all night. Grab the mic later.' },
+    ],
     doors: [
       { x: 0.5, y: 0.93, to: 'social_gaines_exterior', label: 'Exit' },
-      { x: 0.88, y: 0.35, to: 'success_rooftop', label: 'Rooftop stairs' },
+      { x: 0.1, y: 0.3, to: 'success_rooftop', label: 'Rooftop stairs' },  // staircase (top-left)
     ],
   },
   success_rooftop: {
     name: 'Success Rooftop', mode: 'topdown', bg: 'success_rooftop',
-    spawn: { x: 0.5, y: 0.85 },
-    doors: [{ x: 0.5, y: 0.93, to: 'social_gaines_interior', label: 'Back downstairs' }],
+    spawn: { x: 0.18, y: 0.62 },
+    walk: { left: 0.05, right: 0.95, top: 0.28, bottom: 0.9 },
+    blockers: [
+      { x: 0.28, y: 0.34, w: 0.42, h: 0.3 },   // the pool (no walking on water)
+      { x: 0.4, y: 0.1, w: 0.24, h: 0.18 },    // rooftop bar (top)
+      { x: 0.14, y: 0.26, w: 0.16, h: 0.16 },  // cabana daybeds (left)
+      { x: 0.8, y: 0.3, w: 0.16, h: 0.34 },    // umbrella loungers (right)
+      { x: 0.36, y: 0.66, w: 0.36, h: 0.16 },  // VIP sofas (bottom)
+    ],
+    spots: [
+      { x: 0.52, y: 0.3, label: 'Rooftop Bar', line: 'Top of the city — bottle service and a skyline.' },
+      { x: 0.24, y: 0.5, label: 'Poolside', line: 'Dip in or just floss by the water.' },
+      { x: 0.2, y: 0.44, label: 'Cabana', line: 'Private cabana — VIP only up here.' },
+      { x: 0.76, y: 0.52, label: 'Sun Loungers', line: 'Umbrellas, loungers, city lights. Unwind.' },
+      { x: 0.53, y: 0.86, label: 'VIP Sofas', line: "Grab a sofa — the night's just starting." },
+    ],
+    doors: [{ x: 0.08, y: 0.7, to: 'social_gaines_interior', label: 'Back downstairs' }],
   },
 
   // ── Outta Pocket ──
