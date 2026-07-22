@@ -2280,7 +2280,10 @@ function MemberPass({ member, checkedIn, onRenew }) {
           ))}
         </div>
         <div className="loyalty-progress">
-          <div className="loyalty-bar"><span style={{ width: `${progress}%` }} /></div>
+          <div className="loyalty-bar">
+            <span className="loy-fill" style={{ width: `${progress}%` }} />
+            <img className="loy-marker" src={`${A_}assets/ui/rank/loy_marker.png`} style={{ left: `${progress}%` }} alt="" />
+          </div>
           <p>{next
             ? <><b>{rank.name}</b> · {entries} {entries === 1 ? 'night' : 'nights'} in · {next.min - entries} more to <b>{next.name}</b></>
             : <><b>VIP rank</b> · {entries} nights in · top tier reached</>}</p>

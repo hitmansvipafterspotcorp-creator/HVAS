@@ -3388,8 +3388,14 @@ button {
 .loyalty-badge.current img { transform: scale(1.06); }
 .loyalty-badge img { width: 100%; max-width: 72px; height: auto; transition: transform .15s; }
 .loyalty-progress { margin: 12px 0 10px; }
-.loyalty-bar { height: 8px; border-radius: 999px; background: #20102e; overflow: hidden; border: 1px solid #3a2350; }
-.loyalty-bar span { display: block; height: 100%; background: linear-gradient(90deg, #b06bff, #ffd66b); border-radius: 999px; transition: width .35s; }
+/* real designed loyalty bar — art track + gold fill + diamond marker */
+.loyalty-bar { position: relative; height: 15px; margin: 6px 2px 4px; border: none; border-radius: 0; overflow: visible;
+  background: url("/HVAS/assets/ui/rank/loy_track.png") no-repeat center center / 100% 100%; }
+.loyalty-bar .loy-fill { display: block; height: 100%; min-width: 0;
+  background: url("/HVAS/assets/ui/rank/loy_fill.png") no-repeat left center / 100% 100%; transition: width .35s; }
+.loyalty-bar .loy-marker { position: absolute; top: 50%; height: 190%; width: auto;
+  transform: translate(-50%, -50%); pointer-events: none; transition: left .35s;
+  filter: drop-shadow(0 0 5px rgba(196,107,255,.8)); }
 .loyalty-progress p { color: #c9b8ff; font-size: 13px; margin: 8px 0 0; }
 .loyalty-progress b { color: #ffe8a3; }
 .loyalty-log { margin-top: 4px; background: #241436; color: #d8c4ff; border: 1px solid #4a2f6a; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 13px; }
