@@ -3388,14 +3388,16 @@ button {
 .loyalty-badge.current img { transform: scale(1.06); }
 .loyalty-badge img { width: 100%; max-width: 72px; height: auto; transition: transform .15s; }
 .loyalty-progress { margin: 12px 0 10px; }
-/* real designed loyalty bar — art track + gold fill + diamond marker */
-.loyalty-bar { position: relative; height: 15px; margin: 6px 2px 4px; border: none; border-radius: 0; overflow: visible;
+/* per-badge loyalty bar — each rank asset gets its own art track + gold fill */
+.lb-bar { position: relative; width: 100%; max-width: 72px; height: 8px; margin-top: 5px; overflow: visible;
   background: url("/HVAS/assets/ui/rank/loy_track.png") no-repeat center center / 100% 100%; }
-.loyalty-bar .loy-fill { display: block; height: 100%; min-width: 0;
+.lb-bar .lb-fill { display: block; height: 100%; min-width: 0;
   background: url("/HVAS/assets/ui/rank/loy_fill.png") no-repeat left center / 100% 100%; transition: width .35s; }
-.loyalty-bar .loy-marker { position: absolute; top: 50%; height: 190%; width: auto;
+.lb-bar .lb-marker { position: absolute; top: 50%; height: 210%; width: auto;
   transform: translate(-50%, -50%); pointer-events: none; transition: left .35s;
-  filter: drop-shadow(0 0 5px rgba(196,107,255,.8)); }
+  filter: drop-shadow(0 0 4px rgba(196,107,255,.85)); }
+/* locked tiers: dim their empty track to match the grayed-out badge */
+.loyalty-badge:not(.earned) .lb-bar { opacity: .5; }
 .loyalty-progress p { color: #c9b8ff; font-size: 13px; margin: 8px 0 0; }
 .loyalty-progress b { color: #ffe8a3; }
 .loyalty-log { margin-top: 4px; background: #241436; color: #d8c4ff; border: 1px solid #4a2f6a; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 13px; }

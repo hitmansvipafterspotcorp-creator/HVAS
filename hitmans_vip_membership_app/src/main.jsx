@@ -2273,17 +2273,26 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <p className="loyalty-warn">⚠️ Keep a <b>paid membership</b> active to save your loyalty — if it lapses, your rank and nights start over.</p>
         )}
         <div className="loyalty-badges">
-          {RANKS.map((r) => (
-            <div key={r.name} className={`loyalty-badge${r.name === rank.name ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>
-              <img src={r.src} alt={r.name} />
-            </div>
-          ))}
+          {RANKS.map((r, i) => {
+            const nextMin = RANKS[i + 1] ? RANKS[i + 1].min : null;
+            const fill = entries < r.min ? 0
+              : nextMin == null ? 100
+              : Math.min(100, Math.max(0, Math.round(((entries - r.min) / (nextMin - r.min)) * 100)));
+            const isCurrent = r.name === rank.name;
+            return (
+              <div key={r.name} className={`loyalty-badge${isCurrent ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>
+                <img src={r.src} alt={r.name} />
+                <div className="lb-bar">
+                  <span className="lb-fill" style={{ width: `${fill}%` }} />
+                  {isCurrent && fill > 0 && fill < 100 && (
+                    <img className="lb-marker" src={`${A_}assets/ui/rank/loy_marker.png`} style={{ left: `${fill}%` }} alt="" />
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <div className="loyalty-progress">
-          <div className="loyalty-bar">
-            <span className="loy-fill" style={{ width: `${progress}%` }} />
-            <img className="loy-marker" src={`${A_}assets/ui/rank/loy_marker.png`} style={{ left: `${progress}%` }} alt="" />
-          </div>
           <p>{next
             ? <><b>{rank.name}</b> · {entries} {entries === 1 ? 'night' : 'nights'} in · {next.min - entries} more to <b>{next.name}</b></>
             : <><b>VIP rank</b> · {entries} nights in · top tier reached</>}</p>
