@@ -1324,25 +1324,52 @@ function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
   );
 }
 
-// Hidden Team Access — only reachable by holding the crest on the member door.
+// Gold neon glyphs for the Team Access cards (drawn, so they can't corrupt).
+const TEAM_ICONS = {
+  staff: (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <rect x="12" y="11" width="24" height="29" rx="3.5" stroke="url(#tgA)" strokeWidth="2.6" />
+      <rect x="18.5" y="7.5" width="11" height="7.5" rx="2.4" fill="#1a0b28" stroke="url(#tgA)" strokeWidth="2.6" />
+      <path d="M17.5 27l4.2 4.2L30 22.5" stroke="url(#tgA)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <defs><linearGradient id="tgA" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe9a8" /><stop offset="1" stopColor="#e0991f" /></linearGradient></defs>
+    </svg>
+  ),
+  host: (
+    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <path d="M24 5.5l15 5.2V21c0 9.6-6.4 15.9-15 19-8.6-3.1-15-9.4-15-19V10.7z" stroke="url(#tgB)" strokeWidth="2.6" strokeLinejoin="round" />
+      <path d="M24 14.5l2.9 6 6.5.7-4.9 4.4 1.4 6.4L24 28.6l-5.9 3.4 1.4-6.4-4.9-4.4 6.5-.7z" fill="url(#tgB)" />
+      <defs><linearGradient id="tgB" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe9a8" /><stop offset="1" stopColor="#e0991f" /></linearGradient></defs>
+    </svg>
+  ),
+};
+
+// Hidden Team Access — only reachable by the secret taps on the member door.
 // Staff & Host still each need the venue access code (next step).
 function TeamAccessScreen({ onPick, onBack }) {
+  const cards = [
+    { id: 'staff', label: 'Staff Check-In', tag: 'Door & verification tools', cta: 'Staff code' },
+    { id: 'host', label: 'Host / Operator', tag: 'Lip Sync Bingo night controls', cta: 'Open tools' },
+  ];
   return (
-    <section className="screen screen-landing">
-      <div className="home-dashboard auth-screen">
-        <section className="sheet-title-banner"><div><span>VENUE TEAM · RESTRICTED</span><h1>Team Access</h1></div></section>
+    <section className="screen screen-team">
+      <div className="team-access">
+        <div className="team-head">
+          <span className="team-eyebrow">VENUE TEAM · RESTRICTED</span>
+          <h1 className="team-title">Team Access</h1>
+        </div>
         <div className="team-grid">
-          {ROLES.filter((r) => r.id !== 'member').map((r) => (
-            <button key={r.id} type="button" className={`role-card role-card-${r.id}`} onClick={() => onPick(r.id)}>
-              <span className="role-card-eyebrow">{r.eyebrow}</span>
-              <strong className="role-card-label">{r.label}</strong>
-              <span className="role-card-tagline">{r.tagline}</span>
-              <span className="role-card-go">🔒 Access code →</span>
+          {cards.map((c) => (
+            <button key={c.id} type="button" className={`access-card access-${c.id}`} onClick={() => onPick(c.id)}>
+              <span className="access-ring">{TEAM_ICONS[c.id]}</span>
+              <strong className="access-label">{c.label}</strong>
+              <span className="access-tag">{c.tag}</span>
+              <span className="access-div" aria-hidden="true" />
+              <span className="access-cta">🔒 {c.cta} <b>›</b></span>
             </button>
           ))}
         </div>
-        <p className="role-landing-note">Door staff and hosts only. Each needs the venue access code.</p>
-        <button type="button" className="auth-back" onClick={onBack}>← Back to member door</button>
+        <p className="team-note">Door staff and hosts only. Each needs the venue access code.</p>
+        <button type="button" className="team-back" onClick={onBack}>← Back to member door</button>
       </div>
     </section>
   );
@@ -3030,11 +3057,70 @@ function ProfileScreen() {
 }
 
 function HistoryScreen() {
+  const member = useMember();
+  const auth = useAuth();
+  const { rank } = rankFor(member?.entries || 0);
+
+  // Build the activity feed from REAL state only — no sample rows.
+  const rows = [];
+  if (member) {
+    if (member.verifiedAt) rows.push({
+      ic: '✓', tone: 'ok', title: 'Verified at the door',
+      sub: member.number ? `Entry approved · ${member.number}` : 'Entry approved',
+      t: member.verifiedAt, status: 'Approved',
+    });
+    if (member.purchasedAt) rows.push({
+      ic: '★', tone: 'gold', title: `${member.tier} membership activated`,
+      sub: member.payment ? `Paid with ${member.payment}` : 'Membership active',
+      t: member.purchasedAt, status: 'Success',
+    });
+  }
+  const since = auth?.member?.since;
+  if (since) rows.push({ ic: '◇', tone: 'muted', title: 'Member account created', sub: auth.member.name ? `Welcome, ${auth.member.name}` : 'Welcome', t: since, status: 'Done' });
+  // real penalty events (trespass / ban) recorded for this member
+  if (member?.number) {
+    penalizedMembers().filter((d) => String(d.number).toUpperCase() === String(member.number).toUpperCase())
+      .forEach((d) => rows.push({ ic: '⚑', tone: 'bad', title: d.kind === 'ban' ? 'Banned' : 'Trespass flag', sub: d.reason || 'Flagged by security', t: d.at || Date.now(), status: d.kind === 'ban' ? 'Ban' : 'Flag' }));
+  }
+  rows.sort((a, b) => b.t - a.t);
+
+  const stats = [
+    { label: 'Nights in', value: member?.entries ?? 0 },
+    { label: 'Loyalty', value: (member?.loyalty ?? 0).toLocaleString() },
+    { label: 'Rank', value: member ? rank.name : '—' },
+    { label: 'Tickets', value: member?.tickets ?? 0 },
+  ];
+
   return (
-    <div className="history-list">
-      <AppPanel title="Activity History" subtitle="Menu destination">
-        <p className="panel-note">History rows will be generated from real member activity. The sheet examples are blueprint references only.</p>
-      </AppPanel>
+    <div className="history-screen">
+      <div className="hist-stats">
+        {stats.map((s) => (
+          <div key={s.label} className="hist-stat"><span>{s.label}</span><strong>{s.value}</strong></div>
+        ))}
+      </div>
+      <div className="hist-feed">
+        <h3>Activity</h3>
+        {rows.length === 0 ? (
+          <div className="hist-empty">
+            <span className="hist-empty-ic">🗓</span>
+            <strong>No activity yet</strong>
+            <p>Your check-ins, entries, and membership events will show up here automatically.</p>
+          </div>
+        ) : rows.map((r, i) => (
+          <div key={i} className="hist-row">
+            <span className={`hist-ic hist-ic-${r.tone}`}>{r.ic}</span>
+            <div className="hist-row-main">
+              <strong>{r.title}</strong>
+              <span className="hist-row-sub">{r.sub}</span>
+            </div>
+            <div className="hist-row-meta">
+              <span className="hist-time">{fmtDateTime(r.t)}</span>
+              <span className={`hist-badge hist-badge-${r.tone}`}>{r.status}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="hist-foot">Every verified entry, payment, and door decision is logged here as it happens.</p>
     </div>
   );
 }
