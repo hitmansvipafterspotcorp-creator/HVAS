@@ -122,8 +122,27 @@ export const VENUES = {
   },
   outta_pocket_interior: {
     name: 'Outta Pocket — Inside', mode: 'topdown', bg: 'outta_pocket_interior',
-    spawn: { x: 0.5, y: 0.82 },
-    doors: [{ x: 0.5, y: 0.93, to: 'outta_pocket_exterior', label: 'Exit' }],
+    spawn: { x: 0.45, y: 0.82 },
+    walk: { left: 0.06, right: 0.94, top: 0.25, bottom: 0.86 },
+    blockers: [
+      { x: 0.36, y: 0.06, w: 0.2, h: 0.16 },   // DJ booth (top)
+      { x: 0.34, y: 0.3, w: 0.14, h: 0.12 },   // pool table (upper-left)
+      { x: 0.51, y: 0.3, w: 0.14, h: 0.12 },   // pool table (upper-right)
+      { x: 0.34, y: 0.45, w: 0.14, h: 0.12 },  // pool table (lower-left)
+      { x: 0.51, y: 0.45, w: 0.14, h: 0.12 },  // pool table (lower-right)
+      { x: 0.29, y: 0.6, w: 0.4, h: 0.1 },     // main bar (center)
+      { x: 0.66, y: 0.33, w: 0.28, h: 0.1 },   // side bar (right)
+      { x: 0.74, y: 0.04, w: 0.24, h: 0.22 },  // kitchen (top-right)
+      { x: 0.05, y: 0.05, w: 0.1, h: 0.5 },    // booth wall (left)
+    ],
+    spots: [
+      { x: 0.45, y: 0.24, label: 'DJ Booth', line: "DJ's spinning — Outta Pocket, loud and packed." },
+      { x: 0.47, y: 0.55, label: 'Pool Tables', line: "Four tables, always a game. Rack 'em." },
+      { x: 0.45, y: 0.73, label: 'Main Bar', line: 'Cold ones down the line. What are you having?' },
+      { x: 0.85, y: 0.3, label: 'Kitchen', line: 'Late-night eats straight from the kitchen.' },
+      { x: 0.18, y: 0.4, label: 'Booths', line: 'Booths on the wall — post up with the crew.' },
+    ],
+    doors: [{ x: 0.45, y: 0.93, to: 'outta_pocket_exterior', label: 'Exit' }],
   },
 
   // ── Tally Row: street → top-down commons → the 5 spots ──
@@ -136,35 +155,114 @@ export const VENUES = {
   },
   tally_row_topdown: {
     name: 'Tally Row Commons', mode: 'topdown', bg: 'tally_row_topdown',
-    spawn: { x: 0.5, y: 0.88 },
+    spawn: { x: 0.55, y: 0.72 },
+    walk: { left: 0.08, right: 0.92, top: 0.14, bottom: 0.9 },
+    blockers: [{ x: 0.44, y: 0.48, w: 0.14, h: 0.14 }],  // outdoor DJ rig
+    spots: [
+      { x: 0.5, y: 0.66, label: 'Block DJ', line: 'Tally Row block party — DJ live in the plaza.' },
+      { x: 0.24, y: 0.6, label: 'Valet', line: 'Express, regular, VIP — we got you parked.' },
+    ],
     doors: [
       { x: 0.26, y: 0.16, to: 'sammys_stage', label: "Sammy's" },
       { x: 0.53, y: 0.16, to: 'the_itus_pizza', label: 'The Itus' },
       { x: 0.79, y: 0.16, to: 'the_den', label: 'The Den' },
       { x: 0.19, y: 0.46, to: 'public_hall', label: 'Public Hall' },
       { x: 0.37, y: 0.46, to: 'rave_13', label: '13 Rave' },
-      { x: 0.60, y: 0.95, to: 'tally_row_exterior', label: 'Exit to street' },
+      { x: 0.6, y: 0.95, to: 'tally_row_exterior', label: 'Exit to street' },
     ],
   },
   public_hall: {
     name: 'Public Hall', mode: 'topdown', bg: 'public_hall',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
+    spawn: { x: 0.45, y: 0.82 },
+    walk: { left: 0.06, right: 0.95, top: 0.22, bottom: 0.86 },
+    blockers: [
+      { x: 0.16, y: 0.03, w: 0.26, h: 0.16 },  // stage
+      { x: 0.05, y: 0.2, w: 0.22, h: 0.45 },   // arcade / skeeball / air hockey wall
+      { x: 0.66, y: 0.05, w: 0.14, h: 0.4 },   // bar (right)
+      { x: 0.46, y: 0.3, w: 0.16, h: 0.3 },    // center lounge
+      { x: 0.25, y: 0.66, w: 0.14, h: 0.12 },  // pool table (left)
+      { x: 0.5, y: 0.66, w: 0.14, h: 0.12 },   // pool table (right)
+    ],
+    spots: [
+      { x: 0.3, y: 0.22, label: 'Live Stage', line: 'Public Hall — live band all night.' },
+      { x: 0.22, y: 0.4, label: 'Arcade', line: 'Skeeball, air hockey, retro cabinets. Go.' },
+      { x: 0.6, y: 0.35, label: 'Bar', line: 'Cold drinks at the bar.' },
+      { x: 0.55, y: 0.62, label: 'Lounge', line: 'Leather lounge on the rug — chill zone.' },
+      { x: 0.42, y: 0.8, label: 'Pool Tables', line: "Rack 'em — two tables open." },
+      { x: 0.85, y: 0.75, label: 'Darts', line: 'Darts in the corner. Bullseye.' },
+    ],
+    doors: [{ x: 0.45, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   rave_13: {
     name: '13 Rave Club', mode: 'topdown', bg: 'rave_13',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
+    spawn: { x: 0.58, y: 0.82 },
+    walk: { left: 0.08, right: 0.86, top: 0.25, bottom: 0.88 },
+    blockers: [
+      { x: 0.5, y: 0.04, w: 0.2, h: 0.16 },    // DJ booth (top)
+      { x: 0.1, y: 0.32, w: 0.14, h: 0.28 },   // neon oval bar (left)
+    ],
+    spots: [
+      { x: 0.58, y: 0.24, label: 'DJ Booth', line: "13 Rave — hands up, the drop's coming." },
+      { x: 0.58, y: 0.55, label: 'Dance Floor', line: 'Lose yourself on the floor.' },
+      { x: 0.28, y: 0.45, label: 'Neon Bar', line: 'Glow-up cocktails at the bar.' },
+      { x: 0.2, y: 0.72, label: 'VIP Couches', line: 'Neon booths — bottle service, 13 style.' },
+    ],
+    doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   sammys_stage: {
     name: "Sammy's Stage", mode: 'topdown', bg: 'sammys_stage',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
+    spawn: { x: 0.5, y: 0.82 },
+    walk: { left: 0.08, right: 0.88, top: 0.28, bottom: 0.86 },
+    blockers: [
+      { x: 0.38, y: 0.06, w: 0.24, h: 0.2 },   // main stage
+      { x: 0.1, y: 0.06, w: 0.16, h: 0.16 },   // DJ booth
+      { x: 0.22, y: 0.3, w: 0.1, h: 0.35 },    // left bar
+      { x: 0.68, y: 0.3, w: 0.1, h: 0.35 },    // right bar
+      { x: 0.05, y: 0.32, w: 0.14, h: 0.32 },  // VIP booths (left)
+    ],
+    spots: [
+      { x: 0.5, y: 0.32, label: 'Main Stage', line: "Sammy's — the show's about to start." },
+      { x: 0.2, y: 0.28, label: 'DJ', line: "DJ keeping it hot at Sammy's." },
+      { x: 0.36, y: 0.5, label: 'Left Bar', line: 'Drinks on the rail.' },
+      { x: 0.64, y: 0.5, label: 'Right Bar', line: 'Top shelf this side.' },
+      { x: 0.16, y: 0.68, label: 'VIP Booths', line: 'VIP booths — bottle service and a view.' },
+    ],
+    doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   the_itus_pizza: {
     name: 'The Itus Pizza', mode: 'topdown', bg: 'the_itus_pizza',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
+    spawn: { x: 0.42, y: 0.78 },
+    walk: { left: 0.14, right: 0.94, top: 0.28, bottom: 0.82 },
+    blockers: [
+      { x: 0.24, y: 0.1, w: 0.34, h: 0.2 },    // pizza counter / oven
+      { x: 0.74, y: 0.06, w: 0.22, h: 0.22 },  // VIP lounge (top-right)
+      { x: 0.44, y: 0.42, w: 0.2, h: 0.28 },   // center after-dark lounge
+      { x: 0.78, y: 0.58, w: 0.14, h: 0.18 },  // DJ booth (bottom-right)
+    ],
+    spots: [
+      { x: 0.4, y: 0.34, label: 'Pizza Counter', line: 'Itus Pizza — hot slices, good vibes.' },
+      { x: 0.8, y: 0.34, label: 'VIP Lounge', line: 'Good vibes, hot slices — VIP booths up top.' },
+      { x: 0.54, y: 0.74, label: 'Chill Lounge', line: 'Itus After Dark — sink into the couches.' },
+      { x: 0.72, y: 0.74, label: 'Live DJs', line: 'Live DJs spinning late.' },
+      { x: 0.18, y: 0.62, label: 'Drinks Pick-Up', line: 'Grab your drinks at pick-up.' },
+    ],
+    doors: [{ x: 0.42, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
   the_den: {
     name: 'The Den', mode: 'topdown', bg: 'the_den',
-    spawn: { x: 0.5, y: 0.85 }, doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
+    spawn: { x: 0.5, y: 0.82 },
+    walk: { left: 0.18, right: 0.94, top: 0.28, bottom: 0.86 },
+    blockers: [
+      { x: 0.26, y: 0.08, w: 0.44, h: 0.24 },  // long bar (top)
+      { x: 0.74, y: 0.1, w: 0.2, h: 0.7 },     // purple couches (right wall)
+    ],
+    spots: [
+      { x: 0.42, y: 0.4, label: 'Bar', line: 'The Den — low lights, top shelf.' },
+      { x: 0.5, y: 0.6, label: 'Dance Floor', line: 'Feel the beat on the floor.' },
+      { x: 0.68, y: 0.35, label: 'VIP Couches', line: "Purple velvet — The Den's inner circle." },
+      { x: 0.32, y: 0.62, label: 'Lounge Tables', line: 'Pull up a table, stay a while.' },
+    ],
+    doors: [{ x: 0.5, y: 0.93, to: 'tally_row_topdown', label: 'Back to commons' }],
   },
 
   // ── Dukes & Dimes ──
@@ -175,7 +273,23 @@ export const VENUES = {
   },
   dukes_dimes_interior: {
     name: 'Dukes & Dimes — Inside', mode: 'topdown', bg: 'dukes_dimes_interior',
-    spawn: { x: 0.5, y: 0.82 }, doors: [{ x: 0.5, y: 0.93, to: 'dukes_dimes_exterior', label: 'Exit' }],
+    spawn: { x: 0.45, y: 0.8 },
+    walk: { left: 0.08, right: 0.9, top: 0.22, bottom: 0.82 },
+    blockers: [
+      { x: 0.18, y: 0.2, w: 0.18, h: 0.28 },   // mechanical bull ring
+      { x: 0.32, y: 0.04, w: 0.2, h: 0.16 },   // live stage
+      { x: 0.56, y: 0.1, w: 0.16, h: 0.4 },    // U-bar (right)
+      { x: 0.28, y: 0.54, w: 0.34, h: 0.18 },  // center dining tables
+      { x: 0.09, y: 0.5, w: 0.1, h: 0.24 },    // booths (left)
+    ],
+    spots: [
+      { x: 0.26, y: 0.5, label: 'Mechanical Bull', line: 'Ride the bull — hold on tight, cowboy.' },
+      { x: 0.42, y: 0.24, label: 'Live Stage', line: 'Live band tonight at Dukes & Dimes.' },
+      { x: 0.5, y: 0.34, label: 'Bar', line: 'Whiskey and dimes. Belly up.' },
+      { x: 0.45, y: 0.76, label: 'Dining', line: "Grab a table — kitchen's open." },
+      { x: 0.2, y: 0.64, label: 'Booths', line: 'Red leather booths — settle in.' },
+    ],
+    doors: [{ x: 0.45, y: 0.93, to: 'dukes_dimes_exterior', label: 'Exit' }],
   },
 
   // ── Quick Hit Fuel ──
@@ -186,7 +300,25 @@ export const VENUES = {
   },
   quick_hit_fuel_interior: {
     name: 'Quick Hit Fuel — Store', mode: 'topdown', bg: 'quick_hit_fuel_interior',
-    spawn: { x: 0.5, y: 0.82 }, doors: [{ x: 0.5, y: 0.93, to: 'quick_hit_fuel_exterior', label: 'Exit' }],
+    spawn: { x: 0.5, y: 0.82 },
+    walk: { left: 0.1, right: 0.9, top: 0.32, bottom: 0.86 },
+    blockers: [
+      { x: 0.26, y: 0.16, w: 0.48, h: 0.14 },  // hot food counter (top)
+      { x: 0.32, y: 0.36, w: 0.05, h: 0.24 },  // snack aisle 1
+      { x: 0.43, y: 0.36, w: 0.05, h: 0.24 },  // snack aisle 2
+      { x: 0.54, y: 0.36, w: 0.05, h: 0.24 },  // snack aisle 3
+      { x: 0.24, y: 0.64, w: 0.46, h: 0.08 },  // checkout counter
+      { x: 0.14, y: 0.56, w: 0.12, h: 0.14 },  // ATM / lottery
+      { x: 0.78, y: 0.3, w: 0.08, h: 0.44 },   // drink coolers (right wall)
+    ],
+    spots: [
+      { x: 0.45, y: 0.34, label: 'Hot Food', line: 'Fuel up — quick bites, coffee & go.' },
+      { x: 0.49, y: 0.62, label: 'Snack Aisles', line: 'Grab your snacks — everything for the run.' },
+      { x: 0.47, y: 0.76, label: 'Checkout', line: 'Ring it up at Quick Hit Fuel.' },
+      { x: 0.2, y: 0.74, label: 'ATM & Lottery', line: 'Cash out or hit the lottery. Feeling lucky?' },
+      { x: 0.72, y: 0.5, label: 'Coolers', line: 'Cold drinks down the right wall.' },
+    ],
+    doors: [{ x: 0.5, y: 0.93, to: 'quick_hit_fuel_exterior', label: 'Exit' }],
   },
 };
 
