@@ -3759,3 +3759,22 @@ button {
   background: linear-gradient(90deg, transparent, #b06bff);
 }
 .perks h3::after, .loyalty h3::after, .prefs h3::after { background: linear-gradient(90deg, #b06bff, transparent); }
+
+/* ── Character Select (real quest UI art) ── */
+.cs2 { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 20px; }
+.cs-banner { width: min(94%, 540px); height: auto; margin-top: 2px; filter: drop-shadow(0 4px 18px rgba(180,80,255,.45)); }
+.cs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: 100%; max-width: 540px; }
+@media (min-width: 560px) { .cs-grid { grid-template-columns: repeat(5, 1fr); } }
+.cs-slot { position: relative; aspect-ratio: 85 / 111; background: none center/100% 100% no-repeat; border: none; cursor: pointer; padding: 0; transition: transform .12s ease; }
+.cs-slot.picked { transform: scale(1.09); z-index: 2; }
+.cs-portrait { position: absolute; left: 17%; top: 12%; width: 66%; height: 60%; object-fit: cover; object-position: top center; border-radius: 6px; }
+.cs-name { color: #ffd66b; font-weight: 800; font-size: 16px; text-align: center; margin: 0; letter-spacing: .02em; }
+.cs-name span { color: #c9b8ff; font-weight: 600; }
+.cs-actions { display: flex; gap: 16px; justify-content: center; align-items: center; margin-top: 2px; }
+.cs-btn { background: none center/contain no-repeat; border: none; cursor: pointer; height: 54px; width: 150px; transition: transform .1s ease, filter .12s ease; }
+.cs-confirm { width: 166px; }
+.cs-btn:hover { filter: brightness(1.15); }
+.cs-btn:active { transform: translateY(1px); }
+.cs-confirm.off { filter: grayscale(.7) brightness(.55); cursor: not-allowed; }
+/* Character Select uses its own art banner — hide the duplicate text header (keep Home) */
+.screen-characterSelect .screen-header > div { display: none; }

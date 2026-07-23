@@ -3197,44 +3197,34 @@ function CharacterSelectScreen({ onStartGame }) {
   const [picked, setPicked] = useState(null);
   const chosen = ROSTER.find((c) => c.id === picked) ?? null;
   const canPlay = chosen && GAME_FIGHTERS.has(chosen.id);
+  const CS = (n) => `${A_}assets/game/csel/${n}.png`;
+  const pickRandom = () => {
+    const pool = ROSTER.filter((c) => GAME_FIGHTERS.has(c.id));
+    setPicked(pool[Math.floor(Math.random() * pool.length)].id);
+  };
   return (
-    <div className="char-select">
-      <div className="char-grid">
+    <div className="char-select cs2">
+      <img className="cs-banner" src={CS('banner')} alt="Character Select" />
+      <div className="cs-grid">
         {ROSTER.map((c) => (
           <button
             key={c.id}
             type="button"
-            className={`char-card${picked === c.id ? ' picked' : ''}`}
-            style={{ '--accent': c.accent }}
+            className={`cs-slot${picked === c.id ? ' picked' : ''}`}
+            style={{ backgroundImage: `url("${picked === c.id ? CS('slot_selected') : CS('slot')}")` }}
             onClick={() => setPicked(c.id)}
           >
-            <span className="char-portrait"><img src={c.portrait} alt={c.name} /></span>
-            <span className="char-name">{c.name}</span>
-            <span className="char-tag">{c.role}</span>
+            <img className="cs-portrait" src={c.portrait} alt={c.name} />
           </button>
         ))}
       </div>
 
-      {chosen ? (
-        <div className="char-detail" style={{ '--accent': chosen.accent }}>
-          <h2>{chosen.name}</h2>
-          <p className="char-line"><b>Strengths</b><span>{chosen.strong}</span></p>
-          <p className="char-line"><b>Weakness</b><span>{chosen.weak}</span></p>
-          <button
-            type="button"
-            className="char-start"
-            disabled={!canPlay}
-            onClick={() => canPlay && onStartGame(chosen.id, chosen.name)}
-          >
-            {canPlay ? `Start the Night as ${chosen.name} →` : `${chosen.name} — hitting the streets soon`}
-          </button>
-          <p className="char-soon">{canPlay
-            ? 'Cafe8Fifty street brawler loads now — D-pad to move, A to attack. Inside venues + the 2AM run are next.'
-            : 'Playable in Character Select; street frames are being sliced from the new sheets.'}</p>
-        </div>
-      ) : (
-        <p className="char-hint">Tap a fighter to see how your night plays.</p>
-      )}
+      <p className="cs-name">{chosen ? <>{chosen.name}<span> · {chosen.role}</span></> : 'Choose your fighter'}</p>
+      <div className="cs-actions">
+        <button type="button" className="cs-btn" style={{ backgroundImage: `url("${CS('btn_random')}")` }} onClick={pickRandom} aria-label="Random fighter" />
+        <button type="button" className={`cs-btn cs-confirm${canPlay ? '' : ' off'}`} style={{ backgroundImage: `url("${CS('btn_confirm')}")` }} disabled={!canPlay} onClick={() => canPlay && onStartGame(chosen.id, chosen.name)} aria-label="Confirm" />
+      </div>
+      {chosen && !canPlay && <p className="char-soon">{chosen.name} — street frames coming soon.</p>}
 
       <div className="story-tier">
         <h3>Story · Rivals · Bosses</h3>
