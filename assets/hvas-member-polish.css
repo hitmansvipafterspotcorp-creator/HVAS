@@ -111,6 +111,66 @@
   animation-timing-function: ease-in-out;
 }
 
+.menu-shell .dynamic-bg-layer {
+  filter: saturate(1.16) contrast(1.04);
+}
+
+.menu-shell .dynamic-bg-hitkoin {
+  animation: hitkoin-cycle-soft 38s ease-in-out infinite;
+}
+
+.menu-shell .dynamic-bg-vip {
+  animation: vip-cycle-soft 38s ease-in-out infinite;
+}
+
+.menu-shell .dynamic-bg-hitkoin:before,
+.menu-shell .dynamic-bg-vip:before {
+  animation-duration: 8.8s;
+}
+
+.menu-shell .dynamic-bg-hitkoin:after,
+.menu-shell .dynamic-bg-vip:after {
+  animation-duration: 6.8s;
+}
+
+.menu-shell.app-shell:after {
+  animation-duration: 14s;
+}
+
+@keyframes hitkoin-cycle-soft {
+  0%, 38% {
+    transform: translate3d(0, .45%, 0) scale(1.026);
+    opacity: .56;
+  }
+  46% {
+    transform: translate3d(0, -.25%, 0) scale(1.014);
+    opacity: 0;
+  }
+  50%, 92% {
+    transform: translate3d(0, .2%, 0) scale(1.02);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(0, .45%, 0) scale(1.026);
+    opacity: .56;
+  }
+}
+
+@keyframes vip-cycle-soft {
+  0%, 45% {
+    transform: translate3d(0, -.35%, 0) scale(1.022);
+    opacity: 0;
+  }
+  54%, 86% {
+    transform: translate3d(0, .38%, 0) scale(1.024);
+    opacity: .54;
+  }
+  94%, 100% {
+    transform: translate3d(0, .45%, 0) scale(1.02);
+    opacity: 0;
+  }
+}
+
 @media (max-width: 720px) {
   .screen-home .role-badge {
     grid-template-columns: 1fr;
