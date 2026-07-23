@@ -208,3 +208,37 @@
     drop-shadow(0 0 10px rgba(255, 92, 244, .24))
     drop-shadow(0 0 5px rgba(255, 214, 109, .16));
 }
+
+/* Reveal the generated pass/QR cleanly after payment activation. */
+.mem-pass-card {
+  animation: member-pass-pop .42s cubic-bezier(.2, .9, .22, 1) both;
+}
+
+.mem-qr,
+.verify-self {
+  animation: member-qr-pop .5s cubic-bezier(.2, .9, .22, 1) .08s both;
+}
+
+@keyframes member-pass-pop {
+  from {
+    opacity: .25;
+    transform: translateY(18px) scale(.985);
+    filter: brightness(.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes member-qr-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
