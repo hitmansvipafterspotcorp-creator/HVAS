@@ -330,6 +330,24 @@ button {
   display: none;
 }
 
+.screen-characterSelect {
+  max-width: 1120px;
+  padding: 28px 34px 20px;
+}
+
+.screen-characterSelect .screen-header {
+  margin-bottom: 12px;
+}
+
+.screen-characterSelect .screen-header h1 {
+  margin: 6px 0;
+  font-size: clamp(38px, 5vw, 54px);
+}
+
+.screen-characterSelect .screen-header p {
+  margin-bottom: 8px;
+}
+
 .dashboard-grid,
 .menu-command-grid {
   display: grid;
@@ -2959,11 +2977,23 @@ button {
 .menu-flow-row .menu-flow-lock { margin-left: auto; font-size: 15px; }
 
 /* ── Character select ─────────────────────────────────────────────────── */
-.char-select { display: flex; flex-direction: column; gap: 16px; }
+.char-select {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.36fr);
+  gap: 12px;
+  align-items: start;
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
 .char-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+  padding: 2px 6px 6px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 43, 214, 0.55) rgba(12, 3, 20, 0.4);
 }
 .char-card {
   --accent: #7f3cff;
@@ -2972,8 +3002,8 @@ button {
   flex-direction: column;
   gap: 3px;
   text-align: left;
-  padding: 14px 14px 16px;
-  border-radius: 14px;
+  padding: 9px 10px 11px;
+  border-radius: 12px;
   cursor: pointer;
   color: #fff8e8;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
@@ -2992,18 +3022,20 @@ button {
 
 .char-detail {
   --accent: #7f3cff;
+  position: sticky;
+  top: 8px;
   border-radius: 16px;
-  padding: 18px;
+  padding: 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
   background: linear-gradient(160deg, rgba(20,4,32,0.95), rgba(8,2,14,0.95));
 }
-.char-detail h2 { margin: 0 0 10px; font-size: 22px; font-weight: 900; color: var(--accent); }
-.char-line { display: flex; gap: 10px; font-size: 13px; margin: 6px 0; color: #e9e0ff; }
+.char-detail h2 { margin: 0 0 8px; font-size: 20px; font-weight: 900; color: var(--accent); }
+.char-line { display: flex; gap: 10px; font-size: 12px; margin: 5px 0; color: #e9e0ff; }
 .char-line b { color: #ffd66b; min-width: 74px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 1px; }
 .char-start {
-  margin-top: 14px;
+  margin-top: 12px;
   width: 100%;
-  padding: 13px;
+  padding: 12px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
@@ -3012,8 +3044,8 @@ button {
   color: #0a0210;
   background: var(--accent);
 }
-.char-soon { margin-top: 10px; font-size: 11px; color: #9a86c8; text-align: center; }
-.char-hint { font-size: 12px; color: #9a86c8; text-align: center; padding: 8px; }
+.char-soon { margin-top: 9px; font-size: 10.5px; color: #9a86c8; text-align: center; line-height: 1.35; }
+.char-hint { font-size: 12px; color: #9a86c8; text-align: center; padding: 8px; align-self: center; }
 
 /* ── Character select: portraits + story tier ─────────────────────────── */
 .char-card { align-items: stretch; padding-top: 10px; }
@@ -3021,13 +3053,13 @@ button {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: 96px;
-  margin-bottom: 6px;
+  height: 72px;
+  margin-bottom: 5px;
   border-radius: 10px;
   background: radial-gradient(ellipse at 50% 90%, color-mix(in srgb, var(--accent) 30%, transparent), rgba(6,2,12,0.6) 70%);
 }
 .char-portrait img {
-  height: 92px;
+  height: 70px;
   width: auto;
   image-rendering: pixelated;
   filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6));
@@ -3035,7 +3067,7 @@ button {
 .char-name { font-size: 13px; }
 .char-tag { font-size: 10px; }
 
-.story-tier { margin-top: 22px; }
+.story-tier { grid-column: 1 / -1; margin-top: 2px; }
 .story-tier h3 {
   font-size: 12px;
   letter-spacing: 0.14em;
@@ -3068,6 +3100,7 @@ button {
   flex-direction: column;
   background: #06030d;
   color: #fff8e8;
+  overflow: hidden;
 }
 .game-topbar {
   display: flex;
@@ -3093,6 +3126,7 @@ button {
 .game-stage {
   flex: 1;
   min-height: 0;
+  height: calc(100vh - 49px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3101,13 +3135,20 @@ button {
 .game-stage canvas { max-width: 100%; max-height: 100%; }
 
 .game-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 10px 18px 6px;
+  padding: 0 18px;
   user-select: none;
   touch-action: none;
+  pointer-events: none;
+  z-index: 25;
 }
+.game-controls button { pointer-events: auto; box-shadow: 0 12px 28px rgba(0,0,0,.45), 0 0 18px rgba(255, 43, 214, .14); }
 .dpad { position: relative; width: 132px; height: 132px; }
 .dpad-btn {
   position: absolute;
@@ -3139,7 +3180,19 @@ button {
 .btn-b { background: #ff3864; border-color: #ff7a97; color: #fff; }
 .btn-x { background: #4cc9ff; border-color: #93ddff; }
 .btn-y { position: absolute; top: 0; left: 51px; background: #ffd66b; border-color: #ffe7a6; }
-.game-hint { text-align: center; font-size: 10px; color: #7d6ba8; padding: 2px 0 8px; }
+.game-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: min(620px, calc(100% - 300px));
+  margin: 0;
+  text-align: center;
+  font-size: 10px;
+  color: rgba(231, 220, 255, .62);
+  z-index: 24;
+  pointer-events: none;
+}
 
 /* ── Venue selector (dev/QA travel) ───────────────────────────── */
 .game-venues {
@@ -3151,6 +3204,13 @@ button {
   position: absolute; inset: 0; background: rgba(6,3,14,.72);
   display: flex; align-items: flex-start; justify-content: center;
   z-index: 50; padding: 12px; overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .char-select { grid-template-columns: 1fr; }
+  .char-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; overflow: visible; }
+  .char-detail { position: static; }
+  .game-hint { display: none; }
 }
 .venue-picker-panel {
   background: #140a20; border: 1px solid #6b3fa0; border-radius: 14px;
