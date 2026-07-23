@@ -11,6 +11,8 @@ export default function GameCanvas({ fighterId, fighterName, startVenue = 'cafe8
   const gameRef = useRef(null);
   const [venueId, setVenueId] = useState(startVenue);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [restartN, setRestartN] = useState(0);
   const venue = VENUES[venueId] || VENUES.cafe8fifty_exterior;
 
   useEffect(() => {
@@ -20,8 +22,14 @@ export default function GameCanvas({ fighterId, fighterName, startVenue = 'cafe8
       onPortal: (to) => { if (VENUES[to]) setVenueId(to); },
     });
     gameRef.current = game;
+    setPaused(false);
     return () => { game.destroy(true); gameRef.current = null; };
-  }, [fighterId, venueId]);
+  }, [fighterId, venueId, restartN]);
+
+  const scenes = () => (gameRef.current ? gameRef.current.scene.scenes : []);
+  const pause = () => { scenes().forEach((s) => s.scene.isActive() && s.scene.pause()); setPaused(true); };
+  const resume = () => { scenes().forEach((s) => s.scene.isPaused() && s.scene.resume()); setPaused(false); };
+  const restart = () => { setPaused(false); setRestartN((n) => n + 1); };
 
   const set = (k, v) => { window.__hvasInput[k] = v; };
   const hold = (k) => ({
@@ -35,10 +43,23 @@ export default function GameCanvas({ fighterId, fighterName, startVenue = 'cafe8
       <div className="game-topbar">
         <button type="button" className="game-exit" onClick={onExit}>← Leave</button>
         <span className="game-title">{fighterName} · {venue.name}</span>
+        <button type="button" className="game-pause-btn" onClick={pause} aria-label="Pause">❚❚</button>
         <button type="button" className="game-venues" onClick={() => setPickerOpen((o) => !o)}>Venues ▾</button>
       </div>
 
       <div className="game-stage" ref={hostRef} />
+
+      {paused && (
+        <div className="game-pause">
+          <div className="gp-panel">
+            <h2 className="gp-title">PAUSED</h2>
+            <p className="gp-sub">{fighterName} · {venue.name}</p>
+            <button type="button" className="gp-btn gp-continue" onClick={resume}>▶ Continue</button>
+            <button type="button" className="gp-btn" onClick={restart}>↻ Restart venue</button>
+            <button type="button" className="gp-btn gp-quit" onClick={onExit}>✕ Quit to menu</button>
+          </div>
+        </div>
+      )}
 
       {pickerOpen && (
         <div className="venue-picker" onClick={() => setPickerOpen(false)}>

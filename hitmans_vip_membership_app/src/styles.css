@@ -3778,3 +3778,19 @@ button {
 .cs-confirm.off { filter: grayscale(.7) brightness(.55); cursor: not-allowed; }
 /* Character Select uses its own art banner — hide the duplicate text header (keep Home) */
 .screen-characterSelect .screen-header > div { display: none; }
+
+/* ── In-game Pause ── */
+.game-pause-btn { background: rgba(40,14,66,.6); border: 1px solid rgba(191,90,255,.6); color: #e7d6ff; border-radius: 8px; font-size: 12px; padding: 4px 9px; cursor: pointer; letter-spacing: 1px; }
+.game-pause-btn:hover { filter: brightness(1.2); }
+.game-pause { position: absolute; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4,1,10,.72); backdrop-filter: blur(3px); }
+.gp-panel { width: min(88%, 340px); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 22px 24px; border-radius: 20px;
+  background: radial-gradient(120% 100% at 50% 0%, rgba(42,13,70,.96), rgba(9,3,18,.98)); border: 2px solid rgba(191,90,255,.85);
+  box-shadow: 0 0 30px rgba(160,60,255,.5), inset 0 0 24px rgba(150,60,255,.2); }
+.gp-title { margin: 0; font-size: 30px; font-weight: 900; letter-spacing: .12em; color: #ffd66b; text-shadow: 0 0 18px rgba(255,170,40,.5); }
+.gp-sub { margin: -6px 0 6px; font-size: 13px; color: #c9b8ff; text-align: center; }
+.gp-btn { width: 100%; padding: 13px; border-radius: 13px; font-weight: 800; font-size: 15px; letter-spacing: .03em; cursor: pointer; color: #f3e9ff;
+  background: linear-gradient(180deg, rgba(120,40,190,.42), rgba(40,12,66,.5)); border: 2px solid rgba(191,90,255,.85); box-shadow: 0 0 12px rgba(160,60,255,.35); transition: filter .12s, transform .1s; }
+.gp-btn:hover { filter: brightness(1.15); }
+.gp-btn:active { transform: translateY(1px); }
+.gp-continue { background: linear-gradient(180deg, rgba(82,200,120,.5), rgba(20,60,36,.6)); border-color: rgba(82,255,168,.75); color: #eaffef; }
+.gp-quit { background: linear-gradient(180deg, rgba(200,60,60,.4), rgba(60,16,20,.55)); border-color: rgba(255,107,107,.7); }
