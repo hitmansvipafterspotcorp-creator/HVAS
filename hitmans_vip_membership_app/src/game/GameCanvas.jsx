@@ -6,6 +6,8 @@ import { VENUES, ZONE_ORDER } from './venues.js';
 // router that swaps between side-scroller exteriors and top-down interiors as
 // you travel doors. On-screen A/B/X/Y + D-pad (Y = enter/interact). A dev
 // venue selector can jump straight to any of the 19 zones for QA.
+const GH = (n) => `${import.meta.env.BASE_URL}assets/game/${n}.png`;
+
 export default function GameCanvas({ fighterId, fighterName, startVenue = 'cafe8fifty_exterior', onExit }) {
   const hostRef = useRef(null);
   const gameRef = useRef(null);
@@ -52,11 +54,11 @@ export default function GameCanvas({ fighterId, fighterName, startVenue = 'cafe8
       {paused && (
         <div className="game-pause">
           <div className="gp-panel">
-            <h2 className="gp-title">PAUSED</h2>
+            <img className="gp-banner" src={GH('pause/banner')} alt="Paused" />
             <p className="gp-sub">{fighterName} · {venue.name}</p>
-            <button type="button" className="gp-btn gp-continue" onClick={resume}>▶ Continue</button>
-            <button type="button" className="gp-btn" onClick={restart}>↻ Restart venue</button>
-            <button type="button" className="gp-btn gp-quit" onClick={onExit}>✕ Quit to menu</button>
+            <button type="button" className="gp-abtn" style={{ backgroundImage: `url("${GH('pause/btn_continue')}")` }} onClick={resume} aria-label="Continue" />
+            <button type="button" className="gp-abtn" style={{ backgroundImage: `url("${GH('pause/btn_restart')}")` }} onClick={restart} aria-label="Restart venue" />
+            <button type="button" className="gp-abtn gp-quit-btn" style={{ backgroundImage: `url("${GH('pause/btn_quit')}")` }} onClick={onExit} aria-label="Quit to menu"><span>QUIT TO MENU</span></button>
           </div>
         </div>
       )}
