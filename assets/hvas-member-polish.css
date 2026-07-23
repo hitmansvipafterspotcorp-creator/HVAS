@@ -191,3 +191,20 @@
     max-height: 40px;
   }
 }
+
+
+/* Status chips inside member navigation are indicators, not standalone buttons. */
+.screen-home .app-menu-board .menu-flow-row .chip-asset {
+  cursor: default;
+  user-select: none;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 92, 244, .18))
+    drop-shadow(0 0 3px rgba(255, 214, 109, .12));
+}
+
+.screen-home .app-menu-board .menu-flow-row:hover .chip-asset,
+.screen-home .app-menu-board .menu-flow-row:focus-visible .chip-asset {
+  filter:
+    drop-shadow(0 0 10px rgba(255, 92, 244, .24))
+    drop-shadow(0 0 5px rgba(255, 214, 109, .16));
+}
