@@ -242,3 +242,385 @@
     transform: translateY(0) scale(1);
   }
 }
+
+/* Main menu blueprint composition pass */
+.screen.screen-home {
+  max-width: min(1240px, 100%);
+  padding: clamp(18px, 2.6vw, 34px);
+}
+
+.screen-home .role-badge {
+  position: relative;
+  width: min(1120px, 100%);
+  min-height: 82px;
+  margin: 0 auto clamp(14px, 2vw, 20px);
+  padding: 12px clamp(14px, 2vw, 22px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  border: 1px solid rgba(255, 214, 109, .58);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(5, 1, 9, .92), rgba(76, 8, 104, .78) 42%, rgba(5, 1, 9, .92)),
+    radial-gradient(circle at 50% 0%, rgba(255, 214, 109, .2), transparent 44%);
+  box-shadow:
+    inset 0 0 28px rgba(255, 92, 244, .24),
+    inset 0 0 0 1px rgba(255, 255, 255, .04),
+    0 0 30px rgba(0, 0, 0, .52);
+  overflow: hidden;
+}
+
+.screen-home .role-badge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 0 36%, rgba(255, 247, 214, .18) 45%, transparent 56%);
+  opacity: .55;
+  transform: translateX(-28%);
+  animation: menu-topbar-shine 6.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.screen-home .role-badge-id {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.screen-home .role-badge-chip {
+  width: 132px;
+  height: auto;
+  max-height: 58px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 12px rgba(255, 92, 244, .34))
+    drop-shadow(0 0 5px rgba(255, 214, 109, .18));
+}
+
+.screen-home .role-badge .eyebrow {
+  font-size: clamp(12px, 1.1vw, 15px);
+  color: #ff5cf4;
+  text-shadow: 0 0 10px rgba(255, 92, 244, .42);
+}
+
+.screen-home .role-badge h1 {
+  margin: 3px 0 0;
+  color: #ffd66d;
+  font-size: clamp(26px, 3.4vw, 42px);
+  line-height: .98;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 214, 109, .24);
+}
+
+.screen-home .role-badge-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.screen-home .role-badge-checkin,
+.screen-home .role-badge-switch {
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 214, 109, .48);
+  background: linear-gradient(180deg, rgba(13, 3, 22, .9), rgba(6, 1, 10, .86));
+  box-shadow: inset 0 0 18px rgba(255, 92, 244, .18), 0 0 14px rgba(255, 92, 244, .12);
+  color: #fff7e6;
+  font-weight: 900;
+}
+
+.screen-home .role-badge-checkin.on {
+  border-color: rgba(102, 255, 149, .64);
+  color: #66ff95;
+}
+
+.screen-home .role-badge-switch:hover,
+.screen-home .role-badge-switch:focus-visible {
+  outline: none;
+  border-color: rgba(255, 92, 244, .86);
+  box-shadow: inset 0 0 22px rgba(255, 92, 244, .28), 0 0 20px rgba(255, 92, 244, .24);
+}
+
+.screen-home .home-dashboard,
+.screen-home .app-menu-board {
+  width: min(1120px, 100%);
+}
+
+.screen-home .app-menu-board .app-panel {
+  position: relative;
+  border-color: rgba(255, 214, 109, .56);
+  background:
+    linear-gradient(180deg, rgba(11, 2, 18, .52), rgba(8, 2, 14, .72)),
+    radial-gradient(circle at 50% 0%, rgba(255, 92, 244, .18), transparent 42%);
+  -webkit-backdrop-filter: blur(7px) saturate(1.18);
+  backdrop-filter: blur(7px) saturate(1.18);
+  box-shadow:
+    inset 0 0 32px rgba(255, 92, 244, .2),
+    inset 0 0 0 1px rgba(255, 255, 255, .035),
+    0 0 34px rgba(0, 0, 0, .5);
+}
+
+.screen-home .app-menu-board .app-panel::before {
+  content: "";
+  position: absolute;
+  inset: 14px 14px auto 14px;
+  height: clamp(132px, 18vw, 202px);
+  background:
+    linear-gradient(90deg, rgba(5, 1, 9, .18), rgba(5, 1, 9, .54) 48%, rgba(5, 1, 9, .16)),
+    url('/HVAS/assets/ui/hvas_logo_clear.png') left 34px center / auto 92% no-repeat,
+    url('/HVAS/assets/ui/main-menu-background.png') center / cover no-repeat;
+  border: 1px solid rgba(255, 214, 109, .42);
+  border-radius: 8px;
+  box-shadow: inset 0 0 24px rgba(255, 92, 244, .2), 0 0 18px rgba(0, 0, 0, .42);
+  pointer-events: none;
+}
+
+.screen-home .app-menu-board .app-panel header {
+  position: relative;
+  min-height: clamp(160px, 21vw, 230px);
+  padding: clamp(18px, 2.2vw, 28px) clamp(18px, 2.6vw, 34px);
+  display: grid;
+  align-content: center;
+  justify-items: end;
+  text-align: left;
+  border-bottom: 0;
+  background: transparent;
+  z-index: 1;
+}
+
+.screen-home .app-menu-board .app-panel header span,
+.screen-home .app-menu-board .app-panel header h2 {
+  width: min(510px, 58%);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .68);
+}
+
+.screen-home .app-menu-board .app-panel header span {
+  color: #ffd66d;
+  font-size: clamp(12px, 1.3vw, 17px);
+  letter-spacing: .14em;
+}
+
+.screen-home .app-menu-board .app-panel header h2 {
+  color: #ffd66d;
+  font-size: clamp(32px, 4.2vw, 58px);
+  line-height: .94;
+  text-transform: uppercase;
+}
+
+.screen-home .app-menu-board .app-panel-body {
+  position: relative;
+  z-index: 1;
+  padding: clamp(14px, 2vw, 20px);
+}
+
+.screen-home .menu-flow-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.5vw, 18px);
+}
+
+.screen-home .app-menu-board .menu-flow-row {
+  position: relative;
+  min-height: clamp(164px, 18vw, 216px);
+  grid-template-columns: 1fr;
+  grid-template-rows: 26px minmax(62px, 1fr) auto;
+  justify-items: center;
+  align-items: center;
+  padding: 14px 12px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 214, 109, .42);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 92, 244, .22), transparent 42%),
+    linear-gradient(180deg, rgba(17, 4, 27, .74), rgba(5, 1, 9, .86));
+  box-shadow:
+    inset 0 0 24px rgba(255, 92, 244, .18),
+    inset 0 0 0 1px rgba(255, 255, 255, .035),
+    0 0 18px rgba(0, 0, 0, .42);
+}
+
+.screen-home .app-menu-board .menu-flow-row::after {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% -55%;
+  width: 58%;
+  background: linear-gradient(100deg, transparent, rgba(255, 92, 244, .18), rgba(255, 214, 109, .14), transparent);
+  opacity: 0;
+  transform: skewX(-12deg);
+  transition: transform .28s ease, opacity .28s ease;
+  pointer-events: none;
+}
+
+.screen-home .app-menu-board .menu-flow-row:hover,
+.screen-home .app-menu-board .menu-flow-row:focus-visible {
+  border-color: rgba(255, 214, 109, .82);
+  box-shadow:
+    inset 0 0 28px rgba(255, 92, 244, .3),
+    0 0 22px rgba(255, 92, 244, .28),
+    0 0 16px rgba(255, 214, 109, .16);
+  transform: translateY(-2px);
+}
+
+.screen-home .app-menu-board .menu-flow-row:hover::after,
+.screen-home .app-menu-board .menu-flow-row:focus-visible::after {
+  opacity: 1;
+  transform: translateX(250%) skewX(-12deg);
+}
+
+.screen-home .app-menu-board .menu-flow-row b {
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  border: 1px solid rgba(255, 214, 109, .52);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(83, 11, 114, .92), rgba(21, 3, 32, .92));
+  color: #ffd66d;
+  font-size: 13px;
+  box-shadow: inset 0 0 12px rgba(255, 92, 244, .22);
+}
+
+.screen-home .app-menu-board .menu-flow-row img {
+  width: min(168px, 82%);
+  max-height: 72px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 13px rgba(255, 92, 244, .34))
+    drop-shadow(0 0 6px rgba(255, 214, 109, .22));
+}
+
+.screen-home .app-menu-board .menu-flow-row div {
+  min-width: 0;
+  text-align: center;
+}
+
+.screen-home .app-menu-board .menu-flow-row strong {
+  color: #ffd66d;
+  font-size: clamp(17px, 1.75vw, 24px);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.screen-home .app-menu-board .menu-flow-row span {
+  max-width: 24ch;
+  margin: 6px auto 0;
+  color: rgba(255, 247, 230, .84);
+  font-size: clamp(12px, 1vw, 14px);
+  line-height: 1.2;
+}
+
+.screen-home .member-statsbar {
+  width: min(960px, 100%);
+  min-height: 82px;
+  margin: clamp(14px, 2vw, 22px) auto 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 214, 109, .34);
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(8, 2, 14, .72), rgba(76, 8, 104, .36), rgba(8, 2, 14, .72));
+  box-shadow: inset 0 0 22px rgba(255, 92, 244, .18), 0 0 22px rgba(0, 0, 0, .32);
+}
+
+.screen-home .member-statsbar .msb-cell {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 92, 244, .24);
+  background: rgba(6, 1, 10, .46);
+}
+
+.screen-home .member-statsbar div.msb-cell {
+  cursor: default;
+}
+
+.screen-home .member-statsbar button.msb-cell:hover,
+.screen-home .member-statsbar button.msb-cell:focus-visible {
+  outline: none;
+  border-color: rgba(255, 214, 109, .7);
+  box-shadow: 0 0 16px rgba(255, 92, 244, .24);
+}
+
+@keyframes menu-topbar-shine {
+  0%, 28% { opacity: 0; transform: translateX(-42%); }
+  42% { opacity: .55; }
+  62%, 100% { opacity: 0; transform: translateX(58%); }
+}
+
+@media (max-width: 980px) {
+  .screen-home .menu-flow-list {
+    grid-template-columns: 1fr;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row {
+    min-height: 108px;
+    grid-template-columns: 34px 118px minmax(0, 1fr);
+    grid-template-rows: 1fr;
+    justify-items: start;
+    text-align: left;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row div {
+    text-align: left;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row span {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .screen.screen-home {
+    padding: 14px;
+  }
+
+  .screen-home .role-badge {
+    grid-template-columns: 1fr;
+  }
+
+  .screen-home .role-badge-id {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .screen-home .role-badge-chip {
+    width: 104px;
+  }
+
+  .screen-home .role-badge-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .screen-home .app-menu-board .app-panel::before {
+    inset: 10px 10px auto 10px;
+    height: 150px;
+    background-position: left 14px center, center;
+    background-size: auto 74%, cover;
+  }
+
+  .screen-home .app-menu-board .app-panel header {
+    min-height: 172px;
+    justify-items: end;
+  }
+
+  .screen-home .app-menu-board .app-panel header span,
+  .screen-home .app-menu-board .app-panel header h2 {
+    width: 58%;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row {
+    grid-template-columns: 30px 96px minmax(0, 1fr);
+    min-height: 96px;
+    padding: 10px;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row img {
+    width: 96px;
+    max-height: 44px;
+  }
+
+  .screen-home .member-statsbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
