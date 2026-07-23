@@ -548,7 +548,7 @@
   62%, 100% { opacity: 0; transform: translateX(58%); }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 860px) {
   .screen-home .menu-flow-list {
     grid-template-columns: 1fr;
   }
