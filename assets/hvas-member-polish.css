@@ -624,3 +624,201 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Main menu final fit pass: keep the blueprint shape visible in the side window. */
+.screen.screen-home {
+  max-width: min(1180px, 100%);
+  min-height: 100svh;
+  padding: clamp(12px, 1.7vw, 22px);
+  overflow-x: hidden;
+}
+
+.screen-home .role-badge {
+  width: min(1080px, 100%);
+  min-height: 68px;
+  margin-bottom: clamp(10px, 1.25vw, 14px);
+  padding: 9px clamp(12px, 1.6vw, 18px);
+  background:
+    linear-gradient(90deg, rgba(5, 1, 9, .82), rgba(76, 8, 104, .62) 42%, rgba(5, 1, 9, .82)),
+    radial-gradient(circle at 50% 0%, rgba(255, 214, 109, .18), transparent 46%);
+  -webkit-backdrop-filter: blur(8px) saturate(1.22);
+  backdrop-filter: blur(8px) saturate(1.22);
+}
+
+.screen-home .role-badge-id {
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.screen-home .role-badge-chip {
+  width: 116px;
+  max-height: 50px;
+}
+
+.screen-home .role-badge .eyebrow {
+  font-size: clamp(10px, .9vw, 13px);
+}
+
+.screen-home .role-badge h1 {
+  font-size: clamp(22px, 2.7vw, 34px);
+}
+
+.screen-home .role-badge-checkin,
+.screen-home .role-badge-switch {
+  min-height: 36px;
+  padding-inline: 12px;
+}
+
+.screen-home .app-menu-board .app-panel {
+  background:
+    linear-gradient(180deg, rgba(11, 2, 18, .38), rgba(8, 2, 14, .58)),
+    radial-gradient(circle at 50% 0%, rgba(255, 92, 244, .18), transparent 42%);
+}
+
+.screen-home .app-menu-board .app-panel::before {
+  inset: 12px 12px auto 12px;
+  height: clamp(112px, 12.6vw, 156px);
+  background:
+    linear-gradient(90deg, rgba(5, 1, 9, .08), rgba(5, 1, 9, .46) 48%, rgba(5, 1, 9, .2)),
+    url('/HVAS/assets/ui/hvas_logo_clear.png') left 24px center / auto 86% no-repeat,
+    url('/HVAS/assets/ui/main-menu-background.png') right 12px center / auto 118% no-repeat;
+  background-color: rgba(7, 2, 13, .46);
+  box-shadow:
+    inset 0 0 26px rgba(255, 92, 244, .22),
+    inset 0 0 18px rgba(255, 214, 109, .08),
+    0 0 22px rgba(0, 0, 0, .38);
+}
+
+.screen-home .app-menu-board .app-panel header {
+  min-height: clamp(136px, 15vw, 176px);
+  padding: clamp(14px, 1.6vw, 22px) clamp(16px, 2.1vw, 28px);
+}
+
+.screen-home .app-menu-board .app-panel header span,
+.screen-home .app-menu-board .app-panel header h2 {
+  width: min(480px, 56%);
+}
+
+.screen-home .app-menu-board .app-panel header span {
+  font-size: clamp(10px, 1vw, 14px);
+}
+
+.screen-home .app-menu-board .app-panel header h2 {
+  font-size: clamp(28px, 3.35vw, 46px);
+}
+
+.screen-home .app-menu-board .app-panel-body {
+  padding: clamp(10px, 1.25vw, 14px);
+}
+
+.screen-home .menu-flow-list {
+  gap: clamp(9px, 1.1vw, 13px);
+}
+
+.screen-home .app-menu-board .menu-flow-row {
+  min-height: clamp(124px, 13.2vw, 158px);
+  padding: 10px 10px 12px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 92, 244, .2), transparent 44%),
+    linear-gradient(180deg, rgba(17, 4, 27, .58), rgba(5, 1, 9, .72));
+  box-shadow:
+    inset 0 0 20px rgba(255, 92, 244, .2),
+    inset 0 0 0 1px rgba(255, 255, 255, .035),
+    0 0 14px rgba(255, 92, 244, .08),
+    0 0 18px rgba(0, 0, 0, .34);
+}
+
+.screen-home .app-menu-board .menu-flow-row:hover,
+.screen-home .app-menu-board .menu-flow-row:focus-visible {
+  box-shadow:
+    inset 0 0 30px rgba(255, 92, 244, .3),
+    inset 0 0 12px rgba(255, 214, 109, .15),
+    0 0 24px rgba(255, 92, 244, .28),
+    0 0 18px rgba(255, 214, 109, .15);
+}
+
+.screen-home .app-menu-board .menu-flow-row img {
+  width: min(138px, 80%);
+  max-height: 58px;
+}
+
+.screen-home .app-menu-board .menu-flow-row strong {
+  font-size: clamp(15px, 1.45vw, 20px);
+}
+
+.screen-home .app-menu-board .menu-flow-row span {
+  margin-top: 4px;
+  font-size: clamp(11px, .92vw, 13px);
+}
+
+.screen-home .member-statsbar {
+  width: min(920px, 100%);
+  min-height: 62px;
+  margin-top: clamp(9px, 1.2vw, 12px);
+  padding: 8px;
+  background: linear-gradient(90deg, rgba(8, 2, 14, .54), rgba(76, 8, 104, .28), rgba(8, 2, 14, .54));
+}
+
+.screen-home .member-statsbar .msb-cell {
+  min-height: 44px;
+}
+
+@media (min-width: 861px) and (max-height: 760px) {
+  .screen.screen-home {
+    padding: 10px 14px;
+  }
+
+  .screen-home .role-badge {
+    min-height: 60px;
+    margin-bottom: 8px;
+    padding-block: 7px;
+  }
+
+  .screen-home .role-badge-id {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .screen-home .role-badge-chip {
+    width: 104px;
+    max-height: 44px;
+  }
+
+  .screen-home .role-badge h1 {
+    font-size: clamp(21px, 2.4vw, 30px);
+  }
+
+  .screen-home .app-menu-board .app-panel::before {
+    height: 118px;
+    background-size: auto 82%, auto 108%;
+  }
+
+  .screen-home .app-menu-board .app-panel header {
+    min-height: 136px;
+  }
+
+  .screen-home .app-menu-board .app-panel header h2 {
+    font-size: clamp(25px, 3vw, 38px);
+  }
+
+  .screen-home .app-menu-board .menu-flow-row {
+    min-height: 118px;
+    grid-template-rows: 22px minmax(48px, 1fr) auto;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row b {
+    min-width: 24px;
+    min-height: 24px;
+    font-size: 12px;
+  }
+
+  .screen-home .app-menu-board .menu-flow-row img {
+    width: min(122px, 76%);
+    max-height: 50px;
+  }
+
+  .screen-home .member-statsbar {
+    min-height: 54px;
+    margin-top: 8px;
+    padding: 6px;
+  }
+}
