@@ -310,7 +310,7 @@ const StoryMode = (() => {
   // ── fight ────────────────────────────────────────────────────────────────────
   function bindFightControls() {
     const map = { 'touch-up':'up','touch-down':'down','touch-left':'left','touch-right':'right',
-      'touch-a':'attack','touch-b':'special','touch-x':'dodge','touch-y':'interact' };
+      'touch-a':'attack','touch-b':'heavy','touch-x':'block','touch-y':'special' };
     Object.entries(map).forEach(([id,action])=>{
       const btn=document.getElementById(id);
       if (!btn || btn.dataset.vsbound) return;

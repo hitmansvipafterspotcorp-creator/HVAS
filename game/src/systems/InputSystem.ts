@@ -21,6 +21,10 @@ export type Buttons = {
   interact: boolean;    // edge-triggered
 };
 
+type TouchState = {
+  isDown?: (name: string) => boolean;
+};
+
 // Gamepad button indices (standard layout)
 const GP = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, SELECT: 8, START: 9 };
 
@@ -33,6 +37,7 @@ export class InputSystem {
 
   // Gamepad edge-trigger tracking
   private gpPrev: Record<number, boolean> = {};
+  private prevTouch: Record<string, boolean> = {};
 
   // Double-tap: timestamps of the LAST keydown for each canonical direction.
   private lastTapAt: Record<'left' | 'right' | 'up' | 'down', number> = {
@@ -88,6 +93,18 @@ export class InputSystem {
     return pressed && !prev;
   }
 
+  private touchDown(name: string): boolean {
+    const mgr = (globalThis as unknown as { InputManager?: TouchState }).InputManager;
+    return !!mgr?.isDown?.(name);
+  }
+
+  private touchJustDown(name: string): boolean {
+    const down = this.touchDown(name);
+    const prev = this.prevTouch[name] ?? false;
+    this.prevTouch[name] = down;
+    return down && !prev;
+  }
+
   read(): Buttons {
     const k = this.keys;
     const pad = this.scene.input.gamepad?.getPad(0) ?? null;
@@ -106,12 +123,18 @@ export class InputSystem {
     const gpUp    = pad ? (pad.leftStick.y < -0.4 || pad.up)    : false;
     const gpDown  = pad ? (pad.leftStick.y >  0.4 || pad.down)  : false;
 
-    const left  = k.LEFT.isDown  || k.A.isDown || gpLeft;
-    const right = k.RIGHT.isDown || k.D.isDown || gpRight;
-    const up    = k.UP.isDown    || k.W.isDown || gpUp;
-    const down  = k.DOWN.isDown  || k.S.isDown || gpDown;
+    const tLeft = this.touchDown('left');
+    const tRight = this.touchDown('right');
+    const tUp = this.touchDown('up');
+    const tDown = this.touchDown('down');
 
-    const block = k.SHIFT.isDown || (pad?.buttons[GP.LB]?.pressed ?? false);
+    const left  = k.LEFT.isDown  || k.A.isDown || gpLeft || tLeft;
+    const right = k.RIGHT.isDown || k.D.isDown || gpRight || tRight;
+    const up    = k.UP.isDown    || k.W.isDown || gpUp || tUp;
+    const down  = k.DOWN.isDown  || k.S.isDown || gpDown || tDown;
+
+    const tBlock = this.touchDown('block') || this.touchDown('dodge');
+    const block = k.SHIFT.isDown || (pad?.buttons[GP.LB]?.pressed ?? false) || tBlock;
 
     // Dodge = block HELD + any direction just-pressed this frame.
     // We detect "just-pressed" by checking JustDown on the direction keys.
@@ -139,16 +162,18 @@ export class InputSystem {
       (this.runActive.up    && up)    ||
       (this.runActive.down  && down);
 
-    const light = Phaser.Input.Keyboard.JustDown(k.J) || gpX;
+    const tAttack = this.touchJustDown('attack');
+    const tHeavy = this.touchJustDown('heavy');
+    const tSpecial = this.touchJustDown('special');
+    const light = Phaser.Input.Keyboard.JustDown(k.J) || gpX || tAttack;
     const medium = false;
-    const heavy = false;
+    const heavy = Phaser.Input.Keyboard.JustDown(k.L) || gpB || tHeavy;
     const special =
       Phaser.Input.Keyboard.JustDown(k.K) ||
-      Phaser.Input.Keyboard.JustDown(k.L) ||
       Phaser.Input.Keyboard.JustDown(k.I) ||
-      gpB ||
       gpY ||
-      gpRB;
+      gpRB ||
+      tSpecial;
 
     return {
       left, right, up, down,
@@ -157,7 +182,7 @@ export class InputSystem {
       heavy,
       special,
       attack:     light,
-      attackHeld: k.J.isDown || (pad?.buttons[GP.X]?.pressed ?? false),
+      attackHeld: k.J.isDown || (pad?.buttons[GP.X]?.pressed ?? false) || this.touchDown('attack'),
       block,
       dodge,
       dodgeX,
@@ -168,7 +193,8 @@ export class InputSystem {
         Phaser.Input.Keyboard.JustDown(k.E)     ||
         Phaser.Input.Keyboard.JustDown(k.ENTER) ||
         Phaser.Input.Keyboard.JustDown(k.SPACE) ||
-        gpA || gpStart,
+        gpA || gpStart ||
+        this.touchJustDown('interact'),
     };
   }
 }

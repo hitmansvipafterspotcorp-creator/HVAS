@@ -2,7 +2,7 @@
 const InputManager = (() => {
   const state = {
     left: false, right: false, up: false, down: false,
-    attack: false, special: false, dodge: false, interact: false,
+    attack: false, heavy: false, special: false, dodge: false, interact: false,
     super: false, finisher: false,
     confirm: false, back: false, pause: false, start: false, select: false,
     block: false
@@ -17,8 +17,8 @@ const InputManager = (() => {
     ArrowUp: 'up', w: 'up', W: 'up',
     ArrowDown: 'down', s: 'down', S: 'down',
     z: 'attack', Z: 'attack',
-    x: 'special', X: 'special',
-    c: 'dodge', C: 'dodge',
+    x: 'heavy', X: 'heavy',
+    c: 'special', C: 'special',
     v: 'interact', V: 'interact',
     b: 'super', B: 'super',
     f: 'finisher', F: 'finisher',
@@ -39,7 +39,7 @@ const InputManager = (() => {
       state[action] = down;
       if (down) callbacks.forEach(cb => cb(action));
     }
-    if (['up','down','left','right','confirm','back','attack','special','dodge','interact','super','finisher','pause','select'].includes(action)) {
+    if (['up','down','left','right','confirm','back','attack','heavy','special','dodge','interact','super','finisher','pause','select'].includes(action)) {
       e.preventDefault();
     }
   }
@@ -47,6 +47,7 @@ const InputManager = (() => {
   function copyState() { Object.assign(prev, state); }
 
   function justPressed(action) { return state[action] && !prev[action]; }
+  function isDown(action) { return !!state[action]; }
 
   let _inited = false;
   function init() {
@@ -74,9 +75,9 @@ const InputManager = (() => {
 
   const gpMap = [
     { idx: 0, action: 'attack' },    // A
-    { idx: 1, action: 'special' },   // B / back
-    { idx: 2, action: 'dodge' },     // X
-    { idx: 3, action: 'interact' },  // Y
+    { idx: 1, action: 'heavy' },     // B
+    { idx: 2, action: 'dodge' },     // X / block
+    { idx: 3, action: 'special' },   // Y
     { idx: 5, action: 'super' },     // RB — super
     { idx: 4, action: 'finisher' },  // LB — finisher
     { idx: 8, action: 'select' },    // Select/Back
@@ -107,5 +108,5 @@ const InputManager = (() => {
 
   function update() { pollGamepad(); }
 
-  return { state, init, setTouch, onInputCallback, justPressed, update };
+  return { state, init, setTouch, onInputCallback, justPressed, isDown, update };
 })();

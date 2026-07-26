@@ -72,14 +72,16 @@ export class BrawlerScene extends Phaser.Scene {
 
   // Real-art HUD pieces (populated when the UI kit is loaded).
   private hpFill?: Phaser.GameObjects.Rectangle;
+  private hpLiveFill?: Phaser.GameObjects.Rectangle;
+  private meterLiveFill?: Phaser.GameObjects.Rectangle;
+  private guardLiveFill?: Phaser.GameObjects.Rectangle;
+  private hudBarGlow?: Phaser.GameObjects.Graphics;
   private hpInner = { x: 0, w: 0 };
   private hpNum?: NumberDisplay;
   private comboLabel?: Phaser.GameObjects.Image;
   private comboNum?: NumberDisplay;
   private meterPips: Phaser.GameObjects.Image[] = [];
   private dangerOverlay?: Phaser.GameObjects.Image;
-  private hitFlashOverlay?: Phaser.GameObjects.Image;
-  private hitFlashTimer = 0;
   private prevPlayerHp = 0;
   private _stageStartTime = 0;
   private _enemiesDefeated = 0;
@@ -132,7 +134,7 @@ export class BrawlerScene extends Phaser.Scene {
     }
 
     // Player — uses real sprite art if its anims are built, else graybox.
-    this.player = new Fighter(this, 'player', 180, FLOOR_BOTTOM - 20, 120, PLAYER_ID);
+    this.player = new Fighter(this, 'player', 220, FLOOR_BOTTOM - 20, 120, PLAYER_ID);
     this.prevPlayerHp = this.player.maxHp;
 
     // Systems.
@@ -397,6 +399,11 @@ export class BrawlerScene extends Phaser.Scene {
       return;
     }
 
+    if (b.heavy) {
+      this.startSheetAttack('heavy');
+      return;
+    }
+
     if (b.attack) {
       this.startChainAttack();
       return;
@@ -497,17 +504,17 @@ export class BrawlerScene extends Phaser.Scene {
 
     let usedSheetVfx = false;
     if (move.button === 'light') {
-      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 1.18, 91500, flipX);
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 0.72, 91500, flipX);
     } else if (move.button === 'medium') {
-      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_arc', x + this.player.facing * 12, y, 1.3, 91500, flipX)
-        || this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 1.25, 91500, flipX);
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_arc', x + this.player.facing * 12, y, 0.86, 91500, flipX)
+        || this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 0.78, 91500, flipX);
     } else if (move.button === 'heavy') {
-      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_heavy', x, y + 4, 1.48, 91500, flipX)
-        || this.vfx.charVfx(this.player.charId, 'vfx_burst', x, y + 8, 1.42, 91500, flipX);
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_heavy', x, y + 4, 0.98, 91500, flipX)
+        || this.vfx.charVfx(this.player.charId, 'vfx_burst', x, y + 8, 0.92, 91500, flipX);
     } else {
-      const trail = this.vfx.charVfx(this.player.charId, 'vfx_chant_trail', x + this.player.facing * 18, y, 1.65, 91500, flipX);
-      const burst = this.vfx.charVfx(this.player.charId, 'vfx_super_burst', x, y + 10, 1.85, 91501, flipX);
-      usedSheetVfx = trail || burst || this.vfx.charVfx(this.player.charId, 'vfx_special', x, y, 1.65, 91500, flipX);
+      const trail = this.vfx.charVfx(this.player.charId, 'vfx_chant_trail', x + this.player.facing * 18, y, 1.05, 91500, flipX);
+      const burst = this.vfx.charVfx(this.player.charId, 'vfx_super_burst', x, y + 10, 1.1, 91501, flipX);
+      usedSheetVfx = trail || burst || this.vfx.charVfx(this.player.charId, 'vfx_special', x, y, 1.02, 91500, flipX);
     }
 
     if (!usedSheetVfx) this.vfx.hitSpark(x, y, this.player.facing);
@@ -546,8 +553,9 @@ export class BrawlerScene extends Phaser.Scene {
   private clampPlayer(): void {
     const p = this.player;
     // Clamp to current zone: can't pass the next barrier until it dissolves.
-    const zoneMax = GAME_WIDTH * (this.currentZone + 1) - 20;
-    p.x = Phaser.Math.Clamp(p.x, 20, Math.min(zoneMax, this.worldWidth - 20));
+    const visibleHalf = Math.max(90, (p.sprite?.displayWidth ?? 160) * 0.45);
+    const zoneMax = GAME_WIDTH * (this.currentZone + 1) - visibleHalf;
+    p.x = Phaser.Math.Clamp(p.x, visibleHalf, Math.min(zoneMax, this.worldWidth - visibleHalf));
     p.feetY = Phaser.Math.Clamp(p.feetY, FLOOR_TOP + 10, FLOOR_BOTTOM - 5);
   }
 
@@ -763,10 +771,21 @@ export class BrawlerScene extends Phaser.Scene {
   }
 
   triggerHitFlash(): void {
-    if (this.hitFlashOverlay) {
-      this.hitFlashTimer = 120;
-      this.hitFlashOverlay.setVisible(true).setAlpha(1);
-    }
+    const flash = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0xffffff,
+      0.18,
+    ).setScrollFactor(0).setDepth(60001);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 110,
+      ease: 'Quad.out',
+      onComplete: () => flash.destroy(),
+    });
   }
 
   private flashBanner(text: string): void {
@@ -791,51 +810,61 @@ export class BrawlerScene extends Phaser.Scene {
     // ── Player-side HUD (top-left) ────────────────────────────────────────
     // Portrait frame
     if (this.textures.exists(UI.hudPortraitFrame)) {
-      this.add.image(8, 8, UI.hudPortraitFrame)
-        .setOrigin(0, 0).setDisplaySize(90, 112)
+      this.add.image(24, 14, UI.hudPortraitFrame)
+        .setOrigin(0, 0).setDisplaySize(78, 98)
         .setScrollFactor(0).setDepth(DEPTH);
     }
 
     // Health bar — full-width art, dark mask depletes from right
     const hpTex = this.textures.exists(UI.hudHealthBar)
       ? this.textures.get(UI.hudHealthBar).getSourceImage() : null;
-    const hpW = 280, hpH = hpTex ? Math.round((hpTex.height / hpTex.width) * hpW) : 22;
-    const hpX = 104, hpY = 14;
-    this.hpInner.x = hpX + hpW * 0.04;
-    this.hpInner.w = hpW * 0.89;
+    const hpW = 388, hpH = hpTex ? Math.round((hpTex.height / hpTex.width) * hpW) : 42;
+    const hpX = 82, hpY = 16;
+    this.hpInner.x = hpX + hpW * 0.18;
+    this.hpInner.w = hpW * 0.72;
     const innerY = hpY + hpH * 0.5;
+    this.hpLiveFill = this.add.rectangle(
+      this.hpInner.x, innerY, this.hpInner.w, Math.max(10, hpH * 0.34), 0xff1738, 0.9,
+    ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH - 2);
     this.hpFill = this.add.rectangle(
-      this.hpInner.x + this.hpInner.w, innerY, 0, hpH * 0.55, 0x1a0608, 0.92,
-    ).setOrigin(1, 0.5).setScrollFactor(0).setDepth(DEPTH - 1);
+      this.hpInner.x + this.hpInner.w, innerY, 0, Math.max(12, hpH * 0.42), 0x050009, 0.92,
+    ).setOrigin(1, 0.5).setScrollFactor(0).setDepth(DEPTH + 1);
     if (hpTex) {
       this.add.image(hpX, hpY, UI.hudHealthBar)
         .setOrigin(0, 0).setDisplaySize(hpW, hpH)
-        .setScrollFactor(0).setDepth(DEPTH);
+        .setScrollFactor(0).setDepth(DEPTH + 2);
     }
 
     // Super bar below health
     if (this.textures.exists(UI.hudSuperBar)) {
-      this.add.image(hpX, hpY + hpH + 4, UI.hudSuperBar)
-        .setOrigin(0, 0).setDisplaySize(hpW, 20)
-        .setScrollFactor(0).setDepth(DEPTH);
+      this.meterLiveFill = this.add.rectangle(
+        hpX + 90, hpY + hpH + 19, 0, 10, 0xd620ff, 0.85,
+      ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH - 2);
+      this.add.image(hpX + 56, hpY + hpH + 5, UI.hudSuperBar)
+        .setOrigin(0, 0).setDisplaySize(360, 30)
+        .setScrollFactor(0).setDepth(DEPTH + 2);
     }
     // Guard bar below super
     if (this.textures.exists(UI.hudGuardBar)) {
-      this.add.image(hpX, hpY + hpH + 28, UI.hudGuardBar)
-        .setOrigin(0, 0).setDisplaySize(hpW, 20)
-        .setScrollFactor(0).setDepth(DEPTH);
+      this.guardLiveFill = this.add.rectangle(
+        hpX + 90, hpY + hpH + 47, 0, 10, 0x1c8dff, 0.78,
+      ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH - 2);
+      this.add.image(hpX + 56, hpY + hpH + 33, UI.hudGuardBar)
+        .setOrigin(0, 0).setDisplaySize(360, 30)
+        .setScrollFactor(0).setDepth(DEPTH + 2);
     }
+    this.hudBarGlow = this.add.graphics().setScrollFactor(0).setDepth(DEPTH + 3);
 
     // HP digit readout
-    this.hpNum = new NumberDisplay(this, hpX + 6, hpY + hpH + 58, 18).setDepth(DEPTH + 1);
+    this.hpNum = new NumberDisplay(this, hpX + 92, hpY + hpH + 74, 18).setDepth(DEPTH + 4);
 
     // Combo counter (hidden until combo > 1)
     if (this.textures.exists(UI.hudComboCounter)) {
-      this.comboLabel = this.add.image(hpX + 130, hpY + hpH + 58, UI.hudComboCounter)
+      this.comboLabel = this.add.image(hpX + 190, hpY + hpH + 74, UI.hudComboCounter)
         .setOrigin(0, 0.5).setDisplaySize(56, 22)
-        .setScrollFactor(0).setDepth(DEPTH).setVisible(false);
+        .setScrollFactor(0).setDepth(DEPTH + 3).setVisible(false);
     }
-    this.comboNum = new NumberDisplay(this, hpX + 192, hpY + hpH + 58, 20).setDepth(DEPTH + 1);
+    this.comboNum = new NumberDisplay(this, hpX + 252, hpY + hpH + 74, 20).setDepth(DEPTH + 4);
 
     // ── Center top: timer badge ───────────────────────────────────────────
     if (this.textures.exists(UI.hudTimer)) {
@@ -854,16 +883,37 @@ export class BrawlerScene extends Phaser.Scene {
     // ── Controls strip (bottom-center) ───────────────────────────────────
     if (this.textures.exists(UI.hudControls)) {
       this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 4, UI.hudControls)
-        .setOrigin(0.5, 1).setDisplaySize(400, 36)
+        .setOrigin(0.5, 1).setDisplaySize(420, 44)
         .setScrollFactor(0).setDepth(DEPTH);
+    }
+    const promptY = GAME_HEIGHT - 33;
+    const prompts: Array<[string, string, number, number]> = [
+      [UI.hudBtnLight, 'CHAIN', GAME_WIDTH - 306, 78],
+      [UI.hudBtnHeavy, 'HEAVY', GAME_WIDTH - 222, 82],
+      [UI.hudBtnBlock, 'BLOCK', GAME_WIDTH - 140, 74],
+      [UI.hudBtnSpecial, 'SPECIAL', GAME_WIDTH - 62, 82],
+    ];
+    for (const [key, label, x, w] of prompts) {
+      if (this.textures.exists(key)) {
+        this.add.image(x, promptY, key)
+          .setDisplaySize(w, 20)
+          .setScrollFactor(0).setDepth(DEPTH + 1);
+      }
+      this.add.text(x, promptY, label, {
+        fontFamily: 'Arial Black, sans-serif',
+        fontSize: '8px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 2,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH + 2);
     }
 
     // Meter pips (star icons below guard bar)
     if (this.textures.exists(UI.hudPipStar)) {
       for (let i = 0; i < 10; i++) {
-        const pip = this.add.image(hpX + i * 26, hpY + hpH + 82, UI.hudPipStar)
+        const pip = this.add.image(hpX + 88 + i * 23, hpY + hpH + 97, UI.hudPipStar)
           .setOrigin(0, 0.5).setDisplaySize(20, 22)
-          .setScrollFactor(0).setDepth(DEPTH).setAlpha(0.25);
+          .setScrollFactor(0).setDepth(DEPTH + 3).setAlpha(0.25);
         this.meterPips.push(pip);
       }
     }
@@ -873,11 +923,6 @@ export class BrawlerScene extends Phaser.Scene {
       this.dangerOverlay = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.hudDanger)
         .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
         .setScrollFactor(0).setDepth(60000).setAlpha(0).setVisible(false);
-    }
-    if (this.textures.exists(UI.hudHitFlash)) {
-      this.hitFlashOverlay = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, UI.hudHitFlash)
-        .setOrigin(0.5).setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-        .setScrollFactor(0).setDepth(60001).setAlpha(0).setVisible(false);
     }
   }
 
@@ -890,6 +935,15 @@ export class BrawlerScene extends Phaser.Scene {
       // Real-art HUD.
       const frac = Phaser.Math.Clamp(p.hp / p.maxHp, 0, 1);
       this.hpFill.width = this.hpInner.w * (1 - frac);
+      this.hpLiveFill?.setFillStyle(frac < 0.25 ? 0xff2933 : 0xff1738, frac < 0.25 ? 1 : 0.9);
+      this.meterLiveFill?.setDisplaySize(360 * 0.76 * Phaser.Math.Clamp(p.meter / 100, 0, 1), 10);
+      this.guardLiveFill?.setDisplaySize(360 * 0.76 * (p.state === 'block' ? 1 : 0.62), 10);
+      if (this.hudBarGlow) {
+        this.hudBarGlow.clear();
+        const pulse = 0.35 + 0.25 * Math.sin(this.time.now / 180);
+        this.hudBarGlow.lineStyle(2, frac < 0.25 ? 0xff3344 : 0xffd700, pulse);
+        this.hudBarGlow.strokeRoundedRect(78, 13, 398, 101, 8);
+      }
       this.hpNum?.setValue(Math.ceil(p.hp));
       const litPips = Math.round((p.meter / 100) * this.meterPips.length);
       this.meterPips.forEach((pip, i) => pip.setAlpha(i < litPips ? 1 : 0.25));
@@ -911,12 +965,6 @@ export class BrawlerScene extends Phaser.Scene {
         }
       }
 
-      // Hit flash: triggered externally via triggerHitFlash(), fades on its own
-      if (this.hitFlashOverlay && this.hitFlashTimer > 0) {
-        this.hitFlashTimer = Math.max(0, this.hitFlashTimer - 16);
-        const a = this.hitFlashTimer / 120;
-        this.hitFlashOverlay.setVisible(a > 0).setAlpha(a);
-      }
     } else {
       // Text fallback.
       const hpBars = '█'.repeat(Math.ceil((p.hp / p.maxHp) * 20)).padEnd(20, '·');

@@ -26,17 +26,29 @@ export class VFXSystem {
     const key = AnimationSystem.animKey(charId, animName);
     const anims = this.scene.anims;
     if (!anims.exists(key)) return false; // frames not loaded for this char/anim
+    const anim = anims.get(key);
+    const firstFrame = anim.frames[0] as unknown as { textureKey?: string };
+    const textureKey = firstFrame.textureKey;
+    if (!textureKey) return false;
+    const source = this.scene.textures.get(textureKey).getSourceImage() as HTMLImageElement;
+    const tooLarge = source.width > 360 || source.height > 260 || source.width / Math.max(1, source.height) > 3.2;
+    if (tooLarge) return false;
+
+    const safeScale = Math.min(scale, 128 / Math.max(source.width, source.height));
 
     const spr = this.scene.add
       .sprite(wx, wy, key)
       .setOrigin(0.5, 0.5)
-      .setScale(scale)
+      .setScale(safeScale)
       .setFlipX(flipX)
       .setDepth(depth);
 
     spr.play(key);
     spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       spr.destroy();
+    });
+    this.scene.time.delayedCall(460, () => {
+      if (spr.active) spr.destroy();
     });
     return true;
   }
