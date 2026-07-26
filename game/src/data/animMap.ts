@@ -84,14 +84,22 @@ export const ANIMS: Record<string, AnimDef> = {
 
   // ── Per-character VFX sheet (assets/characters/frames/{folder}/vfx/) ────────
   // 8 rows × 8 frames each. Played on a separate sprite at hit/effect location.
+  vfx_hit_light:       { type: 'vfx', row: 0, frames: 8, fps: 24, loop: false },
+  vfx_hit_heavy:       { type: 'vfx', row: 1, frames: 8, fps: 22, loop: false },
+  vfx_arc:             { type: 'vfx', row: 2, frames: 8, fps: 20, loop: false },
+  vfx_burst:           { type: 'vfx', row: 3, frames: 8, fps: 20, loop: false },
+  vfx_shield_pulse:    { type: 'vfx', row: 4, frames: 8, fps: 18, loop: false },
+  vfx_super_burst:     { type: 'vfx', row: 5, frames: 8, fps: 18, loop: false },
+  vfx_finisher_impact: { type: 'vfx', row: 6, frames: 8, fps: 16, loop: false },
+  vfx_chant_trail:     { type: 'vfx', row: 7, frames: 8, fps: 16, loop: false },
   vfx_hit:      { type: 'vfx', row: 0, frames: 8, fps: 24, loop: false },
-  vfx_block:    { type: 'vfx', row: 1, frames: 8, fps: 20, loop: false },
+  vfx_block:    { type: 'vfx', row: 4, frames: 8, fps: 18, loop: false },
   vfx_dodge:    { type: 'vfx', row: 2, frames: 8, fps: 20, loop: false },
-  vfx_super:    { type: 'vfx', row: 3, frames: 8, fps: 18, loop: false },
-  vfx_ko:       { type: 'vfx', row: 4, frames: 8, fps: 16, loop: false },
-  vfx_special:  { type: 'vfx', row: 5, frames: 8, fps: 18, loop: false },
-  vfx_grab:     { type: 'vfx', row: 6, frames: 8, fps: 20, loop: false },
-  vfx_finisher: { type: 'vfx', row: 7, frames: 8, fps: 14, loop: false },
+  vfx_super:    { type: 'vfx', row: 5, frames: 8, fps: 18, loop: false },
+  vfx_ko:       { type: 'vfx', row: 6, frames: 8, fps: 16, loop: false },
+  vfx_special:  { type: 'vfx', row: 7, frames: 8, fps: 16, loop: false },
+  vfx_grab:     { type: 'vfx', row: 3, frames: 8, fps: 20, loop: false },
+  vfx_finisher: { type: 'vfx', row: 6, frames: 8, fps: 16, loop: false },
 };
 
 // Which anims each mode needs (keeps loads small — we never preload all frames).
@@ -117,6 +125,14 @@ export const BRAWLER_ANIMS = [
 ];
 
 export const VFX_ANIMS = [
+  'vfx_hit_light',
+  'vfx_hit_heavy',
+  'vfx_arc',
+  'vfx_burst',
+  'vfx_shield_pulse',
+  'vfx_super_burst',
+  'vfx_finisher_impact',
+  'vfx_chant_trail',
   'vfx_hit',
   'vfx_block',
   'vfx_dodge',

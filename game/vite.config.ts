@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     target: 'es2021',
     outDir: 'dist',
+    assetsDir: 'chunks',
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 2000,
   },

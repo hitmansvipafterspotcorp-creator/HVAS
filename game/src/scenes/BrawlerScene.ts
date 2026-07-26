@@ -262,6 +262,7 @@ export class BrawlerScene extends Phaser.Scene {
         this.weapon.use();
         this.combat.triggerHitStop(120);
         this.floatingText.damage(this.boss.boss.x, this.boss.boss.feetY - 30, opts.damage);
+        this.playMoveImpactVfx(this.boss.boss, move);
         this.floatingText.comboFlash(this.player.x, this.player.feetY - 50, this.player.combo);
       }
     }
@@ -338,8 +339,7 @@ export class BrawlerScene extends Phaser.Scene {
             for (const e of this.waves.enemies) {
               if ((e.state === 'hit' || e.state === 'block') && e.alive) {
                 this.floatingText.damage(e.x, e.feetY - 30, opts.damage);
-                this.vfx.hitSpark(e.x, e.feetY - 60, p.facing);
-                if (e.state === 'block') this.vfx.parryFlash(e.x, e.feetY - 55);
+                this.playMoveImpactVfx(e, move, e.state === 'block');
               }
             }
             this.floatingText.comboFlash(p.x, p.feetY - 50, p.combo);
@@ -481,6 +481,36 @@ export class BrawlerScene extends Phaser.Scene {
         this.banner.setColor('#ffd700');
       },
     });
+  }
+
+  private playMoveImpactVfx(target: Fighter, move: SheetMove, blocked = false): void {
+    const x = target.x - this.player.facing * 10;
+    const y = target.feetY - 62;
+    const flipX = this.player.facing < 0;
+
+    if (blocked) {
+      const shield = this.vfx.charVfx(this.player.charId, 'vfx_shield_pulse', x, y, 1.35, 91500, flipX)
+        || this.vfx.charVfx(this.player.charId, 'vfx_block', x, y, 1.35, 91500, flipX);
+      if (!shield) this.vfx.parryFlash(x, y);
+      return;
+    }
+
+    let usedSheetVfx = false;
+    if (move.button === 'light') {
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 1.18, 91500, flipX);
+    } else if (move.button === 'medium') {
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_arc', x + this.player.facing * 12, y, 1.3, 91500, flipX)
+        || this.vfx.charVfx(this.player.charId, 'vfx_hit_light', x, y, 1.25, 91500, flipX);
+    } else if (move.button === 'heavy') {
+      usedSheetVfx = this.vfx.charVfx(this.player.charId, 'vfx_hit_heavy', x, y + 4, 1.48, 91500, flipX)
+        || this.vfx.charVfx(this.player.charId, 'vfx_burst', x, y + 8, 1.42, 91500, flipX);
+    } else {
+      const trail = this.vfx.charVfx(this.player.charId, 'vfx_chant_trail', x + this.player.facing * 18, y, 1.65, 91500, flipX);
+      const burst = this.vfx.charVfx(this.player.charId, 'vfx_super_burst', x, y + 10, 1.85, 91501, flipX);
+      usedSheetVfx = trail || burst || this.vfx.charVfx(this.player.charId, 'vfx_special', x, y, 1.65, 91500, flipX);
+    }
+
+    if (!usedSheetVfx) this.vfx.hitSpark(x, y, this.player.facing);
   }
 
   private tryGrab(p: Fighter): void {

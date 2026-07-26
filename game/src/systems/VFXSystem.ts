@@ -21,21 +21,24 @@ export class VFXSystem {
     wy: number,
     scale = 1.4,
     depth = 91500,
-  ): void {
+    flipX = false,
+  ): boolean {
     const key = AnimationSystem.animKey(charId, animName);
     const anims = this.scene.anims;
-    if (!anims.exists(key)) return; // frames not loaded for this char/anim
+    if (!anims.exists(key)) return false; // frames not loaded for this char/anim
 
     const spr = this.scene.add
       .sprite(wx, wy, key)
       .setOrigin(0.5, 0.5)
       .setScale(scale)
+      .setFlipX(flipX)
       .setDepth(depth);
 
     spr.play(key);
     spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
       spr.destroy();
     });
+    return true;
   }
 
   // Small starburst on hit contact point.
