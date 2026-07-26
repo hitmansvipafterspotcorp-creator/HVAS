@@ -1058,3 +1058,191 @@
     text-align: center;
   }
 }
+/* Codex gameplay polish: keep the finished menus intact, upgrade the live fight HUD/controls only. */
+.game-shell {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 92, 244, .16), transparent 36%),
+    linear-gradient(180deg, #08020e 0%, #030106 100%) !important;
+  overflow: hidden !important;
+}
+
+.game-topbar {
+  position: relative !important;
+  z-index: 40 !important;
+  min-height: 54px !important;
+  padding: 8px 14px !important;
+  border-bottom: 1px solid rgba(255, 214, 107, .58) !important;
+  background:
+    linear-gradient(90deg, rgba(8, 2, 14, .96), rgba(63, 11, 86, .76), rgba(8, 2, 14, .96)) !important;
+  box-shadow: inset 0 0 18px rgba(255, 92, 244, .18), 0 4px 18px rgba(0, 0, 0, .5) !important;
+}
+
+.game-title {
+  color: #ffe39a !important;
+  text-shadow: 0 0 10px rgba(255, 214, 107, .42), 0 0 18px rgba(255, 92, 244, .28) !important;
+}
+
+.game-exit,
+.game-pause-btn,
+.game-venues {
+  min-height: 36px !important;
+  border-color: rgba(255, 214, 107, .58) !important;
+  background: linear-gradient(180deg, rgba(35, 8, 52, .96), rgba(8, 2, 14, .96)) !important;
+  color: #ffe39a !important;
+  box-shadow: inset 0 0 12px rgba(255, 92, 244, .22), 0 0 10px rgba(255, 92, 244, .16) !important;
+}
+
+.game-stage {
+  position: absolute !important;
+  inset: 54px 0 0 0 !important;
+  z-index: 1 !important;
+  background:
+    radial-gradient(circle at 50% 85%, rgba(255, 214, 107, .08), transparent 40%),
+    #05020a !important;
+}
+
+.game-stage canvas {
+  image-rendering: auto !important;
+}
+
+.game-controls {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 20px !important;
+  z-index: 30 !important;
+  min-height: 126px !important;
+  padding: 0 54px 0 22px !important;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(3, 1, 6, .34) 54%, rgba(3, 1, 6, .66) 100%) !important;
+  border-top: 0 !important;
+}
+
+.dpad {
+  width: 132px !important;
+  height: 132px !important;
+}
+
+.dpad-btn {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 214, 107, .62) !important;
+  background: linear-gradient(180deg, rgba(44, 9, 62, .96), rgba(9, 2, 14, .98)) !important;
+  color: #ffe39a !important;
+  box-shadow: inset 0 0 14px rgba(255, 92, 244, .22), 0 0 12px rgba(255, 92, 244, .16) !important;
+}
+
+.dpad-btn.up,
+.dpad-btn.down {
+  left: 44px !important;
+}
+
+.dpad-btn.left,
+.dpad-btn.right {
+  top: 44px !important;
+}
+
+.abxy {
+  position: relative !important;
+  width: min(760px, calc(100vw - 220px)) !important;
+  height: 132px !important;
+}
+
+.abxy-mid {
+  top: 44px !important;
+}
+
+.abxy button {
+  position: absolute !important;
+  width: 178px !important;
+  height: 52px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+}
+
+.abxy button::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: var(--hud-btn-art) center / contain no-repeat !important;
+  filter: drop-shadow(0 0 9px rgba(255, 92, 244, .34)) drop-shadow(0 0 5px rgba(255, 214, 107, .35)) !important;
+  z-index: 1 !important;
+}
+
+.abxy button::after {
+  content: none !important;
+}
+
+.btn-a {
+  left: calc(50% - 188px) !important;
+  top: 40px !important;
+  bottom: auto !important;
+  --hud-btn-art: url("/HVAS/assets/game/hud/hud_action_chain.png");
+}
+
+.btn-y {
+  left: calc(50% + 196px) !important;
+  top: 40px !important;
+  --hud-btn-art: url("/HVAS/assets/game/hud/hud_action_special.png");
+}
+
+.btn-x {
+  left: calc(50% - 380px) !important;
+  top: 40px !important;
+  --hud-btn-art: url("/HVAS/assets/game/hud/hud_action_block.png");
+}
+
+.btn-b {
+  right: auto !important;
+  left: calc(50% + 4px) !important;
+  top: 40px !important;
+  --hud-btn-art: url("/HVAS/assets/game/hud/hud_action_heavy.png");
+}
+
+.game-controls button:active {
+  transform: translateY(1px) scale(.98) !important;
+  filter: brightness(1.35) !important;
+}
+
+.game-hint {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .abxy {
+    width: 390px !important;
+  }
+
+  .btn-x,
+  .btn-a,
+  .btn-b,
+  .btn-y {
+    width: 170px !important;
+  }
+
+  .btn-x {
+    left: 12px !important;
+    top: 10px !important;
+  }
+
+  .btn-y {
+    left: 204px !important;
+    top: 10px !important;
+  }
+
+  .btn-a {
+    left: 12px !important;
+    top: 70px !important;
+  }
+
+  .btn-b {
+    left: 204px !important;
+    top: 70px !important;
+  }
+}
