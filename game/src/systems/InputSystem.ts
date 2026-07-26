@@ -6,14 +6,18 @@ export type Buttons = {
   right: boolean;
   up: boolean;
   down: boolean;
-  attack: boolean;      // edge-triggered (just pressed this frame)
-  attackHeld: boolean;
+  light: boolean;       // edge-triggered
+  medium: boolean;      // edge-triggered
+  heavy: boolean;       // edge-triggered
+  special: boolean;     // edge-triggered
+  attack: boolean;      // legacy alias for light
+  attackHeld: boolean;  // legacy alias for light held
   block: boolean;       // held — SHIFT / gamepad LB
   dodge: boolean;       // edge: block held + direction just-pressed
   dodgeX: number;       // -1 / 0 / 1  (direction of dodge)
   dodgeY: number;       // -1 / 0 / 1
   running: boolean;     // double-tap direction within window
-  superMove: boolean;   // edge-triggered
+  superMove: boolean;   // reserved for full-meter supers
   interact: boolean;    // edge-triggered
 };
 
@@ -43,7 +47,7 @@ export class InputSystem {
     this.scene = scene;
     const kb = scene.input.keyboard!;
     this.keys = kb.addKeys(
-      'LEFT,RIGHT,UP,DOWN,A,D,W,S,J,K,L,SPACE,SHIFT,E,ENTER',
+      'LEFT,RIGHT,UP,DOWN,A,D,W,S,J,K,L,I,SPACE,SHIFT,E,ENTER',
     ) as Record<string, Phaser.Input.Keyboard.Key>;
 
     // Listen to raw keydown for double-tap detection (runs every actual key event,
@@ -90,6 +94,7 @@ export class InputSystem {
 
     // Gamepad edge states
     const gpA      = pad ? this.gpJustDown(pad, GP.A)     : false;
+    const gpB      = pad ? this.gpJustDown(pad, GP.B)     : false;
     const gpX      = pad ? this.gpJustDown(pad, GP.X)     : false;
     const gpY      = pad ? this.gpJustDown(pad, GP.Y)     : false;
     const gpRB     = pad ? this.gpJustDown(pad, GP.RB)    : false;
@@ -134,16 +139,31 @@ export class InputSystem {
       (this.runActive.up    && up)    ||
       (this.runActive.down  && down);
 
+    const light = Phaser.Input.Keyboard.JustDown(k.J) || gpX;
+    const medium = false;
+    const heavy = false;
+    const special =
+      Phaser.Input.Keyboard.JustDown(k.K) ||
+      Phaser.Input.Keyboard.JustDown(k.L) ||
+      Phaser.Input.Keyboard.JustDown(k.I) ||
+      gpB ||
+      gpY ||
+      gpRB;
+
     return {
       left, right, up, down,
-      attack:     Phaser.Input.Keyboard.JustDown(k.J) || gpX,
+      light,
+      medium,
+      heavy,
+      special,
+      attack:     light,
       attackHeld: k.J.isDown || (pad?.buttons[GP.X]?.pressed ?? false),
       block,
       dodge,
       dodgeX,
       dodgeY,
       running,
-      superMove:  Phaser.Input.Keyboard.JustDown(k.K) || gpY || gpRB,
+      superMove:  false,
       interact:
         Phaser.Input.Keyboard.JustDown(k.E)     ||
         Phaser.Input.Keyboard.JustDown(k.ENTER) ||

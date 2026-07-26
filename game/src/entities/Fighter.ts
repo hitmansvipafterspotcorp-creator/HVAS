@@ -113,7 +113,7 @@ export class Fighter {
       case 'block': return 'block';
       case 'dodge': return 'dodge';
       case 'attack':
-        return ['combo1', 'combo2', 'combo3'][this.attackIndex % 3];
+        return ['combo1', 'combo2', 'combo3', 'special'][this.attackIndex % 4];
       case 'hit':        return 'hurt';
       case 'knockdown':  return 'knockdown';
       case 'ko':         return 'defeated';
@@ -178,7 +178,7 @@ export class Fighter {
   // The reach box of an attack, projected to the floor lane. x extends in the
   // facing direction; y is the feet lane. Returned as {x1,x2,laneY}.
   attackReach(): { x1: number; x2: number; laneY: number } {
-    const reach = 56;
+    const reach = [52, 68, 88, 112][this.attackIndex % 4];
     const x1 = this.facing === 1 ? this.x : this.x - reach;
     const x2 = this.facing === 1 ? this.x + reach : this.x;
     return { x1, x2, laneY: this.feetY };

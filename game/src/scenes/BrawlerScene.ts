@@ -32,6 +32,7 @@ import { VFXSystem } from '../systems/VFXSystem';
 import { AudioSystem } from '../systems/AudioSystem';
 import type { StageData } from '../data/stageTypes';
 import cafe8fiftyStage from '../data/stages/cafe8fifty.json';
+import { movesFor, type AttackButton, type SheetMove } from '../data/sheetMoves';
 
 // BrawlerScene: data-driven brawler. Defaults to the Cafe8Fifty street stage;
 // pass a different StageData via scene.start(SCENE.Brawler, { stage: ... })
@@ -82,6 +83,11 @@ export class BrawlerScene extends Phaser.Scene {
   private prevPlayerHp = 0;
   private _stageStartTime = 0;
   private _enemiesDefeated = 0;
+  private currentMove?: SheetMove;
+  private attackHitLanded = false;
+  private chainStep = 0;
+  private chainLastAt = 0;
+  private readonly chainWindowMs = 720;
 
   constructor() {
     super(SCENE.Brawler);
@@ -245,7 +251,12 @@ export class BrawlerScene extends Phaser.Scene {
     // Also allow hits on boss.
     if (this.player.attackActive && this.boss?.active && this.boss.boss) {
       this.props.checkHits(this.player); // props
-      const opts = this.weapon.augmentOpts({ damage: 9, knockback: 18, meterGain: 8 });
+      const move = this.currentMove ?? movesFor(this.player.charId).light;
+      const opts = this.weapon.augmentOpts({
+        damage: move.damage,
+        knockback: move.knockback,
+        meterGain: move.meterGain,
+      });
       const hit = this.combat.resolve(this.player, [this.boss.boss], opts);
       if (hit) {
         this.weapon.use();
@@ -308,15 +319,22 @@ export class BrawlerScene extends Phaser.Scene {
       p.stateTimer -= delta;
       // Active hit frames sit in the middle of an attack.
       if (p.state === 'attack') {
-        p.attackActive = p.stateTimer > 120 && p.stateTimer < 240;
-        if (p.attackActive) {
-          const base = { damage: 9, knockback: 18, meterGain: 8 };
+        const move = this.currentMove ?? movesFor(p.charId).light;
+        const elapsed = move.lockMs - p.stateTimer;
+        p.attackActive = elapsed >= move.activeStartMs && elapsed <= move.activeEndMs;
+        if (p.attackActive && !this.attackHitLanded) {
+          const base = {
+            damage: move.damage,
+            knockback: move.knockback,
+            meterGain: move.meterGain,
+          };
           const opts = this.weapon.augmentOpts(base);
           const hit = this.combat.resolve(p, this.waves.enemies, opts);
           if (hit) {
+            this.attackHitLanded = true;
             AudioSystem.sfx(this, 'hit');
             this.weapon.use();
-            this.combat.triggerHitStop(60);
+            this.combat.triggerHitStop(move.button === 'heavy' || move.button === 'special' ? 90 : 55);
             for (const e of this.waves.enemies) {
               if ((e.state === 'hit' || e.state === 'block') && e.alive) {
                 this.floatingText.damage(e.x, e.feetY - 30, opts.damage);
@@ -331,6 +349,8 @@ export class BrawlerScene extends Phaser.Scene {
       if (p.stateTimer <= 0) {
         p.state = 'idle';
         p.attackActive = false;
+        this.attackHitLanded = false;
+        this.currentMove = undefined;
       }
       this.clampPlayer();
       return;
@@ -372,11 +392,13 @@ export class BrawlerScene extends Phaser.Scene {
     }
 
     // Attack start — cycle combo1 -> combo2 -> combo3.
+    if (b.special) {
+      this.startSheetAttack('special');
+      return;
+    }
+
     if (b.attack) {
-      p.attackIndex = (p.attackIndex + 1) % 3;
-      p.state = 'attack';
-      p.stateTimer = 300;
-      p.attackActive = false;
+      this.startChainAttack();
       return;
     }
 
@@ -406,6 +428,60 @@ export class BrawlerScene extends Phaser.Scene {
   // Dodge direction (set when entering dodge state, consumed during the slide).
   private dodgeVX = 0;
   private dodgeVY = 0;
+
+  private startChainAttack(): void {
+    const now = this.time.now;
+    if (now - this.chainLastAt > this.chainWindowMs) {
+      this.chainStep = 0;
+    } else {
+      this.chainStep = (this.chainStep + 1) % 3;
+    }
+    this.chainLastAt = now;
+    const button: AttackButton = ['light', 'medium', 'heavy'][this.chainStep] as AttackButton;
+    this.startSheetAttack(button);
+  }
+
+  private startSheetAttack(button: AttackButton): void {
+    const p = this.player;
+    const move: SheetMove = { ...movesFor(p.charId)[button] };
+    if (button === 'special') {
+      const chainBonus = this.chainStep * 2;
+      move.damage += chainBonus;
+      move.knockback += chainBonus * 3;
+      this.chainStep = 0;
+      this.chainLastAt = 0;
+    }
+    this.currentMove = move;
+    this.attackHitLanded = false;
+    p.attackIndex =
+      move.button === 'light' ? 0 :
+        move.button === 'medium' ? 1 :
+          move.button === 'heavy' ? 2 : 3;
+    p.state = 'attack';
+    p.stateTimer = move.lockMs;
+    p.attackActive = false;
+    this.flashMove(move);
+  }
+
+  private flashMove(move: SheetMove): void {
+    this.banner
+      .setText(`${move.button.toUpperCase()} - ${move.name}`)
+      .setVisible(true)
+      .setAlpha(1)
+      .setScale(1);
+    this.banner.setColor(move.bannerColor);
+    this.tweens.add({
+      targets: this.banner,
+      alpha: 0,
+      scale: 1.18,
+      duration: 650,
+      ease: 'Cubic.out',
+      onComplete: () => {
+        this.banner.setVisible(false);
+        this.banner.setColor('#ffd700');
+      },
+    });
+  }
 
   private tryGrab(p: Fighter): void {
     const GRAB_RANGE = 70;
