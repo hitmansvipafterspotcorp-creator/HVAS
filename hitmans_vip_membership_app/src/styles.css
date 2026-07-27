@@ -3319,8 +3319,11 @@ button {
 
 .verify-manual { margin: 18px 0; }
 .verify-manual label { display: block; color: #9a7ac0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
-.verify-manual-row { display: flex; gap: 8px; }
-.verify-manual-row input { flex: 1; background: #0f0820; border: 1px solid #3a2350; border-radius: 10px; padding: 14px; color: #fff; font-family: ui-monospace, monospace; font-size: 16px; letter-spacing: .06em; }
+.verify-manual-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.verify-manual-row input { flex: 1 1 150px; min-width: 0; background: #0f0820; border: 1px solid #3a2350; border-radius: 10px; padding: 14px; color: #fff; font-family: ui-monospace, monospace; font-size: 16px; letter-spacing: .06em; }
+/* keep the VERIFY CARD art button inside the panel on narrow phones */
+.verify-manual-row .asset-cta { flex: 0 1 auto; max-width: 100%; }
+.verify-manual-row .asset-cta img { max-width: 100%; height: auto; max-height: 52px; }
 .verify-manual-row input:focus { outline: none; border-color: #b06bff; }
 .verify-go { background: #b06bff; color: #fff; border: none; border-radius: 10px; padding: 0 20px; font-weight: 800; cursor: pointer; }
 .verify-result { margin-top: 14px; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
