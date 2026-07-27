@@ -4,6 +4,27 @@ import { joinVenue, socialEnabled } from './social.js';
 
 const BASE = import.meta.env.BASE_URL;
 const FIG = (id, anim, i) => `${BASE}assets/game/fighters/${id}/${anim}_${i}.png`;
+// Top-down directional sprites for venue interiors: 8 rows (idle/walk × S,N,W,E).
+const TOPDOWN = (id, row, i) => `${BASE}assets/game/topdown/${id}/r${String(row).padStart(2, '0')}_f${String(i).padStart(2, '0')}.png`;
+const TOPDOWN_ROWS = {
+  idle_s: 0, idle_n: 1, idle_w: 2, idle_e: 3,
+  walk_s: 4, walk_n: 5, walk_w: 6, walk_e: 7,
+};
+function loadTopDownFighter(scene, fighterId) {
+  for (const [anim, row] of Object.entries(TOPDOWN_ROWS)) {
+    for (let i = 0; i < 8; i++) scene.load.image(`f_td_${anim}_${i}`, TOPDOWN(fighterId, row, i));
+  }
+}
+function makeTopDownAnims(scene) {
+  for (const anim of Object.keys(TOPDOWN_ROWS)) {
+    const key = `td_${anim}`;
+    if (scene.anims.exists(key)) continue;
+    scene.anims.create({
+      key, repeat: -1, frameRate: anim.startsWith('walk') ? 10 : 6,
+      frames: Array.from({ length: 8 }, (_, i) => ({ key: `f_td_${anim}_${i}` })),
+    });
+  }
+}
 const selfMemberId = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_api_member_id')) || '';
 
 // Shared: load a fighter's idle/walk/atk frames and build the anims. `p` is the
@@ -55,9 +76,11 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
   class Base extends Phaser.Scene {
     preload() {
       this.load.image('bg', VENUE_ASSET(V.bg));
-      loadFighter(this, fighterId, 'f');
-      if (V.mode !== 'topdown') {
-        loadFighter(this, ENEMY_ID, 'e');  // brawler stages fight
+      if (V.mode === 'topdown') {
+        loadTopDownFighter(this, fighterId);   // interiors: true 4-direction sprites
+      } else {
+        loadFighter(this, fighterId, 'f');
+        loadFighter(this, ENEMY_ID, 'e');      // brawler stages fight
         for (const h of ['health_bar', 'hit_flash'])
           this.load.image(`hud_${h}`, `${BASE}assets/game/hud/hud_${h}.png`);
       }
@@ -288,10 +311,10 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       if (this.player) this.player.setScale((H * 0.13) / this.player.height);
     }
     create() {
-      makeFighterAnims(this);
+      makeTopDownAnims(this);
       this.bg = this.add.image(0, 0, 'bg').setOrigin(0.5, 0.5);
-      this.player = this.add.sprite(0, 0, 'f_idle_0').setOrigin(0.5, 1).play('idle');
-      this.facing = 1;
+      this.player = this.add.sprite(0, 0, 'f_td_idle_s_0').setOrigin(0.5, 1).play('td_idle_s');
+      this.dir = 's';
       this.keys();
       this.prompt = promptText(this);
       this.layout();
@@ -351,14 +374,14 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
     }
     loadRemoteAvatar(r, avatar) {
       if (!avatar) return;
-      const key = `rf_${avatar}_idle0`;
+      const key = `rf_td_${avatar}_idle_s_0`;
       const attach = () => {
         if (r.dot?.active) r.dot.destroy();
         r.sprite = this.add.image(0, 0, key).setOrigin(0.5, 1).setDepth(1);
         r.sprite.setScale((this.scale.height * 0.13) / r.sprite.height);
       };
       if (this.textures.exists(key)) return attach();
-      this.load.image(key, FIG(avatar, 'idle', 0));
+      this.load.image(key, TOPDOWN(avatar, TOPDOWN_ROWS.idle_s, 0));
       this.load.once('complete', () => { if (this.remotes.has([...this.remotes].find(([, v]) => v === r)?.[0])) attach(); });
       this.load.start();
     }
@@ -409,12 +432,14 @@ export function makeVenueGame(parent, { fighterId, venueId, onPortal }) {
       const k = this.kbd();
       const spd = Math.max(2.4, this.scale.height * 0.007);
       let vx = 0, vy = 0;
-      if (k.L) { vx = -spd; this.facing = -1; }
-      if (k.R) { vx = spd; this.facing = 1; }
+      if (k.L) vx = -spd;
+      if (k.R) vx = spd;
       if (k.U) vy = -spd;
       if (k.D) vy = spd;
-      this.player.setFlipX(this.facing < 0);
-      this.player.play((vx || vy) ? 'walk' : 'idle', true);
+      // face the way you actually walk (true top-down, no mirrored side sprite)
+      if (Math.abs(vx) > Math.abs(vy)) this.dir = vx < 0 ? 'w' : 'e';
+      else if (vy) this.dir = vy < 0 ? 'n' : 's';
+      this.player.play(`td_${(vx || vy) ? 'walk' : 'idle'}_${this.dir}`, true);
       // move with wall clamp + furniture collision (axis-separated so you slide)
       const pad = this.scale.width * 0.012;
       const nx = Phaser.Math.Clamp(this.player.x + vx, this.walk.x0, this.walk.x1);
