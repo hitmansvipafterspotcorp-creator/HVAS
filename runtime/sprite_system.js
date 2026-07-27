@@ -8,7 +8,7 @@ const SpriteSystem = (() => {
     1:'creator', 2:'dj', 3:'famu_female', 4:'famu_male',
     5:'influencer', 6:'photographer', 7:'promoter', 8:'dancer',
     9:'vendor', 10:'security', 11:'host',
-    12:'fsu_female', 13:'fsu_male', 14:'kendrick',
+    12:'fsu_male', 13:'fsu_female', 14:'kendrick',
     20:'kt', 21:'bigsoulja', 22:'eld',
     30:'pete', 31:'snow',
   };
@@ -1179,10 +1179,30 @@ const SpriteSystem = (() => {
   }
 
   // ── VFX overlay ──────────────────────────────────────────────────────────
+  function _frameReady(charId, sheet, row, frame) {
+    const img = _frame(charId, sheet, row, frame);
+    if (!img || !img._ready || img._failed || img.naturalWidth <= 1 || img.naturalHeight <= 1) return null;
+    return img;
+  }
+
+  function _safeVfxSize(charId, vfxKey, requestedSize) {
+    const def = CHAR_DEFS[charId];
+    const a = def && def.anims && def.anims[vfxKey];
+    if (!a) return 0;
+    const img = _frameReady(charId, a.sheet, a.row, 0);
+    if (!img) return Math.min(requestedSize || 96, 128);
+    const tooWide = img.naturalWidth / Math.max(1, img.naturalHeight) > 2.7;
+    const tooLarge = img.naturalWidth > 420 || img.naturalHeight > 320;
+    if (tooWide || tooLarge) return 0;
+    return Math.max(32, Math.min(requestedSize || 96, 180));
+  }
+
   function spawnVFX(charId, vfxKey, worldX, worldY, size) {
     const def = CHAR_DEFS[charId];
     if (!def || !def.anims[vfxKey]) return;
-    _vfx.push({ charId, vfxKey, x:worldX, y:worldY, size:size||96, frame:0, frameTimer:0 });
+    const safeSize = _safeVfxSize(charId, vfxKey, size);
+    if (!safeSize) return;
+    _vfx.push({ charId, vfxKey, x:worldX, y:worldY, size:safeSize, frame:0, frameTimer:0 });
   }
 
   function updateVFX(dt) {
@@ -1208,7 +1228,12 @@ const SpriteSystem = (() => {
       if (!a) return;
       const sx = v.x - (cameraX||0) - v.size/2;
       const sy = v.y - (cameraY||0) - v.size/2;
-      _drawFrame(ctx, v.charId, a.sheet, a.row, v.frame, sx, sy, v.size, v.size, false);
+      const img = _frameReady(v.charId, a.sheet, a.row, v.frame);
+      if (!img) return;
+      const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
+      if (aspect > 2.7 || img.naturalWidth > 420 || img.naturalHeight > 320) return;
+      const w = v.size * Math.min(1.8, Math.max(0.65, aspect));
+      _drawFrame(ctx, v.charId, a.sheet, a.row, v.frame, v.x - (cameraX||0) - w/2, sy, w, v.size, false);
     });
   }
 

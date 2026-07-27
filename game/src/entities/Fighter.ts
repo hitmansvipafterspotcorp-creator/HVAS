@@ -84,7 +84,7 @@ export class Fighter {
     // graybox. The sprite's origin is at the feet so feetY drives both position
     // and draw depth — same contract the depth gate relies on.
     if (charId && AnimationSystem.ready(scene, charId)) {
-      const displayH = kind === 'boss' ? 210 : 168;
+      const displayH = kind === 'boss' ? 240 : 196;
       this.sprite = scene.add
         .sprite(x, this.feetY, '__DEFAULT')
         .setOrigin(0.5, 1)

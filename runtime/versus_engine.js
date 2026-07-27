@@ -43,17 +43,17 @@ const VersusEngine = (() => {
 
   // attack definitions (times in seconds, distances in px @ 720-tall canvas)
   const MOVES = {
-    light:   { startup:.05, active:.06, recovery:.16, reach:96,  hh:120, dmgK:0.55, hitstun:.28, block:.18, kb:160, meter:8,  knockdown:false, hi:'mid'  },
-    heavy:   { startup:.12, active:.08, recovery:.30, reach:112, hh:150, dmgK:1.05, hitstun:.42, block:.26, kb:380, meter:12, knockdown:true,  hi:'mid'  },
+    light:   { startup:.05, active:.08, recovery:.13, reach:102, hh:124, dmgK:0.55, hitstun:.28, block:.18, kb:155, meter:8,  knockdown:false, hi:'mid'  },
+    heavy:   { startup:.10, active:.10, recovery:.24, reach:126, hh:156, dmgK:1.05, hitstun:.42, block:.26, kb:380, meter:12, knockdown:true,  hi:'mid'  },
     crouch:  { startup:.06, active:.07, recovery:.18, reach:104, hh:70,  dmgK:0.6,  hitstun:.30, block:.18, kb:140, meter:8,  knockdown:false, hi:'low'  },
     air:     { startup:.05, active:.10, recovery:.12, reach:90,  hh:120, dmgK:0.7,  hitstun:.32, block:.18, kb:200, meter:9,  knockdown:false, hi:'over' },
     // ── directional specials (Y + direction) — same easy button, 3 distinct tools ──
     // FORWARD + Y → Special 1: ranged projectile pressure
-    special:  { startup:.10, active:.12, recovery:.30, reach:140, hh:140, dmgK:1.3,  hitstun:.50, block:.30, kb:420, meter:0,  cost:25, knockdown:true,  projectile:true, name:'PROJECTILE' },
+    special:  { startup:.10, active:.12, recovery:.30, reach:150, hh:150, dmgK:1.3,  hitstun:.50, block:.30, kb:420, meter:0,  cost:25, knockdown:true,  projectile:true, name:'PROJECTILE' },
     // DOWN + Y → Special 2: rising anti-air uppercut (melee, tall hitbox, launches)
-    special2: { startup:.06, active:.14, recovery:.34, reach:104, hh:230, dmgK:1.2,  hitstun:.55, block:.28, kb:280, meter:0,  cost:25, knockdown:true,  launch:true,    name:'RISING' },
+    special2: { startup:.06, active:.14, recovery:.34, reach:116, hh:230, dmgK:1.2,  hitstun:.55, block:.28, kb:280, meter:0,  cost:25, knockdown:true,  launch:true,    name:'RISING' },
     // BACK + Y → Special 3: lunging advancing strike (melee, covers ground)
-    special3: { startup:.12, active:.10, recovery:.26, reach:180, hh:130, dmgK:1.25, hitstun:.50, block:.30, kb:480, meter:0,  cost:25, knockdown:true,  dash:true,      name:'LUNGE' },
+    special3: { startup:.12, active:.10, recovery:.26, reach:190, hh:130, dmgK:1.25, hitstun:.50, block:.30, kb:480, meter:0,  cost:25, knockdown:true,  dash:true,      name:'LUNGE' },
     // UP + Y → SUPER: 3 levels by meter. super1 (33), super2 (66), super (100).
     super1:   { startup:.14, active:.22, recovery:.34, reach:300, hh:210, dmgK:2.0,  hitstun:.60, block:.36, kb:440, meter:0,  cost:33,  knockdown:true,                  name:'SUPER I'  },
     super2:   { startup:.15, active:.26, recovery:.38, reach:400, hh:250, dmgK:2.6,  hitstun:.65, block:.38, kb:500, meter:0,  cost:66,  knockdown:true, launch:true,     name:'SUPER II' },
@@ -259,9 +259,9 @@ const VersusEngine = (() => {
     return {
       left: !!s.left, right: !!s.right, up: !!s.up, down: !!s.down,
       light: !!s.attack,             // A — light auto-combo
-      heavy: !!s.special,            // B — heavy auto-combo
-      block: !!s.dodge || !!s.block, // X — guard
-      sp:    !!s.interact,           // Y — directional special / finisher
+      heavy: !!s.heavy,              // B / HVY
+      block: !!s.block || !!s.dodge, // X / BLK
+      sp:    !!s.special || !!s.interact, // Y / SP
     };
   }
 
@@ -299,6 +299,7 @@ const VersusEngine = (() => {
     f.atkPhase = 'startup';
     f.atkT = m.startup;
     f.atkHit = false;
+    f.stateT = 0;
     f.state = m.cinematic ? 'super' : (m.projectile ? 'special' : kind);
     // special movement flavor: rising launcher hops up, lunge dashes forward
     if (m.launch && f.onGround) { f.vy = -560; f.onGround = false; f.knockdown = 0; }
@@ -398,6 +399,8 @@ const VersusEngine = (() => {
 
   // ── per-fighter update ───────────────────────────────────────────────────────
   function updateFighter(f, opp, inputs, dt) {
+    f.stateT = (f.stateT || 0) + dt;
+
     // facing toward opponent (unless mid-move / airborne)
     if (f.onGround && !f.attack && f.hitstun <= 0)
       f.facing = (opp.x >= f.x) ? 1 : -1;
@@ -846,9 +849,31 @@ const VersusEngine = (() => {
       ctx.globalAlpha = 1;
       return;
     }
-    // No bgImage loaded yet — dark cinematic fill
-    ctx.fillStyle = '#050008';
+    // No bgImage loaded yet: keep the fight alive with a branded full-screen
+    // stage wash instead of a dead black frame while image assets finish.
+    const sky = stage.sky || '#100020';
+    const ground = stage.ground || '#170018';
+    const accent = stage.accent || '#ff00aa';
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, sky);
+    bg.addColorStop(0.58, '#08000f');
+    bg.addColorStop(1, ground);
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
+    const glow = ctx.createRadialGradient(W * 0.5, H * 0.48, H * 0.05, W * 0.5, H * 0.48, H * 0.72);
+    glow.addColorStop(0, accent + '88');
+    glow.addColorStop(0.45, accent + '18');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = accent;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(W, groundY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   // build factor per weight class so each character reads with a distinct silhouette
@@ -872,8 +897,8 @@ const VersusEngine = (() => {
     e.blocking   = f.blocking && f.state === 'block';
     e.attacking  = false; e.comboStep = 0; e.specialAnim = false; e.superAnim = null; e.finishering = false;
     if (f.attack === 'light')   { e.attacking = true;  e.comboStep = 1; }
-    else if (f.attack === 'heavy')   { e.comboStep = 2; }
-    else if (f.attack === 'crouch')  { e.comboStep = 3; }
+    else if (f.attack === 'heavy')   { e.attacking = true; e.comboStep = 3; }
+    else if (f.attack === 'crouch')  { e.attacking = true; e.comboStep = 2; }
     else if (f.attack === 'special' || f.attack === 'special2' || f.attack === 'special3') { e.specialAnim = true; }
     else if (f.attack === 'super1' || f.attack === 'super2' || f.attack === 'super') {
       // 3 super levels -> super1/super2/super3 sprite rows. Level 3 prefers the
@@ -919,7 +944,7 @@ const VersusEngine = (() => {
     const CR = CharRenderer;
 
     // Fighter display height — large and screen-proportional
-    const charH = Math.min(H * 0.56, 300);
+    const charH = Math.min(H * 0.62, 348);
 
     const charId = (f.char && f.char.id) || 1;
     const state  = _vsAnimState(f);
@@ -935,7 +960,10 @@ const VersusEngine = (() => {
       SS.update(f.char.id, se, 1/60, false, null);
       ctx.save();
       if (f.flashHit > 0) { ctx.globalAlpha = 0.7; ctx.filter = 'brightness(4)'; }
-      const didDraw = SS.drawGrounded(ctx, f.char.id, se, f.x, groundY, charH * b.bh, f.facing < 0);
+      const didDraw = SS.drawGrounded(ctx, f.char.id, se, f.x, groundY, charH * b.bh, f.facing < 0, {
+        glow: f.meter >= 100 ? f.color : null,
+        glowBlur: f.meter >= 100 ? 18 : 0,
+      });
       ctx.restore();
       if (didDraw) {
         if (f.char && f.char.isBoss) drawBossCrown(f, charH);
