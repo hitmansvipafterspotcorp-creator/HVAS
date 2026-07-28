@@ -3869,3 +3869,8 @@ button {
   background: rgba(120,40,190,.28); border: 1px solid rgba(191,90,255,.6); }
 .lsb-vote:hover { filter: brightness(1.2); }
 .lsb-sheet.win h3 { font-size: 30px; text-shadow: 0 0 22px rgba(255,170,40,.6); }
+.lsb-share-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.lsb-share-row a.lsb-vote { text-decoration: none; display: inline-block; }
+.lsb-cap { white-space: pre-line; text-align: left; font-size: 11.5px !important; color: #a98fd0 !important;
+  background: rgba(12,4,22,.7); border: 1px solid rgba(191,90,255,.35); border-radius: 10px; padding: 9px 11px; }
+.lsb-sheet.share .lsb-cam { aspect-ratio: 9/16; max-height: 42vh; transform: none; }

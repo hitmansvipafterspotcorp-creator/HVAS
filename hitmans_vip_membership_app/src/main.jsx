@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
@@ -2891,6 +2891,8 @@ function PlayerCardScreen() {
   const [secs, setSecs] = useState(ROUND_SECS);
   const [perform, setPerform] = useState(null);    // { i } lip-sync prompt
   const [live, setLive] = useState(null);          // { i, secs, votes:{}, hype }
+  const [take, setTake] = useState(null);          // { clip, song, artist, hype, votes } after a performance
+  const clipRef = useRef(null);                    // recorded blob from the camera
   const [bingo, setBingo] = useState(false);
 
   const start = (t) => { setTheme(t); setCells(buildCard(t)); setCalled([]); setSecs(ROUND_SECS); setBingo(false); };
@@ -2918,7 +2920,7 @@ function PlayerCardScreen() {
     const id = setInterval(() => {
       setLive((L) => {
         if (!L) return L;
-        if (L.secs <= 1) { finishPerform(L.i); return null; }
+        if (L.secs <= 1) { finishPerform(L.i, L); return null; }
         return { ...L, secs: L.secs - 1, hype: Math.min(100, L.hype + Math.random() * 6) };
       });
     }, 1000);
@@ -2929,7 +2931,15 @@ function PlayerCardScreen() {
   useEffect(() => { if (lines > 0 && !bingo) setBingo(true); }, [lines]);
 
   const setCell = (i, patch) => setCells((cs) => cs.map((c, n) => (n === i ? { ...c, ...patch } : c)));
-  const finishPerform = (i) => setCell(i, { state: 'marked' });
+  // clearing a lip-sync square marks it, then offers the take for posting
+  function finishPerform(i, L) {
+    setCell(i, { state: 'marked' });
+    const c = cells[i];
+    setTimeout(() => setTake({
+      clip: clipRef.current, song: c?.title || '', artist: c?.artist || '',
+      hype: L?.hype ?? 0, votes: L?.votes || {},
+    }), 350);   // let the recorder flush its last chunk
+  }
 
   function tapCell(i) {
     const c = cells[i];
@@ -3019,7 +3029,7 @@ function PlayerCardScreen() {
           <div className="lsb-sheet live" onClick={(e) => e.stopPropagation()}>
             <h3>🔴 LIVE · {live.secs}s</h3>
             <p><b>{cells[live.i].title}</b> · {cells[live.i].artist}</p>
-            <div className="lsb-stage"><LiveCam /></div>
+            <div className="lsb-stage"><LiveCam onClip={(b) => { clipRef.current = b; }} /></div>
             <div className="lsb-hype"><span>HYPE</span><div className="lsb-bar"><i style={{ width: `${live.hype}%` }} /></div><b>{Math.round(live.hype)}%</b></div>
             <div className="lsb-votes">
               {VOTE_TAGS.map((v) => (
@@ -3029,9 +3039,13 @@ function PlayerCardScreen() {
                 </button>
               ))}
             </div>
-            <button type="button" className="lsb-go" onClick={() => { finishPerform(live.i); setLive(null); }}>Finish performance</button>
+            <button type="button" className="lsb-go" onClick={() => { finishPerform(live.i, live); setLive(null); }}>Finish performance</button>
           </div>
         </div>
+      )}
+
+      {take && (
+        <ShareTake {...take} onDone={() => { setTake(null); clipRef.current = null; }} />
       )}
 
       {bingo && (
@@ -3047,23 +3061,85 @@ function PlayerCardScreen() {
   );
 }
 
-// Phone camera for the live lip-sync performance.
-function LiveCam() {
-  const ref = useRef(null); const streamRef = useRef(null);
+// Phone camera for the live lip-sync performance. Records the take so the
+// performer can post it straight to TikTok / IG / YouTube afterwards.
+function LiveCam({ onClip }) {
+  const ref = useRef(null); const streamRef = useRef(null); const recRef = useRef(null);
   const [err, setErr] = useState('');
   useEffect(() => {
     let live = true;
     (async () => {
       if (!navigator.mediaDevices?.getUserMedia) { setErr('No camera on this device'); return; }
       try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: true });
         if (!live) { s.getTracks().forEach((t) => t.stop()); return; }
         streamRef.current = s; if (ref.current) { ref.current.srcObject = s; await ref.current.play(); }
+        // record the take (best supported container on this device)
+        const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm']
+          .find((t) => window.MediaRecorder?.isTypeSupported?.(t)) || '';
+        if (window.MediaRecorder) {
+          const chunks = [];
+          const rec = new MediaRecorder(s, type ? { mimeType: type } : undefined);
+          rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+          rec.onstop = () => { if (chunks.length && onClip) onClip(new Blob(chunks, { type: type || 'video/webm' })); };
+          rec.start(); recRef.current = rec;
+        }
       } catch { setErr('Allow camera access to perform'); }
     })();
-    return () => { live = false; streamRef.current?.getTracks().forEach((t) => t.stop()); };
+    return () => {
+      live = false;
+      try { if (recRef.current?.state === 'recording') recRef.current.stop(); } catch { /* ignore */ }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
   }, []);
   return err ? <p className="lsb-note">{err}</p> : <video ref={ref} className="lsb-cam" playsInline muted autoPlay />;
+}
+
+// Post-performance: watch your take back and push it to TikTok / IG / YouTube.
+// Uses the native share sheet when the device supports sharing files (that's
+// what surfaces TikTok/IG/YouTube on a phone); otherwise saves the clip and
+// copies a ready-made caption so it can be posted in two taps.
+function ShareTake({ clip, song, artist, hype, votes, onDone }) {
+  const [msg, setMsg] = useState('');
+  const url = useMemo(() => (clip ? URL.createObjectURL(clip) : ''), [clip]);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+
+  const top = Object.entries(votes || {}).sort((a, b) => b[1] - a[1])[0];
+  const caption = `🎤 "${song}" — ${artist}\nLip Sync Bingo at HITMANS VIP AFTER SPOT · Tallahassee\n${Math.round(hype)}% hype${top ? ` · ${top[0]}` : ''}\n#LipSyncBingo #HitmansVIP #AfterSpot #Tallahassee #FYP`;
+  const ext = (clip?.type || '').includes('mp4') ? 'mp4' : 'webm';
+  const file = clip ? new File([clip], `lipsync-${Date.now()}.${ext}`, { type: clip.type || 'video/webm' }) : null;
+
+  const share = async () => {
+    try {
+      if (file && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], text: caption, title: 'My Lip Sync Bingo take' });
+        setMsg('Shared — pick TikTok, Instagram or YouTube in the sheet.');
+      } else {
+        await navigator.clipboard?.writeText(caption);
+        setMsg('Caption copied. Save the clip, then post it.');
+      }
+    } catch { setMsg('Sharing cancelled.'); }
+  };
+  const copy = async () => { try { await navigator.clipboard.writeText(caption); setMsg('Caption copied.'); } catch { setMsg('Copy failed — select the caption instead.'); } };
+
+  return (
+    <div className="lsb-modal">
+      <div className="lsb-sheet share" onClick={(e) => e.stopPropagation()}>
+        <h3>📲 Post your take</h3>
+        <p><b>{song}</b> · {artist}</p>
+        {url ? <video className="lsb-cam" src={url} playsInline controls loop /> : <p className="lsb-note">No clip captured on this device.</p>}
+        <div className="lsb-hype"><span>HYPE</span><div className="lsb-bar"><i style={{ width: `${hype}%` }} /></div><b>{Math.round(hype)}%</b></div>
+        <button type="button" className="lsb-go" onClick={share}>Share to TikTok · Instagram · YouTube</button>
+        <div className="lsb-share-row">
+          {url && <a className="lsb-vote" href={url} download={`lipsync.${ext}`}>⬇ Save clip</a>}
+          <button type="button" className="lsb-vote" onClick={copy}>📋 Copy caption</button>
+        </div>
+        <p className="lsb-cap">{caption}</p>
+        {msg && <p className="lsb-note">{msg}</p>}
+        <button type="button" className="lsb-decline" onClick={onDone}>Back to my card</button>
+      </div>
+    </div>
+  );
 }
 
 function HostScreen() {
