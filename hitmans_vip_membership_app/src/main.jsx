@@ -3109,36 +3109,70 @@ function ShareTake({ clip, song, artist, hype, votes, onDone }) {
   const ext = (clip?.type || '').includes('mp4') ? 'mp4' : 'webm';
   const file = clip ? new File([clip], `lipsync-${Date.now()}.${ext}`, { type: clip.type || 'video/webm' }) : null;
 
-  const share = async () => {
+  // Per-platform post. Handing the video file to the OS share sheet is what
+  // opens the app the member is ALREADY signed into — their normal auth prompt,
+  // no extra login. If the device can't share files we save the clip and open
+  // that platform's upload page, where their browser session is already live.
+  const POSTS = [
+    { id: 'tiktok', name: 'TikTok', web: 'https://www.tiktok.com/upload' },
+    { id: 'instagram', name: 'Instagram', web: 'https://www.instagram.com/' },
+    { id: 'youtube', name: 'YouTube', web: 'https://www.youtube.com/upload' },
+  ];
+  const postTo = async (p) => {
+    try { await navigator.clipboard?.writeText(caption); } catch { /* ignore */ }
     try {
       if (file && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], text: caption, title: 'My Lip Sync Bingo take' });
-        setMsg('Shared — pick TikTok, Instagram or YouTube in the sheet.');
-      } else {
-        await navigator.clipboard?.writeText(caption);
-        setMsg('Caption copied. Save the clip, then post it.');
+        await navigator.share({ files: [file], text: caption, title: `Lip Sync Bingo — ${song}` });
+        setMsg(`Caption copied. Choose ${p.name} in the share sheet — you're already signed in.`);
+        return;
       }
-    } catch { setMsg('Sharing cancelled.'); }
+    } catch { setMsg('Post cancelled.'); return; }
+    if (url) { const a = document.createElement('a'); a.href = url; a.download = `lipsync.${ext}`; a.click(); }
+    window.open(p.web, '_blank', 'noopener');
+    setMsg(`Clip saved and caption copied — ${p.name} opened in a new tab.`);
   };
   const copy = async () => { try { await navigator.clipboard.writeText(caption); setMsg('Caption copied.'); } catch { setMsg('Copy failed — select the caption instead.'); } };
 
   return (
     <div className="lsb-modal">
       <div className="lsb-sheet share" onClick={(e) => e.stopPropagation()}>
-        <h3>📲 Post your take</h3>
+        <h3>Post your take</h3>
         <p><b>{song}</b> · {artist}</p>
-        {url ? <video className="lsb-cam" src={url} playsInline controls loop /> : <p className="lsb-note">No clip captured on this device.</p>}
+        {url
+          ? <div className="lsb-player"><video className="lsb-cam" src={url} playsInline autoPlay muted loop onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())} /></div>
+          : <p className="lsb-note">No clip captured on this device.</p>}
         <div className="lsb-hype"><span>HYPE</span><div className="lsb-bar"><i style={{ width: `${hype}%` }} /></div><b>{Math.round(hype)}%</b></div>
-        <button type="button" className="lsb-go" onClick={share}>Share to TikTok · Instagram · YouTube</button>
+        <div className="lsb-posts">
+          {POSTS.map((p) => (
+            <button key={p.id} type="button" className={`lsb-post ${p.id}`} onClick={() => postTo(p)}>
+              <PlatformMark id={p.id} />
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
         <div className="lsb-share-row">
-          {url && <a className="lsb-vote" href={url} download={`lipsync.${ext}`}>⬇ Save clip</a>}
-          <button type="button" className="lsb-vote" onClick={copy}>📋 Copy caption</button>
+          {url && <a className="lsb-vote" href={url} download={`lipsync.${ext}`}>Save clip</a>}
+          <button type="button" className="lsb-vote" onClick={copy}>Copy caption</button>
         </div>
         <p className="lsb-cap">{caption}</p>
         {msg && <p className="lsb-note">{msg}</p>}
         <button type="button" className="lsb-decline" onClick={onDone}>Back to my card</button>
       </div>
     </div>
+  );
+}
+
+// Platform glyphs drawn inline so they inherit the club's neon styling
+// (no third-party logo files, nothing off-brand).
+function PlatformMark({ id }) {
+  if (id === 'tiktok') return (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.5 3c.35 1.9 1.5 3.3 3.5 3.6v2.6c-1.3.05-2.6-.3-3.7-1v5.9c0 3.4-2.6 5.9-5.9 5.9S4.5 17.5 4.5 14.1s2.9-6 6.4-5.6v2.7c-.3-.1-.7-.15-1-.15-1.7 0-3.1 1.4-3.1 3.1s1.4 3.1 3.1 3.1 3.1-1.3 3.1-3V3h3.5z" /></svg>
+  );
+  if (id === 'instagram') return (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="3.2" y="3.2" width="17.6" height="17.6" rx="5" /><circle cx="12" cy="12" r="4.1" /><circle cx="17.2" cy="6.8" r="1.15" fill="currentColor" stroke="none" /></g></svg>
+  );
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21.6 7.2a2.5 2.5 0 0 0-1.8-1.8C18.2 5 12 5 12 5s-6.2 0-7.8.4A2.5 2.5 0 0 0 2.4 7.2C2 8.8 2 12 2 12s0 3.2.4 4.8a2.5 2.5 0 0 0 1.8 1.8C5.8 19 12 19 12 19s6.2 0 7.8-.4a2.5 2.5 0 0 0 1.8-1.8c.4-1.6.4-4.8.4-4.8s0-3.2-.4-4.8zM10 15.2V8.8l5.2 3.2-5.2 3.2z" /></svg>
   );
 }
 
