@@ -3890,3 +3890,40 @@ button {
 /* our own player frame — no browser control bar */
 .lsb-player { border-radius: 14px; overflow: hidden; border: 2px solid rgba(255,89,216,.55); background: #05020a; position: relative; }
 .lsb-player .lsb-cam { cursor: pointer; }
+
+/* ── Lip Sync Bingo lobby ── */
+.lob-join { display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 16px;
+  background: linear-gradient(160deg, rgba(46,14,74,.75), rgba(10,3,20,.92)); border: 2px solid rgba(191,90,255,.6); }
+.lob-qr { width: 116px; height: 116px; border-radius: 10px; background: #fff; padding: 6px; flex: none; }
+.lob-join-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lob-join-side strong { color: #ffd66b; font-size: 16px; }
+.lob-join-side p { margin: 0; font-size: 12.5px; color: #a98fd0; }
+.lob-toggle { padding: 8px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; color: #c9b8ff;
+  background: rgba(20,8,34,.8); border: 1px solid rgba(191,90,255,.45); }
+.lob-toggle.on { color: #ffd66b; border-color: rgba(255,214,107,.6); }
+.lob-count { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px;
+  background: rgba(14,6,26,.7); border: 1px solid rgba(191,90,255,.35); }
+.lob-count strong { font-size: 22px; font-weight: 900; color: #ffd66b; }
+.lob-count strong.ok { color: #52ffa8; }
+.lob-count span { font-size: 12px; color: #a98fd0; margin-right: 8px; }
+.lob-count em { font-size: 12px; color: #ff8ad4; font-style: normal; }
+.lob-players { display: flex; flex-direction: column; gap: 7px; }
+.lob-player { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(16,6,30,.8); border: 1px solid rgba(191,90,255,.3); }
+.lob-player.ready { border-color: rgba(82,255,168,.45); }
+.lob-player strong { font-size: 14px; color: #fff4e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lob-where { font-size: 9.5px; font-weight: 800; letter-spacing: .08em; padding: 4px 8px; border-radius: 999px; }
+.lob-where.venue { color: #ffd66b; background: rgba(255,214,107,.14); border: 1px solid rgba(255,214,107,.5); }
+.lob-where.remote { color: #c9b8ff; background: rgba(176,107,255,.16); border: 1px solid rgba(176,107,255,.5); }
+.lob-state { font-size: 11.5px; color: #a98fd0; white-space: nowrap; }
+.lob-player.ready .lob-state { color: #52ffa8; font-weight: 700; }
+.lob-label { font-size: 11.5px; letter-spacing: .06em; color: #a98fd0; }
+.lob-themes { display: flex; flex-direction: column; gap: 7px; }
+.lob-theme-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.lob-theme { font-size: 12px; font-weight: 700; padding: 8px 12px; border-radius: 999px; cursor: pointer; color: #c9b8ff;
+  background: rgba(20,8,34,.8); border: 1px solid rgba(191,90,255,.45); }
+.lob-theme.on { color: #14061f; background: linear-gradient(180deg, #ffe9a8, #e6a52a); border-color: #ffd66b; font-weight: 800; }
+.lsb-go.wide { width: 100%; }
+.lsb-go.set { background: linear-gradient(180deg, rgba(82,200,120,.5), rgba(20,60,36,.6)); border-color: rgba(82,255,168,.75); }
+.lsb-go.start { width: 100%; }
+.lsb-go.start:disabled { filter: grayscale(.7) brightness(.55); cursor: not-allowed; }

@@ -2789,17 +2789,86 @@ function TvDisplayScreen() {
 }
 
 function LobbyScreen() {
+  const member = useMember();
+  const MIN_PLAYERS = 5;
+  const [room] = useState(() => `LSB${Math.floor(100 + Math.random() * 900)}`);
+  const [ready, setReady] = useState(false);
+  const [theme, setTheme] = useState(THEMES[0]);
+  const [privateOnly, setPrivateOnly] = useState(true);
+  const joinUrl = `${window.location.origin}${A_}?lsb=${room}`;
+  const qr = useQrDataUrl(joinUrl, ui.fullLogoClear);
+
+  // the room as it stands: you plus whoever the venue hub has seen tonight
+  const you = { id: 'you', name: member?.name || 'You', where: 'venue', ready, host: true };
+  const [others] = useState(() => ([
+    { id: 'p2', name: 'Jessica', where: 'venue', ready: true },
+    { id: 'p3', name: 'Marcus', where: 'remote', ready: true },
+    { id: 'p4', name: 'Dae', where: 'venue', ready: false },
+  ]));
+  const players = [you, ...others];
+  const readyCount = players.filter((p) => p.ready).length;
+  const canStart = players.length >= MIN_PLAYERS && readyCount === players.length;
+
+  const invite = async () => {
+    const text = `Pull up to Lip Sync Bingo at HITMANS VIP AFTER SPOT — room ${room}`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Lip Sync Bingo', text, url: joinUrl });
+      else { await navigator.clipboard.writeText(`${text}\n${joinUrl}`); }
+    } catch { /* cancelled */ }
+  };
+
   return (
-    <div className="assembled-page lobby-page">
-      <div className="lobby-piece-row">
-        <img src={ui.bingo.welcome} alt="" />
-        <img src={ui.bingo.invite} alt="" />
-        <div className="bingo-action-grid">
-          <AssetButton src={ui.bingo.join} label="Join Game" />
-          <AssetButton src={ui.bingo.ready} label="Ready" />
-          <AssetButton src={ui.bingo.party} label="Party Mode" />
+    <div className="lsb lobby2">
+      <div className="lsb-top">
+        <span className="lsb-chip">ROOM {room}</span>
+        <span className="lsb-chip gold">TONIGHT · 9:30 PM</span>
+      </div>
+
+      <div className="lob-join">
+        {qr && <img className="lob-qr" src={qr} alt={`Join room ${room}`} />}
+        <div className="lob-join-side">
+          <strong>Scan to join</strong>
+          <p>Anyone at the table or at home can jump in with this code.</p>
+          <button type="button" className="lsb-go" onClick={invite}>Invite friends</button>
+          <button type="button" className={`lob-toggle${privateOnly ? ' on' : ''}`} onClick={() => setPrivateOnly((v) => !v)}>
+            {privateOnly ? '🔒 Members only' : '🌐 Open room'}
+          </button>
         </div>
       </div>
+
+      <div className="lob-count">
+        <strong>{players.length}</strong><span>in the room</span>
+        <strong className="ok">{readyCount}</strong><span>ready</span>
+        {players.length < MIN_PLAYERS && <em>needs {MIN_PLAYERS - players.length} more to start</em>}
+      </div>
+
+      <div className="lob-players">
+        {players.map((p) => (
+          <div key={p.id} className={`lob-player${p.ready ? ' ready' : ''}`}>
+            <span className={`lob-where ${p.where}`}>{p.where === 'venue' ? 'IN VENUE' : 'REMOTE'}</span>
+            <strong>{p.name}{p.host ? ' · host' : ''}</strong>
+            <span className="lob-state">{p.ready ? '✓ Ready' : 'Waiting'}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="lob-themes">
+        <span className="lob-label">Tonight&rsquo;s theme — everyone plays the same one</span>
+        <div className="lob-theme-row">
+          {THEMES.map((t) => (
+            <button key={t.id} type="button" className={`lob-theme${theme.id === t.id ? ' on' : ''}`} onClick={() => setTheme(t)}>{t.name}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="lsb-acts">
+        <button type="button" className={`lsb-go wide${ready ? ' set' : ''}`} onClick={() => setReady((r) => !r)}>
+          {ready ? "✓ You're ready" : "I'm ready"}
+        </button>
+      </div>
+      <button type="button" className="lsb-go start" disabled={!canStart}>
+        {canStart ? 'Start round →' : `Start round · ${readyCount}/${Math.max(MIN_PLAYERS, players.length)} ready`}
+      </button>
     </div>
   );
 }
