@@ -3246,19 +3246,96 @@ function PlatformMark({ id }) {
 }
 
 function HostScreen() {
+  const [theme, setTheme] = useState(THEMES[0]);
+  const [round, setRound] = useState(1);
+  const [queue, setQueue] = useState(() => [...THEMES[0].songs].sort(() => Math.random() - 0.5));
+  const [called, setCalled] = useState([]);     // [title, artist][] most recent first
+  const [secs, setSecs] = useState(ROUND_SECS);
+  const [running, setRunning] = useState(false);
+  const [onTv, setOnTv] = useState(null);       // performance pushed to the TV
+  const [claim, setClaim] = useState(null);     // a player claiming bingo
+
+  useEffect(() => { setQueue([...theme.songs].sort(() => Math.random() - 0.5)); setCalled([]); }, [theme]);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setSecs((x) => (x > 1 ? x - 1 : (callNext(), ROUND_SECS))), 1000);
+    return () => clearInterval(id);
+  }, [running, queue]);
+
+  function callNext() {
+    setQueue((q) => { if (!q.length) return q; const [next, ...rest] = q; setCalled((c) => [next, ...c]); return rest; });
+    setSecs(ROUND_SECS);
+  }
+  const skip = () => setQueue((q) => q.slice(1));
+  const now = called[0];
+
   return (
-    <div className="assembled-page host-page">
-      <div className="host-piece-row">
-        <img src={ui.host.liveRound} alt="" />
-        <img src={ui.host.songHistory} alt="" />
-        <img src={ui.host.hostNotes} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.host.callSong} label="Call Song" />
-          <AssetButton src={ui.host.skipSong} label="Skip Song" />
-          <AssetButton src={ui.host.nextSong} label="Next Song" />
-          <AssetButton src={ui.host.pauseRound} label="Pause Round" />
+    <div className="lsb host2">
+      <div className="lsb-top">
+        <span className="lsb-chip">ROUND {round} OF 5</span>
+        <span className={`lsb-timer${secs <= 5 ? ' hot' : ''}`}>00:{String(secs).padStart(2, '0')}</span>
+        <span className="lsb-chip gold">{called.length} CALLED</span>
+      </div>
+
+      <div className="lsb-now">
+        <span className="lsb-now-label">★ NOW PLAYING ★</span>
+        {now ? <><strong>{now[0]}</strong><span>{now[1]}</span></>
+             : <><strong>Nothing called yet</strong><span>Hit Call song to open the round</span></>}
+      </div>
+
+      <div className="host-ctl">
+        <button type="button" className={`host-btn${running ? ' on' : ''}`} onClick={() => setRunning((r) => !r)}>{running ? '❚❚ Pause round' : '▶ Start round'}</button>
+        <button type="button" className="host-btn" onClick={callNext} disabled={!queue.length}>🎵 Call song</button>
+        <button type="button" className="host-btn" onClick={skip} disabled={!queue.length}>⏭ Skip</button>
+        <button type="button" className="host-btn" onClick={() => { setRound((r) => Math.min(5, r + 1)); setSecs(ROUND_SECS); }}>⏱ End round</button>
+      </div>
+
+      <div className="host-themes">
+        <span className="lob-label">Theme for the room</span>
+        <div className="lob-theme-row">
+          {THEMES.map((t) => (
+            <button key={t.id} type="button" className={`lob-theme${theme.id === t.id ? ' on' : ''}`} onClick={() => setTheme(t)}>{t.name}</button>
+          ))}
         </div>
       </div>
+
+      <div className="host-split">
+        <section className="host-panel">
+          <h4>Up next <small>{queue.length}</small></h4>
+          {queue.slice(0, 5).map(([t, a], i) => (
+            <div key={t + i} className="host-row"><span className="host-i">{i + 1}</span><strong>{t}</strong><span>{a}</span></div>
+          ))}
+          {!queue.length && <p className="lsb-note">Queue empty — switch theme to reload.</p>}
+        </section>
+        <section className="host-panel">
+          <h4>Already called <small>{called.length}</small></h4>
+          {called.slice(0, 5).map(([t, a], i) => (
+            <div key={t + i} className="host-row done"><span className="host-i">✓</span><strong>{t}</strong><span>{a}</span></div>
+          ))}
+          {!called.length && <p className="lsb-note">Nothing yet.</p>}
+        </section>
+      </div>
+
+      <section className="host-panel">
+        <h4>Live performance</h4>
+        {onTv
+          ? <div className="host-tv"><strong>{onTv} is on the TV</strong><button type="button" className="lsb-vote" onClick={() => setOnTv(null)}>Pull from TV</button></div>
+          : <div className="host-tv"><span className="lsb-note">Nobody performing right now.</span><button type="button" className="lsb-vote" onClick={() => setOnTv('Jessica')}>📺 Push to TV</button></div>}
+      </section>
+
+      <section className="host-panel">
+        <h4>Bingo claims</h4>
+        {claim
+          ? <div className="host-claim">
+              <strong>{claim} claims bingo</strong>
+              <div className="host-claim-acts">
+                <button type="button" className="lsb-go" onClick={() => setClaim(null)}>✓ Verify &amp; pay</button>
+                <button type="button" className="lsb-decline" onClick={() => setClaim(null)}>✕ Reject</button>
+              </div>
+            </div>
+          : <div className="host-tv"><span className="lsb-note">No claims to review.</span><button type="button" className="lsb-vote" onClick={() => setClaim('Marcus')}>Simulate a claim</button></div>}
+      </section>
     </div>
   );
 }

@@ -3927,3 +3927,31 @@ button {
 .lsb-go.set { background: linear-gradient(180deg, rgba(82,200,120,.5), rgba(20,60,36,.6)); border-color: rgba(82,255,168,.75); }
 .lsb-go.start { width: 100%; }
 .lsb-go.start:disabled { filter: grayscale(.7) brightness(.55); cursor: not-allowed; }
+
+/* ── Host / DJ dashboard ── */
+.host-ctl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.host-btn { padding: 13px 10px; border-radius: 13px; font-weight: 800; font-size: 13.5px; cursor: pointer; color: #f3e9ff;
+  background: linear-gradient(180deg, rgba(120,40,190,.42), rgba(40,12,66,.55));
+  border: 2px solid rgba(191,90,255,.8); box-shadow: 0 0 12px rgba(160,60,255,.3); transition: filter .12s, transform .1s; }
+.host-btn:hover:not(:disabled) { filter: brightness(1.18); }
+.host-btn:active:not(:disabled) { transform: translateY(1px); }
+.host-btn:disabled { filter: grayscale(.7) brightness(.5); cursor: not-allowed; }
+.host-btn.on { background: linear-gradient(180deg, rgba(82,200,120,.5), rgba(20,60,36,.6)); border-color: rgba(82,255,168,.75); }
+.host-themes { display: flex; flex-direction: column; gap: 7px; }
+.host-split { display: grid; gap: 10px; }
+@media (min-width: 620px) { .host-split { grid-template-columns: 1fr 1fr; } }
+.host-panel { padding: 12px 13px; border-radius: 14px; background: rgba(14,6,26,.75); border: 1px solid rgba(191,90,255,.35); }
+.host-panel h4 { margin: 0 0 9px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #ffd66b; display: flex; justify-content: space-between; }
+.host-panel h4 small { color: #a98fd0; font-weight: 600; letter-spacing: 0; }
+.host-row { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(191,90,255,.12); }
+.host-row:last-child { border-bottom: none; }
+.host-row strong { font-size: 13px; color: #fff4e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host-row span:last-child { font-size: 11px; color: #a98fd0; white-space: nowrap; }
+.host-i { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; font-size: 10.5px; font-weight: 800;
+  color: #c9b8ff; background: rgba(120,40,190,.3); border: 1px solid rgba(191,90,255,.5); }
+.host-row.done .host-i { color: #52ffa8; border-color: rgba(82,255,168,.5); background: rgba(82,255,168,.12); }
+.host-row.done strong { color: #c9b8ff; }
+.host-tv, .host-claim { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.host-claim strong { color: #ffd66b; font-size: 15px; }
+.host-claim-acts { display: flex; gap: 8px; }
+.host-claim-acts button { padding: 10px 14px; font-size: 13px; }
