@@ -3795,3 +3795,77 @@ button {
 .gp-abtn:hover { filter: brightness(1.15); }
 .gp-abtn:active { transform: translateY(1px); }
 .gp-quit-btn span { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 15px; letter-spacing: .04em; color: #ffd0d0; }
+
+/* ── LIP SYNC BINGO ── */
+.lsb { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
+.lsb-h { margin: 0; text-align: center; font-size: 24px; font-weight: 900; color: #ffd66b; letter-spacing: .04em; text-shadow: 0 0 18px rgba(255,170,40,.45); }
+.lsb-sub { margin: -6px 0 4px; text-align: center; font-size: 13.5px; color: #c9b8ff; }
+.lsb-themes { display: grid; gap: 12px; }
+.lsb-theme { display: flex; flex-direction: column; gap: 3px; padding: 16px 18px; border-radius: 16px; cursor: pointer; text-align: left;
+  background: radial-gradient(120% 100% at 50% 0%, rgba(42,13,70,.9), rgba(9,3,18,.96));
+  border: 2px solid rgba(191,90,255,.75); box-shadow: 0 0 18px rgba(160,60,255,.35); transition: filter .12s, transform .1s; }
+.lsb-theme:hover { filter: brightness(1.15); transform: translateY(-2px); }
+.lsb-theme strong { color: #ffd66b; font-size: 17px; font-weight: 800; }
+.lsb-theme span { color: #a98fd0; font-size: 12.5px; }
+
+.lsb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lsb-chip { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #e7d6ff;
+  padding: 6px 11px; border-radius: 999px; background: rgba(120,40,190,.3); border: 1px solid rgba(191,90,255,.6); }
+.lsb-chip.gold { color: #ffd66b; border-color: rgba(255,214,107,.6); background: rgba(255,214,107,.12); }
+.lsb-timer { font-family: ui-monospace, monospace; font-size: 22px; font-weight: 900; color: #fff; letter-spacing: .05em;
+  padding: 4px 12px; border-radius: 10px; border: 2px solid rgba(191,90,255,.7); background: rgba(20,6,34,.85); }
+.lsb-timer.hot { color: #ff6b6b; border-color: rgba(255,107,107,.8); animation: lsbpulse .6s ease-in-out infinite; }
+@keyframes lsbpulse { 50% { transform: scale(1.06); } }
+
+.lsb-now { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px; border-radius: 14px;
+  background: linear-gradient(180deg, rgba(60,18,96,.6), rgba(12,4,22,.85)); border: 1px solid rgba(191,90,255,.5); }
+.lsb-now-label { font-size: 10.5px; letter-spacing: .18em; color: #ff59d8; font-weight: 800; }
+.lsb-now strong { color: #fff4e0; font-size: 16px; }
+.lsb-now span { color: #a98fd0; font-size: 12.5px; }
+
+.lsb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.lsb-cell { position: relative; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 3px; border-radius: 8px; cursor: pointer; overflow: hidden;
+  background: linear-gradient(180deg, rgba(30,10,50,.9), rgba(8,3,16,.95)); border: 1.5px solid rgba(191,90,255,.35); }
+.lsb-cell .lsb-t { font-size: 8.5px; font-weight: 700; color: #efe4ff; line-height: 1.1; text-align: center; overflow: hidden; }
+.lsb-cell .lsb-a { font-size: 7px; color: #9a80c4; line-height: 1; text-align: center; overflow: hidden; }
+.lsb-cell img { width: 100%; height: 100%; object-fit: contain; }
+.lsb-cell .lsb-mic { position: absolute; inset: 0; opacity: .3; }
+.lsb-cell.live { border-color: #ffd66b; box-shadow: 0 0 12px rgba(255,214,107,.55); }
+.lsb-cell.marked { border-color: rgba(191,90,255,.9); box-shadow: 0 0 12px rgba(160,60,255,.5); padding: 0; }
+.lsb-cell.free { padding: 0; border-color: rgba(255,255,255,.5); }
+.lsb-cell.locked { cursor: not-allowed; background: rgba(12,4,20,.95); border-color: rgba(255,107,107,.5); filter: grayscale(.6); }
+.lsb-lock { font-size: 18px; opacity: .85; }
+
+.lsb-prog { display: flex; flex-direction: column; gap: 5px; }
+.lsb-prog span { font-size: 11.5px; color: #c9b8ff; letter-spacing: .04em; }
+.lsb-bar { height: 10px; border-radius: 999px; background: rgba(20,8,34,.9); border: 1px solid rgba(191,90,255,.5); overflow: hidden; }
+.lsb-bar i { display: block; height: 100%; background: linear-gradient(90deg, #b06bff, #ffd66b); transition: width .3s; }
+
+.lsb-acts { display: flex; gap: 12px; justify-content: center; }
+.lsb-btn { background: none; border: none; padding: 0; cursor: pointer; }
+.lsb-btn img { height: 46px; width: auto; display: block; }
+.lsb-btn:disabled { filter: grayscale(.75) brightness(.55); cursor: not-allowed; }
+
+.lsb-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 18px; background: rgba(4,1,10,.8); backdrop-filter: blur(4px); }
+.lsb-sheet { width: min(94%, 380px); display: flex; flex-direction: column; gap: 10px; padding: 22px; border-radius: 20px; text-align: center;
+  background: radial-gradient(120% 100% at 50% 0%, rgba(42,13,70,.97), rgba(9,3,18,.99));
+  border: 2px solid rgba(191,90,255,.85); box-shadow: 0 0 34px rgba(160,60,255,.5); }
+.lsb-sheet h3 { margin: 0; color: #ffd66b; font-size: 22px; font-weight: 900; }
+.lsb-sheet p { margin: 0; color: #e7d6ff; font-size: 14px; }
+.lsb-note { color: #a98fd0 !important; font-size: 12.5px !important; }
+.lsb-go, .lsb-decline { padding: 13px; border-radius: 13px; font-weight: 800; font-size: 15px; cursor: pointer; color: #f3e9ff;
+  background: linear-gradient(180deg, rgba(150,55,225,.55), rgba(52,16,86,.6)); border: 2px solid rgba(191,90,255,.85); }
+.lsb-decline { background: linear-gradient(180deg, rgba(200,60,60,.4), rgba(60,16,20,.55)); border-color: rgba(255,107,107,.7); }
+.lsb-go:hover, .lsb-decline:hover { filter: brightness(1.15); }
+.lsb-stage { border-radius: 14px; overflow: hidden; border: 2px solid rgba(255,89,216,.6); background: #05020a; }
+.lsb-cam { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; transform: scaleX(-1); }
+.lsb-hype { display: flex; align-items: center; gap: 8px; }
+.lsb-hype span { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #ff59d8; }
+.lsb-hype .lsb-bar { flex: 1; }
+.lsb-hype b { font-size: 12px; color: #ffd66b; min-width: 34px; }
+.lsb-votes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.lsb-vote { font-size: 11.5px; font-weight: 700; padding: 7px 11px; border-radius: 999px; cursor: pointer; color: #e7d6ff;
+  background: rgba(120,40,190,.28); border: 1px solid rgba(191,90,255,.6); }
+.lsb-vote:hover { filter: brightness(1.2); }
+.lsb-sheet.win h3 { font-size: 30px; text-shadow: 0 0 22px rgba(255,170,40,.6); }

@@ -2804,22 +2804,266 @@ function LobbyScreen() {
   );
 }
 
+// ── LIP SYNC BINGO ───────────────────────────────────────────────────────────
+// One theme is picked for the room; every player's card is built from that same
+// theme, each square holding a random song. Some squares are Lip Sync spaces
+// (mic): to clear one you perform live — decline and the square LOCKS for good.
+const LSB = (n) => `${A_}assets/game/lsb/${n}.png`;
+const ROUND_SECS = 30;          // regular song round
+const LIPSYNC_SECS = 60;        // live performance round
+const VOTE_TAGS = ['Hype', 'Mood', 'Funny', 'Smooth', 'Sexy', 'On Beat', 'Star Power'];
+
+const THEMES = [
+  { id: 'hiphop90s', name: "90s Hip-Hop & R&B", songs: [
+    ['Juicy', 'The Notorious B.I.G.'], ['California Love', '2Pac'], ['Waterfalls', 'TLC'],
+    ['No Scrubs', 'TLC'], ['Hypnotize', 'The Notorious B.I.G.'], ['Gin and Juice', 'Snoop Dogg'],
+    ['Killing Me Softly', 'Fugees'], ['Pony', 'Ginuwine'], ['Return of the Mack', 'Mark Morrison'],
+    ['This Is How We Do It', 'Montell Jordan'], ['Doo Wop', 'Lauryn Hill'], ['Regulate', 'Warren G'],
+    ['Nuthin but a G Thang', 'Dr. Dre'], ['Creep', 'TLC'], ['I Will Always Love You', 'Whitney Houston'],
+    ['Motownphilly', 'Boyz II Men'], ['Ruff Ryders Anthem', 'DMX'], ['Big Poppa', 'The Notorious B.I.G.'],
+    ['Are You That Somebody', 'Aaliyah'], ['No Diggity', 'Blackstreet'], ['Weak', 'SWV'],
+    ['Before I Let Go', 'Frankie Beverly'], ['Poison', 'Bell Biv DeVoe'], ['Freak Like Me', 'Adina Howard'],
+    ['Candy Rain', 'Soul for Real'], ['Tha Crossroads', 'Bone Thugs-N-Harmony'],
+  ] },
+  { id: 'edm', name: 'EDM / House', songs: [
+    ['Levels', 'Avicii'], ['Titanium', 'David Guetta'], ['One More Time', 'Daft Punk'],
+    ['Animals', 'Martin Garrix'], ['Wake Me Up', 'Avicii'], ['Turn Down for What', 'DJ Snake'],
+    ['Clarity', 'Zedd'], ['Lean On', 'Major Lazer'], ['Silence', 'Marshmello'],
+    ['Around the World', 'Daft Punk'], ['Bangarang', 'Skrillex'], ['Don’t You Worry Child', 'SHM'],
+    ['Firestone', 'Kygo'], ['Faded', 'Alan Walker'], ['Where Are U Now', 'Skrillex & Diplo'],
+    ['Summer', 'Calvin Harris'], ['Latch', 'Disclosure'], ['Rather Be', 'Clean Bandit'],
+    ['This Girl', 'Kungs'], ['Sandstorm', 'Darude'], ['Losing It', 'Fisher'],
+    ['Opus', 'Eric Prydz'], ['Ghosts n Stuff', 'deadmau5'], ['Get Lucky', 'Daft Punk'],
+    ['Feel So Close', 'Calvin Harris'], ['Roses', 'The Chainsmokers'],
+  ] },
+  { id: 'afrobeats', name: 'Afrobeats', songs: [
+    ['Essence', 'Wizkid'], ['Last Last', 'Burna Boy'], ['Calm Down', 'Rema'],
+    ['Ye', 'Burna Boy'], ['Fall', 'Davido'], ['On the Low', 'Burna Boy'],
+    ['Peru', 'Fireboy DML'], ['Love Nwantiti', 'CKay'], ['Soco', 'Wizkid'],
+    ['Unavailable', 'Davido'], ['Rush', 'Ayra Starr'], ['Terminator', 'Asake'],
+    ['Sungba', 'Asake'], ['Kilometre', 'Burna Boy'], ['Joro', 'Wizkid'],
+    ['Bandana', 'Fireboy DML'], ['Ku Lo Sa', 'Oxlade'], ['Finesse', 'Pheelz'],
+    ['Buga', 'Kizz Daniel'], ['If', 'Davido'], ['Come Closer', 'Wizkid'],
+    ['Monalisa', 'Lojay'], ['Understand', 'Omah Lay'], ['Godly', 'Omah Lay'],
+    ['Attention', 'Omah Lay'], ['City Boys', 'Burna Boy'],
+  ] },
+  { id: 'ladies', name: 'Ladies in Hip Hop', songs: [
+    ['Bodak Yellow', 'Cardi B'], ['Savage', 'Megan Thee Stallion'], ['Super Bass', 'Nicki Minaj'],
+    ['Doo Wop', 'Lauryn Hill'], ['U.N.I.T.Y.', 'Queen Latifah'], ['Get Ur Freak On', 'Missy Elliott'],
+    ['Work It', 'Missy Elliott'], ['My Neck My Back', 'Khia'], ['Lose Control', 'Missy Elliott'],
+    ['WAP', 'Cardi B'], ['Anaconda', 'Nicki Minaj'], ['Truth Hurts', 'Lizzo'],
+    ['Good as Hell', 'Lizzo'], ['Hot Girl Summer', 'Megan Thee Stallion'], ['Chun-Li', 'Nicki Minaj'],
+    ['Bills Bills Bills', "Destiny's Child"], ['Say My Name', "Destiny's Child"], ['No Scrubs', 'TLC'],
+    ['Shoop', 'Salt-N-Pepa'], ['Push It', 'Salt-N-Pepa'], ['Ladies First', 'Queen Latifah'],
+    ['Money', 'Cardi B'], ['Body', 'Megan Thee Stallion'], ['Pound Town', 'Sexyy Red'],
+    ['Rumors', 'Lizzo'], ['Princess Diana', 'Ice Spice'],
+  ] },
+];
+
+// deterministic-ish shuffle so a card feels random but stays stable per session
+function buildCard(theme) {
+  const pool = [...theme.songs].sort(() => Math.random() - 0.5).slice(0, 24);
+  const cells = [];
+  for (let i = 0; i < 25; i++) {
+    if (i === 12) { cells.push({ free: true, state: 'free' }); continue; }
+    const [title, artist] = pool[cells.filter((c) => !c.free).length] || ['—', ''];
+    cells.push({ title, artist, state: 'empty', lipsync: false });
+  }
+  // 4 random non-free squares become Lip Sync spaces
+  const idx = cells.map((c, i) => (c.free ? -1 : i)).filter((i) => i >= 0).sort(() => Math.random() - 0.5).slice(0, 4);
+  idx.forEach((i) => { cells[i].lipsync = true; });
+  return cells;
+}
+
+const LINES = (() => {
+  const out = [];
+  for (let r = 0; r < 5; r++) out.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));
+  for (let c = 0; c < 5; c++) out.push([0, 1, 2, 3, 4].map((r) => r * 5 + c));
+  out.push([0, 6, 12, 18, 24]); out.push([4, 8, 12, 16, 20]);
+  return out;
+})();
+const isDone = (c) => c.state === 'marked' || c.state === 'free';
+
 function PlayerCardScreen() {
-  return (
-    <div className="assembled-page player-page">
-      <div className="player-piece-row">
-        <img src={ui.player.emptyCard} alt="" />
-        <img src={ui.player.coveredCard} alt="" />
-        <img src={ui.player.calledCard} alt="" />
-        <img src={ui.player.lipSyncCard} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.player.mark} label="Mark" />
-          <AssetButton src={ui.player.undo} label="Undo" />
-          <AssetButton src={ui.player.confirm} label="Confirm" />
+  const [theme, setTheme] = useState(null);
+  const [cells, setCells] = useState([]);
+  const [called, setCalled] = useState([]);        // songs the host has called
+  const [secs, setSecs] = useState(ROUND_SECS);
+  const [perform, setPerform] = useState(null);    // { i } lip-sync prompt
+  const [live, setLive] = useState(null);          // { i, secs, votes:{}, hype }
+  const [bingo, setBingo] = useState(false);
+
+  const start = (t) => { setTheme(t); setCells(buildCard(t)); setCalled([]); setSecs(ROUND_SECS); setBingo(false); };
+
+  // round clock: every 30s the host calls the next song from your card's pool
+  useEffect(() => {
+    if (!theme || bingo || live) return;
+    const id = setInterval(() => {
+      setSecs((s) => {
+        if (s > 1) return s - 1;
+        setCalled((prev) => {
+          const pool = cells.filter((c) => !c.free && !prev.includes(c.title));
+          if (!pool.length) return prev;
+          return [...prev, pool[Math.floor(Math.random() * pool.length)].title];
+        });
+        return ROUND_SECS;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [theme, cells, bingo, live]);
+
+  // live performance clock + viewer hype meter
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => {
+      setLive((L) => {
+        if (!L) return L;
+        if (L.secs <= 1) { finishPerform(L.i); return null; }
+        return { ...L, secs: L.secs - 1, hype: Math.min(100, L.hype + Math.random() * 6) };
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [live]);
+
+  const lines = cells.length ? LINES.filter((L) => L.every((i) => isDone(cells[i]))).length : 0;
+  useEffect(() => { if (lines > 0 && !bingo) setBingo(true); }, [lines]);
+
+  const setCell = (i, patch) => setCells((cs) => cs.map((c, n) => (n === i ? { ...c, ...patch } : c)));
+  const finishPerform = (i) => setCell(i, { state: 'marked' });
+
+  function tapCell(i) {
+    const c = cells[i];
+    if (!c || c.free || c.state === 'locked' || c.state === 'marked') return;
+    if (c.lipsync) { setPerform({ i }); return; }              // mic square → perform or decline
+    if (!called.includes(c.title)) return;                      // only after the host calls it
+    setCell(i, { state: 'marked' });
+  }
+
+  if (!theme) {
+    return (
+      <div className="lsb">
+        <h2 className="lsb-h">Pick tonight&rsquo;s theme</h2>
+        <p className="lsb-sub">Everyone in the room plays the same theme. Each square is a song from it.</p>
+        <div className="lsb-themes">
+          {THEMES.map((t) => (
+            <button key={t.id} type="button" className="lsb-theme" onClick={() => start(t)}>
+              <strong>{t.name}</strong><span>{t.songs.length} songs</span>
+            </button>
+          ))}
         </div>
       </div>
+    );
+  }
+
+  const nowPlaying = called.length ? cells.find((c) => c.title === called[called.length - 1]) : null;
+
+  return (
+    <div className="lsb">
+      <div className="lsb-top">
+        <span className="lsb-chip">{theme.name}</span>
+        <span className={`lsb-timer${secs <= 5 ? ' hot' : ''}`}>{String(Math.floor(secs / 60)).padStart(2, '0')}:{String(secs % 60).padStart(2, '0')}</span>
+        <span className="lsb-chip gold">ROUND ${10}</span>
+      </div>
+
+      <div className="lsb-now">
+        <span className="lsb-now-label">★ NOW PLAYING ★</span>
+        {nowPlaying
+          ? <><strong>{nowPlaying.title}</strong><span>{nowPlaying.artist}</span></>
+          : <><strong>Waiting for the host…</strong><span>First song drops when the timer hits zero</span></>}
+      </div>
+
+      <div className="lsb-grid">
+        {cells.map((c, i) => {
+          const cls = `lsb-cell ${c.state}${c.lipsync && c.state === 'empty' ? ' mic' : ''}${called.includes(c.title) && c.state === 'empty' ? ' live' : ''}`;
+          return (
+            <button key={i} type="button" className={cls} onClick={() => tapCell(i)}>
+              {c.free ? <img src={LSB('sq_free')} alt="Free space" />
+                : c.state === 'marked' ? <img className="lsb-mark" src={LSB('sq_marked')} alt="marked" />
+                : c.state === 'locked' ? <span className="lsb-lock">🔒</span>
+                : <>
+                    {c.lipsync && <img className="lsb-mic" src={LSB('sq_lipsync')} alt="lip sync" />}
+                    <span className="lsb-t">{c.title}</span>
+                    <span className="lsb-a">{c.artist}</span>
+                  </>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="lsb-prog">
+        <span>{lines} / 5 lines to bingo</span>
+        <div className="lsb-bar"><i style={{ width: `${Math.min(100, lines * 20)}%` }} /></div>
+      </div>
+
+      <div className="lsb-acts">
+        <button type="button" className="lsb-btn" onClick={() => start(theme)}><img src={LSB('btn_undo')} alt="New card" /></button>
+        <button type="button" className="lsb-btn" disabled={!bingo}><img src={LSB('btn_confirm')} alt="Claim bingo" /></button>
+      </div>
+
+      {/* lip-sync square: perform live, or decline and lock it forever */}
+      {perform && (
+        <div className="lsb-modal" onClick={() => setPerform(null)}>
+          <div className="lsb-sheet" onClick={(e) => e.stopPropagation()}>
+            <h3>🎤 Lip Sync Space</h3>
+            <p><b>{cells[perform.i].title}</b> · {cells[perform.i].artist}</p>
+            <p className="lsb-note">Perform live for {LIPSYNC_SECS}s — the room watches and votes. Decline and this square locks for good.</p>
+            <button type="button" className="lsb-go" onClick={() => { setLive({ i: perform.i, secs: LIPSYNC_SECS, votes: {}, hype: 12 }); setPerform(null); }}>Lip Sync to Clear</button>
+            <button type="button" className="lsb-decline" onClick={() => { setCell(perform.i, { state: 'locked' }); setPerform(null); }}>Decline — lock this square</button>
+          </div>
+        </div>
+      )}
+
+      {/* live performance: camera, hype meter, viewer votes */}
+      {live && (
+        <div className="lsb-modal">
+          <div className="lsb-sheet live" onClick={(e) => e.stopPropagation()}>
+            <h3>🔴 LIVE · {live.secs}s</h3>
+            <p><b>{cells[live.i].title}</b> · {cells[live.i].artist}</p>
+            <div className="lsb-stage"><LiveCam /></div>
+            <div className="lsb-hype"><span>HYPE</span><div className="lsb-bar"><i style={{ width: `${live.hype}%` }} /></div><b>{Math.round(live.hype)}%</b></div>
+            <div className="lsb-votes">
+              {VOTE_TAGS.map((v) => (
+                <button key={v} type="button" className="lsb-vote"
+                  onClick={() => setLive((L) => ({ ...L, votes: { ...L.votes, [v]: (L.votes[v] || 0) + 1 }, hype: Math.min(100, L.hype + 4) }))}>
+                  {v}{live.votes[v] ? ` ${live.votes[v]}` : ''}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="lsb-go" onClick={() => { finishPerform(live.i); setLive(null); }}>Finish performance</button>
+          </div>
+        </div>
+      )}
+
+      {bingo && (
+        <div className="lsb-modal" onClick={() => setBingo(false)}>
+          <div className="lsb-sheet win" onClick={(e) => e.stopPropagation()}>
+            <h3>🏆 BINGO!</h3>
+            <p>{lines} line{lines > 1 ? 's' : ''} on {theme.name}. Take it to the host to verify your card.</p>
+            <button type="button" className="lsb-go" onClick={() => setBingo(false)}>Keep playing</button>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// Phone camera for the live lip-sync performance.
+function LiveCam() {
+  const ref = useRef(null); const streamRef = useRef(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      if (!navigator.mediaDevices?.getUserMedia) { setErr('No camera on this device'); return; }
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        if (!live) { s.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = s; if (ref.current) { ref.current.srcObject = s; await ref.current.play(); }
+      } catch { setErr('Allow camera access to perform'); }
+    })();
+    return () => { live = false; streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
+  return err ? <p className="lsb-note">{err}</p> : <video ref={ref} className="lsb-cam" playsInline muted autoPlay />;
 }
 
 function HostScreen() {
