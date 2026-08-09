@@ -20,8 +20,30 @@ const GRID = 5;
 const CELL_W = 110;
 const CELL_H = 64;
 const GRID_X = (GAME_WIDTH - GRID * CELL_W) / 2;
-const GRID_Y = 110;
+const GRID_Y = 104;
 const AUTO_CALL_MS = 3500;
+const HISTORY_LEN = 6;
+
+const STORE_KEY = 'hvas_lsb_bingo_state';
+
+interface BingoState {
+  card: string[];
+  marked: boolean[];
+  called: string[];
+  won: boolean;
+}
+
+function loadState(): BingoState | null {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw) as BingoState;
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveState(s: BingoState): void {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
 
 export class LipsyncBingoScene extends Phaser.Scene {
   private card: string[] = [];       // 25 squares (shuffled subset of PHRASES)
@@ -30,47 +52,88 @@ export class LipsyncBingoScene extends Phaser.Scene {
   private cells: Phaser.GameObjects.Container[] = [];
   private callerText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
+  private historyText!: Phaser.GameObjects.Text;
   private callTimer!: Phaser.Time.TimerEvent;
   private won = false;
 
   constructor() { super(SCENE.LipsyncBingo); }
 
   create(): void {
-    this.won = false;
-    AudioSystem.playForScene(this, 'MainMenu');
+    AudioSystem.playForScene(this, 'LipsyncBingo');
     this.cameras.main.setBackgroundColor(0x08040e);
 
     // Header
-    this.add.text(GAME_WIDTH / 2, 22, 'LIPSYNC BINGO', {
-      fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffd700',
+    this.add.text(GAME_WIDTH / 2, 18, 'LIPSYNC BINGO', {
+      fontFamily: 'Arial Black, sans-serif', fontSize: '26px', color: '#ffd700',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, 52, 'HITMANS VIP AFTER SPOT', {
-      fontFamily: 'Arial, sans-serif', fontSize: '13px', color: '#c100ff',
+    this.add.text(GAME_WIDTH / 2, 46, 'HITMANS VIP AFTER SPOT', {
+      fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#c100ff',
     }).setOrigin(0.5);
+
+    // Back chip
+    const back = this.add.rectangle(56, 24, 92, 26, 0x1a0030, 0.9)
+      .setStrokeStyle(1, 0xc100ff).setInteractive({ useHandCursor: true });
+    this.add.text(56, 24, 'ESC — HUB', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#c100ff',
+    }).setOrigin(0.5);
+    back.on('pointerdown', () => this.leaveToHub());
+
+    // New card chip
+    const fresh = this.add.rectangle(GAME_WIDTH - 66, 24, 116, 26, 0x1a1000, 0.9)
+      .setStrokeStyle(1, 0xffd700).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH - 66, 24, '↻ NEW CARD', {
+      fontFamily: 'monospace', fontSize: '10px', color: '#ffd700',
+    }).setOrigin(0.5);
+    fresh.on('pointerdown', () => this.newCard());
 
     // Caller display
-    this.callerText = this.add.text(GAME_WIDTH / 2, GRID_Y + GRID * CELL_H + 26, '', {
+    this.callerText = this.add.text(GAME_WIDTH / 2, GRID_Y + GRID * CELL_H + 24, '', {
       fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#ffffff',
     }).setOrigin(0.5);
 
-    this.statusText = this.add.text(GAME_WIDTH / 2, GRID_Y + GRID * CELL_H + 58, 'Calling...', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#8877aa',
+    this.statusText = this.add.text(GAME_WIDTH / 2, GRID_Y + GRID * CELL_H + 54, 'Calling...', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#8877aa',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 20,
-      'Click squares to mark  •  ESC: menu', {
-        fontFamily: 'monospace', fontSize: '12px', color: '#554466',
+    this.historyText = this.add.text(GAME_WIDTH / 2, GRID_Y + GRID * CELL_H + 78, '', {
+      fontFamily: 'monospace', fontSize: '11px', color: '#554466',
+      wordWrap: { width: GAME_WIDTH - 80 }, align: 'center',
+    }).setOrigin(0.5, 0);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 14,
+      'Click squares to mark  •  ESC: hub', {
+        fontFamily: 'monospace', fontSize: '11px', color: '#554466',
       }).setOrigin(0.5);
 
-    this.input.keyboard!.on('keydown-ESC', () => {
-      this.callTimer?.destroy();
-      this.scene.start(SCENE.AppHub);
-    });
+    this.input.keyboard!.on('keydown-ESC', () => this.leaveToHub());
 
-    this.dealCard();
+    const saved = loadState();
+    if (saved && !saved.won && saved.card.length === 25) {
+      this.card = saved.card;
+      this.marked = saved.marked;
+      this.called = saved.called;
+    } else {
+      this.dealCard();
+    }
     this.buildGrid();
+    this.refreshHistory();
     this.scheduleCall();
+  }
+
+  private leaveToHub(): void {
+    this.callTimer?.destroy();
+    this.scene.start(SCENE.AppHub);
+  }
+
+  private newCard(): void {
+    this.callTimer?.destroy();
+    this.dealCard();
+    this.scene.restart();
+  }
+
+  private persist(): void {
+    saveState({ card: this.card, marked: this.marked, called: this.called, won: this.won });
   }
 
   private dealCard(): void {
@@ -79,6 +142,8 @@ export class LipsyncBingoScene extends Phaser.Scene {
     this.marked = Array(25).fill(false);
     this.marked[12] = true; // center FREE square
     this.called = [];
+    this.won = false;
+    this.persist();
   }
 
   private buildGrid(): void {
@@ -110,8 +175,13 @@ export class LipsyncBingoScene extends Phaser.Scene {
       grp.on('pointerout',  () => this.refreshCell(i));
 
       this.cells.push(grp);
-      if (i === 12) this.applyMark(i);
+      if (this.marked[i]) this.applyMark(i);
     }
+  }
+
+  private refreshHistory(): void {
+    const recent = this.called.slice(-HISTORY_LEN - 1, -1).reverse();
+    this.historyText.setText(recent.length ? `PREVIOUS: ${recent.join('  ·  ')}` : '');
   }
 
   private scheduleCall(): void {
@@ -140,15 +210,19 @@ export class LipsyncBingoScene extends Phaser.Scene {
       duration: 200, yoyo: true, ease: 'Quad.out',
     });
     this.statusText.setText(`${this.called.length} phrases called`);
+    this.refreshHistory();
+    AudioSystem.sfx(this, 'select');
     // Auto-mark any matching squares
     this.card.forEach((sq, i) => {
       if (sq === phrase && !this.marked[i]) this.autoMark(i);
     });
+    this.persist();
   }
 
   private autoMark(i: number): void {
     this.marked[i] = true;
     this.applyMark(i);
+    AudioSystem.sfx(this, 'confirm');
     this.checkWin();
   }
 
@@ -156,6 +230,8 @@ export class LipsyncBingoScene extends Phaser.Scene {
     if (this.won || i === 12) return;
     this.marked[i] = !this.marked[i];
     this.refreshCell(i);
+    AudioSystem.sfx(this, 'select');
+    this.persist();
     if (this.marked[i]) this.checkWin();
   }
 
@@ -192,6 +268,8 @@ export class LipsyncBingoScene extends Phaser.Scene {
     if (!won) return;
     this.won = true;
     this.callTimer?.destroy();
+    this.persist();
+    AudioSystem.sfx(this, 'win');
     this.showWin();
   }
 
@@ -208,12 +286,12 @@ export class LipsyncBingoScene extends Phaser.Scene {
       fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffffff',
     }).setOrigin(0.5).setDepth(80001);
 
-    this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 68, 'SPACE — Play Again   ESC — Menu', {
+    this.add.text(GAME_WIDTH/2, GAME_HEIGHT/2 + 68, 'SPACE — Play Again   ESC — Hub', {
       fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
     }).setOrigin(0.5).setDepth(80001);
 
     const kb = this.input.keyboard!;
     kb.once('keydown-SPACE', () => this.scene.restart());
-    kb.once('keydown-ESC',   () => this.scene.start(SCENE.AppHub));
+    kb.once('keydown-ESC',   () => this.leaveToHub());
   }
 }

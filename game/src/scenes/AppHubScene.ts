@@ -22,7 +22,6 @@ const CARDS: HubCard[] = [
   { label: 'SECURITY DOOR MODE',sub: 'Guard console',       icon: '🛡',  color: 0xff4444, scene: SCENE.SecurityDoor },
   { label: 'LIP SYNC BINGO',    sub: 'Play the game',       icon: '🎤', color: 0xff66cc, scene: SCENE.LipsyncBingo },
   { label: 'HOST / DJ CONTROL', sub: 'Run the show',        icon: '🎧', color: 0x00aaff, scene: SCENE.HostDj },
-  { label: 'TV DISPLAY',        sub: 'Big-screen view',     icon: '📺', color: 0x8844ff, scene: SCENE.TvMode },
   { label: 'OWNER COMMAND',     sub: 'Admin controls',      icon: '👑', color: 0xff9900, scene: SCENE.OwnerCommand },
 ];
 
@@ -55,7 +54,6 @@ export class AppHubScene extends Phaser.Scene {
     kb.on('keydown-DOWN',  () => this.move(0, 1));
     kb.on('keydown-ENTER', () => this.activate(this.cursor));
     kb.on('keydown-SPACE', () => this.activate(this.cursor));
-    kb.on('keydown-ESC',   () => this.scene.start(SCENE.MainMenu));
 
     this.refreshSelection();
   }
@@ -81,14 +79,6 @@ export class AppHubScene extends Phaser.Scene {
     this.add.text(GAME_WIDTH - 90, 32, '● ACTIVE MEMBER', {
       fontFamily: 'monospace', fontSize: '10px', color: '#44cc44',
     }).setOrigin(0.5).setDepth(103);
-
-    // Back chip top-left
-    const back = this.add.rectangle(64, 32, 100, 30, 0x1a0030, 0.9)
-      .setStrokeStyle(1, 0xc100ff).setDepth(102).setInteractive({ useHandCursor: true });
-    this.add.text(64, 32, 'ESC — GAME', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#c100ff',
-    }).setOrigin(0.5).setDepth(103);
-    back.on('pointerdown', () => this.scene.start(SCENE.MainMenu));
   }
 
   // ── Center: 4x2 grid of clean cards ───────────────────────────────────────
@@ -137,7 +127,7 @@ export class AppHubScene extends Phaser.Scene {
     const y = GAME_HEIGHT - 14;
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 2, GAME_WIDTH, 24, 0x0a0420, 0.9)
       .setOrigin(0.5, 1).setDepth(100);
-    this.add.text(GAME_WIDTH / 2, y, '◀ ▶ ▲ ▼ NAVIGATE   [ENTER] SELECT   [ESC] BACK TO GAME', {
+    this.add.text(GAME_WIDTH / 2, y, '◀ ▶ ▲ ▼ NAVIGATE   [ENTER] SELECT', {
       fontFamily: 'monospace', fontSize: '10px', color: '#665577',
     }).setOrigin(0.5, 1).setDepth(101);
   }

@@ -2,20 +2,10 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './config';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
-import { MainMenuScene } from './scenes/MainMenuScene';
-import { BrawlerScene } from './scenes/BrawlerScene';
-import { VenueScene } from './scenes/VenueScene';
-import { LevelEditorScene } from './scenes/LevelEditorScene';
-import { ArcadeVsScene } from './scenes/ArcadeVsScene';
-import { StageSelectScene } from './scenes/StageSelectScene';
-import { VenueSelectScene } from './scenes/VenueSelectScene';
 import { LipsyncBingoScene } from './scenes/LipsyncBingoScene';
-import { TvModeScene } from './scenes/TvModeScene';
 import { HostDjScene } from './scenes/HostDjScene';
 import { MemberCheckInScene } from './scenes/MemberCheckInScene';
 import { MembershipScene } from './scenes/MembershipScene';
-import { CharacterSelectScene } from './scenes/CharacterSelectScene';
-import { OptionsScene } from './scenes/OptionsScene';
 import { AppHubScene } from './scenes/AppHubScene';
 import { SecurityDoorScene } from './scenes/SecurityDoorScene';
 import { OwnerCommandScene } from './scenes/OwnerCommandScene';
@@ -33,12 +23,8 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  physics: {
-    default: 'arcade',
-    arcade: { gravity: { x: 0, y: 0 }, debug: false },
-  },
-  input: { gamepad: true },
-  scene: [BootScene, PreloadScene, MainMenuScene, BrawlerScene, VenueScene, LevelEditorScene, ArcadeVsScene, StageSelectScene, VenueSelectScene, LipsyncBingoScene, TvModeScene, HostDjScene, MemberCheckInScene, MembershipScene, CharacterSelectScene, OptionsScene, AppHubScene, SecurityDoorScene, OwnerCommandScene],
+  input: { gamepad: false },
+  scene: [BootScene, PreloadScene, AppHubScene, LipsyncBingoScene, HostDjScene, MemberCheckInScene, MembershipScene, SecurityDoorScene, OwnerCommandScene],
 };
 
 const game = new Phaser.Game(config);

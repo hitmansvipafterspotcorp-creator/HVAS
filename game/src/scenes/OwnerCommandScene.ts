@@ -1,10 +1,9 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { AudioSystem } from '../systems/AudioSystem';
-import { ProgressionSystem } from '../systems/ProgressionSystem';
 
 // ── OwnerCommandScene ─────────────────────────────────────────────────────
-// Admin panel: quest progression reset/unlock, quick links to every other
+// Admin panel: reset local member/check-in data, quick links to every other
 // app surface. Clean button grid, no raw asset sheets.
 
 type AdminAction = { label: string; sub: string; run: () => void; color: number };
@@ -26,19 +25,14 @@ export class OwnerCommandScene extends Phaser.Scene {
 
     const actions: AdminAction[] = [
       {
-        label: 'UNLOCK ALL QUESTS', sub: 'Clear boss/venue gates',
-        color: 0x44cc44,
-        run: () => { ProgressionSystem.unlockAll(); this.flash('✔ ALL QUESTS UNLOCKED'); },
-      },
-      {
-        label: 'RESET PROGRESS', sub: 'Wipe quest save data',
+        label: 'RESET MEMBER CARD', sub: 'Clear this device\'s saved membership',
         color: 0xff4444,
-        run: () => { ProgressionSystem.reset(); this.flash('✔ PROGRESS RESET'); },
+        run: () => { localStorage.removeItem('hvas_lsb_member'); this.flash('✔ MEMBER CARD RESET'); },
       },
       {
-        label: 'GO TO MAIN MENU', sub: 'Return to game',
-        color: 0xc100ff,
-        run: () => this.scene.start(SCENE.MainMenu),
+        label: 'RESET CHECK-IN LOG', sub: 'Clear the demo member roster',
+        color: 0xffd700,
+        run: () => { localStorage.removeItem('hvas_members'); this.flash('✔ CHECK-IN DATA RESET'); },
       },
       {
         label: 'GO TO APP HUB', sub: 'Member app home',

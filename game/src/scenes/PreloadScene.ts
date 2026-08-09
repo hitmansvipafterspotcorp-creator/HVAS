@@ -1,19 +1,14 @@
 import Phaser from 'phaser';
 import { SCENE, GAME_WIDTH, GAME_HEIGHT } from '../config';
-import { AnimationSystem } from '../systems/AnimationSystem';
-import { BRAWLER_ANIMS, VENUE_ANIMS, VFX_ANIMS, TOPDOWN_CHAR_IDS } from '../data/animMap';
-import { PLAYER_ID, ENEMY_IDS, VENUE_NPC_IDS } from '../data/roster';
 import { UISystem } from '../systems/UISystem';
 import { AudioSystem } from '../systems/AudioSystem';
 
 const TIPS = [
-  'BLOCK (Shift) then ATTACK to grab an enemy.',
-  'Double-tap a direction to RUN — faster but no block.',
-  'Fill your SUPER meter and press Q to unleash a super move.',
-  'Pick up dropped weapons — they deal extra damage.',
-  'DODGE (Shift + direction) makes you briefly invulnerable.',
-  'Clear all waves to unlock the venue entrance.',
   'VIP members get access to the inner lounge — check in at the door.',
+  'STAFF DOOR SCAN verifies a member card in one tap.',
+  'HOST / DJ CONTROL tracks the night\'s Vibe Points live.',
+  'LIP SYNC BINGO calls a new phrase automatically — mark your card fast!',
+  'OWNER COMMAND has quick admin tools for the whole app.',
 ];
 
 export class PreloadScene extends Phaser.Scene {
@@ -119,17 +114,6 @@ export class PreloadScene extends Phaser.Scene {
     // ── Queue everything ─────────────────────────────────────────────────────
     UISystem.queue(this);
     AudioSystem.queue(this);
-
-    // Only preload the most-used characters — other chars are lazy-loaded
-    // by each scene when needed. This cuts preload from ~5000 to ~600 requests.
-    const priorityIds = [PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS];
-    const prioritySet = new Set<number>(priorityIds);
-    const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
-    for (const id of prioritySet) {
-      AnimationSystem.queue(this, id, BRAWLER_ANIMS);
-      AnimationSystem.queue(this, id, VFX_ANIMS);
-      if (topdownSet.has(id)) AnimationSystem.queue(this, id, VENUE_ANIMS);
-    }
   }
 
   override update(): void {
@@ -139,15 +123,7 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   create(): void {
-    const priorityIds = [PLAYER_ID, ...ENEMY_IDS, ...VENUE_NPC_IDS];
-    const topdownSet = new Set<number>(TOPDOWN_CHAR_IDS);
-    for (const id of priorityIds) {
-      AnimationSystem.build(this, id, BRAWLER_ANIMS);
-      AnimationSystem.build(this, id, VFX_ANIMS);
-      if (topdownSet.has(id)) AnimationSystem.build(this, id, VENUE_ANIMS);
-    }
-
-    this.time.delayedCall(400, () => this.scene.start(SCENE.MainMenu));
-    AudioSystem.playForScene(this, 'MainMenu');
+    this.time.delayedCall(400, () => this.scene.start(SCENE.AppHub));
+    AudioSystem.playForScene(this, 'AppHub');
   }
 }
