@@ -1,0 +1,46 @@
+name: Deploy HITMANS VIP Membership App to GitHub Pages
+
+# Publishes the pre-built membership app that lives on the `gh-pages` branch
+# (hitmans_vip_membership_app built with base '/hvas/', trimmed to the 154
+# referenced assets). Rebuild + `git push origin gh-pages` to update the live
+# site, or run this workflow manually.
+
+on:
+  push:
+    branches: ["gh-pages", "claude/gracious-rubin-3klank"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages (pre-built app)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
