@@ -1276,6 +1276,7 @@ function MemberDoor({ onMember, onStaff, auth, onSignOut }) {
         )}
         {/* hidden staff/security entry — 5 quick taps here */}
         <button type="button" className="door-fine" onClick={secretTap}>Members only · verified at the door</button>
+        <ConnectVenue />
       </div>
     </section>
   );
