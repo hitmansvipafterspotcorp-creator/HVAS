@@ -987,11 +987,15 @@ function App() {
   // the door verification, not the on-the-way toggle.
   const session = { role, onTheWay, checkedIn: inside };
   function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); setGate(null); }
+  // Members only have My Pass + History — skip the menu and land straight on
+  // My Pass instead of showing a 2-item picker for something with no picking
+  // to do. Staff/Host still land on 'home' (their menus have real choices).
+  function enterMember() { setRole('member'); setActiveScreen('myPass'); setTargetScreen('myPass'); setGate(null); }
   function switchRole() { setRole(null); setActiveScreen('home'); setTargetScreen('home'); setGate(null); }
   // Gate a role behind its auth: members self-serve (need a signed-in account),
   // staff/host need the venue access code (unlocked per session).
   function requestRole(id) {
-    if (id === 'member') return auth.member ? chooseRole('member') : setGate('member');
+    if (id === 'member') return auth.member ? enterMember() : setGate('member');
     if (unlocked[id]) return chooseRole(id);
     return setGate(id);
   }
@@ -1005,7 +1009,7 @@ function App() {
       <TransitionOverlay transition={transition} destination={targetScreen} />
       {!role ? (
         gate === 'member' ? (
-          <MemberAuthScreen onBack={() => setGate(null)} onDone={() => chooseRole('member')} />
+          <MemberAuthScreen onBack={() => setGate(null)} onDone={() => enterMember()} />
         ) : gate ? (
           // staff/host code gate — back returns to the hidden Team Access, not the public door
           <CodeGateScreen role={gate} onBack={() => { setGate(null); setTeam(true); }}
