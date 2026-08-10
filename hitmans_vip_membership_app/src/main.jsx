@@ -3,8 +3,6 @@ import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
-import GameCanvas from './game/GameCanvas.jsx';
-import { GAME_FIGHTERS } from './game/venues.js';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
@@ -633,13 +631,6 @@ const screens = [
     detail: 'Member access, staff check-in, Lip Sync Bingo, and host controls.',
   },
   {
-    id: 'characterSelect',
-    label: 'Start the Night',
-    eyebrow: 'THE NIGHT',
-    title: 'Choose Your Character',
-    detail: 'Pick who you are tonight — your class changes how the night plays.',
-  },
-  {
     id: 'payVerify',
     label: 'Pay & Verify',
     eyebrow: 'Front Door',
@@ -826,9 +817,8 @@ const ROLES = [
     menu: [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
-      { title: 'Start the Night', detail: 'Choose your character and play', chip: ui.chips.active, target: 'characterSelect' },
     ],
-    allowed: ['characterSelect', 'membership', 'myPass', 'profile', 'checkout', 'history'],
+    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history'],
   },
   {
     id: 'staff',
@@ -866,36 +856,6 @@ const ROLES = [
 ];
 const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
 
-// ── The real roster ─────────────────────────────────────────────────────
-// Playable crew — the fighters you pick to run the night. Each reframes the
-// whole run (mission types, combat baseline, networking). Portraits are the
-// game's own idle frames.
-const ROSTER = [
-  { id: 'creator', name: 'The Creator', role: 'Movement builder', portrait: '/assets/fighters/creator.png', strong: 'Networking · influence · event bonuses', weak: 'Weaker combat early', accent: '#ff2bd6' },
-  { id: 'dj', name: 'The DJ', role: 'Vibe control', portrait: '/assets/fighters/dj.png', strong: 'Audio / VFX crowd boosts', weak: 'Limited street combat', accent: '#7f3cff' },
-  { id: 'promoter', name: 'The Promoter', role: 'Guest list', portrait: '/assets/fighters/promoter.png', strong: 'Referrals · crowd pull', weak: 'Soft in a fight early', accent: '#ff2bd6' },
-  { id: 'dancer', name: 'The Dancer', role: 'Floor · hype', portrait: '/assets/fighters/dancer.png', strong: 'Mini-games · charisma', weak: 'Low defense', accent: '#ff6b8a' },
-  { id: 'host', name: 'The Host', role: 'Runs the room', portrait: '/assets/fighters/host.png', strong: 'Mini-game + dialogue bonuses', weak: 'Mid combat', accent: '#4cc9ff' },
-  { id: 'photographer', name: 'The Lens', role: 'Social proof', portrait: '/assets/fighters/photographer.png', strong: 'Marketing · reputation', weak: 'Fragile in fights', accent: '#ffd66b' },
-  { id: 'vendor', name: 'The Vendor', role: 'Sells the night', portrait: '/assets/fighters/vendor.png', strong: 'Money · item bonuses', weak: 'Low special meter', accent: '#ffab4c' },
-  { id: 'security', name: 'Security', role: 'Keeps the peace', portrait: '/assets/fighters/security.png', strong: 'Combat · block · crowd control', weak: 'Slow networking', accent: '#52ffa8' },
-  { id: 'influencer', name: 'The Influencer', role: 'Clout · reach', portrait: '/assets/fighters/influencer.png', strong: 'Reputation · viral missions', weak: 'Needs protection', accent: '#c9b8ff' },
-  { id: 'famu_female', name: 'FAMU Student ♀', role: 'Campus to club', portrait: '/assets/fighters/famu_female.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#52ffa8' },
-  { id: 'famu_male', name: 'FAMU Student ♂', role: 'Campus to club', portrait: '/assets/fighters/famu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#52ffa8' },
-  { id: 'fsu_female', name: 'FSU Student ♀', role: 'New to the scene', portrait: '/assets/fighters/fsu_female.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
-  { id: 'fsu_male', name: 'FSU Student ♂', role: 'Chasing status', portrait: '/assets/fighters/fsu_male.png', strong: 'Fast growth · social missions', weak: 'Low starting money', accent: '#ffd66b' },
-  { id: 'kendrick', name: 'Kendrick', role: 'Kitchen manager · chef', portrait: '/assets/fighters/kendrick.png', strong: 'Kitchen combos · pan block · crowd feed', weak: 'Mid mobility', accent: '#4c9cff' },
-  { id: 'kt', name: 'KT', role: 'Cafe8Fifty owner · boss', portrait: '/assets/fighters/kt.png', strong: 'Owner access · money · boss presence', weak: 'Heavy, slower dodge', accent: '#ff3b3b' },
-];
-// Story / boss tier — met on the route, unlockable later. Shown locked (also
-// keeps the two art-remaster fighters, kendrick & kt, from rendering broken).
-const STORY_TIER = [
-  { id: 'big_soulja', name: 'Big Soulja', note: 'Story ally / wall' },
-  { id: 'eld', name: 'Entry Line Disruptor', note: 'Recurring problem' },
-  { id: 'predator_pete', name: 'Predator Pete', note: 'Rival boss' },
-  { id: 'agent_snow', name: 'Agent Snow', note: 'Final boss' },
-];
-
 // Prefix every '/assets/...' path with the deploy base (e.g. '/hvas') so the
 // app works under a GitHub Pages project subpath as well as at root. All
 // asset paths funnel through the four data objects above, so one in-place
@@ -910,7 +870,7 @@ const prefixAssets = (node) => {
   }
   return node;
 };
-[ui, screens, loadingPhases, ROLES, ROSTER].forEach(prefixAssets);
+[ui, screens, loadingPhases, ROLES].forEach(prefixAssets);
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('home');
@@ -923,7 +883,6 @@ function App() {
   const member = useMember();                    // subscribe: door verification updates this
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
-  const [playing, setPlaying] = useState(null); // { id, name } while in the brawler
   const [transition, setTransition] = useState({
     active: true,
     from: 'Loading',
@@ -1037,11 +996,6 @@ function App() {
     return setGate(id);
   }
 
-  // In-game takes over the whole screen.
-  if (playing) {
-    return <GameCanvas fighterId={playing.id} fighterName={playing.name} onExit={() => setPlaying(null)} />;
-  }
-
   return (
     <main className="app-shell menu-shell">
       <div className="dynamic-bg" aria-hidden="true">
@@ -1078,7 +1032,7 @@ function App() {
           {current.id === 'home' ? (
             <HomeScreen role={roleById(role)} session={session} navigate={navigate} />
           ) : (
-            <ScreenBody activeScreen={current.id} navigate={navigate} session={session} onStartGame={(id, name) => setPlaying({ id, name })} />
+            <ScreenBody activeScreen={current.id} navigate={navigate} session={session} />
           )}
         </section>
       )}
@@ -1264,10 +1218,9 @@ function ScreenHeader({ screen, onBack }) {
   );
 }
 
-function ScreenBody({ activeScreen, navigate, onStartGame, session }) {
+function ScreenBody({ activeScreen, navigate, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
-  if (activeScreen === 'characterSelect') return <CharacterSelectScreen onStartGame={onStartGame} />;
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
@@ -3189,65 +3142,6 @@ function AppPanel({ title, subtitle, children, className = '' }) {
       </header>
       <div className="app-panel-body">{children}</div>
     </article>
-  );
-}
-
-function CharacterSelectScreen({ onStartGame }) {
-  const [picked, setPicked] = useState(null);
-  const chosen = ROSTER.find((c) => c.id === picked) ?? null;
-  const canPlay = chosen && GAME_FIGHTERS.has(chosen.id);
-  return (
-    <div className="char-select">
-      <div className="char-grid">
-        {ROSTER.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`char-card${picked === c.id ? ' picked' : ''}`}
-            style={{ '--accent': c.accent }}
-            onClick={() => setPicked(c.id)}
-          >
-            <span className="char-portrait"><img src={c.portrait} alt={c.name} /></span>
-            <span className="char-name">{c.name}</span>
-            <span className="char-tag">{c.role}</span>
-          </button>
-        ))}
-      </div>
-
-      {chosen ? (
-        <div className="char-detail" style={{ '--accent': chosen.accent }}>
-          <h2>{chosen.name}</h2>
-          <p className="char-line"><b>Strengths</b><span>{chosen.strong}</span></p>
-          <p className="char-line"><b>Weakness</b><span>{chosen.weak}</span></p>
-          <button
-            type="button"
-            className="char-start"
-            disabled={!canPlay}
-            onClick={() => canPlay && onStartGame(chosen.id, chosen.name)}
-          >
-            {canPlay ? `Start the Night as ${chosen.name} →` : `${chosen.name} — hitting the streets soon`}
-          </button>
-          <p className="char-soon">{canPlay
-            ? 'Cafe8Fifty street brawler loads now — D-pad to move, A to attack. Inside venues + the 2AM run are next.'
-            : 'Playable in Character Select; street frames are being sliced from the new sheets.'}</p>
-        </div>
-      ) : (
-        <p className="char-hint">Tap a fighter to see how your night plays.</p>
-      )}
-
-      <div className="story-tier">
-        <h3>Story · Rivals · Bosses</h3>
-        <div className="story-grid">
-          {STORY_TIER.map((s) => (
-            <div key={s.id} className="story-card" aria-disabled="true">
-              <span className="story-name">{s.name}</span>
-              <span className="story-note">{s.note}</span>
-              <span className="story-lock" aria-hidden="true">🔒</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
