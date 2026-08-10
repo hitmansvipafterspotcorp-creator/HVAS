@@ -416,6 +416,20 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       json(res, 200, board());
     },
+
+    // Staff/host lookup by name, member number, or contact — every device
+    // hitting this backend searches the one shared members table, so a member
+    // who signed up on their own phone shows up at the door on a different one.
+    'GET /members/search': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const q = (new URL(req.url, 'http://x').searchParams.get('q') || '').trim();
+      if (q.length < 2) return json(res, 200, { members: [] });
+      const like = `%${q}%`;
+      const rows = db.prepare(
+        `SELECT * FROM members WHERE name LIKE ? OR number LIKE ? OR contact LIKE ? ORDER BY created_at DESC LIMIT 8`
+      ).all(like, like, like);
+      json(res, 200, { members: rows.map(publicMember) });
+    },
     'GET /door/stream': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });

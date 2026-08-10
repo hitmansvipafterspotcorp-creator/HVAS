@@ -10,6 +10,10 @@ import { WebMesh } from './meshweb.js';
 
 let hub = null;
 export const hubOn = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_hub') === '1');
+// Set when the user explicitly turns hosting off (e.g. to connect to a real
+// venue backend instead) — stops the auto-start-on-boot logic from silently
+// flipping hosting back on underneath them after the reload it triggers.
+export const hubDeclined = () => (typeof localStorage !== 'undefined' && localStorage.getItem('hvas_hub_off') === '1');
 export function hubNode() { return hub; }
 
 export async function startHub(room = 'venue') {
@@ -17,9 +21,14 @@ export async function startHub(room = 'venue') {
   hub = new WebMesh(room);
   await hub.init();
   localStorage.setItem('hvas_hub', '1');
+  localStorage.removeItem('hvas_hub_off');
   return hub;
 }
-export function stopHub() { localStorage.removeItem('hvas_hub'); hub = null; }
+export function stopHub() {
+  localStorage.removeItem('hvas_hub');
+  localStorage.setItem('hvas_hub_off', '1');
+  hub = null;
+}
 
 // ── WebRTC transport (cross-device, serverless) ──────────────────────────────
 // Manual signaling: the hub shows an OFFER (as a QR / code), the joiner returns

@@ -57,6 +57,27 @@ export function apiSignOut() {
 export function apiPurchase(tier, payment) { return call('POST', '/membership/purchase', { tier, payment }, apiToken()); }
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
 
+// Staff / host: venue-code login, then everything below reads from the ONE
+// shared backend database — so a member who signed up on their own phone
+// shows up for staff on a completely different device.
+export const apiStaffToken = () => ls('hvas_api_staff_token');
+export const apiStaffRole = () => ls('hvas_api_staff_role');
+export async function apiStaffLogin(code) {
+  const r = await call('POST', '/auth/staff', { code });
+  if (r?.token) {
+    localStorage.setItem('hvas_api_staff_token', r.token);
+    localStorage.setItem('hvas_api_staff_role', r.role);
+  }
+  return r;
+}
+export function apiStaffSignOut() {
+  localStorage.removeItem('hvas_api_staff_token');
+  localStorage.removeItem('hvas_api_staff_role');
+}
+export function apiDoorVerify(payload) { return call('POST', '/door/verify', payload, apiStaffToken()); }
+export function apiDoorBoard() { return call('GET', '/door/board', null, apiStaffToken()); }
+export function apiMembersSearch(q) { return call('GET', `/members/search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
+
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
 // Handles prefer the connected venue's config (config-over-the-air), then env.
 export const zelleHandle = () => venueConfig().zelle || import.meta.env.VITE_ZELLE_HANDLE || '';

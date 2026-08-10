@@ -4,9 +4,10 @@ import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
-  zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue } from './api.js';
+  zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
+  apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
-import { hubOn, startHub, stopHub, hubNode } from './hub.js';
+import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -292,6 +293,22 @@ export function verifyByNumber(number) {
 }
 export function resetMembership() { commitMember(null); }
 
+// Door-side verify when connected to a real venue backend: checks the ONE
+// shared members table server-side, so any staff device gets the same answer
+// for any member regardless of which device they signed up on. Falls back to
+// the offline/local-only check above when there's no backend connected.
+export async function verifyAtDoor(number) {
+  if (apiEnabled() && apiStaffToken()) {
+    try {
+      const r = await apiDoorVerify({ number });
+      return { ok: r.ok, status: r.status, member: r.member, reason: r.reason };
+    } catch (e) {
+      return { ok: false, status: 'error', reason: e.message || 'Could not reach the venue backend.' };
+    }
+  }
+  return verifyByNumber(number);
+}
+
 // ── Member penalties: trespass / ban ────────────────────────────────────
 // Door staff can flag a member. The flag rides the hub op-log so it converges
 // to every device — the member sees it on their own profile, and any door that
@@ -344,6 +361,17 @@ export function searchMembers(query) {
     rows.push({ number: memberState.number, name: memberState.name || 'Member', contact: memberState.contact || '' });
   }
   return rows.filter((r) => `${r.name} ${r.number} ${r.contact}`.toLowerCase().includes(q)).slice(0, 6);
+}
+// Same idea as verifyAtDoor: query the shared backend when connected (any
+// member, any device they signed up on), fall back to the local hub-only
+// search otherwise.
+export async function searchMembersAtDoor(query) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  if (apiEnabled() && apiStaffToken()) {
+    try { return (await apiMembersSearch(q)).members || []; } catch { return []; }
+  }
+  return searchMembers(query);
 }
 export function penalizedMembers() {
   const hub = hubNode();
@@ -897,10 +925,12 @@ function App() {
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
     enforceMembership();       // keep a paid membership or stats start over
-    // The app IS the backend: it always runs its own in-browser hub in the
-    // background — no "connect to venue", no server. Members come onto the
-    // network the moment they buy a membership (see purchaseTier).
-    if (!apiEnabled()) startHub();
+    // The app IS the backend by default: it runs its own in-browser hub in
+    // the background so the social layer has something to attach to even
+    // with no server connected. Skipped if the user explicitly stopped
+    // hosting (e.g. to connect to a real venue backend instead) — otherwise
+    // that choice gets silently reverted on the very next boot.
+    if (!apiEnabled() && !hubDeclined()) startHub();
   }, []);
 
   // Signing out (from anywhere — the door or the profile) clears the member
@@ -1516,13 +1546,27 @@ function MemberAuthScreen({ onBack, onDone }) {
   );
 }
 
-// Staff / Host venue access-code gate. Client-side demo — production checks the
-// code server-side so it can't be read from the bundle.
+// Staff / Host venue access-code gate. When connected to a venue backend the
+// code is checked server-side (POST /auth/staff) and the returned session
+// token is what every door-verify/search/board call below authenticates
+// with — that's what makes it "one shared venue," not a per-device demo.
+// With no backend connected it falls back to the client-side demo check.
 function CodeGateScreen({ role, onBack, onDone }) {
   const r = roleById(role);
   const [code, setCode] = useState('');
   const [err, setErr] = useState(false);
-  const submit = () => { if (checkRoleCode(role, code)) onDone(); else setErr(true); };
+  const [busy, setBusy] = useState(false);
+  const backend = apiEnabled();
+  const submit = async () => {
+    if (backend) {
+      setBusy(true); setErr(false);
+      try { await apiStaffLogin(code.trim()); onDone(); }
+      catch { setErr(true); }
+      finally { setBusy(false); }
+      return;
+    }
+    if (checkRoleCode(role, code)) onDone(); else setErr(true);
+  };
   return (
     <section className="screen screen-landing">
       <div className="home-dashboard auth-screen">
@@ -1532,8 +1576,12 @@ function CodeGateScreen({ role, onBack, onDone }) {
           <label>Access code<input type="text" value={code} onChange={(e) => { setCode(e.target.value); setErr(false); }}
             placeholder="Venue code" autoComplete="off" onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
           {err && <p className="gate-err">Wrong code — check with the venue.</p>}
-          <button type="button" className="auth-continue" disabled={!code.trim()} onClick={submit}>Unlock {r.label} →</button>
-          <p className="auth-fine">Demo code for <b>{r.label}</b>: <code>{ROLE_CODES[role]}</code>. In production this is issued per staff member and verified on a server.</p>
+          <button type="button" className="auth-continue" disabled={!code.trim() || busy} onClick={submit}>
+            {busy ? 'Checking…' : `Unlock ${r.label} →`}
+          </button>
+          <p className="auth-fine">{backend
+            ? `Connected to ${venueConfig().venue || 'this venue'} — the code is checked by the venue backend.`
+            : <>Demo code for <b>{r.label}</b>: <code>{ROLE_CODES[role]}</code>. In production this is issued per staff member and verified on a server.</>}</p>
           <button type="button" className="auth-back" onClick={onBack}>← Back</button>
         </div>
       </div>
@@ -2418,31 +2466,47 @@ function PenaltyControls({ member }) {
   );
 }
 
+// Connected to a venue backend: shows EVERY member the shared board knows
+// about (poll GET /door/board every 4s) — not just this device's own local
+// member. With no backend it falls back to the single local member, same as
+// before.
 function StaffDashboardScreen({ navigate }) {
   const member = useMember();
-  const [, tick] = useState(0);
-  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(id); }, []);
+  const backend = apiEnabled() && apiStaffToken();
+  const [board, setBoard] = useState(null);
 
-  const incoming = isOnTheWay(member);
-  const inside = isInsideTonight(member);
+  useEffect(() => {
+    if (!backend) return;
+    let live = true;
+    const poll = async () => { try { const b = await apiDoorBoard(); if (live) setBoard(b); } catch { /* ignore */ } };
+    poll();
+    const id = setInterval(poll, 4000);
+    return () => { live = false; clearInterval(id); };
+  }, [backend]);
+  useEffect(() => {
+    if (backend) return;
+    const id = setInterval(() => setBoard((b) => ({ ...b })), 30000); // force a re-render tick
+    return () => clearInterval(id);
+  }, [backend]);
+
   const ago = (ts) => {
     if (!ts) return '';
     const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
     return mins < 1 ? 'just now' : mins === 1 ? '1 min ago' : `${mins} mins ago`;
   };
-  const lastDecision = member && member.verifiedAt
-    ? { status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt }
-    : null;
+  const normStatus = (s) => (s === 'granted' ? 'valid' : s === 'expired-qr' ? 'expired' : s === 'suspended' ? 'trespass' : s);
 
-  const entriesTotal = member?.entries || 0;
-  const insideCount = inside ? 1 : 0;
-  // live tracker: append tonight's entry count to a rolling series every 4s
-  const [spark, setSpark] = useState(() => Array.from({ length: 14 }, () => entriesTotal));
-  useEffect(() => {
-    const id = setInterval(() => setSpark((s) => [...s.slice(1), (memberState?.entries || 0)]), 4000);
-    return () => clearInterval(id);
-  }, []);
-  useEffect(() => { setSpark((s) => [...s.slice(1), entriesTotal]); }, [entriesTotal]);
+  const onTheWayList = backend ? (board?.onTheWay || []) : (isOnTheWay(member) ? [member] : []);
+  const insideList = backend ? (board?.inside || []) : (isInsideTonight(member) ? [member] : []);
+  const lastDecision = backend
+    ? (board?.lastDecision ? { status: normStatus(board.lastDecision.status), when: board.lastDecision.at, number: board.lastDecision.number, name: null } : null)
+    : (member && member.verifiedAt ? { status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt, number: member.number, name: member.name } : null);
+
+  const insideCount = insideList.length;
+  const entriesTotal = backend ? insideCount : (member?.entries || 0);
+  const [spark, setSpark] = useState(() => Array.from({ length: 14 }, () => insideCount));
+  useEffect(() => { setSpark((s) => [...s.slice(1), insideCount]); }, [insideCount]);
+
   return (
     <div className="staff-dash">
       <div className="stat-widgets">
@@ -2451,33 +2515,33 @@ function StaffDashboardScreen({ navigate }) {
         <StatWidget src={ui.widgets.venue} label="VENUE ACCESS" sub="CURRENTLY INSIDE" value={insideCount} cap={100} />
       </div>
       <AppPanel title="On the way" subtitle="Members heading over">
-        {incoming ? (
-          <div className="dash-row incoming">
+        {onTheWayList.length > 0 ? onTheWayList.map((m) => (
+          <div className="dash-row incoming" key={m.number}>
             <span className="dash-dot amber" />
             <div className="dash-info">
-              <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
-              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
-              <PenaltyControls member={member} />
+              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
+              <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
+              {!backend && <PenaltyControls member={m} />}
             </div>
-            <span className="dash-when">{ago(member.onTheWayAt)}</span>
+            <span className="dash-when">{ago(m.onTheWayAt)}</span>
           </div>
-        ) : (
+        )) : (
           <p className="dash-empty">No members signalled on the way right now.</p>
         )}
       </AppPanel>
 
       <AppPanel title="Inside tonight" subtitle="Verified at the door">
-        {inside ? (
-          <div className="dash-row inside">
+        {insideList.length > 0 ? insideList.map((m) => (
+          <div className="dash-row inside" key={m.number}>
             <span className="dash-dot green" />
             <div className="dash-info">
-              <strong>{member.name || 'Member'} · {member.tier}{member.vip ? ' VIP' : ''}</strong>
-              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
-              <PenaltyControls member={member} />
+              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
+              <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
+              {!backend && <PenaltyControls member={m} />}
             </div>
-            <span className="dash-when">entry #{member.entries}</span>
+            <span className="dash-when">entry #{m.entries}</span>
           </div>
-        ) : (
+        )) : (
           <p className="dash-empty">Nobody verified inside yet tonight.</p>
         )}
       </AppPanel>
@@ -2485,10 +2549,10 @@ function StaffDashboardScreen({ navigate }) {
       <AppPanel title="Last door decision" subtitle="Most recent scan">
         {lastDecision ? (
           <div className={`dash-row ${lastDecision.status}`}>
-            <img className="dash-chip" src={STATUS_CHIP[lastDecision.status]} alt={lastDecision.status} />
+            <img className="dash-chip" src={STATUS_CHIP[lastDecision.status] || STATUS_CHIP.expired} alt={lastDecision.status} />
             <div>
-              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'} · {member.name || 'Member'}</strong>
-              <span className="dash-num">{member.number}{member.contact ? ` · ${member.contact}` : ''}</span>
+              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'}{lastDecision.name ? ` · ${lastDecision.name}` : ''}</strong>
+              <span className="dash-num">{lastDecision.number}</span>
             </div>
             <span className="dash-when">{ago(lastDecision.when)}</span>
           </div>
@@ -2543,13 +2607,33 @@ function SecurityVerifyScreen() {
   const member = useMember();
   const [num, setNum] = useState('');
   const [result, setResult] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [ready, setReady] = useState(false);        // first camera frame arrived
   const [query, setQuery] = useState('');           // "search member" box
-  const hits = query ? searchMembers(query) : [];
+  const [hits, setHits] = useState([]);
   const videoRef = useRef(null);
   const rafRef = useRef(0);
   const streamRef = useRef(null);
+
+  // Debounced search — hits the shared venue backend when connected, so a
+  // member is findable regardless of which device they signed up on.
+  useEffect(() => {
+    if (!query) { setHits([]); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      const rows = await searchMembersAtDoor(query);
+      if (live) setHits(rows);
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [query]);
+
+  const runVerify = async (number) => {
+    setChecking(true);
+    const r = await verifyAtDoor(number);
+    setChecking(false);
+    setResult(r);
+  };
 
   function stopScan() {
     cancelAnimationFrame(rafRef.current);
@@ -2582,7 +2666,7 @@ function SecurityVerifyScreen() {
           const code = jsQR(img.data, img.width, img.height);
           if (code) {
             const parsed = code.data.replace('HVAS-MEMBER:', '').trim();
-            setNum(parsed); stopScan(); setResult(verifyByNumber(parsed)); return;
+            setNum(parsed); stopScan(); runVerify(parsed); return;
           }
         }
         rafRef.current = requestAnimationFrame(tick);
@@ -2606,7 +2690,7 @@ function SecurityVerifyScreen() {
             <div className="verify-hits">
               {hits.map((h) => (
                 <button type="button" key={h.number} className="verify-hit"
-                  onClick={() => { setNum(h.number); setQuery(''); setResult(verifyByNumber(h.number)); }}>
+                  onClick={() => { setNum(h.number); setQuery(''); runVerify(h.number); }}>
                   <strong>{h.name}</strong>
                   <span>{h.number}{h.contact ? ` · ${h.contact}` : ''}</span>
                 </button>
@@ -2647,7 +2731,7 @@ function SecurityVerifyScreen() {
           <div className="verify-manual-row">
             <input id="memnum" type="text" placeholder="HV-0000-0000" value={num}
               onChange={(e) => setNum(e.target.value)} autoComplete="off" />
-            <button type="button" className="asset-cta compact" onClick={() => setResult(verifyByNumber(num))} aria-label="Verify card">
+            <button type="button" className="asset-cta compact" disabled={checking} onClick={() => runVerify(num)} aria-label="Verify card">
               <img src={ui.verify.verifyCard} alt="Verify card" />
             </button>
           </div>
