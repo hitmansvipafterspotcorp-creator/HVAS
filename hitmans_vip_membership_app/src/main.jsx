@@ -3232,9 +3232,25 @@ function AssetButton({ src, label }) {
 createRoot(document.getElementById('root')).render(<App />);
 
 // Register the PWA service worker — this is what makes "Add to Home Screen" /
-// the Android install prompt available at all.
+// the Android install prompt available at all. First, kill any OTHER service
+// worker + cache this origin might already have (e.g. the old cache-first
+// legacy-app worker, which serves stale content forever and never rechecks
+// the network) so it can't keep shadowing real deploys.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});
+  window.addEventListener('load', async () => {
+    const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => {
+        const active = r.active || r.waiting || r.installing;
+        if (!active || !active.scriptURL.endsWith('/sw.js')) return r.unregister();
+        return Promise.resolve();
+      }));
+    } catch { /* ignore */ }
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    } catch { /* ignore */ }
+    navigator.serviceWorker.register(swUrl).catch(() => {});
   });
 }
