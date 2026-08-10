@@ -3230,3 +3230,11 @@ function AssetButton({ src, label }) {
 }
 
 createRoot(document.getElementById('root')).render(<App />);
+
+// Register the PWA service worker — this is what makes "Add to Home Screen" /
+// the Android install prompt available at all.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});
+  });
+}
