@@ -5,7 +5,9 @@ import jsQR from 'jsqr';
 import './styles.css';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
-  apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch } from './api.js';
+  apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
+  apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoStart, apiBingoCall, apiBingoResolve,
+  apiBingoReset, apiBingoBoard } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
 
@@ -858,9 +860,10 @@ const ROLES = [
     chip: 'vip',
     menu: [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
+      { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history'],
+    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard'],
   },
   {
     id: 'staff',
@@ -1277,10 +1280,10 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
   if (activeScreen === 'checkInLog') return <HistoryScreen />;
   if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
-  if (activeScreen === 'bingoStyle') return <BingoStyleScreen />;
+  if (activeScreen === 'bingoStyle') return <BingoStyleScreen navigate={navigate} />;
   if (activeScreen === 'tv') return <TvDisplayScreen />;
-  if (activeScreen === 'lobby') return <LobbyScreen />;
-  if (activeScreen === 'playerCard') return <PlayerCardScreen />;
+  if (activeScreen === 'lobby') return <LobbyScreen navigate={navigate} />;
+  if (activeScreen === 'playerCard') return <PlayerCardScreen navigate={navigate} />;
   if (activeScreen === 'host') return <HostScreen />;
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
@@ -2814,83 +2817,202 @@ function EntryScreen() {
   );
 }
 
-function BingoStyleScreen() {
+// Shared poll of the one live round every device reads — GET /bingo/state
+// needs no auth (the TV runs unattended), but carries `me` when a member
+// token is sent, so player screens reuse the exact same call.
+function useBingoState(pollMs = 3000) {
+  const [state, setState] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!apiEnabled()) { setErr('not-connected'); return undefined; }
+    let live = true;
+    const poll = async () => {
+      try { const s = await apiBingoState(); if (live) { setState(s); setErr(''); } }
+      catch { if (live) setErr('Could not reach the venue backend.'); }
+    };
+    poll();
+    const id = setInterval(poll, pollMs);
+    return () => { live = false; clearInterval(id); };
+  }, [pollMs]);
+  return { state, err };
+}
+const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
+function NotConnectedBingo({ title }) {
   return (
-    <div className="assembled-page bingo-style-page">
-      <div className="style-kit-dock">
-        <img src={ui.styleKit.panel} alt="" />
-        <img src={ui.styleKit.timer} alt="" />
-        <div className="bingo-action-grid">
-          <AssetButton src={ui.bingo.join} label="Join Game" />
-          <AssetButton src={ui.bingo.ready} label="Ready" />
-          <AssetButton src={ui.bingo.party} label="Party Mode" />
-        </div>
-      </div>
+    <div className="staff-dash">
+      <AppPanel title={title} subtitle="Lip Sync Bingo">
+        <p className="dash-empty">Connect to a venue backend to play tonight's round.</p>
+      </AppPanel>
     </div>
   );
 }
 
+// Game Menu — quick round-control panel for the host (start/reset + status).
+function BingoStyleScreen({ navigate }) {
+  const { state, err } = useBingoState(4000);
+  const [busy, setBusy] = useState(false);
+  if (err === 'not-connected') return <NotConnectedBingo title="Game Menu" />;
+  const act = async (fn) => { setBusy(true); try { await fn(); } catch { /* ignore */ } setBusy(false); };
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Game Menu" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready · ${state.calls.length} phrases called` : ''}</p>
+        <button type="button" className="bingo-btn" disabled={busy || state?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
+        <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiBingoReset)}>Reset for New Game</button>
+        <button type="button" className="bingo-btn gold" onClick={() => navigate('host')}>Open Host Control →</button>
+      </AppPanel>
+    </div>
+  );
+}
+
+// Public room screen — unattended TV, no login, big call log.
 function TvDisplayScreen() {
+  const { state, err } = useBingoState(3000);
+  if (err === 'not-connected') return <NotConnectedBingo title="TV Display" />;
+  const calls = state?.calls || [];
   return (
-    <div className="assembled-page tv-page">
-      <div className="tv-piece-row">
-        <img src={ui.tv.header} alt="" />
-        <img src={ui.tv.timerFrame} alt="" />
-        <img src={ui.tv.songBanner} alt="" />
-        <img src={ui.tv.winnerBanner} alt="" />
-      </div>
-    </div>
-  );
-}
-
-function LobbyScreen() {
-  return (
-    <div className="assembled-page lobby-page">
-      <div className="lobby-piece-row">
-        <img src={ui.bingo.welcome} alt="" />
-        <img src={ui.bingo.invite} alt="" />
-        <div className="bingo-action-grid">
-          <AssetButton src={ui.bingo.join} label="Join Game" />
-          <AssetButton src={ui.bingo.ready} label="Ready" />
-          <AssetButton src={ui.bingo.party} label="Party Mode" />
+    <div className="staff-dash">
+      {state?.winner && (
+        <div className="bingo-winner-banner">
+          <strong>🏆 {state.winner.name} has BINGO!</strong>
+          <span>{state.winner.number}</span>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function PlayerCardScreen() {
-  return (
-    <div className="assembled-page player-page">
-      <div className="player-piece-row">
-        <img src={ui.player.emptyCard} alt="" />
-        <img src={ui.player.coveredCard} alt="" />
-        <img src={ui.player.calledCard} alt="" />
-        <img src={ui.player.lipSyncCard} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.player.mark} label="Mark" />
-          <AssetButton src={ui.player.undo} label="Undo" />
-          <AssetButton src={ui.player.confirm} label="Confirm" />
+      )}
+      <AppPanel title="Lip Sync Bingo" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} playing · ${state.readyCount} ready` : ''}</p>
+        <div className="bingo-call-log">
+          {calls.length === 0 && <p className="dash-empty">Calls will appear here once the round goes live.</p>}
+          {calls.map((c, i) => <span key={c} className={`bingo-chip${i === calls.length - 1 ? ' latest' : ''}`}>{c}</span>)}
         </div>
-      </div>
+      </AppPanel>
     </div>
   );
 }
 
+// Member: join + ready up before the round starts.
+function LobbyScreen({ navigate }) {
+  const { state, err } = useBingoState(3000);
+  const [busy, setBusy] = useState(false);
+  if (err === 'not-connected') return <NotConnectedBingo title="Lip Sync Bingo" />;
+  const me = state?.me;
+  const join = async () => { setBusy(true); try { await apiBingoJoin(); } catch { /* ignore */ } setBusy(false); };
+  const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); } catch { /* ignore */ } setBusy(false); };
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Lip Sync Bingo" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
+        {!me ? (
+          <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
+        ) : (
+          <>
+            <button type="button" className={`bingo-btn${me.ready ? ' ready' : ''}`} disabled={busy} onClick={toggleReady}>{me.ready ? '✓ Ready' : 'Mark Ready'}</button>
+            <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>Go to My Card →</button>
+          </>
+        )}
+        {state?.status === 'live' && <p className="mem-fineprint">The round is live — head to your card to play!</p>}
+      </AppPanel>
+    </div>
+  );
+}
+
+// Member: their real dealt card, live-marked as the host calls phrases.
+function PlayerCardScreen({ navigate }) {
+  const { state, err } = useBingoState(2500);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (err === 'not-connected') return <NotConnectedBingo title="Your Card" />;
+  const me = state?.me;
+  const called = new Set(state?.calls || []);
+  const claim = async () => {
+    setBusy(true); setMsg('');
+    try { await apiBingoClaim(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
+    catch (e) { setMsg(e.message === 'not a bingo yet' ? 'Not a bingo yet — keep watching the calls!' : 'Could not submit — try again.'); }
+    setBusy(false);
+  };
+  if (!me) {
+    return (
+      <div className="staff-dash">
+        <AppPanel title="Your Card" subtitle="Lip Sync Bingo">
+          <p className="dash-empty">You haven't joined tonight's round yet.</p>
+          <button type="button" className="bingo-btn" onClick={() => navigate('lobby')}>Go to Lobby</button>
+        </AppPanel>
+      </div>
+    );
+  }
+  return (
+    <div className="staff-dash">
+      {state.winner && (
+        <div className="bingo-winner-banner">
+          <strong>🏆 {state.winner.name} won!</strong>
+        </div>
+      )}
+      <AppPanel title="Your Card" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+        <div className="bingo-grid">
+          {me.card.map((phrase, i) => {
+            const marked = i === 12 || called.has(phrase);
+            return <div key={`${i}-${phrase}`} className={`bingo-cell${marked ? ' marked' : ''}${i === 12 ? ' free' : ''}`}>{phrase}</div>;
+          })}
+        </div>
+        {!state.winner && (
+          <button type="button" className="bingo-btn gold" disabled={busy || me.hasPendingClaim || state.status !== 'live'} onClick={claim}>
+            {me.hasPendingClaim ? 'Claim pending…' : 'Claim Bingo!'}
+          </button>
+        )}
+        {msg && <p className="mem-fineprint">{msg}</p>}
+      </AppPanel>
+    </div>
+  );
+}
+
+// Host: run the round — start/call, watch players, approve/reject claims.
 function HostScreen() {
+  const [board, setBoard] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return undefined; }
+    let live = true;
+    const poll = async () => { try { const b = await apiBingoBoard(); if (live) { setBoard(b); setErr(''); } } catch { if (live) setErr('Could not reach the venue backend.'); } };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
+  if (err === 'not-connected') return <NotConnectedBingo title="Host Control" />;
+  const act = async (fn) => { setBusy(true); try { await fn(); } catch { /* ignore */ } setBusy(false); };
+  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); } catch { /* ignore */ } setBusy(false); };
   return (
-    <div className="assembled-page host-page">
-      <div className="host-piece-row">
-        <img src={ui.host.liveRound} alt="" />
-        <img src={ui.host.songHistory} alt="" />
-        <img src={ui.host.hostNotes} alt="" />
-        <div className="staff-image-actions">
-          <AssetButton src={ui.host.callSong} label="Call Song" />
-          <AssetButton src={ui.host.skipSong} label="Skip Song" />
-          <AssetButton src={ui.host.nextSong} label="Next Song" />
-          <AssetButton src={ui.host.pauseRound} label="Pause Round" />
+    <div className="staff-dash">
+      <AppPanel title="Host Control" subtitle={board ? BINGO_STATUS_LABEL[board.status] : 'Loading…'}>
+        <div className="bingo-status-row">
+          <span>{board ? `${board.players.length} players` : ''}</span>
+          <span>{board ? `${board.calls.length} called` : ''}</span>
         </div>
-      </div>
+        <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
+        <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
+        <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiBingoReset)}>Reset for New Game</button>
+      </AppPanel>
+      <AppPanel title="Pending claims" subtitle="Approve to end the round">
+        {board && board.claims.length === 0 && <p className="dash-empty">No claims yet.</p>}
+        {board?.claims.map((c) => (
+          <div key={c.id} className="bingo-claim-row">
+            <div className="dash-info"><strong>{c.name}</strong><span className="dash-num">{c.number}</span></div>
+            <div className="bingo-claim-actions">
+              <button type="button" className="pay-confirm" disabled={busy} onClick={() => resolve(c.id, true)}>✓ Approve</button>
+              <button type="button" className="pay-void" disabled={busy} onClick={() => resolve(c.id, false)}>Reject</button>
+            </div>
+          </div>
+        ))}
+      </AppPanel>
+      <AppPanel title="Players" subtitle="Joined tonight's round">
+        {board && board.players.length === 0 && <p className="dash-empty">Nobody has joined yet.</p>}
+        {board?.players.map((p) => (
+          <div key={p.member_id} className="dash-row">
+            <span className={`dash-dot ${p.ready ? 'green' : 'amber'}`} />
+            <div className="dash-info"><strong>{p.name}</strong><span className="dash-num">{p.number}</span></div>
+            <span className="dash-when">{p.ready ? 'ready' : 'not ready'}</span>
+          </div>
+        ))}
+      </AppPanel>
     </div>
   );
 }
@@ -2913,32 +3035,63 @@ function VerificationScreen() {
   );
 }
 
+// Call history — every phrase called this round, most recent first.
 function SongQueueScreen() {
+  const { state, err } = useBingoState(3000);
+  if (err === 'not-connected') return <NotConnectedBingo title="Call History" />;
+  const calls = [...(state?.calls || [])].reverse();
   return (
-    <div className="assembled-page queue-page">
-      <div className="queue-piece-row">
-        <img src={ui.queue.nowPlaying} alt="" />
-        <img src={ui.queue.queuePanel} alt="" />
-        <img src={ui.queue.roundTracker} alt="" />
-        <div className="genre-chip-row">
-          {[ui.queue.allSongs, ui.queue.hipHop, ui.queue.rb, ui.queue.country, ui.queue.dance].map((item) => <img src={item} alt="" key={item} />)}
+    <div className="staff-dash">
+      <AppPanel title="Call History" subtitle={state ? `${calls.length} phrases called` : 'Loading…'}>
+        {calls.length === 0 && <p className="dash-empty">Nothing called yet this round.</p>}
+        <div className="bingo-call-log">
+          {calls.map((c, i) => <span key={c} className={`bingo-chip${i === 0 ? ' latest' : ''}`}>{c}</span>)}
         </div>
-      </div>
+      </AppPanel>
     </div>
   );
 }
 
+// Winner spotlight + any claims still waiting on a host decision.
 function WinnerScreen() {
+  const [board, setBoard] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return undefined; }
+    let live = true;
+    const poll = async () => { try { const b = await apiBingoBoard(); if (live) { setBoard(b); setErr(''); } } catch { if (live) setErr('Could not reach the venue backend.'); } };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
+  const { state } = useBingoState(4000);
+  if (err === 'not-connected') return <NotConnectedBingo title="Winner · Payout" />;
+  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); } catch { /* ignore */ } setBusy(false); };
   return (
-    <div className="assembled-page winner-page">
-      <div className="winner-piece-row">
-        <img src={ui.winner.spotlight} alt="" />
-        <img src={ui.winner.prize} alt="" />
-        <img src={ui.winner.payout} alt="" />
-        <div className="genre-chip-row">
-          {[ui.winner.correct, ui.winner.wrong, ui.winner.bingo, ui.winner.missed].map((item) => <img src={item} alt="" key={item} />)}
+    <div className="staff-dash">
+      {state?.winner ? (
+        <div className="bingo-winner-banner">
+          <strong>🏆 {state.winner.name} won this round!</strong>
+          <span>{state.winner.number} · pay out the prize, then reset for the next game.</span>
         </div>
-      </div>
+      ) : (
+        <AppPanel title="Winner · Payout" subtitle="No winner yet">
+          <p className="dash-empty">Waiting on a confirmed bingo this round.</p>
+        </AppPanel>
+      )}
+      <AppPanel title="Pending claims" subtitle="Validate before you pay out">
+        {board && board.claims.length === 0 && <p className="dash-empty">No claims waiting.</p>}
+        {board?.claims.map((c) => (
+          <div key={c.id} className="bingo-claim-row">
+            <div className="dash-info"><strong>{c.name}</strong><span className="dash-num">{c.number}</span></div>
+            <div className="bingo-claim-actions">
+              <button type="button" className="pay-confirm" disabled={busy} onClick={() => resolve(c.id, true)}>✓ Approve</button>
+              <button type="button" className="pay-void" disabled={busy} onClick={() => resolve(c.id, false)}>Reject</button>
+            </div>
+          </div>
+        ))}
+      </AppPanel>
     </div>
   );
 }

@@ -82,6 +82,37 @@ export function applyOp(db, op) {
         .run(d.by ?? null, d.at ?? ts, d.id);
       break;
 
+    // ── Lip Sync Bingo: one shared live round ──
+    case 'bingo.start':
+      db.prepare(`UPDATE bingo_round SET status='live', phrases=?, calls='[]', started_at=?, winner_member_id=NULL WHERE id=1`)
+        .run(JSON.stringify(d.phrases), d.at ?? ts);
+      break;
+    case 'bingo.call':
+      db.prepare(`UPDATE bingo_round SET calls=? WHERE id=1`).run(JSON.stringify(d.calls));
+      break;
+    case 'bingo.join':
+      db.prepare(`INSERT OR IGNORE INTO bingo_cards(member_id,card,ready,joined_at) VALUES(?,?,0,?)`)
+        .run(d.member_id, JSON.stringify(d.card), d.at ?? ts);
+      break;
+    case 'bingo.ready':
+      db.prepare(`UPDATE bingo_cards SET ready=? WHERE member_id=?`).run(d.ready ? 1 : 0, d.member_id);
+      break;
+    case 'bingo.claim':
+      db.prepare(`INSERT INTO bingo_claims(member_id,at,status) VALUES(?,?,'pending')`).run(d.member_id, d.at ?? ts);
+      break;
+    case 'bingo.resolve':
+      db.prepare(`UPDATE bingo_claims SET status=?, resolved_by=?, resolved_at=? WHERE id=?`)
+        .run(d.approve ? 'approved' : 'rejected', d.by ?? null, d.at ?? ts, d.claim_id);
+      if (d.approve) {
+        db.prepare(`UPDATE bingo_round SET status='ended', winner_member_id=? WHERE id=1`).run(d.member_id);
+      }
+      break;
+    case 'bingo.reset':
+      db.prepare(`DELETE FROM bingo_cards`).run();
+      db.prepare(`DELETE FROM bingo_claims`).run();
+      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL WHERE id=1`).run();
+      break;
+
     default:
       break;
   }

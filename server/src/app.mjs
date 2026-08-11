@@ -24,6 +24,41 @@ const TIERS = {
 const STAFF_CODES = { staff: process.env.HVAS_STAFF_CODE || 'DOOR850', host: process.env.HVAS_HOST_CODE || 'HOST850' };
 const SESSION_TTL = 12 * 3600 * 1000;
 
+// ── Lip Sync Bingo ──
+const BINGO_PHRASES = [
+  'Splits on the floor', 'Death drop', 'Duet with the DJ', 'Crowd sings the hook',
+  'Wig gets adjusted on beat', 'Runs and hides behind the speaker', 'Points at someone in VIP',
+  'Grabs a mic stand', 'Fake tears during the bridge', 'Confetti cannon goes off',
+  'Someone yells the artist’s name', 'Host jumps in mid-song', 'Heel comes off',
+  'Blows a kiss to the crowd', 'Backup dancers freeze mid-move', 'Spins into a dip',
+  'Lights cut to a spotlight', 'Runs the length of the stage', 'Crowd throws dollar bills',
+  'Mouths the wrong lyric on purpose', 'Does the whole bridge on their knees',
+  'Fan handed up from the crowd', 'Costume reveal / rip-away', 'Air mic drop at the end',
+  'Struts to the edge of the stage', 'Blackout into the next track', 'Pulls someone from VIP to dance',
+  'Nails the high note perfectly', 'Host says “put your hands up”', 'DJ scratches in a callback',
+];
+// 5x5 card, index 12 is the free center square.
+const BINGO_LINES = [
+  [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
+  [0, 5, 10, 15, 20], [1, 6, 11, 16, 21], [2, 7, 12, 17, 22], [3, 8, 13, 18, 23], [4, 9, 14, 19, 24],
+  [0, 6, 12, 18, 24], [4, 8, 12, 16, 20],
+];
+function bingoHasWin(card, calls) {
+  const called = new Set(calls);
+  const marked = card.map((p, i) => i === 12 || called.has(p));
+  return BINGO_LINES.some((line) => line.every((i) => marked[i]));
+}
+function bingoDealCard(phrases) {
+  const pool = [...phrases];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picks = pool.slice(0, 24);
+  picks.splice(12, 0, 'FREE SPACE');
+  return picks;
+}
+
 // PayPal plan id → tier (from the same env the app uses), so a verified
 // subscription activation maps to the right membership.
 const PAYPAL_PLAN_TIER = Object.fromEntries([
@@ -149,6 +184,22 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       entries: nights, insideTonight, onTheWay: !!sig?.on_the_way && !insideTonight, onTheWayAt: sig?.at || null,
     };
   };
+  // ── Lip Sync Bingo helpers ──
+  const getBingoRound = () => {
+    const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
+    return { ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls) };
+  };
+  const bingoCallNext = () => {
+    const r = getBingoRound();
+    if (r.status !== 'live') return null;
+    const remaining = r.phrases.filter((p) => !r.calls.includes(p));
+    if (!remaining.length) return null;
+    const phrase = remaining[Math.floor(Math.random() * remaining.length)];
+    commit('bingo.call', { calls: [...r.calls, phrase] });
+    return phrase;
+  };
+  setInterval(() => { try { bingoCallNext(); } catch { /* ignore */ } }, 6000).unref?.();
+
   const emitBoard = () => {
     const payload = `data: ${JSON.stringify(board())}\n\n`;
     for (const res of sse) res.write(payload);
@@ -436,6 +487,93 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       res.write(`data: ${JSON.stringify(board())}\n\n`);
       sse.add(res);
       req.on('close', () => sse.delete(res));
+    },
+
+    // ── Lip Sync Bingo: one shared live round, same on every device ──
+    // No auth required to read state — the TV Display screen runs unattended
+    // at the venue with no login. When a member token IS present, `me` carries
+    // their own card/ready/claim status so PlayerCard can use the same call.
+    'GET /bingo/state': (req, res) => {
+      const r = getBingoRound();
+      const players = db.prepare('SELECT member_id, ready FROM bingo_cards').all();
+      const pendingClaims = db.prepare(`SELECT COUNT(*) c FROM bingo_claims WHERE status='pending'`).get().c;
+      const winner = r.winner_member_id ? publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(r.winner_member_id)) : null;
+      let me = null;
+      const c = auth(req, 'member');
+      if (c) {
+        const mine = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
+        const myClaim = db.prepare(`SELECT 1 FROM bingo_claims WHERE member_id=? AND status='pending'`).get(c.sub);
+        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, hasPendingClaim: !!myClaim } : null;
+      }
+      json(res, 200, {
+        status: r.status, calls: r.calls, startedAt: r.started_at,
+        playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
+        pendingClaims, winner, me,
+      });
+    },
+    'POST /bingo/join': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const existing = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
+      if (existing) return json(res, 200, { card: JSON.parse(existing.card), ready: !!existing.ready });
+      const r = getBingoRound();
+      const pool = r.phrases.length >= 24 ? r.phrases : BINGO_PHRASES;
+      const card = bingoDealCard(pool);
+      commit('bingo.join', { member_id: c.sub, card, at: Date.now() });
+      json(res, 200, { card, ready: false });
+    },
+    'POST /bingo/ready': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { ready } = await readBody(req);
+      if (!db.prepare('SELECT 1 FROM bingo_cards WHERE member_id=?').get(c.sub)) return json(res, 400, { error: 'join first' });
+      commit('bingo.ready', { member_id: c.sub, ready: !!ready });
+      json(res, 200, { ok: true });
+    },
+    'POST /bingo/claim': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const r = getBingoRound();
+      if (r.status !== 'live') return json(res, 400, { error: 'no live round' });
+      const row = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
+      if (!row) return json(res, 400, { error: 'no card' });
+      if (!bingoHasWin(JSON.parse(row.card), r.calls)) return json(res, 400, { error: 'not a bingo yet' });
+      commit('bingo.claim', { member_id: c.sub, at: Date.now() });
+      json(res, 200, { ok: true, pending: true });
+    },
+    // Host controls — start a fresh live round (keeps everyone already in the
+    // lobby, since their cards were dealt from the same phrase pool).
+    'POST /bingo/start': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      commit('bingo.start', { phrases: BINGO_PHRASES, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    // Manual "call next" for host pacing control — the round also auto-calls
+    // every ~6s on its own so the TV display keeps moving unattended.
+    'POST /bingo/call': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const phrase = bingoCallNext();
+      if (!phrase) return json(res, 400, { error: 'no live round or all phrases called' });
+      json(res, 200, { phrase });
+    },
+    'POST /bingo/resolve': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { claimId, approve } = await readBody(req);
+      const claim = db.prepare(`SELECT * FROM bingo_claims WHERE id=? AND status='pending'`).get(claimId);
+      if (!claim) return json(res, 404, { error: 'no pending claim' });
+      commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /bingo/reset': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      commit('bingo.reset', { at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'GET /bingo/board': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const players = db.prepare(`SELECT bc.member_id, bc.ready, bc.joined_at, m.name, m.number
+        FROM bingo_cards bc JOIN members m ON m.id=bc.member_id ORDER BY bc.joined_at ASC`).all();
+      const claims = db.prepare(`SELECT bc.*, m.name, m.number FROM bingo_claims bc
+        JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
+      const r = getBingoRound();
+      json(res, 200, { status: r.status, calls: r.calls, players, claims });
     },
   };
 

@@ -85,6 +85,30 @@ export function openDb(path) {
       confirmed_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_pay_status ON payments(status, at);
+    -- ── Lip Sync Bingo: one shared live round, same on every device ──
+    CREATE TABLE IF NOT EXISTS bingo_round (
+      id INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton: one round at a time
+      status TEXT NOT NULL DEFAULT 'lobby',   -- lobby | live | ended
+      phrases TEXT NOT NULL DEFAULT '[]',     -- JSON array: this round's master call pool
+      calls TEXT NOT NULL DEFAULT '[]',       -- JSON array: called phrases, in call order
+      started_at INTEGER,
+      winner_member_id TEXT
+    );
+    CREATE TABLE IF NOT EXISTS bingo_cards (
+      member_id TEXT PRIMARY KEY REFERENCES members(id),
+      card TEXT NOT NULL,                     -- JSON array of 25 phrases (server-dealt)
+      ready INTEGER NOT NULL DEFAULT 0,
+      joined_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS bingo_claims (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id TEXT NOT NULL,
+      at INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', -- pending | approved | rejected
+      resolved_by TEXT,
+      resolved_at INTEGER
+    );
+    INSERT OR IGNORE INTO bingo_round(id, status, phrases, calls) VALUES (1, 'lobby', '[]', '[]');
   `);
   return db;
 }

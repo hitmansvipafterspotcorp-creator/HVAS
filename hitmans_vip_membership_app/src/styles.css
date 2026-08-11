@@ -3819,3 +3819,32 @@ button {
   background: linear-gradient(90deg, transparent, #b06bff);
 }
 .perks h3::after, .loyalty h3::after, .prefs h3::after { background: linear-gradient(90deg, #b06bff, transparent); }
+
+/* ── Lip Sync Bingo ── */
+.bingo-btn {
+  display: block; width: 100%; margin-top: 12px; padding: 14px; border-radius: 14px; border: none;
+  background: linear-gradient(180deg, #b06bff, #7a1fd6); color: #fff; font-weight: 900; letter-spacing: .04em;
+  font-size: 14px; cursor: pointer; box-shadow: 0 0 18px rgba(176,107,255,.4), inset 0 1px 0 rgba(255,255,255,.25);
+}
+.bingo-btn:active { transform: translateY(1px); }
+.bingo-btn:disabled { opacity: .5; cursor: default; }
+.bingo-btn.ready { background: linear-gradient(180deg, #52ffa8, #0f8f52); box-shadow: 0 0 18px rgba(82,255,168,.35); }
+.bingo-btn.ghost { background: #1c0f2e; border: 1px solid #4a2540; color: #ff9ae0; box-shadow: none; }
+.bingo-btn.gold { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; box-shadow: 0 0 18px rgba(255,180,60,.4); }
+.bingo-status-row { display: flex; justify-content: space-between; align-items: center; color: #b9a4e0; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; }
+.bingo-cell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 9.5px; line-height: 1.2; padding: 4px; border-radius: 8px; color: #cdb6f2;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(176,107,255,.22); overflow: hidden;
+}
+.bingo-cell.marked { background: linear-gradient(180deg, rgba(176,107,255,.35), rgba(122,31,214,.35)); color: #fff; border-color: #b06bff; box-shadow: 0 0 10px rgba(176,107,255,.4) inset; }
+.bingo-cell.free { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; border-color: #ffd66b; font-weight: 900; }
+.bingo-call-log { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.bingo-chip { padding: 5px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgba(176,107,255,.16); border: 1px solid rgba(176,107,255,.35); color: #dcc4ff; }
+.bingo-chip.latest { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; border-color: #ffd66b; }
+.bingo-winner-banner { text-align: center; padding: 16px; border-radius: 14px; margin-bottom: 12px;
+  background: linear-gradient(180deg, rgba(255,224,138,.22), rgba(214,143,26,.18)); border: 1px solid #ffd66b; }
+.bingo-winner-banner strong { display: block; font-size: 18px; color: #ffe08a; text-shadow: 0 0 12px rgba(255,180,60,.5); }
+.bingo-claim-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(176,107,255,.2); margin-bottom: 8px; }
+.bingo-claim-actions { display: flex; gap: 8px; }

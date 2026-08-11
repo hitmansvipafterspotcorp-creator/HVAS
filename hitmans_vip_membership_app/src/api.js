@@ -78,6 +78,19 @@ export function apiDoorVerify(payload) { return call('POST', '/door/verify', pay
 export function apiDoorBoard() { return call('GET', '/door/board', null, apiStaffToken()); }
 export function apiMembersSearch(q) { return call('GET', `/members/search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
 
+// ── Lip Sync Bingo — one shared live round, same on every device ──
+// State is public (the TV Display runs unattended with no login) but carries
+// `me` when a member token is sent, so the player-facing screens can reuse it.
+export function apiBingoState() { return call('GET', '/bingo/state', null, apiToken() || apiStaffToken()); }
+export function apiBingoJoin() { return call('POST', '/bingo/join', {}, apiToken()); }
+export function apiBingoReady(ready) { return call('POST', '/bingo/ready', { ready }, apiToken()); }
+export function apiBingoClaim() { return call('POST', '/bingo/claim', {}, apiToken()); }
+export function apiBingoStart() { return call('POST', '/bingo/start', {}, apiStaffToken()); }
+export function apiBingoCall() { return call('POST', '/bingo/call', {}, apiStaffToken()); }
+export function apiBingoResolve(claimId, approve) { return call('POST', '/bingo/resolve', { claimId, approve }, apiStaffToken()); }
+export function apiBingoReset() { return call('POST', '/bingo/reset', {}, apiStaffToken()); }
+export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiStaffToken()); }
+
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
 // Handles prefer the connected venue's config (config-over-the-air), then env.
 export const zelleHandle = () => venueConfig().zelle || import.meta.env.VITE_ZELLE_HANDLE || '';
