@@ -722,6 +722,20 @@ const screens = [
     detail: 'Door status and check-in overview.',
   },
   {
+    id: 'watchlist',
+    label: 'Watchlist',
+    eyebrow: 'Staff Check-In',
+    title: 'Watchlist',
+    detail: 'Trespassed & banned members — flag or lift.',
+  },
+  {
+    id: 'payments',
+    label: 'Payments',
+    eyebrow: 'Staff Check-In',
+    title: 'Payments',
+    detail: 'Confirm Zelle / cash membership payments.',
+  },
+  {
     id: 'searchMember',
     label: 'Search Member',
     eyebrow: 'Staff Check-In',
@@ -787,7 +801,7 @@ const screens = [
   {
     id: 'verification',
     label: 'Verify',
-    eyebrow: 'Host Approval',
+    eyebrow: 'Door Verification',
     title: 'Card Verification',
     detail: 'QR scan, keypad, member validation, result banners, and entry status.',
   },
