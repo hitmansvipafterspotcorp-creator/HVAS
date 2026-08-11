@@ -209,8 +209,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const onTheWay = db.prepare(`SELECT m.* FROM signals s JOIN members m ON m.id=s.member_id
        WHERE s.on_the_way=1 AND m.id NOT IN (SELECT member_id FROM entries WHERE night=?)`).all(nk).map(publicMember);
     const inside = db.prepare(`SELECT m.* FROM entries e JOIN members m ON m.id=e.member_id WHERE e.night=?`).all(nk).map(publicMember);
-    const last = db.prepare('SELECT * FROM decisions ORDER BY at DESC LIMIT 1').get();
-    return { onTheWay, inside, lastDecision: last || null };
+    // Full recent audit trail (venue-wide, every staff device sees the same
+    // list) — the door dashboard's "Recent door decisions" panel. Includes the
+    // member's name via a join so staff don't have to look up bare numbers.
+    const recentDecisions = db.prepare(
+      `SELECT d.*, m.name FROM decisions d LEFT JOIN members m ON m.id = d.member_id ORDER BY d.at DESC LIMIT 25`
+    ).all();
+    return { onTheWay, inside, lastDecision: recentDecisions[0] || null, recentDecisions };
   };
 
   const auth = (req, role) => {

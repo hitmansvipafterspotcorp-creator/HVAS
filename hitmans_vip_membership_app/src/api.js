@@ -96,6 +96,9 @@ export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiSt
 export const zelleHandle = () => venueConfig().zelle || import.meta.env.VITE_ZELLE_HANDLE || '';
 export const paypalMeHandle = () => venueConfig().paypalMe || import.meta.env.VITE_PAYPAL_ME || 'hitmanmusicworldwide';
 export function payClaim(tier, rail, reference) { return call('POST', '/pay/claim', { tier, rail, reference }, apiToken()); }
-export function payPending() { return call('GET', '/pay/pending', null, apiToken()); }
-export function payConfirm(id) { return call('POST', '/pay/confirm', { id }, apiToken()); }
-export function payVoid(id) { return call('POST', '/pay/void', { id }, apiToken()); }
+// Reconciling pending payments is a staff/host action — authenticate with the
+// staff session, not the member one (a staff device usually has no member
+// login at all, so this used to silently fail every time).
+export function payPending() { return call('GET', '/pay/pending', null, apiStaffToken()); }
+export function payConfirm(id) { return call('POST', '/pay/confirm', { id }, apiStaffToken()); }
+export function payVoid(id) { return call('POST', '/pay/void', { id }, apiStaffToken()); }

@@ -71,6 +71,8 @@ b = await call('GET', '/door/board', null, stok);
 ok(b.body.inside.length === 1, 'member now Inside');
 ok(b.body.onTheWay.length === 0, 'On the way cleared on admit');
 ok(b.body.lastDecision.status === 'granted', 'decision logged');
+ok(Array.isArray(b.body.recentDecisions) && b.body.recentDecisions[0].status === 'granted', 'recent decisions list includes it');
+ok(b.body.recentDecisions[0].name === 'Tasha', 'recent decisions carries the member name (joined)');
 // idempotent: second grant same night doesn't double count
 const fresh2 = await call('GET', '/pass/current', null, mtok);
 await call('POST', '/door/verify', { pass: fresh2.body.pass }, stok);

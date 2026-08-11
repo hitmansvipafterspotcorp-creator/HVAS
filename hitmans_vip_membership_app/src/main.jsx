@@ -745,13 +745,6 @@ const screens = [
     detail: 'Find a member by name or member number.',
   },
   {
-    id: 'checkInLog',
-    label: 'Check-In Log',
-    eyebrow: 'Staff Check-In',
-    title: 'Check-In Log',
-    detail: 'Recent door decisions and check-in history.',
-  },
-  {
     id: 'pricingDigits',
     label: 'Price Digits',
     eyebrow: 'Dynamic Display',
@@ -875,10 +868,9 @@ const ROLES = [
       { title: 'Door Dashboard', detail: 'Who’s on the way, who’s inside, recent decisions', chip: ui.chips.staff, target: 'staffDashboard' },
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
       { title: 'Watchlist', detail: 'Trespassed & banned members — flag or lift', chip: ui.chips.vip, target: 'watchlist' },
-      { title: 'Check-In Log', detail: 'Tonight’s entries & door history', chip: ui.chips.checkedIn, target: 'checkInLog' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
     ],
-    allowed: ['verification', 'staffDashboard', 'watchlist', 'checkInLog', 'payVerify', 'searchMember', 'entry', 'payments'],
+    allowed: ['verification', 'staffDashboard', 'watchlist', 'payVerify', 'searchMember', 'entry', 'payments'],
   },
   {
     id: 'host',
@@ -1278,7 +1270,6 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
-  if (activeScreen === 'checkInLog') return <HistoryScreen />;
   if (activeScreen === 'pricingDigits') return <PricingDigitsScreen />;
   if (activeScreen === 'bingoStyle') return <BingoStyleScreen navigate={navigate} />;
   if (activeScreen === 'tv') return <TvDisplayScreen />;
@@ -2425,7 +2416,7 @@ function PaymentsScreen() {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState('');
   const load = () => {
-    if (!apiEnabled() || !apiToken()) { setErr('Connect a backend to reconcile payments.'); setRows([]); return; }
+    if (!apiEnabled() || !apiStaffToken()) { setErr('Connect a backend to reconcile payments.'); setRows([]); return; }
     payPending().then((r) => setRows(r.pending || [])).catch(() => setErr('Could not load payments.'));
   };
   useEffect(() => { load(); const id = setInterval(load, 8000); return () => clearInterval(id); }, []);
@@ -2515,9 +2506,13 @@ function StaffDashboardScreen({ navigate }) {
 
   const onTheWayList = backend ? (board?.onTheWay || []) : (isOnTheWay(member) ? [member] : []);
   const insideList = backend ? (board?.inside || []) : (isInsideTonight(member) ? [member] : []);
-  const lastDecision = backend
-    ? (board?.lastDecision ? { status: normStatus(board.lastDecision.status), when: board.lastDecision.at, number: board.lastDecision.number, name: null } : null)
-    : (member && member.verifiedAt ? { status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt, number: member.number, name: member.name } : null);
+  // Recent door decisions — the venue-wide audit trail (formerly a separate,
+  // broken "Check-In Log" screen). Connected devices get the real multi-entry
+  // log from the shared backend; local/demo mode falls back to just this
+  // device's own last scan, same as before.
+  const recentDecisions = backend
+    ? (board?.recentDecisions || []).map((d) => ({ status: normStatus(d.status), when: d.at, number: d.number, name: d.name }))
+    : (member && member.verifiedAt ? [{ status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt, number: member.number, name: member.name }] : []);
 
   const insideCount = insideList.length;
   const entriesTotal = backend ? insideCount : (member?.entries || 0);
@@ -2563,17 +2558,17 @@ function StaffDashboardScreen({ navigate }) {
         )}
       </AppPanel>
 
-      <AppPanel title="Last door decision" subtitle="Most recent scan">
-        {lastDecision ? (
-          <div className={`dash-row ${lastDecision.status}`}>
-            <img className="dash-chip" src={STATUS_CHIP[lastDecision.status] || STATUS_CHIP.expired} alt={lastDecision.status} />
+      <AppPanel title="Recent door decisions" subtitle="Tonight's check-in log">
+        {recentDecisions.length > 0 ? recentDecisions.map((d, i) => (
+          <div className={`dash-row ${d.status}`} key={`${d.number}-${d.when}-${i}`}>
+            <img className="dash-chip" src={STATUS_CHIP[d.status] || STATUS_CHIP.expired} alt={d.status} />
             <div>
-              <strong>{lastDecision.status === 'valid' ? 'Granted' : 'Denied'}{lastDecision.name ? ` · ${lastDecision.name}` : ''}</strong>
-              <span className="dash-num">{lastDecision.number}</span>
+              <strong>{d.status === 'valid' ? 'Granted' : 'Denied'}{d.name ? ` · ${d.name}` : ''}</strong>
+              <span className="dash-num">{d.number}</span>
             </div>
-            <span className="dash-when">{ago(lastDecision.when)}</span>
+            <span className="dash-when">{ago(d.when)}</span>
           </div>
-        ) : (
+        )) : (
           <p className="dash-empty">No scans yet this shift.</p>
         )}
       </AppPanel>
