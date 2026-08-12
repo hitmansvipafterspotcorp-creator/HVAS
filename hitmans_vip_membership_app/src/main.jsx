@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
-import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase,
+import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoStart, apiBingoCall, apiBingoResolve,
@@ -188,6 +188,32 @@ export function purchaseTier(tierName, payment, amount) {
   // Also mirror to a real backend if one is connected, so the server mints the
   // membership and the rolling QR pass is server-verifiable at the door.
   if (apiEnabled() && apiToken()) apiPurchase(tierName, payment).catch(() => {});
+}
+
+// Pull the member's OWN real state back from the backend. Needed for the
+// half of the purchase flow that doesn't happen on this device at all: a
+// member files a Zelle/cash claim (HvasPayOptions), then a DIFFERENT
+// device — staff, at the door, maybe minutes later — confirms it. Without
+// this, "you'll see your card update" (the promise made right there in the
+// claim-filed message) was never actually true. Only ever adds a real,
+// server-confirmed tier on top of local state — never invents or clears one,
+// so local/demo purchases on a disconnected device are untouched.
+export async function syncMemberFromBackend() {
+  if (!apiEnabled() || !apiToken()) return;
+  try {
+    const r = await apiMe();
+    const m = r?.member;
+    if (!m || !m.tier) return;
+    const prev = memberState || {};
+    if (prev.tier === m.tier && prev.status === m.status && prev.expiresAt === m.expiresAt) return; // no change
+    commitMember({
+      ...prev,
+      tier: m.tier, vip: !!m.vip, payment: m.payment || prev.payment || 'Zelle',
+      status: m.status || 'active', expiresAt: m.expiresAt, number: m.number || prev.number,
+      name: m.name || prev.name, entries: m.entries ?? prev.entries ?? 0,
+      purchasedAt: prev.purchasedAt || Date.now(), verifiedAt: prev.verifiedAt ?? null,
+    });
+  } catch { /* ignore — never break the screen over a background sync */ }
 }
 
 // Reissue tonight's hospitality tickets / meal if we've crossed 3AM.
@@ -1986,6 +2012,15 @@ function MembershipScreen({ checkedIn }) {
   useEffect(() => {                                   // purchased in renew mode -> back to pass
     if (renew && member && member.purchasedAt !== boughtAt.current) setRenew(false);
   }, [member?.purchasedAt, renew]);
+  // A Zelle/cash claim confirms on a DIFFERENT device (staff, at the door) —
+  // poll for that here so "you'll see your card update" (promised on the
+  // claim-filed screen) is actually true, whether or not this device has a
+  // local tier yet.
+  useEffect(() => {
+    syncMemberFromBackend();
+    const id = setInterval(syncMemberFromBackend, 8000);
+    return () => clearInterval(id);
+  }, []);
   if (member && !renew) {
     return <MemberPass member={member} checkedIn={checkedIn}
       onRenew={() => { boughtAt.current = member.purchasedAt; setRenew(true); }} />;
@@ -2348,6 +2383,8 @@ function MemberPass({ member, checkedIn, onRenew }) {
         <p className="loyalty-note">Nights count automatically each time security verifies you at the door.</p>
       </section>
 
+      <HitKoinWidget />
+
       {/* — status indicators (driven by real state, not buttons) — */}
       <div className="access-ribbons">
         {!expired && !soon && <img src={ui.ribbons[0]} alt="Active plan" />}
@@ -2407,6 +2444,50 @@ function MemberPass({ member, checkedIn, onRenew }) {
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
     </div>
+  );
+}
+
+// HitKoin — the member's real on-chain reward balance. Mints automatically
+// on a confirmed payment, so this is read-only here: nothing to buy, tap,
+// or claim — it just shows what's already been earned. Hidden entirely
+// until the venue has HitKoin turned on and this member has earned some.
+function HitKoinWidget() {
+  const [wallet, setWallet] = useState(null);
+  useEffect(() => {
+    if (!apiEnabled() || !apiToken()) return;
+    let live = true;
+    const load = () => apiWallet().then((w) => live && setWallet(w)).catch(() => {});
+    load();
+    const id = setInterval(load, 15000);
+    return () => { live = false; clearInterval(id); };
+  }, []);
+  if (!wallet?.enabled) return null; // venue hasn't turned HitKoin on
+  const balance = Math.round(Number(wallet.balance || 0));
+  return (
+    <section className="hitkoin">
+      <h3>HitKoin</h3>
+      {!wallet.address ? (
+        <p className="hitkoin-note">Pay for a membership to start earning HitKoin — it mints to your own wallet automatically.</p>
+      ) : (
+        <>
+          <div className="hitkoin-balance">
+            <span className="hitkoin-amount">{balance.toLocaleString()}</span>
+            <span className="hitkoin-unit">HITK</span>
+          </div>
+          <p className="hitkoin-note">Redeemable for entry, VIP upgrades, and drink perks at the venue.</p>
+          {wallet.mints.length > 0 && (
+            <div className="hitkoin-history">
+              {wallet.mints.slice(0, 5).map((m) => (
+                <div className="hitkoin-row" key={m.id}>
+                  <span>{m.reason} · {fmtUSD(m.usdAmount)}</span>
+                  <span className="hitkoin-row-amount">+{Math.round(m.amount).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

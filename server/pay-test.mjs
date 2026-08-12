@@ -45,6 +45,11 @@ pend = await call(uB, 'GET', '/pay/pending', null, staff.body.token);
 ok(!pend.body.pending.some((p) => p.id === claim.body.id), 'claim no longer pending after confirm');
 ok(A.node.digest() === B.node.digest(), 'both nodes converged');
 
+console.log('\nHITKOIN — mints on the same confirm, fails soft when not configured');
+const wallet = await call(uA, 'GET', '/wallet', null, marco.token);
+ok(wallet.status === 200 && wallet.body.enabled === false, 'reports not-configured (no HITKOIN_* env in this test)');
+ok(me2.body.member.tier === 'Monthly', 'membership still activated even though no HitKoin was minted (never a blocker)');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 A.closeMesh(); B.closeMesh(); A.server.close(); B.server.close();
 try { rmSync(dA, { recursive: true, force: true }); rmSync(dB, { recursive: true, force: true }); } catch {}

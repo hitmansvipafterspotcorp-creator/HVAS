@@ -37,6 +37,13 @@ ok(verify.status === 200 && verify.body.token, 'member signed in');
 const mtok = verify.body.token;
 ok(/^HV-\d{4}-\d{4}$/.test(verify.body.member.number), 'member number minted');
 
+console.log('HITKOIN WALLET (not configured in this test env)');
+const walletNoAuth = await call('GET', '/wallet', null, null);
+ok(walletNoAuth.status === 401, 'wallet requires member auth');
+const wallet0 = await call('GET', '/wallet', null, mtok);
+ok(wallet0.status === 200 && wallet0.body.enabled === false, 'reports HitKoin not configured for this venue');
+ok(wallet0.body.address === null && wallet0.body.balance === '0' && wallet0.body.mints.length === 0, 'no wallet exists until a real payment mints one');
+
 console.log('MEMBERSHIP + ROLLING PASS');
 const buy = await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'Credit / Debit' }, mtok);
 ok(buy.body.member.tier === 'Monthly', 'Monthly purchased');

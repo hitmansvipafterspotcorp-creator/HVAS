@@ -109,6 +109,32 @@ export function openDb(path) {
       resolved_at INTEGER
     );
     INSERT OR IGNORE INTO bingo_round(id, status, phrases, calls) VALUES (1, 'lobby', '[]', '[]');
+
+    -- ── HitKoin: member reward token (mints on real payment confirm) ──
+    -- One custodial wallet per member — generated server-side so nobody
+    -- needs a seed phrase; the private key is encrypted at rest (seal/open
+    -- in crypto.mjs) with a key that never leaves this device.
+    CREATE TABLE IF NOT EXISTS wallets (
+      member_id TEXT PRIMARY KEY REFERENCES members(id),
+      address TEXT NOT NULL UNIQUE,
+      enc_privkey TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    -- Local mirror of every mint this venue has ever requested — the source
+    -- of truth for display even if the chain call itself later fails
+    -- (status stays 'pending'/'failed' so it's visible, never silently lost).
+    CREATE TABLE IF NOT EXISTS hitkoin_mints (
+      id TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL,
+      amount_wei TEXT NOT NULL,               -- string: real wei value exceeds JS safe-integer range
+      usd_amount REAL NOT NULL,
+      reason TEXT NOT NULL,                   -- paypal | zelle | cash | other
+      status TEXT NOT NULL DEFAULT 'pending', -- pending | sent | failed
+      tx_hash TEXT,
+      error TEXT,
+      at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_hitkoin_member ON hitkoin_mints(member_id, at);
   `);
   // Migration: now_playing (YouTube auto-media) added after the table already
   // shipped — ALTER TABLE ADD COLUMN isn't idempotent like CREATE TABLE, so

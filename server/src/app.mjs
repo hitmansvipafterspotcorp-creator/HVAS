@@ -15,6 +15,7 @@ import {
 } from './crypto.mjs';
 import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
+import { hitkoinEnabled, mintForPayment, walletSummary } from './hitkoin.mjs';
 
 const TIERS = {
   Daily: { days: 1, vip: false, price: 20 }, Weekly: { days: 7, vip: false, price: 100 },
@@ -125,6 +126,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   const keys = loadOrCreateKeys(`${dataDir}/venue-key.json`);
   const secret = sessionSecret(`${dataDir}/session.key`);
   const meshKey = venueSecret(`${dataDir}/mesh.key`);    // shared AES key for the mesh
+  const walletKey = venueSecret(`${dataDir}/hitkoin-wallet.key`); // encrypts each member's custodial wallet key at rest
   const sse = new Set(); // live door-board subscribers
 
   // ── mesh (background) ──
@@ -252,6 +254,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         if (memberId && t && db.prepare('SELECT 1 FROM members WHERE id=?').get(memberId)) {
           const now = Date.now();
           commit('membership.upsert', { member_id: memberId, tier, vip: t.vip, payment: 'PayPal', purchased_at: now, expires_at: now + t.days * 86400000, status: 'active' });
+          mintForPayment(db, walletKey, { memberId, usdAmount: t.price, reason: 'paypal' }).catch(() => {});
         }
       }
       json(res, 200, { received: true, verified: true });
@@ -265,7 +268,8 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
       paypalMe: process.env.PAYPAL_ME || process.env.VITE_PAYPAL_ME || '',
       zelle: process.env.HVAS_ZELLE || process.env.VITE_ZELLE_HANDLE || '',
-      features: { social: true, pay: true, mesh: !!meshPort, youtube: !!YOUTUBE_API_KEY },
+      features: { social: true, pay: true, mesh: !!meshPort, youtube: !!YOUTUBE_API_KEY, hitkoin: hitkoinEnabled() },
+      hitkoinPerDollar: Number(process.env.HITKOIN_PER_DOLLAR || 100),
     }),
 
     // Member self-serve auth (mock OTP — dev code returned; wire a real SMS
@@ -302,6 +306,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'GET /me': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
+    },
+    // HitKoin: a member's own wallet + reward history. No wallet exists
+    // until their first mint (their first real, confirmed payment).
+    'GET /wallet': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, { enabled: hitkoinEnabled(), ...walletSummary(db, c.sub) });
     },
     'POST /membership/purchase': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
@@ -341,6 +351,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const t = TIERS[p.tier]; const now = Date.now();
       commit('payment.confirm', { id, by: c.sub, at: now });
       commit('membership.upsert', { member_id: p.member_id, tier: p.tier, vip: t.vip, payment: p.rail, purchased_at: now, expires_at: now + t.days * 86400000, status: 'active' });
+      await mintForPayment(db, walletKey, { memberId: p.member_id, usdAmount: t.price, reason: p.rail }).catch(() => {});
       json(res, 200, { ok: true, activated: p.tier });
     },
     'POST /pay/void': async (req, res) => {

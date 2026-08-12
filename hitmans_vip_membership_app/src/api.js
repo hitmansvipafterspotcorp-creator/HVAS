@@ -57,6 +57,10 @@ export function apiSignOut() {
 export function apiPurchase(tier, payment) { return call('POST', '/membership/purchase', { tier, payment }, apiToken()); }
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
 
+// HitKoin — a member's own wallet + reward history. No wallet exists until
+// their first real, confirmed payment mints one.
+export function apiWallet() { return call('GET', '/wallet', null, apiToken()); }
+
 // Staff / host: venue-code login, then everything below reads from the ONE
 // shared backend database — so a member who signed up on their own phone
 // shows up for staff on a completely different device.

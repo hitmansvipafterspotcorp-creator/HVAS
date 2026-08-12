@@ -3874,3 +3874,22 @@ button {
 .bingo-media-result img { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; }
 .bingo-media-result .dash-info { flex: 1; min-width: 0; }
 .bingo-media-result .bingo-btn { margin-top: 0; width: auto; padding: 9px 14px; font-size: 12px; white-space: nowrap; }
+
+/* ── HitKoin (member reward token) ── */
+.hitkoin {
+  margin: 16px auto 0; max-width: 720px; padding: 16px 18px; border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255,224,138,.1), rgba(20,10,34,.72));
+  border: 1px solid rgba(255,214,106,.35); box-shadow: 0 0 20px rgba(255,180,60,.12);
+}
+.hitkoin h3 {
+  text-align: center; color: #ffd66b; text-transform: uppercase; letter-spacing: .14em;
+  font-size: 15px; font-weight: 900; margin: 0 0 10px;
+  text-shadow: 0 0 10px rgba(255,180,60,.5);
+}
+.hitkoin-balance { display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+.hitkoin-amount { font-size: 36px; font-weight: 900; color: #ffe08a; text-shadow: 0 0 16px rgba(255,180,60,.5); }
+.hitkoin-unit { font-size: 13px; font-weight: 800; color: #d68f1a; letter-spacing: .08em; }
+.hitkoin-note { text-align: center; color: #c9b490; font-size: 12px; margin: 8px 0 0; }
+.hitkoin-history { margin-top: 12px; border-top: 1px solid rgba(255,214,106,.2); padding-top: 8px; }
+.hitkoin-row { display: flex; justify-content: space-between; font-size: 12px; color: #e8d4a8; padding: 4px 0; text-transform: capitalize; }
+.hitkoin-row-amount { color: #ffd66b; font-weight: 800; }

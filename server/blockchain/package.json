@@ -1,0 +1,19 @@
+{
+  "name": "hvas-hitkoin-contracts",
+  "private": true,
+  "version": "1.0.0",
+  "description": "HitKoin ERC-20 — dev/compile/deploy tooling only. Kept separate from the zero-dependency runtime backend in server/.",
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.cjs --network polygonAmoy",
+    "deploy:mainnet": "hardhat run scripts/deploy.cjs --network polygon"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "hardhat": "^2.22.0",
+    "solc": "^0.8.24"
+  }
+}
