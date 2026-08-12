@@ -7,7 +7,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoStart, apiBingoCall, apiBingoResolve,
-  apiBingoReset, apiBingoBoard } from './api.js';
+  apiBingoReset, apiBingoBoard, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
 
@@ -2861,12 +2861,57 @@ function BingoStyleScreen({ navigate }) {
 }
 
 // Public room screen — unattended TV, no login, big call log.
+// Loads the YouTube IFrame Player API once (shared across mounts) and reports
+// when window.YT.Player is ready to construct — no personal login involved,
+// the API just embeds public videos.
+let ytApiPromise = null;
+function loadYoutubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { prev?.(); resolve(); };
+    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(s);
+    }
+  });
+  return ytApiPromise;
+}
+function YouTubeStage({ video }) {
+  const hostRef = useRef(null);
+  const playerRef = useRef(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadYoutubeApi().then(() => {
+      if (!live || !hostRef.current || playerRef.current) return;
+      playerRef.current = new window.YT.Player(hostRef.current, {
+        width: '100%', height: '100%',
+        playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1 },
+        events: { onReady: () => live && setPlayerReady(true) },
+      });
+    });
+    return () => { live = false; };
+  }, []);
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!playerReady || !p) return;
+    if (video?.videoId) p.loadVideoById(video.videoId);
+    else p.stopVideo?.();
+  }, [playerReady, video?.videoId]);
+  if (!video?.videoId) return null;
+  return <div className="bingo-tv-media"><div ref={hostRef} /></div>;
+}
+
 function TvDisplayScreen() {
   const { state, err } = useBingoState(3000);
   if (err === 'not-connected') return <NotConnectedBingo title="TV Display" />;
   const calls = state?.calls || [];
   return (
     <div className="staff-dash">
+      <YouTubeStage video={state?.nowPlaying} />
       {state?.winner && (
         <div className="bingo-winner-banner">
           <strong>🏆 {state.winner.name} has BINGO!</strong>
@@ -3008,7 +3053,54 @@ function HostScreen() {
           </div>
         ))}
       </AppPanel>
+      <TvAutoMediaPanel nowPlaying={board?.nowPlaying} />
     </div>
+  );
+}
+
+// Host: search YouTube and send a video to every TV Display — no personal
+// login needed, since search runs on the venue's own key and playback embeds
+// a public video. If the venue hasn't added a YOUTUBE_API_KEY yet, search
+// fails with a clear "not connected" message instead of silently doing nothing.
+function TvAutoMediaPanel({ nowPlaying }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const search = async (e) => {
+    e.preventDefault();
+    if (q.trim().length < 2) return;
+    setBusy(true); setErr(''); setResults(null);
+    try { const r = await apiYoutubeSearch(q.trim()); setResults(r.results || []); }
+    catch (e2) { setErr(e2.message || 'Search failed.'); }
+    setBusy(false);
+  };
+  const play = async (v) => { setBusy(true); try { await apiBingoPlayMedia(v.videoId, v.title); } catch { /* ignore */ } setBusy(false); };
+  const stop = async () => { setBusy(true); try { await apiBingoStopMedia(); } catch { /* ignore */ } setBusy(false); };
+  return (
+    <AppPanel title="TV Auto Media" subtitle="Search a song, send it to every TV">
+      {nowPlaying?.videoId ? (
+        <div className="bingo-nowplaying-row">
+          <div className="dash-info"><strong>▶ Now playing</strong><span className="dash-num">{nowPlaying.title || nowPlaying.videoId}</span></div>
+          <button type="button" className="pay-void" disabled={busy} onClick={stop}>Stop</button>
+        </div>
+      ) : (
+        <p className="dash-empty">Nothing playing on the TV right now.</p>
+      )}
+      <form className="bingo-media-search" onSubmit={search}>
+        <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a song or artist…" />
+        <button type="submit" className="bingo-btn gold" disabled={busy || q.trim().length < 2}>Search</button>
+      </form>
+      {err && <p className="dash-empty">{err}</p>}
+      {results && results.length === 0 && !err && <p className="dash-empty">No results.</p>}
+      {results?.map((v) => (
+        <div key={v.videoId} className="bingo-media-result">
+          {v.thumbnail && <img src={v.thumbnail} alt="" />}
+          <div className="dash-info"><strong>{v.title}</strong><span className="dash-num">{v.channel}</span></div>
+          <button type="button" className="bingo-btn ready" disabled={busy} onClick={() => play(v)}>Play on TV</button>
+        </div>
+      ))}
+    </AppPanel>
   );
 }
 

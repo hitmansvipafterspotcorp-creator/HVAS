@@ -24,6 +24,11 @@ const TIERS = {
 const STAFF_CODES = { staff: process.env.HVAS_STAFF_CODE || 'DOOR850', host: process.env.HVAS_HOST_CODE || 'HOST850' };
 const SESSION_TTL = 12 * 3600 * 1000;
 
+// YouTube auto-media: search is a server-held API key (never shipped to the
+// client — a leaked key gets used up by anyone), playback itself needs no
+// login at all since the IFrame Player embeds public videos directly.
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+
 // ── Lip Sync Bingo ──
 const BINGO_PHRASES = [
   'Splits on the floor', 'Death drop', 'Duet with the DJ', 'Crowd sings the hook',
@@ -187,7 +192,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ── Lip Sync Bingo helpers ──
   const getBingoRound = () => {
     const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
-    return { ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls) };
+    return { ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls), nowPlaying: r.now_playing ? JSON.parse(r.now_playing) : null };
   };
   const bingoCallNext = () => {
     const r = getBingoRound();
@@ -260,7 +265,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
       paypalMe: process.env.PAYPAL_ME || process.env.VITE_PAYPAL_ME || '',
       zelle: process.env.HVAS_ZELLE || process.env.VITE_ZELLE_HANDLE || '',
-      features: { social: true, pay: true, mesh: !!meshPort },
+      features: { social: true, pay: true, mesh: !!meshPort, youtube: !!YOUTUBE_API_KEY },
     }),
 
     // Member self-serve auth (mock OTP — dev code returned; wire a real SMS
@@ -513,7 +518,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, {
         status: r.status, calls: r.calls, startedAt: r.started_at,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
-        pendingClaims, winner, me,
+        pendingClaims, winner, me, nowPlaying: r.nowPlaying,
       });
     },
     'POST /bingo/join': async (req, res) => {
@@ -578,7 +583,45 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const claims = db.prepare(`SELECT bc.*, m.name, m.number FROM bingo_claims bc
         JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
       const r = getBingoRound();
-      json(res, 200, { status: r.status, calls: r.calls, players, claims });
+      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying });
+    },
+
+    // ── YouTube auto-media: no personal login needed at all — search runs on
+    // this venue's own app-level key, and the IFrame Player embeds public
+    // videos directly. Host picks a result; it syncs to every TV/device the
+    // same way a bingo call does. ──
+    'GET /media/youtube-search': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      if (!YOUTUBE_API_KEY) return json(res, 503, { error: 'YouTube search isn’t connected for this venue yet.' });
+      const q = (new URL(req.url, 'http://x').searchParams.get('q') || '').trim();
+      if (q.length < 2) return json(res, 200, { results: [] });
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=6&videoEmbeddable=true&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        if (!r.ok) return json(res, 502, { error: data?.error?.message || 'YouTube search failed.' });
+        const results = (data.items || []).map((it) => ({
+          videoId: it.id.videoId,
+          title: it.snippet.title,
+          channel: it.snippet.channelTitle,
+          thumbnail: it.snippet.thumbnails?.medium?.url || it.snippet.thumbnails?.default?.url || '',
+        }));
+        json(res, 200, { results });
+      } catch {
+        json(res, 502, { error: 'Could not reach YouTube.' });
+      }
+    },
+    'POST /bingo/media': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { videoId, title } = await readBody(req);
+      if (!videoId) return json(res, 400, { error: 'videoId required' });
+      commit('bingo.media', { video: { videoId, title: String(title || '').slice(0, 200) }, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /bingo/media/stop': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      commit('bingo.media', { video: null, at: Date.now() });
+      json(res, 200, { ok: true });
     },
   };
 

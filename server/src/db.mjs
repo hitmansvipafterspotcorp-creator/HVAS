@@ -110,6 +110,13 @@ export function openDb(path) {
     );
     INSERT OR IGNORE INTO bingo_round(id, status, phrases, calls) VALUES (1, 'lobby', '[]', '[]');
   `);
+  // Migration: now_playing (YouTube auto-media) added after the table already
+  // shipped — ALTER TABLE ADD COLUMN isn't idempotent like CREATE TABLE, so
+  // guard it with a column check instead of re-running it every boot.
+  const cols = db.prepare(`PRAGMA table_info(bingo_round)`).all().map((c) => c.name);
+  if (!cols.includes('now_playing')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN now_playing TEXT`); // JSON {videoId,title,at} | null
+  }
   return db;
 }
 

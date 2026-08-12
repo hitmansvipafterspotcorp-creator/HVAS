@@ -110,7 +110,13 @@ export function applyOp(db, op) {
     case 'bingo.reset':
       db.prepare(`DELETE FROM bingo_cards`).run();
       db.prepare(`DELETE FROM bingo_claims`).run();
-      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL WHERE id=1`).run();
+      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL, now_playing=NULL WHERE id=1`).run();
+      break;
+    // TV auto-media: host picks (or clears) the video playing on the room's
+    // TV Display. d.video is {videoId,title} or null to stop.
+    case 'bingo.media':
+      db.prepare(`UPDATE bingo_round SET now_playing=? WHERE id=1`)
+        .run(d.video ? JSON.stringify({ ...d.video, at: d.at ?? ts }) : null);
       break;
 
     default:

@@ -131,6 +131,23 @@ const reset = await call('POST', '/bingo/reset', {}, stok);
 ok(reset.status === 200, 'host resets for a new game');
 state = await call('GET', '/bingo/state');
 ok(state.body.status === 'lobby' && state.body.playerCount === 0, 'reset clears players + returns to lobby');
+ok(state.body.nowPlaying === null, 'reset also clears now-playing media');
+
+console.log('YOUTUBE AUTO-MEDIA');
+const search = await call('GET', '/media/youtube-search?q=test', null, stok);
+ok(search.status === 503, 'search refuses cleanly when no YOUTUBE_API_KEY is configured (this test env has none)');
+const badSearch = await call('GET', '/media/youtube-search?q=test', null, mtok);
+ok(badSearch.status === 401, 'members cannot use the host-only search proxy');
+const setMedia = await call('POST', '/bingo/media', { videoId: 'dQw4w9WgXcQ', title: 'Test Video' }, stok);
+ok(setMedia.status === 200, 'host sets now-playing media');
+state = await call('GET', '/bingo/state');
+ok(state.body.nowPlaying?.videoId === 'dQw4w9WgXcQ' && state.body.nowPlaying?.title === 'Test Video', 'now-playing syncs to every device via /bingo/state');
+const stopMedia = await call('POST', '/bingo/media/stop', {}, stok);
+ok(stopMedia.status === 200, 'host stops the media');
+state = await call('GET', '/bingo/state');
+ok(state.body.nowPlaying === null, 'now-playing cleared after stop');
+const badSetMedia = await call('POST', '/bingo/media', { videoId: 'x' }, mtok);
+ok(badSetMedia.status === 401, 'members cannot set now-playing media');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 server.close();

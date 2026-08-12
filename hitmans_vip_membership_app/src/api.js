@@ -90,6 +90,9 @@ export function apiBingoCall() { return call('POST', '/bingo/call', {}, apiStaff
 export function apiBingoResolve(claimId, approve) { return call('POST', '/bingo/resolve', { claimId, approve }, apiStaffToken()); }
 export function apiBingoReset() { return call('POST', '/bingo/reset', {}, apiStaffToken()); }
 export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiStaffToken()); }
+export function apiYoutubeSearch(q) { return call('GET', `/media/youtube-search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
+export function apiBingoPlayMedia(videoId, title) { return call('POST', '/bingo/media', { videoId, title }, apiStaffToken()); }
+export function apiBingoStopMedia() { return call('POST', '/bingo/media/stop', {}, apiStaffToken()); }
 
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
 // Handles prefer the connected venue's config (config-over-the-air), then env.
