@@ -789,35 +789,35 @@ const screens = [
     label: 'Bingo Style',
     eyebrow: 'Lip Sync Bingo',
     title: 'Game Menu',
-    detail: 'Bingo-specific buttons, tabs, panels, timers, rewards, and selectors.',
+    detail: 'Live round status, quick start/reset, and a shortcut into full Host Control.',
   },
   {
     id: 'tv',
     label: 'TV Display',
     eyebrow: 'Room Display',
     title: 'TV Live Display',
-    detail: 'Fullscreen public display for timer, current song, winners, prize, and ticker.',
+    detail: 'Fullscreen public display — the live call log, the winner banner, and whatever the host sends to auto-play.',
   },
   {
     id: 'lobby',
     label: 'Lobby',
     eyebrow: 'Lip Sync Bingo',
     title: 'Lip Sync Bingo Lobby',
-    detail: 'Join, ready, party mode, invite, tabs, and lobby status screen.',
+    detail: 'Join tonight’s round, mark yourself ready, and see how many others already have.',
   },
   {
     id: 'playerCard',
     label: 'Player Card',
     eyebrow: 'Player Game',
     title: 'Bingo Card',
-    detail: 'Player card, current song, card states, navigation, mark/undo/confirm screen.',
+    detail: 'Your real dealt card, live-marked as the host calls phrases, with a Claim Bingo button.',
   },
   {
     id: 'host',
     label: 'Host',
     eyebrow: 'Operator',
     title: 'Host / DJ Control',
-    detail: 'Host controls, round selector, queue, notes, song history, and warning states.',
+    detail: 'Start the round, call phrases, approve or reject bingo claims, and send songs to the TV.',
   },
   {
     id: 'verification',
@@ -831,14 +831,14 @@ const screens = [
     label: 'Queue',
     eyebrow: 'Host Tools',
     title: 'Song Queue / Call History',
-    detail: 'Queue, now playing, previous calls, filters, objectives, and round tracking.',
+    detail: 'Every phrase called this round, most recent first.',
   },
   {
     id: 'winner',
     label: 'Winner',
     eyebrow: 'Rewards',
     title: 'Winner Validation / Payout',
-    detail: 'Bingo validation, pattern checks, prize badges, ranks, and host approval.',
+    detail: 'The confirmed winner (once there is one) plus any claims still waiting on approval.',
   },
   {
     id: 'checkout',
@@ -905,13 +905,13 @@ const ROLES = [
     eyebrow: 'OPERATOR',
     chip: 'staff',
     menu: [
-      { title: 'Game Menu', detail: 'Bingo setup and selectors', chip: ui.chips.staff, target: 'bingoStyle' },
-      { title: 'Lobby', detail: 'Join, ready, party mode', chip: ui.chips.active, target: 'lobby' },
-      { title: 'Player Card', detail: 'Card, marks, confirm', chip: ui.chips.checkedIn, target: 'playerCard' },
-      { title: 'Host Control', detail: 'Rounds, queue, notes', chip: ui.chips.staff, target: 'host' },
-      { title: 'Song Queue', detail: 'Now playing and history', chip: ui.chips.vip, target: 'songQueue' },
-      { title: 'Winner · Payout', detail: 'Validate and pay out', chip: ui.chips.vip, target: 'winner' },
-      { title: 'TV Display', detail: 'Public room screen', chip: ui.chips.active, target: 'tv' },
+      { title: 'Game Menu', detail: 'Round status, start & reset', chip: ui.chips.staff, target: 'bingoStyle' },
+      { title: 'Lobby', detail: 'See who has joined & readied up', chip: ui.chips.active, target: 'lobby' },
+      { title: 'Player Card', detail: 'Preview a player’s live card', chip: ui.chips.checkedIn, target: 'playerCard' },
+      { title: 'Host Control', detail: 'Start, call, approve claims, TV media', chip: ui.chips.staff, target: 'host' },
+      { title: 'Song Queue', detail: 'Every phrase called so far', chip: ui.chips.vip, target: 'songQueue' },
+      { title: 'Winner · Payout', detail: 'Validate the claim, pay out', chip: ui.chips.vip, target: 'winner' },
+      { title: 'TV Display', detail: 'Public call log + auto media', chip: ui.chips.active, target: 'tv' },
       { title: 'Party Mode', detail: 'Battlez and voting', chip: ui.chips.staff, target: 'party' },
     ],
     allowed: ['bingoStyle', 'lobby', 'playerCard', 'host', 'songQueue', 'winner', 'tv', 'party'],
@@ -3090,17 +3090,22 @@ function HostScreen() {
   const [board, setBoard] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const liveRef = useRef(true);
+  const poll = async () => {
+    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return; }
+    try { const b = await apiBingoBoard(); if (liveRef.current) { setBoard(b); setErr(''); } } catch { if (liveRef.current) setErr('Could not reach the venue backend.'); }
+  };
   useEffect(() => {
-    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return undefined; }
-    let live = true;
-    const poll = async () => { try { const b = await apiBingoBoard(); if (live) { setBoard(b); setErr(''); } } catch { if (live) setErr('Could not reach the venue backend.'); } };
+    liveRef.current = true;
     poll();
     const id = setInterval(poll, 3000);
-    return () => { live = false; clearInterval(id); };
+    return () => { liveRef.current = false; clearInterval(id); };
   }, []);
   if (err === 'not-connected') return <NotConnectedBingo title="Host Control" />;
-  const act = async (fn) => { setBusy(true); try { await fn(); } catch { /* ignore */ } setBusy(false); };
-  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); } catch { /* ignore */ } setBusy(false); };
+  // Re-poll right after an action instead of waiting up to 3s for the next
+  // tick — a host tapping "Call Next Phrase" should see it change instantly.
+  const act = async (fn) => { setBusy(true); try { await fn(); await poll(); } catch { /* ignore */ } setBusy(false); };
+  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); await poll(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
       <AppPanel title="Host Control" subtitle={board ? BINGO_STATUS_LABEL[board.status] : 'Loading…'}>
@@ -3134,7 +3139,7 @@ function HostScreen() {
           </div>
         ))}
       </AppPanel>
-      <TvAutoMediaPanel nowPlaying={board?.nowPlaying} />
+      <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />
     </div>
   );
 }
@@ -3143,7 +3148,7 @@ function HostScreen() {
 // login needed, since search runs on the venue's own key and playback embeds
 // a public video. If the venue hasn't added a YOUTUBE_API_KEY yet, search
 // fails with a clear "not connected" message instead of silently doing nothing.
-function TvAutoMediaPanel({ nowPlaying }) {
+function TvAutoMediaPanel({ nowPlaying, onChange }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [err, setErr] = useState('');
@@ -3156,8 +3161,8 @@ function TvAutoMediaPanel({ nowPlaying }) {
     catch (e2) { setErr(e2.message || 'Search failed.'); }
     setBusy(false);
   };
-  const play = async (v) => { setBusy(true); try { await apiBingoPlayMedia(v.videoId, v.title); } catch { /* ignore */ } setBusy(false); };
-  const stop = async () => { setBusy(true); try { await apiBingoStopMedia(); } catch { /* ignore */ } setBusy(false); };
+  const play = async (v) => { setBusy(true); try { await apiBingoPlayMedia(v.videoId, v.title); await onChange?.(); } catch { /* ignore */ } setBusy(false); };
+  const stop = async () => { setBusy(true); try { await apiBingoStopMedia(); await onChange?.(); } catch { /* ignore */ } setBusy(false); };
   return (
     <AppPanel title="TV Auto Media" subtitle="Search a song, send it to every TV">
       {nowPlaying?.videoId ? (
@@ -3225,17 +3230,20 @@ function WinnerScreen() {
   const [board, setBoard] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const liveRef = useRef(true);
+  const poll = async () => {
+    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return; }
+    try { const b = await apiBingoBoard(); if (liveRef.current) { setBoard(b); setErr(''); } } catch { if (liveRef.current) setErr('Could not reach the venue backend.'); }
+  };
   useEffect(() => {
-    if (!apiEnabled() || !apiStaffToken()) { setErr('not-connected'); return undefined; }
-    let live = true;
-    const poll = async () => { try { const b = await apiBingoBoard(); if (live) { setBoard(b); setErr(''); } } catch { if (live) setErr('Could not reach the venue backend.'); } };
+    liveRef.current = true;
     poll();
     const id = setInterval(poll, 3000);
-    return () => { live = false; clearInterval(id); };
+    return () => { liveRef.current = false; clearInterval(id); };
   }, []);
   const { state } = useBingoState(4000);
   if (err === 'not-connected') return <NotConnectedBingo title="Winner · Payout" />;
-  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); } catch { /* ignore */ } setBusy(false); };
+  const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); await poll(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
       {state?.winner ? (
