@@ -2075,6 +2075,30 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
   const [tier, setTier] = useState(currentTier || 'Monthly');
   const [pay, setPay] = useState('PayPal');   // real payable method up front
   const [give, setGive] = useState('');        // open Daily contribution ('' = 0.00)
+  const railRef = useRef(null);
+  const scrollTimer = useRef(null);
+  // Tap OR swipe both pick a tier. Tapping scrolls that card to center;
+  // swiping and letting go auto-selects whatever settled at center — the
+  // rail is CSS scroll-snap, so "settled" always means centered already.
+  const selectTier = (name) => {
+    setTier(name);
+    railRef.current?.querySelector(`[data-tier="${name}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  };
+  const onRailScroll = () => {
+    clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const rail = railRef.current;
+      if (!rail) return;
+      const center = rail.scrollLeft + rail.clientWidth / 2;
+      let closest = null, closestDist = Infinity;
+      for (const card of rail.querySelectorAll('[data-tier]')) {
+        const dist = Math.abs((card.offsetLeft + card.offsetWidth / 2) - center);
+        if (dist < closestDist) { closestDist = dist; closest = card.dataset.tier; }
+      }
+      if (closest) setTier(closest);
+    }, 120);
+  };
   const t = TIER_BY[tier];
   const win = t.open ? dailyWindow() : null;         // Daily: open (pay-what-you-want) until 2AM, else $15
   const cd = useCountdown(win ? win.until : null);   // ticks; flips win.free at 2AM
@@ -2096,17 +2120,23 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
           ? 'Pick the tier you want to renew or switch to. Your member number and loyalty carry over.'
           : 'You must hold a membership to get in. Buy a tier and you’ll get a member card, a number, and a QR code security scans at the door.'}</p>
       </div>
-      <div className="tier-buy-grid">
+      <div className="tier-buy-grid" ref={railRef} onScroll={onRailScroll}>
         {TIERS.map((row) => (
           <button
             key={row.name}
             type="button"
+            data-tier={row.name}
             className={`tier-buy-card${tier === row.name ? ' picked' : ''}`}
-            onClick={() => setTier(row.name)}
+            onClick={() => selectTier(row.name)}
           >
             {/* tier card with the purple price digits baked into the slot */}
             <img className="tier-buy-art" src={TIER_SRC[row.name]} alt={row.name} />
           </button>
+        ))}
+      </div>
+      <div className="tier-buy-dots">
+        {TIERS.map((row) => (
+          <span key={row.name} className={`tier-buy-dot${tier === row.name ? ' on' : ''}`} />
         ))}
       </div>
 

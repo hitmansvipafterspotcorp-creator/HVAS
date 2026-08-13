@@ -2728,11 +2728,32 @@ button {
   }
 
   .screen {
-    padding: 28px 18px;
+    padding: 12px 14px;
+  }
+
+  /* The header (icon + eyebrow + title + subtitle) repeats at the top of
+     every single sub-screen — trimming it here is the single highest-
+     leverage change for making every page shorter on a phone, not just
+     one screen. */
+  .screen-header {
+    gap: 10px;
+    margin: 0 auto 10px;
   }
 
   .screen-header h1 {
-    font-size: 34px;
+    font-size: 30px;
+    margin: 4px 0;
+  }
+
+  .screen-header p {
+    font-size: 13px;
+    line-height: 1.35;
+    margin: 0;
+  }
+
+  .back-to-menu {
+    min-height: 34px;
+    top: 10px;
   }
 
   .dashboard-grid,
@@ -3247,6 +3268,7 @@ button {
 .mem-intro p { color: #c9b8ff; max-width: 640px; margin: 0 auto; line-height: 1.5; }
 
 .tier-buy-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
+.tier-buy-dots { display: none; }
 /* The card art already has its own neon frame — no dark box around it. */
 .tier-buy-card { position: relative; background: none; border: none; border-radius: 14px; padding: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; transition: transform .15s ease, filter .15s ease; }
 .tier-buy-card:hover { transform: translateY(-4px); filter: brightness(1.08); }
@@ -3402,9 +3424,53 @@ button {
 .verify-hint { margin-top: 16px; color: #6f5a90; font-size: 12px; text-align: center; }
 
 @media (max-width: 720px) {
-  .tier-buy-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Swipeable tier carousel — one card centered, neighbors peeking at the
+     edges as a swipe hint. Replaces the old 2-column grid (three tall rows
+     for 5 tiers) with one short row, which is most of why this screen used
+     to need scrolling at all. */
+  .tier-buy-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    padding: 4px 28% 6px;
+    margin-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .tier-buy-grid::-webkit-scrollbar { display: none; }
+  .tier-buy-card { flex: 0 0 44%; scroll-snap-align: center; }
+  .tier-buy-dots { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
+  .tier-buy-dot { width: 6px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); transition: background .15s ease, transform .15s ease; }
+  .tier-buy-dot.on { background: #ffd66b; transform: scale(1.3); }
   .mem-pass-card { grid-template-columns: 1fr; text-align: center; justify-items: center; }
   .mem-pass-meta { justify-content: center; }
+
+  /* Rest of the "Become a member" flow, tightened to actually fit. */
+  .mem-intro { margin-bottom: 8px; }
+  .mem-intro h2 { font-size: 19px; }
+  .mem-intro p { font-size: 12.5px; line-height: 1.3; }
+  .tier-benefits { padding: 10px 12px; margin: 0 0 8px; }
+  .tier-benefits-head { margin-bottom: 4px; }
+  .tier-benefits ul { margin: 0; padding-left: 2px; gap: 5px; }
+  .tier-benefits li { font-size: 13px; gap: 8px; }
+  .mem-pay { margin-bottom: 8px; }
+  .mem-pay-label { margin-bottom: 5px; }
+  .mem-pay-grid { gap: 6px; }
+  .mem-pay-grid .image-action img { height: 32px; }
+  .buy-summary { margin: 0 0 6px; font-size: 13px; }
+  .asset-cta img { height: 44px; }
+  .mem-fineprint { margin-top: 6px; font-size: 11px; }
+
+  /* Door verification — the camera square was a fixed 272px regardless of
+     screen size, by far the single biggest thing on this screen. */
+  .qr-scanframe.sq { width: 185px; }
+  .verify-scanbox { gap: 8px; margin-bottom: 4px; }
+  .verify-panel { padding: 14px; }
+  .verify-panel h2 { font-size: 18px; margin: 0 0 4px; }
+  .verify-panel > p { font-size: 12.5px; margin: 0 0 8px; line-height: 1.3; }
+  .verify-search { margin: 0 0 10px; }
+  .verify-hint { margin-top: 8px; }
+  .verify-go { padding: 0 14px; }
 }
 
 /* ── Polish: real assets instead of CSS-drawn controls ────────────── */
