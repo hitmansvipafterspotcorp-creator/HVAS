@@ -40,7 +40,9 @@ export const TIER_PERKS = {
 // What each tier comes with — shown when a member taps a card on the buy screen
 // so they can choose wisely.
 export const TIER_BENEFITS = {
-  Daily: ['Entry for the night', 'Pay what you want until 2 AM — even $0', 'Member card, number & door QR', 'Loyalty rank starts counting'],
+  // "Pay what you want" is left off here on purpose — the live countdown
+  // block right below already says it, no need to say it twice.
+  Daily: ['Entry for the night', 'Member card, number & door QR', 'Loyalty rank starts counting'],
   Weekly: ['7 days of entry', '1 hospitality ticket a night — use for entry or a Cafe8Fifty meal', 'Member card, number & door QR', 'Event & venue access once you check in'],
   Monthly: ['30 days of entry', '3 hospitality tickets a night — entry or a Cafe8Fifty meal', 'Event & venue access', 'Faster loyalty rank climb'],
   Yearly: ['365 days of entry', '3 hospitality tickets a night — entry or a Cafe8Fifty meal', 'Priority event & venue access', 'Faster loyalty rank climb'],
@@ -2357,6 +2359,9 @@ function MemberPass({ member, checkedIn, onRenew }) {
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
   // Member self-verify: same gate the door uses — pops GRANTED / DENIED / etc.
   const [verifyResult, setVerifyResult] = useState(null);
+  // Pass / Loyalty & Access / Account — three focused screens instead of one
+  // long stack. Nothing was removed, it's just not all on screen at once.
+  const [tab, setTab] = useState('pass');
 
   const penalty = memberPenalty(member.number);
   return (
@@ -2368,6 +2373,13 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <small>Your access is suspended. See a manager at the door.</small>
         </div>
       )}
+      <div className="mem-tabs">
+        <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>Pass</button>
+        <button type="button" className={`mem-tab${tab === 'loyalty' ? ' on' : ''}`} onClick={() => setTab('loyalty')}>Loyalty &amp; Access</button>
+        <button type="button" className={`mem-tab${tab === 'account' ? ' on' : ''}`} onClick={() => setTab('account')}>Account</button>
+      </div>
+      {tab === 'pass' && (
+      <>
       {/* — the pass card — */}
       <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
         <img className="mem-pass-art" src={PASS_SRC[member.tier]} alt={`${member.tier} pass`} />
@@ -2391,7 +2403,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <div className="qr-clean">
             {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
           </div>
-          <BrandStamp />
+          <BrandStamp compact />
           <span>Show at the door to get scanned</span>
           <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(verifyByNumber(member.number))} aria-label="Verify membership">
             <img src={ui.verify.verifyCard} alt="Verify membership" />
@@ -2425,7 +2437,11 @@ function MemberPass({ member, checkedIn, onRenew }) {
         <span className="renews-tier">{member.tier}{isVip ? ' VIP' : ''} MEMBER<small>{expired ? 'Expired · renew now' : 'Active · thank you!'}</small></span>
         <span className="renews-right"><small>{expired ? 'Status' : 'Renews in'}</small>{expired ? <span className="renews-time exp">EXPIRED</span> : <RenewsIn expiresAt={member.expiresAt} />}</span>
       </div>
+      </>
+      )}
 
+      {tab === 'loyalty' && (
+      <>
       {/* — loyalty rank (earned by nights, not bought) — */}
       <section className="loyalty">
         <h3>Loyalty rank</h3>
@@ -2485,7 +2501,11 @@ function MemberPass({ member, checkedIn, onRenew }) {
         </div>
         {!beenInside && <span className="access-list-lock">🔒 Unlocks when you’re verified inside</span>}
       </div>
+      </>
+      )}
 
+      {tab === 'account' && (
+      <>
       {/* — actions: renew (prominent when expired) + step-up to the next tier — */}
       {expired && <div className="renew-alert">⚠ Your {member.tier} membership expired — renew to get back in.</div>}
       <div className="mem-actions">
@@ -2518,6 +2538,8 @@ function MemberPass({ member, checkedIn, onRenew }) {
         <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
       </section>
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
+      </>
+      )}
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
     </div>

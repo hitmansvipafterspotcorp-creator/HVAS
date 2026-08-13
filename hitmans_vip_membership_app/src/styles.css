@@ -3263,6 +3263,16 @@ button {
 /* ── Membership system (buy · pass · verify) ──────────────────────── */
 .mem-screen { max-width: 960px; margin: 0 auto; padding: 8px 4px 40px; }
 .mem-selector-back { background: none; border: none; color: #7fb0ff; font-weight: 700; font-size: 14px; cursor: pointer; padding: 4px 0 10px; }
+
+/* Pass / Loyalty & Access / Account — split the one long member page into
+   three focused screens so no single view needs to scroll. */
+.mem-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.mem-tab {
+  padding: 10px 6px; border: 1px solid rgba(176,107,255,.35); border-radius: 10px;
+  background: rgba(20,10,32,.7); color: #c9b8ff; font-weight: 800; font-size: 12.5px;
+  cursor: pointer; text-align: center; line-height: 1.2;
+}
+.mem-tab.on { border-color: #ffd66b; color: #ffd66b; background: rgba(80,40,10,.35); box-shadow: inset 0 0 14px rgba(255,214,107,.15); }
 .mem-intro { text-align: center; margin-bottom: 18px; }
 .mem-intro h2 { color: #ffe8a3; font-size: 26px; margin: 0 0 6px; }
 .mem-intro p { color: #c9b8ff; max-width: 640px; margin: 0 auto; line-height: 1.5; }
@@ -3423,55 +3433,6 @@ button {
 .verify-result small { color: #9a7ac0; }
 .verify-hint { margin-top: 16px; color: #6f5a90; font-size: 12px; text-align: center; }
 
-@media (max-width: 720px) {
-  /* Swipeable tier carousel — one card centered, neighbors peeking at the
-     edges as a swipe hint. Replaces the old 2-column grid (three tall rows
-     for 5 tiers) with one short row, which is most of why this screen used
-     to need scrolling at all. */
-  .tier-buy-grid {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    gap: 12px;
-    padding: 4px 28% 6px;
-    margin-bottom: 6px;
-    scrollbar-width: none;
-  }
-  .tier-buy-grid::-webkit-scrollbar { display: none; }
-  .tier-buy-card { flex: 0 0 44%; scroll-snap-align: center; }
-  .tier-buy-dots { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
-  .tier-buy-dot { width: 6px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); transition: background .15s ease, transform .15s ease; }
-  .tier-buy-dot.on { background: #ffd66b; transform: scale(1.3); }
-  .mem-pass-card { grid-template-columns: 1fr; text-align: center; justify-items: center; }
-  .mem-pass-meta { justify-content: center; }
-
-  /* Rest of the "Become a member" flow, tightened to actually fit. */
-  .mem-intro { margin-bottom: 8px; }
-  .mem-intro h2 { font-size: 19px; }
-  .mem-intro p { font-size: 12.5px; line-height: 1.3; }
-  .tier-benefits { padding: 10px 12px; margin: 0 0 8px; }
-  .tier-benefits-head { margin-bottom: 4px; }
-  .tier-benefits ul { margin: 0; padding-left: 2px; gap: 5px; }
-  .tier-benefits li { font-size: 13px; gap: 8px; }
-  .mem-pay { margin-bottom: 8px; }
-  .mem-pay-label { margin-bottom: 5px; }
-  .mem-pay-grid { gap: 6px; }
-  .mem-pay-grid .image-action img { height: 32px; }
-  .buy-summary { margin: 0 0 6px; font-size: 13px; }
-  .asset-cta img { height: 44px; }
-  .mem-fineprint { margin-top: 6px; font-size: 11px; }
-
-  /* Door verification — the camera square was a fixed 272px regardless of
-     screen size, by far the single biggest thing on this screen. */
-  .qr-scanframe.sq { width: 185px; }
-  .verify-scanbox { gap: 8px; margin-bottom: 4px; }
-  .verify-panel { padding: 14px; }
-  .verify-panel h2 { font-size: 18px; margin: 0 0 4px; }
-  .verify-panel > p { font-size: 12.5px; margin: 0 0 8px; line-height: 1.3; }
-  .verify-search { margin: 0 0 10px; }
-  .verify-hint { margin-top: 8px; }
-  .verify-go { padding: 0 14px; }
-}
 
 /* ── Polish: real assets instead of CSS-drawn controls ────────────── */
 .tier-buy-card .tier-buy-art { width: 100%; max-width: 120px; height: auto; }
@@ -4029,3 +3990,143 @@ button {
 .hitkoin-history { margin-top: 12px; border-top: 1px solid rgba(255,214,106,.2); padding-top: 8px; }
 .hitkoin-row { display: flex; justify-content: space-between; font-size: 12px; color: #e8d4a8; padding: 4px 0; text-transform: capitalize; }
 .hitkoin-row-amount { color: #ffd66b; font-weight: 800; }
+
+/* Moved to end of file so these mobile overrides always win on source order,
+   regardless of specificity ties with earlier same-specificity selectors —
+   two real bugs (brand stamp, QR size not shrinking) came from this exact
+   trap when the block lived earlier in the file. */
+@media (max-width: 720px) {
+  /* Swipeable tier carousel — one card centered, neighbors peeking at the
+     edges as a swipe hint. Replaces the old 2-column grid (three tall rows
+     for 5 tiers) with one short row, which is most of why this screen used
+     to need scrolling at all. */
+  .tier-buy-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 12px;
+    padding: 4px 28% 6px;
+    margin-bottom: 6px;
+    scrollbar-width: none;
+  }
+  .tier-buy-grid::-webkit-scrollbar { display: none; }
+  .tier-buy-card { flex: 0 0 44%; scroll-snap-align: center; }
+  .tier-buy-dots { display: flex; justify-content: center; gap: 6px; margin: 0 0 8px; }
+  .tier-buy-dot { width: 6px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.25); transition: background .15s ease, transform .15s ease; }
+  .tier-buy-dot.on { background: #ffd66b; transform: scale(1.3); }
+  .mem-pass-card { grid-template-columns: 1fr; text-align: center; justify-items: center; }
+  .mem-pass-meta { justify-content: center; }
+
+  /* Rest of the "Become a member" flow, tightened to actually fit. */
+  .mem-intro { margin-bottom: 8px; }
+  .mem-intro h2 { font-size: 19px; }
+  .mem-intro p { font-size: 12.5px; line-height: 1.3; }
+  .tier-benefits { padding: 10px 12px; margin: 0 0 8px; }
+  .tier-benefits-head { margin-bottom: 4px; }
+  .tier-benefits ul { margin: 0; padding-left: 2px; gap: 5px; }
+  .tier-benefits li { font-size: 13px; gap: 8px; }
+  .mem-pay { margin-bottom: 8px; }
+  .mem-pay-label { margin-bottom: 5px; }
+  .mem-pay-grid { gap: 6px; }
+  .mem-pay-grid .image-action img { height: 32px; }
+  .buy-summary { margin: 0 0 6px; font-size: 13px; }
+  .asset-cta img { height: 44px; }
+  .mem-fineprint { margin-top: 6px; font-size: 11px; }
+
+  /* Door verification — the camera square was a fixed 272px regardless of
+     screen size, by far the single biggest thing on this screen. */
+  .qr-scanframe.sq { width: 185px; }
+  .verify-scanbox { gap: 8px; margin-bottom: 4px; }
+  .verify-panel { padding: 14px; }
+  .verify-panel h2 { font-size: 18px; margin: 0 0 4px; }
+  .verify-panel > p { font-size: 12.5px; margin: 0 0 8px; line-height: 1.3; }
+  .verify-search { margin: 0 0 10px; }
+  .verify-hint { margin-top: 8px; }
+  .verify-go { padding: 0 14px; }
+
+  /* Daily tier only: an extra countdown + contribution block stacks on top
+     of the benefits panel every other tier already has, which is what was
+     pushing this specific tier past the screen. */
+  .daily-window { padding: 6px 10px; margin-bottom: 4px; gap: 1px; }
+  .daily-window-label { font-size: 10.5px; }
+  .daily-window-clock { font-size: 19px; }
+  .daily-window-sub { font-size: 9.5px; }
+  .mem-give { margin-bottom: 4px; }
+  .mem-give-row { padding: 5px 10px; max-width: 160px; }
+  .mem-give-cur { font-size: 15px; }
+  .mem-give-input { font-size: 16px; }
+  .mem-give-note { font-size: 10px; margin: 3px 0 0; }
+
+  /* This route only (My Pass / Become a member) — the header + intro are
+     the biggest remaining fixed cost on top of already-tight tier content. */
+  .screen-membership .screen-header,
+  .screen-myPass .screen-header,
+  .screen-profile .screen-header {
+    margin: 0 auto 4px;
+    gap: 8px;
+  }
+  .screen-membership .screen-header h1,
+  .screen-myPass .screen-header h1,
+  .screen-profile .screen-header h1 {
+    font-size: 22px;
+    margin: 2px 0;
+  }
+  .screen-membership .screen-header p,
+  .screen-myPass .screen-header p,
+  .screen-profile .screen-header p {
+    font-size: 11px;
+    margin: 0;
+  }
+  .mem-intro { margin-bottom: 4px; }
+  .mem-intro h2 { font-size: 16px; }
+  .mem-intro p { font-size: 11.5px; }
+  .tier-benefits { padding: 6px 10px; margin: 0 0 4px; }
+  .tier-benefits-head { margin-bottom: 2px; }
+  .tier-benefits ul { gap: 3px; }
+  .tier-benefits li { gap: 6px; font-size: 12px; }
+  .buy-summary { margin: 0 0 4px; }
+  .mem-pay { margin-bottom: 6px; }
+  .mem-pay-grid .image-action img { height: 28px; }
+  .tier-buy-dots { margin: 0 0 4px; }
+
+  /* Pass tab — the card art, QR, meta fields, perks, and renewal bar were
+     stacking to nearly 4x screen height on a phone. Trimmed each piece,
+     not just padding — the two logo images (pass art + brand stamp) were
+     the single biggest cost. */
+  .mem-pass-card { padding: 12px; gap: 6px; }
+  .mem-pass-art { width: 64px; }
+  .mem-pass-tier { font-size: 18px; }
+  .mem-pass-meta { gap: 4px 16px; margin: 6px 0 0; }
+  .mem-pass-meta dt { font-size: 10px; }
+  .mem-pass-meta dd { font-size: 13px; margin-top: 0; }
+  .qr-clean img, .qr-clean .qr-load { width: 100px; height: 100px; }
+  .mem-qr img, .mem-qr-load { width: 100px; height: 100px; }
+  .qr-clean { padding: 6px; }
+  .mem-qr { gap: 3px; }
+  /* The pass-art crown/shield above already carries full branding — a
+     second logo watermark under the QR was pure duplication on a screen
+     already fighting for every pixel. (Scoped selector, not just
+     .qr-brand-full, because that class ties with the base .qr-brand
+     { display:flex } rule on specificity and loses on source order.) */
+  .mem-qr .qr-brand-full { display: none; }
+  .mem-qr span { font-size: 10px; }
+  .mem-verified-alert { height: 24px; }
+  .verify-self { margin-top: 2px; }
+  .asset-cta.compact img { height: 34px; }
+  .mem-chip { height: 20px; }
+  .mem-chip-row { margin: 4px 0; gap: 6px; }
+  .mem-pass-eyebrow { font-size: 10px; }
+
+  .perks { margin-top: 10px; }
+  .perks h3, .loyalty h3, .prefs h3 { font-size: 15px; margin-bottom: 8px; }
+  .perk-tickets { padding: 10px; gap: 10px; }
+  .ticket-stub { width: 64px; padding: 6px 4px; }
+  .ticket-stub b { font-size: 22px; }
+  .ticket-stub span { font-size: 9px; }
+  .perk-body p { font-size: 12px; margin: 0 0 6px; }
+  .perk-use { padding: 8px 12px; font-size: 13px; }
+
+  .renews-bar { margin-top: 10px; padding: 10px 14px; }
+  .renews-tier { font-size: 13px; }
+  .renews-time { font-size: 15px; }
+}
