@@ -59,15 +59,72 @@ MESH_PEERS=192.168.1.20:9944 npm run host
 Every op (admissions, payments, links, chat) converges across them, and each
 keeps working if the link drops.
 
-## Reaching phones that aren't on the venue wifi (optional)
-For pre-arrival ("on the way") from anywhere, expose the device without a cloud
-host using a free tunnel — the venue device stays the server:
-- **Cloudflare Tunnel:** `cloudflared tunnel --url http://localhost:8787`
-- **Tailscale:** put the device + phones on your tailnet, connect to its
-  Tailscale IP.
+## Make it reachable from anywhere — Cloudflare Tunnel (free, no VPS)
+Every member on any network (home wifi, cellular, another city) needs the
+SAME thing a venue-wifi phone gets: a URL to paste into **Connect to venue**.
+Cloudflare Tunnel gets you a real public `https://` URL without a cloud
+server, without opening a port on your router, and without paying anything —
+the venue device (the one already running `npm run keeper`) makes an
+*outbound* connection to Cloudflare; Cloudflare routes public traffic back
+through it. Unlimited tunnels, unlimited requests, genuinely free.
 
-Either gives a URL to paste into **Connect to venue**; no hosting bill, no
-serverless.
+**Quick test (no account, no domain, URL changes every run):**
+```bash
+cloudflared tunnel --url http://localhost:8787
+```
+Prints a random `https://something.trycloudflare.com` URL on the spot. Great
+for trying this out; not for a QR code that has to keep working.
+
+**Permanent URL (needs a domain on Cloudflare's free DNS — about $10-12/yr,
+one-time-ish, not a hosting fee):**
+```bash
+cloudflared tunnel login                       # opens a browser, pick your domain
+cloudflared tunnel create hvas                 # creates a named tunnel, prints its ID
+cloudflared tunnel route dns hvas app.yourdomain.com
+```
+Then point it at the backend with `cloudflared/config.yml` (copy
+`cloudflared/config.yml.example`, fill in the tunnel ID from above):
+```yaml
+tunnel: <the-tunnel-id-just-printed>
+credentials-file: /home/you/.cloudflared/<the-tunnel-id>.json
+ingress:
+  - hostname: app.yourdomain.com
+    service: http://localhost:8787
+  - service: http_status:404
+```
+Run it (`cloudflared tunnel run hvas`), or install it as a service so it
+survives reboots the same way Deploy Keeper does — either the official
+installer:
+```bash
+sudo cloudflared service install
+```
+or a manual unit if you'd rather manage it alongside `hvas-keeper`:
+```ini
+# /etc/systemd/system/hvas-tunnel.service
+[Unit]
+Description=HVAS Cloudflare Tunnel
+After=network.target
+
+[Service]
+WorkingDirectory=/home/you/hvas-deploy/server
+ExecStart=/usr/local/bin/cloudflared tunnel --config cloudflared/config.yml run hvas
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl enable --now hvas-tunnel
+```
+`https://app.yourdomain.com` now works from any phone, anywhere — paste it
+into **Connect to venue** once and it's remembered. Two independent, free
+safety nets running side by side: Deploy Keeper keeps the app itself up,
+`cloudflared` keeps it reachable.
+
+**Alternative:** Tailscale — put the device + your members' phones on one
+tailnet, connect to its Tailscale IP. Simpler for a small, known group of
+devices; Cloudflare Tunnel is the better fit for "any member, any phone,
+no app to install on their end."
 
 ## Deploy Keeper — your own Coolify, built in
 

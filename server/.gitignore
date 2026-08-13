@@ -4,3 +4,6 @@ data/
 *.db-*
 venue-key.json
 session.key
+
+# your real Cloudflare Tunnel config (tunnel id + hostname) — keep the .example only
+cloudflared/config.yml

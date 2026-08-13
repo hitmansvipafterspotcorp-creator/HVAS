@@ -1,0 +1,14 @@
+# Cloudflare Tunnel config — copy to config.yml and fill in your own values.
+# See SELF_HOST.md "Make it reachable from anywhere" for the full setup.
+#
+#   cp cloudflared/config.yml.example cloudflared/config.yml
+#
+# Get the tunnel id + credentials-file path from:
+#   cloudflared tunnel create hvas
+tunnel: REPLACE-WITH-YOUR-TUNNEL-ID
+credentials-file: /home/you/.cloudflared/REPLACE-WITH-YOUR-TUNNEL-ID.json
+
+ingress:
+  - hostname: REPLACE-WITH-app.yourdomain.com
+    service: http://localhost:8787
+  - service: http_status:404   # required catch-all — cloudflared refuses to start without one
