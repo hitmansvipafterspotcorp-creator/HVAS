@@ -101,8 +101,17 @@ const mtok2 = v2.body.token;
 
 let state = await call('GET', '/bingo/state');
 ok(state.body.status === 'lobby', 'round starts in lobby');
+ok(state.body.deckId === 'after-spot-starter', 'defaults to the starter deck before any reset ever picks one');
+
+const decks = await call('GET', '/bingo/decks', null, stok);
+ok(decks.body.decks.some((d) => d.id === 'after-spot-starter') && decks.body.decks.length >= 4, 'real decks are listed, not a single hardcoded pool');
+ok(decks.body.patterns.includes('four_corners') && decks.body.patterns.includes('blackout'), 'multiple win patterns available');
+const badDecks = await call('GET', '/bingo/decks', null, mtok);
+ok(badDecks.status === 401, 'members cannot see the host-only deck list');
+
 const join1 = await call('POST', '/bingo/join', {}, mtok);
-ok(join1.body.card.length === 25 && join1.body.card[12] === 'FREE SPACE', 'card dealt: 25 squares, free center');
+ok(join1.body.card.length === 25 && join1.body.card[12].id === 'FREE', 'card dealt: 25 real artist/song squares, free center');
+ok(join1.body.card[0].artist && join1.body.card[0].song, 'squares carry real artist/song, not generic phrases');
 const join2 = await call('POST', '/bingo/join', {}, mtok2);
 ok(join2.body.card.length === 25, 'second member dealt a card');
 const rejoin = await call('POST', '/bingo/join', {}, mtok);
@@ -112,33 +121,61 @@ await call('POST', '/bingo/ready', { ready: true }, mtok);
 const noCall = await call('POST', '/bingo/call', {}, stok);
 ok(noCall.status === 400, 'cannot call before round is live');
 const bingoStart = await call('POST', '/bingo/start', {}, stok);
-ok(bingoStart.status === 200, 'host starts the round');
+ok(bingoStart.status === 200 && bingoStart.body.deckId === 'after-spot-starter', 'host starts the round on the picked deck');
 state = await call('GET', '/bingo/state');
 ok(state.body.status === 'live' && state.body.playerCount === 2 && state.body.readyCount === 1, 'live round shows player/ready counts');
 
 const badClaim = await call('POST', '/bingo/claim', {}, mtok2);
 ok(badClaim.status === 400, 'claim rejected when card has no bingo line');
 
-// call out the entire phrase pool — once every phrase has been called, every
-// card (including Tasha's and Rell's) is fully marked, so a claim is real.
+const badMark = await call('POST', '/bingo/mark', { itemId: 'not-on-my-card', covered: true }, mtok);
+ok(badMark.status === 400, 'cannot mark an item that is not on your own card');
+
+// call out the entire deck's pool — once every item has been called, every
+// card (including Tasha's and Rell's) COULD be fully covered.
 for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
 
+const claimBeforeMarking = await call('POST', '/bingo/claim', {}, mtok);
+ok(claimBeforeMarking.status === 400, 'even with everything called, claim fails until the player actually taps squares covered');
+
+// tap every non-free square on Tasha's card covered (this is the real
+// gameplay action — marking is never automatic anymore).
+for (const item of join1.body.card) {
+  if (item.free) continue;
+  const m = await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok);
+  if (m.status !== 200) { ok(false, `mark failed for ${item.id}`); break; }
+}
 const claim = await call('POST', '/bingo/claim', {}, mtok);
-ok(claim.status === 200 && claim.body.pending, 'valid bingo claim accepted as pending');
+ok(claim.status === 200 && claim.body.pending, 'valid bingo claim accepted once covered squares match the call history');
 
 const board = await call('GET', '/bingo/board', null, stok);
 ok(board.body.players.length === 2 && board.body.claims.length === 1, 'host board shows players + pending claim');
+ok(board.body.deckName === 'After Spot Starter', 'host board shows the human-readable deck name');
 const claimId = board.body.claims[0].id;
 const resolve = await call('POST', '/bingo/resolve', { claimId, approve: true }, stok);
 ok(resolve.status === 200, 'host approves the claim');
 state = await call('GET', '/bingo/state');
 ok(state.body.status === 'ended' && state.body.winner?.name === 'Tasha', 'round ends with the right winner');
 
-const reset = await call('POST', '/bingo/reset', {}, stok);
-ok(reset.status === 200, 'host resets for a new game');
+const reset = await call('POST', '/bingo/reset', { deckId: 'tally-after-dark', pattern: 'four_corners' }, stok);
+ok(reset.status === 200 && reset.body.deckId === 'tally-after-dark' && reset.body.pattern === 'four_corners', 'host resets into a different deck + pattern for the next game');
 state = await call('GET', '/bingo/state');
 ok(state.body.status === 'lobby' && state.body.playerCount === 0, 'reset clears players + returns to lobby');
+ok(state.body.deckId === 'tally-after-dark' && state.body.pattern === 'four_corners', 'the new deck/pattern choice is live for the next round');
 ok(state.body.nowPlaying === null, 'reset also clears now-playing media');
+
+console.log('LIP SYNC BINGO: FOUR CORNERS PATTERN');
+const cornerJoin = await call('POST', '/bingo/join', {}, mtok2);
+ok(cornerJoin.body.card.length === 25, 'Rell gets a fresh card on the new deck');
+await call('POST', '/bingo/start', {}, stok);
+for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
+const corners = [cornerJoin.body.card[0], cornerJoin.body.card[4], cornerJoin.body.card[20], cornerJoin.body.card[24]];
+for (const item of corners) await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok2);
+const cornerClaim = await call('POST', '/bingo/claim', {}, mtok2);
+ok(cornerClaim.status === 200, 'covering only the four corners is enough to win under the Four Corners pattern');
+
+const resetBadDeck = await call('POST', '/bingo/reset', { deckId: 'not-a-real-deck', pattern: 'not-a-real-pattern' }, stok);
+ok(resetBadDeck.body.deckId === 'after-spot-starter' && resetBadDeck.body.pattern === 'line', 'unrecognized deck/pattern falls back to a safe default instead of erroring');
 
 console.log('YOUTUBE AUTO-MEDIA');
 const search = await call('GET', '/media/youtube-search?q=test', null, stok);
@@ -155,6 +192,42 @@ state = await call('GET', '/bingo/state');
 ok(state.body.nowPlaying === null, 'now-playing cleared after stop');
 const badSetMedia = await call('POST', '/bingo/media', { videoId: 'x' }, mtok);
 ok(badSetMedia.status === 401, 'members cannot set now-playing media');
+
+console.log('PARTY MODE / BATTLERZ');
+const notEnough = await call('POST', '/party/start', {}, stok);
+ok(notEnough.status === 400, 'refuses to start with fewer than 5 players in the room');
+
+// bring the room to 5 players (bingo_cards was cleared by the last reset)
+await call('POST', '/bingo/join', {}, mtok);
+await call('POST', '/bingo/join', {}, mtok2);
+for (let i = 0; i < 3; i++) {
+  const s = await call('POST', '/auth/member/start', { contact: `850-555-70${i}` });
+  const v = await call('POST', '/auth/member/verify', { contact: `850-555-70${i}`, code: s.body.devCode, name: `Guest${i}` });
+  await call('POST', '/bingo/join', {}, v.body.token);
+}
+const partyStart = await call('POST', '/party/start', {}, stok);
+ok(partyStart.status === 200, 'host starts Battlerz once 5+ players are in the room');
+let party = await call('GET', '/party/state');
+ok(party.body.status === 'battling' && party.body.teamA === 'Team Purple' && party.body.teamB === 'Team Pink', 'battle is live with both teams named');
+
+const badVote = await call('POST', '/party/vote', { team: 'a' }, null);
+ok(badVote.status === 401, 'voting requires a member session');
+await call('POST', '/party/vote', { team: 'a', reaction: '🔥' }, mtok);
+await call('POST', '/party/vote', { team: 'b' }, mtok2);
+const revote = await call('POST', '/party/vote', { team: 'b' }, mtok); // Tasha changes her mind
+ok(revote.status === 200, 'a member can change their vote before the battle ends');
+party = await call('GET', '/party/state');
+ok(party.body.votesA === 0 && party.body.votesB === 2, 'revote moved cleanly from Team A to Team B — one vote per member, not two');
+
+const partyEnd = await call('POST', '/party/end', {}, stok);
+ok(partyEnd.body.winner === 'b', 'winner calculated correctly from the votes');
+party = await call('GET', '/party/state');
+ok(party.body.status === 'ended' && party.body.winner === 'b', 'ended state shows the winning team');
+
+const partyReset = await call('POST', '/party/reset', {}, stok);
+ok(partyReset.status === 200, 'host resets for the next battle');
+party = await call('GET', '/party/state');
+ok(party.body.status === 'idle' && party.body.winner === null, 'reset returns to idle with no winner');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 server.close();

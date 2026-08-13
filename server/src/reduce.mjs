@@ -110,13 +110,43 @@ export function applyOp(db, op) {
     case 'bingo.reset':
       db.prepare(`DELETE FROM bingo_cards`).run();
       db.prepare(`DELETE FROM bingo_claims`).run();
-      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL, now_playing=NULL WHERE id=1`).run();
+      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL, now_playing=NULL, deck_id=?, pattern=? WHERE id=1`)
+        .run(d.deck_id ?? null, d.pattern ?? 'line');
       break;
+    // Player taps a square to mark it covered — only actually called items
+    // count toward a win (checked at claim time), but tapping itself is
+    // always allowed so the UI can't desync from a slightly-stale poll.
+    case 'bingo.mark': {
+      const row = db.prepare('SELECT covered FROM bingo_cards WHERE member_id=?').get(d.member_id);
+      if (!row) break;
+      const covered = new Set(JSON.parse(row.covered));
+      if (d.covered) covered.add(d.item_id); else covered.delete(d.item_id);
+      db.prepare('UPDATE bingo_cards SET covered=? WHERE member_id=?').run(JSON.stringify([...covered]), d.member_id);
+      break;
+    }
     // TV auto-media: host picks (or clears) the video playing on the room's
     // TV Display. d.video is {videoId,title} or null to stop.
     case 'bingo.media':
       db.prepare(`UPDATE bingo_round SET now_playing=? WHERE id=1`)
         .run(d.video ? JSON.stringify({ ...d.video, at: d.at ?? ts }) : null);
+      break;
+
+    // ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──
+    case 'party.start':
+      db.prepare(`UPDATE party_battle SET status='battling', round=round+1, started_at=?, winner=NULL WHERE id=1`).run(d.at ?? ts);
+      break;
+    case 'party.vote': {
+      const b = db.prepare('SELECT round FROM party_battle WHERE id=1').get();
+      db.prepare(`INSERT INTO party_votes(round,member_id,team,reaction,at) VALUES(?,?,?,?,?)
+        ON CONFLICT(round,member_id) DO UPDATE SET team=excluded.team, reaction=excluded.reaction, at=excluded.at`)
+        .run(b.round, d.member_id, d.team, d.reaction ?? null, d.at ?? ts);
+      break;
+    }
+    case 'party.end':
+      db.prepare(`UPDATE party_battle SET status='ended', winner=? WHERE id=1`).run(d.winner ?? null);
+      break;
+    case 'party.reset':
+      db.prepare(`UPDATE party_battle SET status='idle', winner=NULL, started_at=NULL WHERE id=1`).run();
       break;
 
     default:

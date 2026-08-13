@@ -16,6 +16,7 @@ import {
 import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
 import { hitkoinEnabled, mintForPayment, walletSummary } from './hitkoin.mjs';
+import { BINGO_DECKS, DEFAULT_DECK_ID, deckList, deckById } from './decks.mjs';
 
 const TIERS = {
   Daily: { days: 1, vip: false, price: 20 }, Weekly: { days: 7, vip: false, price: 100 },
@@ -31,37 +32,36 @@ const SESSION_TTL = 12 * 3600 * 1000;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 // ── Lip Sync Bingo ──
-const BINGO_PHRASES = [
-  'Splits on the floor', 'Death drop', 'Duet with the DJ', 'Crowd sings the hook',
-  'Wig gets adjusted on beat', 'Runs and hides behind the speaker', 'Points at someone in VIP',
-  'Grabs a mic stand', 'Fake tears during the bridge', 'Confetti cannon goes off',
-  'Someone yells the artist’s name', 'Host jumps in mid-song', 'Heel comes off',
-  'Blows a kiss to the crowd', 'Backup dancers freeze mid-move', 'Spins into a dip',
-  'Lights cut to a spotlight', 'Runs the length of the stage', 'Crowd throws dollar bills',
-  'Mouths the wrong lyric on purpose', 'Does the whole bridge on their knees',
-  'Fan handed up from the crowd', 'Costume reveal / rip-away', 'Air mic drop at the end',
-  'Struts to the edge of the stage', 'Blackout into the next track', 'Pulls someone from VIP to dance',
-  'Nails the high note perfectly', 'Host says “put your hands up”', 'DJ scratches in a callback',
-];
+const FREE_ITEM = { id: 'FREE', free: true, artist: '', song: '', type: 'free' };
+const BINGO_PATTERN_IDS = ['line', 'four_corners', 'x', 'around_the_world', 'blackout'];
 // 5x5 card, index 12 is the free center square.
 const BINGO_LINES = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
   [0, 5, 10, 15, 20], [1, 6, 11, 16, 21], [2, 7, 12, 17, 22], [3, 8, 13, 18, 23], [4, 9, 14, 19, 24],
   [0, 6, 12, 18, 24], [4, 8, 12, 16, 20],
 ];
-function bingoHasWin(card, calls) {
-  const called = new Set(calls);
-  const marked = card.map((p, i) => i === 12 || called.has(p));
-  return BINGO_LINES.some((line) => line.every((i) => marked[i]));
+const BINGO_PATTERNS = {
+  line: (m) => BINGO_LINES.some((line) => line.every((i) => m[i])),
+  four_corners: (m) => [0, 4, 20, 24].every((i) => m[i]),
+  x: (m) => [0, 6, 12, 18, 24, 4, 8, 16, 20].every((i) => m[i]),
+  around_the_world: (m) => [0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 19, 20, 21, 22, 23, 24].every((i) => m[i]),
+  blackout: (m) => m.every(Boolean),
+};
+// A square only counts if it's FREE, or the player tapped it covered AND it
+// was actually called — tapping alone (or being called alone) isn't enough,
+// so a claim can't be faked by covering something never called.
+function bingoHasWin(card, calledIds, coveredIds, pattern) {
+  const marked = card.map((item, i) => i === 12 || (coveredIds.has(item.id) && calledIds.has(item.id)));
+  return (BINGO_PATTERNS[pattern] || BINGO_PATTERNS.line)(marked);
 }
-function bingoDealCard(phrases) {
-  const pool = [...phrases];
+function bingoDealCard(items) {
+  const pool = [...items];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   const picks = pool.slice(0, 24);
-  picks.splice(12, 0, 'FREE SPACE');
+  picks.splice(12, 0, FREE_ITEM);
   return picks;
 }
 
@@ -194,18 +194,39 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ── Lip Sync Bingo helpers ──
   const getBingoRound = () => {
     const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
-    return { ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls), nowPlaying: r.now_playing ? JSON.parse(r.now_playing) : null };
+    return {
+      ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls),
+      nowPlaying: r.now_playing ? JSON.parse(r.now_playing) : null,
+      deckId: r.deck_id || DEFAULT_DECK_ID, pattern: r.pattern || 'line',
+    };
   };
-  const bingoCallNext = () => {
+  // No manual links, ever: the moment a real song gets called, search
+  // YouTube for it and send the top result straight to the TV. Best-effort
+  // — if it fails or no key is configured, the call itself already landed
+  // and gameplay keeps going regardless.
+  const autoResolveMedia = async (item) => {
+    if (!YOUTUBE_API_KEY || !item || item.free || !item.artist) return;
+    try {
+      const q = `${item.artist} ${item.song}`;
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoEmbeddable=true&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
+      const r = await fetch(url);
+      const data = await r.json();
+      const it = data.items?.[0];
+      if (it) commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
+    } catch { /* media is a bonus, never a blocker */ }
+  };
+  const bingoCallNext = async () => {
     const r = getBingoRound();
     if (r.status !== 'live') return null;
-    const remaining = r.phrases.filter((p) => !r.calls.includes(p));
+    const calledIds = new Set(r.calls.map((c) => c.id));
+    const remaining = r.phrases.filter((p) => !calledIds.has(p.id));
     if (!remaining.length) return null;
-    const phrase = remaining[Math.floor(Math.random() * remaining.length)];
-    commit('bingo.call', { calls: [...r.calls, phrase] });
-    return phrase;
+    const item = remaining[Math.floor(Math.random() * remaining.length)];
+    commit('bingo.call', { calls: [...r.calls, item] });
+    autoResolveMedia(item);
+    return item;
   };
-  setInterval(() => { try { bingoCallNext(); } catch { /* ignore */ } }, 6000).unref?.();
+  setInterval(() => { bingoCallNext().catch(() => {}); }, 6000).unref?.();
 
   const emitBoard = () => {
     const payload = `data: ${JSON.stringify(board())}\n\n`;
@@ -524,23 +545,29 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (c) {
         const mine = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
         const myClaim = db.prepare(`SELECT 1 FROM bingo_claims WHERE member_id=? AND status='pending'`).get(c.sub);
-        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, hasPendingClaim: !!myClaim } : null;
+        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, covered: JSON.parse(mine.covered), hasPendingClaim: !!myClaim } : null;
       }
       json(res, 200, {
         status: r.status, calls: r.calls, startedAt: r.started_at,
+        deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
         pendingClaims, winner, me, nowPlaying: r.nowPlaying,
       });
     },
+    // Decks + patterns the host can pick from — used to populate Host
+    // Control's selectors before starting a round.
+    'GET /bingo/decks': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, { decks: deckList(), patterns: BINGO_PATTERN_IDS, defaultDeckId: DEFAULT_DECK_ID });
+    },
     'POST /bingo/join': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const existing = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
-      if (existing) return json(res, 200, { card: JSON.parse(existing.card), ready: !!existing.ready });
+      if (existing) return json(res, 200, { card: JSON.parse(existing.card), ready: !!existing.ready, covered: JSON.parse(existing.covered) });
       const r = getBingoRound();
-      const pool = r.phrases.length >= 24 ? r.phrases : BINGO_PHRASES;
-      const card = bingoDealCard(pool);
+      const card = bingoDealCard(deckById(r.deckId).items);
       commit('bingo.join', { member_id: c.sub, card, at: Date.now() });
-      json(res, 200, { card, ready: false });
+      json(res, 200, { card, ready: false, covered: [] });
     },
     'POST /bingo/ready': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
@@ -549,30 +576,45 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       commit('bingo.ready', { member_id: c.sub, ready: !!ready });
       json(res, 200, { ok: true });
     },
+    // Player taps a square once the host has called it — marking it
+    // "covered" is a real action (not automatic), matching real bingo.
+    'POST /bingo/mark': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { itemId, covered } = await readBody(req);
+      if (!itemId) return json(res, 400, { error: 'itemId required' });
+      const row = db.prepare('SELECT card FROM bingo_cards WHERE member_id=?').get(c.sub);
+      if (!row) return json(res, 400, { error: 'join first' });
+      if (!JSON.parse(row.card).some((it) => it.id === itemId)) return json(res, 400, { error: 'not on your card' });
+      commit('bingo.mark', { member_id: c.sub, item_id: itemId, covered: !!covered });
+      json(res, 200, { ok: true });
+    },
     'POST /bingo/claim': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const r = getBingoRound();
       if (r.status !== 'live') return json(res, 400, { error: 'no live round' });
       const row = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
       if (!row) return json(res, 400, { error: 'no card' });
-      if (!bingoHasWin(JSON.parse(row.card), r.calls)) return json(res, 400, { error: 'not a bingo yet' });
+      const calledIds = new Set(r.calls.map((it) => it.id));
+      const coveredIds = new Set(JSON.parse(row.covered));
+      if (!bingoHasWin(JSON.parse(row.card), calledIds, coveredIds, r.pattern)) return json(res, 400, { error: 'not a bingo yet' });
       commit('bingo.claim', { member_id: c.sub, at: Date.now() });
       json(res, 200, { ok: true, pending: true });
     },
-    // Host controls — start a fresh live round (keeps everyone already in the
-    // lobby, since their cards were dealt from the same phrase pool).
+    // Host controls — start a fresh live round using whichever deck/pattern
+    // is set on the round (picked via /bingo/reset before this).
     'POST /bingo/start': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      commit('bingo.start', { phrases: BINGO_PHRASES, at: Date.now() });
-      json(res, 200, { ok: true });
+      const r = getBingoRound();
+      commit('bingo.start', { phrases: deckById(r.deckId).items, at: Date.now() });
+      json(res, 200, { ok: true, deckId: r.deckId, pattern: r.pattern });
     },
     // Manual "call next" for host pacing control — the round also auto-calls
     // every ~6s on its own so the TV display keeps moving unattended.
     'POST /bingo/call': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      const phrase = bingoCallNext();
-      if (!phrase) return json(res, 400, { error: 'no live round or all phrases called' });
-      json(res, 200, { phrase });
+      const item = await bingoCallNext();
+      if (!item) return json(res, 400, { error: 'no live round or all phrases called' });
+      json(res, 200, { item });
     },
     'POST /bingo/resolve': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
@@ -582,10 +624,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub, at: Date.now() });
       json(res, 200, { ok: true });
     },
+    // Reset also sets up the NEXT game's deck/pattern — chosen here, before
+    // anyone joins, so nobody's card ever gets dealt from a deck that later
+    // changes out from under them.
     'POST /bingo/reset': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      commit('bingo.reset', { at: Date.now() });
-      json(res, 200, { ok: true });
+      const { deckId, pattern } = await readBody(req);
+      const validDeckId = BINGO_DECKS[deckId] ? deckId : DEFAULT_DECK_ID;
+      const validPattern = BINGO_PATTERN_IDS.includes(pattern) ? pattern : 'line';
+      commit('bingo.reset', { deck_id: validDeckId, pattern: validPattern, at: Date.now() });
+      json(res, 200, { ok: true, deckId: validDeckId, pattern: validPattern });
     },
     'GET /bingo/board': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
@@ -594,7 +642,51 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const claims = db.prepare(`SELECT bc.*, m.name, m.number FROM bingo_claims bc
         JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
       const r = getBingoRound();
-      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying });
+      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying, deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern });
+    },
+
+    // ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──
+    // Reuses the bingo room's joined players as "the crew" for the min-
+    // player check — same room, same people, no separate roster to manage.
+    'GET /party/state': (req, res) => {
+      const b = db.prepare('SELECT * FROM party_battle WHERE id=1').get();
+      const votesA = db.prepare(`SELECT COUNT(*) c FROM party_votes WHERE round=? AND team='a'`).get(b.round).c;
+      const votesB = db.prepare(`SELECT COUNT(*) c FROM party_votes WHERE round=? AND team='b'`).get(b.round).c;
+      const playerCount = db.prepare('SELECT COUNT(*) c FROM bingo_cards').get().c;
+      let myVote = null;
+      const c = auth(req, 'member');
+      if (c) myVote = db.prepare('SELECT team, reaction FROM party_votes WHERE round=? AND member_id=?').get(b.round, c.sub) || null;
+      json(res, 200, { status: b.status, teamA: b.team_a, teamB: b.team_b, votesA, votesB, hype: votesA + votesB, winner: b.winner, playerCount, minPlayers: 5, myVote });
+    },
+    'POST /party/start': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const playerCount = db.prepare('SELECT COUNT(*) c FROM bingo_cards').get().c;
+      if (playerCount < 5) return json(res, 400, { error: 'Not enough players — gather your crew and try again.' });
+      commit('party.start', { at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /party/vote': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const b = db.prepare('SELECT status FROM party_battle WHERE id=1').get();
+      if (b.status !== 'battling') return json(res, 400, { error: 'no battle live right now' });
+      const { team, reaction } = await readBody(req);
+      if (!['a', 'b'].includes(team)) return json(res, 400, { error: 'bad team' });
+      commit('party.vote', { member_id: c.sub, team, reaction: reaction ? String(reaction).slice(0, 8) : null, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /party/end': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const b = db.prepare('SELECT round FROM party_battle WHERE id=1').get();
+      const votesA = db.prepare(`SELECT COUNT(*) c FROM party_votes WHERE round=? AND team='a'`).get(b.round).c;
+      const votesB = db.prepare(`SELECT COUNT(*) c FROM party_votes WHERE round=? AND team='b'`).get(b.round).c;
+      const winner = votesA === votesB ? null : (votesA > votesB ? 'a' : 'b');
+      commit('party.end', { winner, at: Date.now() });
+      json(res, 200, { ok: true, winner, votesA, votesB });
+    },
+    'POST /party/reset': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      commit('party.reset', { at: Date.now() });
+      json(res, 200, { ok: true });
     },
 
     // ── YouTube auto-media: no personal login needed at all — search runs on

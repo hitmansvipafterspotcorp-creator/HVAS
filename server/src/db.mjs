@@ -96,7 +96,7 @@ export function openDb(path) {
     );
     CREATE TABLE IF NOT EXISTS bingo_cards (
       member_id TEXT PRIMARY KEY REFERENCES members(id),
-      card TEXT NOT NULL,                     -- JSON array of 25 phrases (server-dealt)
+      card TEXT NOT NULL,                     -- JSON array of 25 item objects (server-dealt)
       ready INTEGER NOT NULL DEFAULT 0,
       joined_at INTEGER NOT NULL
     );
@@ -109,6 +109,26 @@ export function openDb(path) {
       resolved_at INTEGER
     );
     INSERT OR IGNORE INTO bingo_round(id, status, phrases, calls) VALUES (1, 'lobby', '[]', '[]');
+
+    -- ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──
+    CREATE TABLE IF NOT EXISTS party_battle (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      round INTEGER NOT NULL DEFAULT 0,       -- increments per battle; scopes votes so they can't carry over
+      status TEXT NOT NULL DEFAULT 'idle',    -- idle | battling | ended
+      team_a TEXT NOT NULL DEFAULT 'Team Purple',
+      team_b TEXT NOT NULL DEFAULT 'Team Pink',
+      started_at INTEGER,
+      winner TEXT                              -- 'a' | 'b' | null
+    );
+    CREATE TABLE IF NOT EXISTS party_votes (
+      round INTEGER NOT NULL,
+      member_id TEXT NOT NULL,
+      team TEXT NOT NULL,                      -- 'a' | 'b'
+      reaction TEXT,                           -- emoji chip, optional
+      at INTEGER NOT NULL,
+      PRIMARY KEY (round, member_id)
+    );
+    INSERT OR IGNORE INTO party_battle(id) VALUES (1);
 
     -- ── HitKoin: member reward token (mints on real payment confirm) ──
     -- One custodial wallet per member — generated server-side so nobody
@@ -142,6 +162,16 @@ export function openDb(path) {
   const cols = db.prepare(`PRAGMA table_info(bingo_round)`).all().map((c) => c.name);
   if (!cols.includes('now_playing')) {
     db.exec(`ALTER TABLE bingo_round ADD COLUMN now_playing TEXT`); // JSON {videoId,title,at} | null
+  }
+  if (!cols.includes('deck_id')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN deck_id TEXT`); // which BINGO_DECKS key this round deals from
+  }
+  if (!cols.includes('pattern')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN pattern TEXT NOT NULL DEFAULT 'line'`); // line | four_corners | x | around_the_world | blackout
+  }
+  const cardCols = db.prepare(`PRAGMA table_info(bingo_cards)`).all().map((c) => c.name);
+  if (!cardCols.includes('covered')) {
+    db.exec(`ALTER TABLE bingo_cards ADD COLUMN covered TEXT NOT NULL DEFAULT '[]'`); // JSON array of item ids the player has tapped
   }
   return db;
 }

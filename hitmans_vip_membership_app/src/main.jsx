@@ -6,8 +6,9 @@ import './styles.css';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
-  apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoStart, apiBingoCall, apiBingoResolve,
-  apiBingoReset, apiBingoBoard, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia } from './api.js';
+  apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
+  apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
+  apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
 
@@ -852,7 +853,7 @@ const screens = [
     label: 'Party Mode',
     eyebrow: 'Party Mode',
     title: 'Party Mode Battlez',
-    detail: 'Battle mode, audience voting, hype meter, teams, and reaction screen.',
+    detail: 'Team Purple vs Team Pink — real audience voting and reactions, live for everyone in the room.',
   },
 ];
 
@@ -880,9 +881,10 @@ const ROLES = [
     menu: [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
+      { title: 'Party Mode', detail: 'Vote for your favorite team during Battlerz', chip: ui.chips.active, target: 'party' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard'],
+    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party'],
   },
   {
     id: 'staff',
@@ -912,7 +914,7 @@ const ROLES = [
       { title: 'Song Queue', detail: 'Every phrase called so far', chip: ui.chips.vip, target: 'songQueue' },
       { title: 'Winner · Payout', detail: 'Validate the claim, pay out', chip: ui.chips.vip, target: 'winner' },
       { title: 'TV Display', detail: 'Public call log + auto media', chip: ui.chips.active, target: 'tv' },
-      { title: 'Party Mode', detail: 'Battlez and voting', chip: ui.chips.staff, target: 'party' },
+      { title: 'Party Mode', detail: 'Start Battlerz, watch the vote come in live', chip: ui.chips.staff, target: 'party' },
     ],
     allowed: ['bingoStyle', 'lobby', 'playerCard', 'host', 'songQueue', 'winner', 'tv', 'party'],
   },
@@ -1305,7 +1307,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
   if (activeScreen === 'checkout') return <CheckoutScreen />;
-  return <PartyScreen />;
+  return <PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
 }
 
 // Landing role picker — the app entry gate. A user is one of three things,
@@ -2913,6 +2915,40 @@ function useBingoState(pollMs = 3000) {
   return { state, err };
 }
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
+const BINGO_PATTERN_LABEL = {
+  line: 'complete a line', four_corners: 'cover all four corners', x: 'cover an X',
+  around_the_world: 'cover the outer ring', blackout: 'cover the whole card',
+};
+const BINGO_PATTERN_NAME = { line: 'Line', four_corners: 'Four Corners', x: 'X', around_the_world: 'Around The World', blackout: 'Blackout' };
+const BINGO_PATTERN_IDS = ['line', 'four_corners', 'x', 'around_the_world', 'blackout'];
+
+// Host-facing deck + win-pattern picker for the NEXT game — shared by Game
+// Menu and Host Control. Deliberately only takes effect on reset (not
+// start), so nobody's already-dealt card can be pulled out from under them
+// mid-lobby by a deck change.
+function DeckPatternPicker({ currentDeckId, currentPattern, onReset, busy }) {
+  const [decks, setDecks] = useState(null);
+  const [deckId, setDeckId] = useState(currentDeckId || '');
+  const [pattern, setPattern] = useState(currentPattern || 'line');
+  useEffect(() => { apiBingoDecks().then((r) => setDecks(r.decks)).catch(() => {}); }, []);
+  useEffect(() => { if (currentDeckId) setDeckId(currentDeckId); }, [currentDeckId]);
+  useEffect(() => { if (currentPattern) setPattern(currentPattern); }, [currentPattern]);
+  return (
+    <div className="bingo-deck-picker">
+      <label className="bingo-picker-label">Deck for next game
+        <select value={deckId} onChange={(e) => setDeckId(e.target.value)} disabled={!decks}>
+          {(decks || []).map((d) => <option key={d.id} value={d.id}>{d.name} ({d.count})</option>)}
+        </select>
+      </label>
+      <label className="bingo-picker-label">Win pattern
+        <select value={pattern} onChange={(e) => setPattern(e.target.value)}>
+          {BINGO_PATTERN_IDS.map((p) => <option key={p} value={p}>{BINGO_PATTERN_NAME[p]}</option>)}
+        </select>
+      </label>
+      <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => onReset(deckId, pattern)}>Reset for New Game</button>
+    </div>
+  );
+}
 function NotConnectedBingo({ title }) {
   return (
     <div className="staff-dash">
@@ -2931,10 +2967,10 @@ function BingoStyleScreen({ navigate }) {
   const act = async (fn) => { setBusy(true); try { await fn(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
-      <AppPanel title="Game Menu" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
-        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready · ${state.calls.length} phrases called` : ''}</p>
+      <AppPanel title="Game Menu" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready · ${state.calls.length} called` : ''}</p>
         <button type="button" className="bingo-btn" disabled={busy || state?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
-        <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiBingoReset)}>Reset for New Game</button>
+        <DeckPatternPicker currentDeckId={state?.deckId} currentPattern={state?.pattern} busy={busy} onReset={(deckId, pattern) => act(() => apiBingoReset(deckId, pattern))} />
         <button type="button" className="bingo-btn gold" onClick={() => navigate('host')}>Open Host Control →</button>
       </AppPanel>
     </div>
@@ -2999,11 +3035,18 @@ function TvDisplayScreen() {
           <span>{state.winner.number}</span>
         </div>
       )}
-      <AppPanel title="Lip Sync Bingo" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
-        <p className="dash-num">{state ? `${state.playerCount} playing · ${state.readyCount} ready` : ''}</p>
+      <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} playing · ${state.readyCount} ready · ${BINGO_PATTERN_NAME[state.pattern]}` : ''}</p>
+        {calls.length > 0 && (
+          <div className="bingo-current-call">
+            {calls[calls.length - 1].type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+            <strong>{calls[calls.length - 1].artist}</strong>
+            <span>{calls[calls.length - 1].song}</span>
+          </div>
+        )}
         <div className="bingo-call-log">
           {calls.length === 0 && <p className="dash-empty">Calls will appear here once the round goes live.</p>}
-          {calls.map((c, i) => <span key={c} className={`bingo-chip${i === calls.length - 1 ? ' latest' : ''}`}>{c}</span>)}
+          {calls.map((c, i) => <span key={c.id} className={`bingo-chip${i === calls.length - 1 ? ' latest' : ''}`}>{c.artist} — {c.song}</span>)}
         </div>
       </AppPanel>
     </div>
@@ -3020,7 +3063,7 @@ function LobbyScreen({ navigate }) {
   const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
-      <AppPanel title="Lip Sync Bingo" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+      <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
         <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
         {!me ? (
           <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
@@ -3037,18 +3080,32 @@ function LobbyScreen({ navigate }) {
 }
 
 // Member: their real dealt card, live-marked as the host calls phrases.
+// Real bingo, not decoration: a called square only counts once the player
+// actually taps it. Tapping is optimistic (instant local feedback) and
+// reconciled by the next poll, but the server is the one that ultimately
+// decides whether a claim is real — see bingoHasWin() on the backend.
 function PlayerCardScreen({ navigate }) {
   const { state, err } = useBingoState(2500);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [localCovered, setLocalCovered] = useState(null); // optimistic override until the next poll lands
   if (err === 'not-connected') return <NotConnectedBingo title="Your Card" />;
   const me = state?.me;
-  const called = new Set(state?.calls || []);
+  const calledIds = new Set((state?.calls || []).map((c) => c.id));
+  const covered = new Set(localCovered ?? me?.covered ?? []);
   const claim = async () => {
     setBusy(true); setMsg('');
     try { await apiBingoClaim(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
-    catch (e) { setMsg(e.message === 'not a bingo yet' ? 'Not a bingo yet — keep watching the calls!' : 'Could not submit — try again.'); }
+    catch (e) { setMsg(e.message === 'not a bingo yet' ? 'Not a bingo yet — cover a full pattern first!' : 'Could not submit — try again.'); }
     setBusy(false);
+  };
+  const tap = async (item) => {
+    if (item.free || !calledIds.has(item.id)) return; // can only cover what's actually been called
+    const next = new Set(covered);
+    const wasCovered = next.has(item.id);
+    wasCovered ? next.delete(item.id) : next.add(item.id);
+    setLocalCovered([...next]);
+    try { await apiBingoMark(item.id, !wasCovered); } catch { setLocalCovered(null); } // reconcile from server on failure
   };
   if (!me) {
     return (
@@ -3067,11 +3124,25 @@ function PlayerCardScreen({ navigate }) {
           <strong>🏆 {state.winner.name} won!</strong>
         </div>
       )}
-      <AppPanel title="Your Card" subtitle={state ? BINGO_STATUS_LABEL[state.status] : 'Loading…'}>
+      <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+        <p className="mem-fineprint">Tap a square once the host calls it — {BINGO_PATTERN_LABEL[state?.pattern] || 'complete a line'} to win.</p>
         <div className="bingo-grid">
-          {me.card.map((phrase, i) => {
-            const marked = i === 12 || called.has(phrase);
-            return <div key={`${i}-${phrase}`} className={`bingo-cell${marked ? ' marked' : ''}${i === 12 ? ' free' : ''}`}>{phrase}</div>;
+          {me.card.map((item, i) => {
+            const isFree = i === 12;
+            const isCalled = calledIds.has(item.id);
+            const isCovered = isFree || covered.has(item.id);
+            const cls = ['bingo-cell', isFree ? 'free' : '', isCovered ? 'marked' : '', !isFree && isCalled && !isCovered ? 'tappable' : ''].filter(Boolean).join(' ');
+            return (
+              <button type="button" key={`${i}-${item.id}`} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled}>
+                {isFree ? 'FREE SPACE' : (
+                  <>
+                    {item.type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+                    <span className="bingo-cell-artist">{item.artist}</span>
+                    <span className="bingo-cell-song">{item.song}</span>
+                  </>
+                )}
+              </button>
+            );
           })}
         </div>
         {!state.winner && (
@@ -3108,14 +3179,21 @@ function HostScreen() {
   const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); await poll(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
-      <AppPanel title="Host Control" subtitle={board ? BINGO_STATUS_LABEL[board.status] : 'Loading…'}>
+      <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
         <div className="bingo-status-row">
           <span>{board ? `${board.players.length} players` : ''}</span>
           <span>{board ? `${board.calls.length} called` : ''}</span>
         </div>
+        {board?.calls.length > 0 && (
+          <div className="bingo-current-call">
+            {board.calls[board.calls.length - 1].type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+            <strong>{board.calls[board.calls.length - 1].artist}</strong>
+            <span>{board.calls[board.calls.length - 1].song}</span>
+          </div>
+        )}
         <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
         <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
-        <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiBingoReset)}>Reset for New Game</button>
+        <DeckPatternPicker currentDeckId={board?.deckId} currentPattern={board?.pattern} busy={busy} onReset={(deckId, pattern) => act(() => apiBingoReset(deckId, pattern))} />
       </AppPanel>
       <AppPanel title="Pending claims" subtitle="Approve to end the round">
         {board && board.claims.length === 0 && <p className="dash-empty">No claims yet.</p>}
@@ -3215,10 +3293,10 @@ function SongQueueScreen() {
   const calls = [...(state?.calls || [])].reverse();
   return (
     <div className="staff-dash">
-      <AppPanel title="Call History" subtitle={state ? `${calls.length} phrases called` : 'Loading…'}>
+      <AppPanel title="Call History" subtitle={state ? `${calls.length} called · ${state.deckName}` : 'Loading…'}>
         {calls.length === 0 && <p className="dash-empty">Nothing called yet this round.</p>}
         <div className="bingo-call-log">
-          {calls.map((c, i) => <span key={c} className={`bingo-chip${i === 0 ? ' latest' : ''}`}>{c}</span>)}
+          {calls.map((c, i) => <span key={c.id} className={`bingo-chip${i === 0 ? ' latest' : ''}`}>{c.type === 'lipsync' ? '🎤 ' : ''}{c.artist} — {c.song}</span>)}
         </div>
       </AppPanel>
     </div>
@@ -3288,17 +3366,79 @@ function CheckoutScreen() {
   );
 }
 
-function PartyScreen() {
+const PARTY_STATUS_LABEL = { idle: 'No battle right now', battling: 'Battle live — vote now!', ended: 'Battle over' };
+const PARTY_REACTIONS = ['🔥', '😍', '😂', '👏', '💯', '⭐'];
+
+// Party Mode / Battlerz — Team Purple vs Team Pink, real audience voting.
+// Host starts/ends the battle and needs 5+ players in the room; members
+// vote for a team and can react once they've picked one. Same shared state
+// for everyone, same as the rest of Lip Sync Bingo.
+function PartyScreen({ isHost }) {
+  const [party, setParty] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const liveRef = useRef(true);
+  const poll = async () => {
+    if (!apiEnabled()) { setErr('not-connected'); return; }
+    try { const p = await apiPartyState(); if (liveRef.current) { setParty(p); setErr(''); } }
+    catch { if (liveRef.current) setErr('Could not reach the venue backend.'); }
+  };
+  useEffect(() => {
+    liveRef.current = true;
+    poll();
+    const id = setInterval(poll, 2500);
+    return () => { liveRef.current = false; clearInterval(id); };
+  }, []);
+  if (err === 'not-connected') return <NotConnectedBingo title="Party Mode" />;
+  const act = async (fn) => { setBusy(true); setErr(''); try { await fn(); await poll(); } catch (e) { setErr(e.message || 'Could not do that.'); } setBusy(false); };
+  const vote = async (team, reaction) => { setBusy(true); try { await apiPartyVote(team, reaction); await poll(); } catch { /* ignore */ } setBusy(false); };
+
+  const total = (party?.votesA || 0) + (party?.votesB || 0);
+  const pctA = total ? Math.round((party.votesA / total) * 100) : 50;
+  const myTeam = party?.myVote?.team;
+
   return (
-    <div className="assembled-page party-page">
-      <div className="party-piece-row">
-        <img src={ui.party.battleCard} alt="" />
-        <img src={ui.party.hypeMeter} alt="" />
-        <img src={ui.party.startBattle} alt="" />
-        <div className="reaction-row">
-          {[ui.party.reaction1, ui.party.reaction2, ui.party.reaction3, ui.party.reaction4].map((item) => <img src={item} alt="" key={item} />)}
-        </div>
-      </div>
+    <div className="staff-dash">
+      <AppPanel title="Party Mode Battlerz" subtitle={party ? PARTY_STATUS_LABEL[party.status] : 'Loading…'}>
+        {party?.status === 'idle' && !isHost && <p className="dash-empty">No battle right now — check back when the host starts one.</p>}
+        {party && party.status !== 'idle' && (
+          <>
+            <div className="party-vs-row">
+              <div className={`party-team a${myTeam === 'a' ? ' mine' : ''}`}><strong>{party.teamA}</strong><span>{party.votesA} votes</span></div>
+              <div className="party-vs">VS</div>
+              <div className={`party-team b${myTeam === 'b' ? ' mine' : ''}`}><strong>{party.teamB}</strong><span>{party.votesB} votes</span></div>
+            </div>
+            <div className="party-hype-bar"><span style={{ width: `${pctA}%` }} /></div>
+            {party.status === 'battling' && !isHost && (
+              <div className="party-vote-row">
+                <button type="button" className="bingo-btn" disabled={busy} onClick={() => vote('a')}>{myTeam === 'a' ? '✓ Voted ' : 'Vote '}{party.teamA}</button>
+                <button type="button" className="bingo-btn gold" disabled={busy} onClick={() => vote('b')}>{myTeam === 'b' ? '✓ Voted ' : 'Vote '}{party.teamB}</button>
+              </div>
+            )}
+            {party.status === 'ended' && party.winner && (
+              <div className="bingo-winner-banner"><strong>🏆 {party.winner === 'a' ? party.teamA : party.teamB} wins the battle!</strong></div>
+            )}
+          </>
+        )}
+      </AppPanel>
+      {!isHost && party?.status === 'battling' && (
+        <AppPanel title="React" subtitle={myTeam ? 'Hype up your team' : 'Vote for a team first'}>
+          <div className="party-reaction-row">
+            {PARTY_REACTIONS.map((r) => (
+              <button type="button" key={r} className="party-reaction-chip" disabled={busy || !myTeam} onClick={() => vote(myTeam, r)}>{r}</button>
+            ))}
+          </div>
+        </AppPanel>
+      )}
+      {isHost && (
+        <AppPanel title="Host Controls" subtitle={`Minimum ${party?.minPlayers ?? 5} players to start`}>
+          <p className="dash-num">{party ? `${party.playerCount} in the room` : ''}</p>
+          {err && <p className="dash-empty">{err}</p>}
+          <button type="button" className="bingo-btn" disabled={busy || party?.status === 'battling'} onClick={() => act(apiPartyStart)}>Start Battle</button>
+          <button type="button" className="bingo-btn gold" disabled={busy || party?.status !== 'battling'} onClick={() => act(apiPartyEnd)}>End Battle</button>
+          <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiPartyReset)}>Reset</button>
+        </AppPanel>
+      )}
     </div>
   );
 }

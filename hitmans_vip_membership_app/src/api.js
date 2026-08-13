@@ -89,14 +89,23 @@ export function apiBingoState() { return call('GET', '/bingo/state', null, apiTo
 export function apiBingoJoin() { return call('POST', '/bingo/join', {}, apiToken()); }
 export function apiBingoReady(ready) { return call('POST', '/bingo/ready', { ready }, apiToken()); }
 export function apiBingoClaim() { return call('POST', '/bingo/claim', {}, apiToken()); }
+export function apiBingoMark(itemId, covered) { return call('POST', '/bingo/mark', { itemId, covered }, apiToken()); }
 export function apiBingoStart() { return call('POST', '/bingo/start', {}, apiStaffToken()); }
 export function apiBingoCall() { return call('POST', '/bingo/call', {}, apiStaffToken()); }
 export function apiBingoResolve(claimId, approve) { return call('POST', '/bingo/resolve', { claimId, approve }, apiStaffToken()); }
-export function apiBingoReset() { return call('POST', '/bingo/reset', {}, apiStaffToken()); }
+export function apiBingoReset(deckId, pattern) { return call('POST', '/bingo/reset', { deckId, pattern }, apiStaffToken()); }
 export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiStaffToken()); }
+export function apiBingoDecks() { return call('GET', '/bingo/decks', null, apiStaffToken()); }
 export function apiYoutubeSearch(q) { return call('GET', `/media/youtube-search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
 export function apiBingoPlayMedia(videoId, title) { return call('POST', '/bingo/media', { videoId, title }, apiStaffToken()); }
 export function apiBingoStopMedia() { return call('POST', '/bingo/media/stop', {}, apiStaffToken()); }
+
+// ── Party Mode / Battlerz ──
+export function apiPartyState() { return call('GET', '/party/state', null, apiToken() || apiStaffToken()); }
+export function apiPartyStart() { return call('POST', '/party/start', {}, apiStaffToken()); }
+export function apiPartyVote(team, reaction) { return call('POST', '/party/vote', { team, reaction }, apiToken()); }
+export function apiPartyEnd() { return call('POST', '/party/end', {}, apiStaffToken()); }
+export function apiPartyReset() { return call('POST', '/party/reset', {}, apiStaffToken()); }
 
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
 // Handles prefer the connected venue's config (config-over-the-air), then env.
