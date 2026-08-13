@@ -93,7 +93,10 @@ button {
 .dynamic-bg-hitkoin {
   background-image: url("/HVAS/assets/ui/source_sheets/ui_05_HITKOIN_LOGO.png");
   background-position: center;
-  background-size: auto 112%;
+  /* contain, not "auto <height>%": on a tall narrow phone (portrait) sizing
+     by height alone blows the width way past the viewport and crops both
+     sides; contain always shows the whole image, in any orientation. */
+  background-size: contain;
   animation: hitkoin-cycle 26s cubic-bezier(0.42, 0, 0.24, 1) infinite;
 }
 
@@ -118,7 +121,7 @@ button {
 .dynamic-bg-vip {
   background-image: url("/HVAS/assets/ui/main-menu-background.png");
   background-position: center;
-  background-size: auto 112%;
+  background-size: contain;
   animation: vip-cycle 26s cubic-bezier(0.42, 0, 0.24, 1) infinite;
 }
 
@@ -553,21 +556,23 @@ button {
 }
 
 .app-menu-board .menu-flow-row {
-  grid-template-columns: 34px 92px 1fr;
-  min-height: 76px;
+  grid-template-columns: 22px 52px 1fr;
+  min-height: 46px;
 }
 
 .app-menu-board .menu-flow-row img {
-  width: 92px;
-  max-height: 36px;
+  width: 52px;
+  max-height: 22px;
 }
 
 .app-menu-board .menu-flow-row strong {
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.2;
 }
 
 .app-menu-board .menu-flow-row span {
-  font-size: 13px;
+  font-size: 11.5px;
+  line-height: 1.2;
 }
 
 .simple-menu-screen {
@@ -1470,7 +1475,7 @@ button {
 
 .menu-flow-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .sheet-screen-grid {
@@ -1977,9 +1982,9 @@ button {
 .rule-row {
   display: grid;
   align-items: center;
-  gap: 12px;
-  min-height: 58px;
-  padding: 10px 12px;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 10px;
   border: 1px solid rgba(201, 68, 255, 0.38);
   border-radius: 8px;
   background: rgba(12, 5, 21, 0.72);
@@ -1988,7 +1993,7 @@ button {
 }
 
 .menu-flow-row {
-  grid-template-columns: 30px 78px 1fr;
+  grid-template-columns: 24px 58px 1fr;
   width: 100%;
   cursor: pointer;
 }
@@ -2007,17 +2012,18 @@ button {
 .menu-flow-row b {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: 1px solid #ff5cf4;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #ffd66d;
   background: rgba(81, 10, 116, 0.75);
+  font-size: 12px;
 }
 
 .menu-flow-row img {
-  width: 78px;
-  max-height: 32px;
+  width: 58px;
+  max-height: 24px;
   object-fit: contain;
 }
 
@@ -2029,13 +2035,15 @@ button {
 
 .menu-flow-row strong {
   color: #fff7e6;
-  font-size: 16px;
+  font-size: 14.5px;
+  line-height: 1.25;
 }
 
 .menu-flow-row span,
 .rule-row span {
   color: rgba(255, 247, 230, 0.74);
-  line-height: 1.3;
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .member-pass-live {
