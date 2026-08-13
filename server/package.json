@@ -11,6 +11,8 @@
   "scripts": {
     "start": "node src/index.mjs",
     "host": "node host.mjs",
+    "keeper": "node deploy-keeper.mjs",
+    "test:keeper": "node deploy-keeper-test.mjs",
     "test": "node test.mjs",
     "test:mesh": "node mesh-test.mjs",
     "test:mesh-tcp": "node mesh-tcp-test.mjs",

@@ -17,6 +17,12 @@ Anything that runs Node 22+:
 cd server
 npm run host        # PORT=8787 by default
 ```
+
+**Or, so it stays up on its own** — no terminal window to keep open, survives
+crashes and power blips, and updates itself when you push new code:
+```bash
+npm run keeper       # runs host.mjs under the Deploy Keeper (see below)
+```
 It prints the address to connect to, e.g.:
 
 ```
@@ -62,6 +68,54 @@ host using a free tunnel — the venue device stays the server:
 
 Either gives a URL to paste into **Connect to venue**; no hosting bill, no
 serverless.
+
+## Deploy Keeper — your own Coolify, built in
+
+`deploy-keeper.mjs` is a small, zero-dependency supervisor: it runs the
+backend as a child process, restarts it if it ever crashes, and watches your
+deploy branch for new pushes. When one lands, it pulls it into a **dedicated
+checkout**, runs the real test suite against it, and only flips traffic to
+the new code if every test passes — otherwise it rolls the checkout back and
+keeps the last good version running. No Docker, no external PaaS account,
+no separate service to configure.
+
+```bash
+git clone <your fork> hvas-deploy && cd hvas-deploy/server   # a checkout just for this
+npm install
+KEEPER_BRANCH=main npm run keeper
+```
+
+Useful env vars (all optional):
+```bash
+KEEPER_POLL_SECONDS=120        # how often to check for new commits
+KEEPER_NOTIFY_WEBHOOK=https://ntfy.sh/your-topic   # POSTed on crash/deploy events
+```
+
+Live status (pid, current commit, restart count, last event) is written to
+`server/data/keeper-status.json`.
+
+**Run it forever, even across reboots**, with systemd (Linux — mini-PC, Pi, or
+a $5/mo VPS all work the same way):
+```ini
+# /etc/systemd/system/hvas-keeper.service
+[Unit]
+Description=HVAS Deploy Keeper
+After=network.target
+
+[Service]
+WorkingDirectory=/home/you/hvas-deploy/server
+ExecStart=/usr/bin/node deploy-keeper.mjs
+Restart=always
+Environment=KEEPER_BRANCH=main
+
+[Install]
+WantedBy=multi-user.target
+```
+```bash
+sudo systemctl enable --now hvas-keeper
+```
+Systemd restarts the *keeper* if it ever dies; the keeper restarts the *app*
+if it ever dies — two independent safety nets, no monthly fee either way.
 
 ## Why this runs better than cloud
 - **Latency:** LAN hop vs. a round-trip to a datacenter.
