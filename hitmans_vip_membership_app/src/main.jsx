@@ -2080,10 +2080,16 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
   // Tap OR swipe both pick a tier. Tapping scrolls that card to center;
   // swiping and letting go auto-selects whatever settled at center — the
   // rail is CSS scroll-snap, so "settled" always means centered already.
+  // Scrolls ONLY the rail itself (rail.scrollTo, not element.scrollIntoView)
+  // — scrollIntoView can drag ancestor scroll containers along with it on
+  // mobile, which was scrolling the whole page just from tapping a tier.
   const selectTier = (name) => {
     setTier(name);
-    railRef.current?.querySelector(`[data-tier="${name}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const rail = railRef.current;
+    const card = rail?.querySelector(`[data-tier="${name}"]`);
+    if (rail && card) {
+      rail.scrollTo({ left: card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2, behavior: 'smooth' });
+    }
   };
   const onRailScroll = () => {
     clearTimeout(scrollTimer.current);
