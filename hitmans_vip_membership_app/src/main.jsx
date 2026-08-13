@@ -8,7 +8,8 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
-  apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset } from './api.js';
+  apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
+  apiBookingRequest, apiBookingMine, apiBookingCancel, apiBookingBoard, apiBookingDecide } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
 
@@ -855,6 +856,20 @@ const screens = [
     title: 'Party Mode Battlez',
     detail: 'Team Purple vs Team Pink — real audience voting and reactions, live for everyone in the room.',
   },
+  {
+    id: 'booking',
+    label: 'Book a Table',
+    eyebrow: 'VIP Table Booking',
+    title: 'Book a VIP Table',
+    detail: 'Request a night and party size — staff confirms with a table assignment.',
+  },
+  {
+    id: 'bookingBoard',
+    label: 'Table Bookings',
+    eyebrow: 'Staff Check-In',
+    title: 'Table Bookings',
+    detail: 'Every upcoming table request — approve with a table, or decline with a reason.',
+  },
 ];
 
 const loadingPhases = [
@@ -882,9 +897,10 @@ const ROLES = [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
       { title: 'Party Mode', detail: 'Vote for your favorite team during Battlerz', chip: ui.chips.active, target: 'party' },
+      { title: 'Book a VIP Table', detail: 'Request a night + party size, staff confirms', chip: ui.chips.vip, target: 'booking' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party'],
+    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking'],
   },
   {
     id: 'staff',
@@ -897,8 +913,9 @@ const ROLES = [
       { title: 'Verify at the Door', detail: 'Scan QR or type the member number', chip: ui.chips.active, target: 'verification' },
       { title: 'Watchlist', detail: 'Trespassed & banned members — flag or lift', chip: ui.chips.vip, target: 'watchlist' },
       { title: 'Payments', detail: 'Confirm Zelle / cash membership payments', chip: ui.chips.vip, target: 'payments' },
+      { title: 'Table Bookings', detail: 'Approve or decline VIP table requests', chip: ui.chips.staff, target: 'bookingBoard' },
     ],
-    allowed: ['verification', 'staffDashboard', 'watchlist', 'payVerify', 'searchMember', 'entry', 'payments'],
+    allowed: ['verification', 'staffDashboard', 'watchlist', 'payVerify', 'searchMember', 'entry', 'payments', 'bookingBoard'],
   },
   {
     id: 'host',
@@ -1307,6 +1324,8 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
   if (activeScreen === 'checkout') return <CheckoutScreen />;
+  if (activeScreen === 'booking') return <TableBookingScreen />;
+  if (activeScreen === 'bookingBoard') return <TableBookingBoardScreen />;
   return <PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
 }
 
@@ -3437,6 +3456,161 @@ function PartyScreen({ isHost }) {
           <button type="button" className="bingo-btn" disabled={busy || party?.status === 'battling'} onClick={() => act(apiPartyStart)}>Start Battle</button>
           <button type="button" className="bingo-btn gold" disabled={busy || party?.status !== 'battling'} onClick={() => act(apiPartyEnd)}>End Battle</button>
           <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiPartyReset)}>Reset</button>
+        </AppPanel>
+      )}
+    </div>
+  );
+}
+
+// ── VIP Table Booking — the in-house "Cal.com": a member requests a night +
+// party size, staff approves with a table assignment or declines with a
+// reason. Same op-log → SQLite pattern as everything else, no external
+// scheduling service. ──
+const BOOKING_STATUS_LABEL = { pending: 'Pending', approved: 'Approved', declined: 'Declined', cancelled: 'Cancelled' };
+
+function TableBookingScreen() {
+  const [bookings, setBookings] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [night, setNight] = useState('');
+  const [partySize, setPartySize] = useState(4);
+  const [note, setNote] = useState('');
+  const [formErr, setFormErr] = useState('');
+
+  const load = () => {
+    if (!apiEnabled() || !apiToken()) { setErr('Connect to a venue backend to request a table.'); setBookings([]); return; }
+    apiBookingMine().then((r) => { setBookings(r.bookings || []); setErr(''); }).catch(() => setErr('Could not load your bookings.'));
+  };
+  useEffect(() => { load(); const id = setInterval(load, 10000); return () => clearInterval(id); }, []);
+
+  const submit = async () => {
+    setFormErr(''); setBusy(true);
+    try {
+      await apiBookingRequest(night, Number(partySize), note.trim());
+      setNight(''); setNote(''); setPartySize(4);
+      load();
+    } catch (e) { setFormErr(e.message || 'Could not request a table.'); }
+    setBusy(false);
+  };
+  const cancel = async (id) => { setBusy(true); try { await apiBookingCancel(id); load(); } catch { /* ignore */ } setBusy(false); };
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Book a VIP Table" subtitle="Pick a night, party size, and any notes for the host">
+        {err && <p className="dash-empty">{err}</p>}
+        {!err && (
+          <div className="auth-card booking-form">
+            <label>Night<input type="date" min={today} value={night} onChange={(e) => setNight(e.target.value)} /></label>
+            <label>Party size<input type="number" min="1" max="20" value={partySize} onChange={(e) => setPartySize(e.target.value)} /></label>
+            <label>Note (optional)<input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Birthday, bottle service, etc." /></label>
+            {formErr && <p className="gate-err">{formErr}</p>}
+            <button type="button" className="bingo-btn" disabled={busy || !night} onClick={submit}>Request Table</button>
+          </div>
+        )}
+      </AppPanel>
+      {bookings && bookings.length > 0 && (
+        <AppPanel title="Your Requests" subtitle="Most recent first">
+          {bookings.map((b) => (
+            <div key={b.id} className="pay-claim booking-row">
+              <div className="pay-claim-info">
+                <strong>{b.night} · {b.party_size} {b.party_size === 1 ? 'guest' : 'guests'}</strong>
+                <span className="dash-num">
+                  <span className={`booking-status booking-status-${b.status}`}>{BOOKING_STATUS_LABEL[b.status]}</span>
+                  {b.table_label ? ` · ${b.table_label}` : ''}
+                  {b.reason ? ` · ${b.reason}` : ''}
+                </span>
+              </div>
+              {['pending', 'approved'].includes(b.status) && (
+                <div className="pay-claim-actions">
+                  <button type="button" className="pay-void" disabled={busy} onClick={() => cancel(b.id)}>Cancel</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </AppPanel>
+      )}
+    </div>
+  );
+}
+
+// Staff-facing board — approve (with a table assignment) or decline (with an
+// optional reason), inline, no native browser dialogs.
+function TableBookingBoardScreen() {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [action, setAction] = useState(null); // { id, kind: 'approve' | 'decline' }
+  const [value, setValue] = useState('');
+
+  const load = () => {
+    if (!apiEnabled() || !apiStaffToken()) { setErr('Connect to a venue backend to manage table bookings.'); setRows([]); return; }
+    apiBookingBoard().then((r) => { setRows(r.bookings || []); setErr(''); }).catch(() => setErr('Could not load table bookings.'));
+  };
+  useEffect(() => { load(); const id = setInterval(load, 8000); return () => clearInterval(id); }, []);
+
+  const openApprove = (id) => { setAction({ id, kind: 'approve' }); setValue('VIP Booth'); };
+  const openDecline = (id) => { setAction({ id, kind: 'decline' }); setValue(''); };
+  const cancelAction = () => { setAction(null); setValue(''); };
+  const confirmAction = async () => {
+    if (!action) return;
+    setBusy(true);
+    try {
+      if (action.kind === 'approve') await apiBookingDecide(action.id, true, value.trim());
+      else await apiBookingDecide(action.id, false, '', value.trim());
+      setAction(null); setValue('');
+      load();
+    } catch { /* ignore */ }
+    setBusy(false);
+  };
+
+  const pending = (rows || []).filter((b) => b.status === 'pending');
+  const decided = (rows || []).filter((b) => b.status !== 'pending');
+
+  return (
+    <div className="staff-dash">
+      <AppPanel title="Table Bookings" subtitle="Pending requests">
+        {err && <p className="dash-empty">{err}</p>}
+        {rows && pending.length === 0 && !err && <p className="dash-empty">No pending requests — you're all caught up.</p>}
+        {pending.map((b) => (
+          <div key={b.id} className="pay-claim booking-row">
+            <div className="pay-claim-info">
+              <strong>{b.name} · {b.night} · {b.party_size} {b.party_size === 1 ? 'guest' : 'guests'}</strong>
+              <span className="dash-num">{b.number}{b.note ? ` · ${b.note}` : ''}</span>
+              {action?.id === b.id && (
+                <div className="booking-inline-action">
+                  <input type="text" value={value} onChange={(e) => setValue(e.target.value)}
+                    placeholder={action.kind === 'approve' ? 'Table / booth (e.g. VIP Booth 3)' : 'Reason (optional)'} />
+                  <button type="button" className="pay-confirm" disabled={busy} onClick={confirmAction}>
+                    {action.kind === 'approve' ? '✓ Confirm Approve' : 'Confirm Decline'}
+                  </button>
+                  <button type="button" className="bingo-btn ghost" disabled={busy} onClick={cancelAction}>Cancel</button>
+                </div>
+              )}
+            </div>
+            {action?.id !== b.id && (
+              <div className="pay-claim-actions">
+                <button type="button" className="pay-confirm" disabled={busy} onClick={() => openApprove(b.id)}>✓ Approve</button>
+                <button type="button" className="pay-void" disabled={busy} onClick={() => openDecline(b.id)}>Decline</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </AppPanel>
+      {decided.length > 0 && (
+        <AppPanel title="Decided" subtitle="Approved & declined, upcoming nights">
+          {decided.map((b) => (
+            <div key={b.id} className="pay-claim booking-row">
+              <div className="pay-claim-info">
+                <strong>{b.name} · {b.night} · {b.party_size} {b.party_size === 1 ? 'guest' : 'guests'}</strong>
+                <span className="dash-num">
+                  <span className={`booking-status booking-status-${b.status}`}>{BOOKING_STATUS_LABEL[b.status]}</span>
+                  {b.table_label ? ` · ${b.table_label}` : ''}
+                  {b.reason ? ` · ${b.reason}` : ''}
+                </span>
+              </div>
+            </div>
+          ))}
         </AppPanel>
       )}
     </div>

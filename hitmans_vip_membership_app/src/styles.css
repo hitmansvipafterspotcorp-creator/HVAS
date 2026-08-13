@@ -3925,6 +3925,18 @@ button {
 .party-reaction-chip:active { transform: scale(.92); }
 .party-reaction-chip:disabled { opacity: .4; cursor: default; }
 
+/* ── VIP Table Booking ── */
+.booking-form input { margin-top: 0; }
+.booking-form .bingo-btn { margin-top: 4px; }
+.booking-row { align-items: flex-start; flex-wrap: wrap; }
+.booking-status { font-weight: 800; letter-spacing: .02em; }
+.booking-status-pending { color: #ffd66b; }
+.booking-status-approved { color: #52ffa8; }
+.booking-status-declined, .booking-status-cancelled { color: #ff8a8a; }
+.booking-inline-action { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; width: 100%; }
+.booking-inline-action input { flex: 1; min-width: 160px; padding: 10px 12px; border-radius: 10px; border: 1px solid #4a3a72; background: #140a26; color: #f4ecff; font-size: 14px; }
+.booking-inline-action .pay-confirm, .booking-inline-action .bingo-btn { margin-top: 0; }
+
 /* ── HitKoin (member reward token) ── */
 .hitkoin {
   margin: 16px auto 0; max-width: 720px; padding: 16px 18px; border-radius: 16px;

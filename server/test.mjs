@@ -229,6 +229,67 @@ ok(partyReset.status === 200, 'host resets for the next battle');
 party = await call('GET', '/party/state');
 ok(party.body.status === 'idle' && party.body.winner === null, 'reset returns to idle with no winner');
 
+console.log('VIP TABLE BOOKING');
+const tonight = new Date().toISOString().slice(0, 10);
+const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+const lastWeek = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+
+const noAuthReq = await call('POST', '/booking/request', { night: nextWeek, partySize: 4 }, null);
+ok(noAuthReq.status === 401, 'requesting a table requires a member session');
+
+const badDate = await call('POST', '/booking/request', { night: 'not-a-date', partySize: 4 }, mtok);
+ok(badDate.status === 400, 'refuses a malformed date');
+
+const pastDate = await call('POST', '/booking/request', { night: lastWeek, partySize: 4 }, mtok);
+ok(pastDate.status === 400, 'refuses a night that already passed');
+
+const tooBig = await call('POST', '/booking/request', { night: nextWeek, partySize: 99 }, mtok);
+ok(tooBig.status === 400, 'refuses an out-of-range party size');
+
+const req1 = await call('POST', '/booking/request', { night: nextWeek, partySize: 6, note: 'Birthday, need bottle service' }, mtok);
+ok(req1.status === 200 && req1.body.status === 'pending', 'Tasha requests a table for next week');
+
+const mine = await call('GET', '/booking/mine', null, mtok);
+ok(mine.body.bookings.length === 1 && mine.body.bookings[0].id === req1.body.id, 'Tasha sees her own request');
+
+const notMine = await call('GET', '/booking/mine', null, mtok2);
+ok(notMine.body.bookings.length === 0, "another member doesn't see Tasha's booking");
+
+const boardNoAuth = await call('GET', '/booking/board', null, mtok);
+ok(boardNoAuth.status === 401, 'members cannot see the staff booking board');
+
+const board1 = await call('GET', '/booking/board', null, stok);
+ok(board1.body.bookings.length === 1 && board1.body.bookings[0].name === 'Tasha', 'staff board shows the request with the member name joined in');
+
+const decideNoAuth = await call('POST', '/booking/decide', { id: req1.body.id, approve: true }, mtok);
+ok(decideNoAuth.status === 401, 'members cannot approve/decline bookings');
+
+const approve = await call('POST', '/booking/decide', { id: req1.body.id, approve: true, tableLabel: 'VIP Booth 3' }, stok);
+ok(approve.status === 200 && approve.body.status === 'approved', 'host approves with a table assignment');
+
+const mineAfterApprove = await call('GET', '/booking/mine', null, mtok);
+ok(mineAfterApprove.body.bookings[0].status === 'approved' && mineAfterApprove.body.bookings[0].table_label === 'VIP Booth 3', "Tasha sees it approved with the table label");
+
+const redecide = await call('POST', '/booking/decide', { id: req1.body.id, approve: false }, stok);
+ok(redecide.status === 404, 'an already-decided booking cannot be decided again');
+
+const req2 = await call('POST', '/booking/request', { night: nextWeek, partySize: 2 }, mtok2);
+const decline = await call('POST', '/booking/decide', { id: req2.body.id, approve: false, reason: 'Fully booked that night' }, stok);
+ok(decline.status === 200 && decline.body.status === 'declined', 'host declines a different request with a reason');
+
+const cancelOthers = await call('POST', '/booking/cancel', { id: req1.body.id }, mtok2);
+ok(cancelOthers.status === 404, "cancelling someone else's booking is refused outright");
+const stillApproved = await call('GET', '/booking/mine', null, mtok);
+ok(stillApproved.body.bookings[0].status === 'approved', "a member can't cancel someone else's booking");
+
+const cancelMine = await call('POST', '/booking/cancel', { id: req1.body.id }, mtok);
+ok(cancelMine.status === 200, 'Tasha cancels her own approved booking');
+const afterCancel = await call('GET', '/booking/mine', null, mtok);
+ok(afterCancel.body.bookings[0].status === 'cancelled', 'booking now shows cancelled');
+
+const board2 = await call('GET', '/booking/board', null, stok);
+ok(board2.body.bookings.every((b) => b.night >= tonight), 'staff board only shows tonight-or-later, never past nights');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 server.close();
 try { rmSync(dataDir, { recursive: true, force: true }); } catch {}

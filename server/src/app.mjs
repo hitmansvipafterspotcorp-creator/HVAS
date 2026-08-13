@@ -689,6 +689,51 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { ok: true });
     },
 
+    // ── VIP Table Booking: member requests a night + party size, staff decides ──
+    'POST /booking/request': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { night, partySize, note } = await readBody(req);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(night || '')) return json(res, 400, { error: 'pick a valid date' });
+      if (night < nightKey()) return json(res, 400, { error: 'that night has already passed' });
+      const size = Math.round(Number(partySize));
+      if (!Number.isFinite(size) || size < 1 || size > 20) return json(res, 400, { error: 'party size must be 1-20' });
+      const id = `BK-${randomBytes(4).toString('hex').toUpperCase()}`;
+      commit('booking.request', { id, member_id: c.sub, night, party_size: size, note: (note || '').slice(0, 200), at: Date.now() });
+      json(res, 200, { id, night, partySize: size, status: 'pending' });
+    },
+    'GET /booking/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT * FROM table_bookings WHERE member_id=? ORDER BY at DESC`).all(c.sub);
+      json(res, 200, { bookings: rows });
+    },
+    'POST /booking/cancel': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { id } = await readBody(req);
+      const b = db.prepare(`SELECT * FROM table_bookings WHERE id=? AND member_id=?`).get(id, c.sub);
+      if (!b) return json(res, 404, { error: 'not found' });
+      if (!['pending', 'approved'].includes(b.status)) return json(res, 400, { error: 'nothing to cancel' });
+      commit('booking.cancel', { id, member_id: c.sub, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'GET /booking/board': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT b.*, m.name, m.number FROM table_bookings b JOIN members m ON m.id=b.member_id
+        WHERE b.night >= ? ORDER BY b.night ASC, b.at ASC`).all(nightKey());
+      json(res, 200, { bookings: rows });
+    },
+    'POST /booking/decide': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { id, approve, tableLabel, reason } = await readBody(req);
+      const b = db.prepare(`SELECT * FROM table_bookings WHERE id=? AND status='pending'`).get(id);
+      if (!b) return json(res, 404, { error: 'no pending booking' });
+      commit('booking.decide', {
+        id, approve: !!approve, by: c.sub, at: Date.now(),
+        table_label: approve ? (tableLabel || '').slice(0, 60) || null : null,
+        reason: !approve ? (reason || '').slice(0, 200) || null : null,
+      });
+      json(res, 200, { ok: true, status: approve ? 'approved' : 'declined' });
+    },
+
     // ── YouTube auto-media: no personal login needed at all — search runs on
     // this venue's own app-level key, and the IFrame Player embeds public
     // videos directly. Host picks a result; it syncs to every TV/device the

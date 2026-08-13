@@ -149,6 +149,21 @@ export function applyOp(db, op) {
       db.prepare(`UPDATE party_battle SET status='idle', winner=NULL, started_at=NULL WHERE id=1`).run();
       break;
 
+    // ── VIP Table Booking: member requests, staff decides ──
+    case 'booking.request':
+      db.prepare(`INSERT OR IGNORE INTO table_bookings(id,member_id,night,party_size,note,status,at)
+        VALUES(?,?,?,?,?,'pending',?)`).run(d.id, d.member_id, d.night, d.party_size, d.note ?? null, d.at ?? ts);
+      break;
+    case 'booking.decide':
+      db.prepare(`UPDATE table_bookings SET status=?, table_label=?, reason=?, decided_by=?, decided_at=?
+        WHERE id=? AND status='pending'`)
+        .run(d.approve ? 'approved' : 'declined', d.table_label ?? null, d.reason ?? null, d.by ?? null, d.at ?? ts, d.id);
+      break;
+    case 'booking.cancel':
+      db.prepare(`UPDATE table_bookings SET status='cancelled' WHERE id=? AND member_id=? AND status IN ('pending','approved')`)
+        .run(d.id, d.member_id);
+      break;
+
     default:
       break;
   }

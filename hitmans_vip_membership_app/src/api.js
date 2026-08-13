@@ -107,6 +107,13 @@ export function apiPartyVote(team, reaction) { return call('POST', '/party/vote'
 export function apiPartyEnd() { return call('POST', '/party/end', {}, apiStaffToken()); }
 export function apiPartyReset() { return call('POST', '/party/reset', {}, apiStaffToken()); }
 
+// ── VIP Table Booking ──
+export function apiBookingRequest(night, partySize, note) { return call('POST', '/booking/request', { night, partySize, note }, apiToken()); }
+export function apiBookingMine() { return call('GET', '/booking/mine', null, apiToken()); }
+export function apiBookingCancel(id) { return call('POST', '/booking/cancel', { id }, apiToken()); }
+export function apiBookingBoard() { return call('GET', '/booking/board', null, apiStaffToken()); }
+export function apiBookingDecide(id, approve, tableLabel, reason) { return call('POST', '/booking/decide', { id, approve, tableLabel, reason }, apiStaffToken()); }
+
 // ── HVAS Pay ledger — pay by any rail, owner reconciles ──
 // Handles prefer the connected venue's config (config-over-the-air), then env.
 export const zelleHandle = () => venueConfig().zelle || import.meta.env.VITE_ZELLE_HANDLE || '';

@@ -155,6 +155,23 @@ export function openDb(path) {
       at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_hitkoin_member ON hitkoin_mints(member_id, at);
+
+    -- ── VIP Table Booking: member requests a night + party size, staff decides ──
+    CREATE TABLE IF NOT EXISTS table_bookings (
+      id TEXT PRIMARY KEY,
+      member_id TEXT NOT NULL REFERENCES members(id),
+      night TEXT NOT NULL,                    -- YYYY-MM-DD, the night requested
+      party_size INTEGER NOT NULL,
+      note TEXT,
+      status TEXT NOT NULL DEFAULT 'pending', -- pending | approved | declined | cancelled
+      table_label TEXT,                       -- staff-assigned on approve, e.g. "VIP Booth 3"
+      reason TEXT,                            -- staff note on decline
+      decided_by TEXT,
+      decided_at INTEGER,
+      at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_booking_night ON table_bookings(night, status);
+    CREATE INDEX IF NOT EXISTS idx_booking_member ON table_bookings(member_id, at);
   `);
   // Migration: now_playing (YouTube auto-media) added after the table already
   // shipped — ALTER TABLE ADD COLUMN isn't idempotent like CREATE TABLE, so
