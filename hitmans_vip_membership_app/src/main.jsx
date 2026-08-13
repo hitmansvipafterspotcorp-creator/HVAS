@@ -979,6 +979,20 @@ function App() {
   useEffect(() => {
     runTransition('Boot', current.title, () => setActiveScreen('home'));
     enforceMembership();       // keep a paid membership or stats start over
+    // Scanning the venue's "join QR" with an ordinary camera app (not the
+    // in-app scanner) opens this page with ?connect=<backend url> — connect
+    // to it immediately so a plain camera scan works, not just the in-app one.
+    const toConnect = new URLSearchParams(window.location.search).get('connect');
+    if (toConnect && !apiEnabled()) {
+      connectVenue(toConnect)
+        .then(() => {
+          const clean = window.location.pathname;
+          window.history.replaceState(null, '', clean);
+          window.location.reload();
+        })
+        .catch(() => {}); // bad/unreachable link — fall through to normal boot below
+      return;
+    }
     // The app IS the backend by default: it runs its own in-browser hub in
     // the background so the social layer has something to attach to even
     // with no server connected. Skipped if the user explicitly stopped
@@ -1456,13 +1470,13 @@ function QrScan({ onDecode, onCancel }) {
 }
 
 // A big "Join this venue" QR of the venue address, for others to scan.
-function JoinQR({ url, onClose }) {
+function JoinQR({ url, label, onClose }) {
   const qr = useQrDataUrl(url, ui.fullLogoClear);
   return (
     <div className="join-qr">
       {qr ? <img src={qr} alt="Join QR" /> : <div className="qr-load">QR…</div>}
       <span>Scan to join</span>
-      <small>{url}</small>
+      <small>{label || url}</small>
       <button type="button" className="auth-back" onClick={onClose}>Done</button>
     </div>
   );
@@ -1502,7 +1516,13 @@ function ConnectVenue() {
           <button type="button" onClick={() => setShowQR((v) => !v)}>Show join QR</button>
           <button type="button" onClick={() => { disconnectVenue(); window.location.reload(); }}>Disconnect</button>
         </div>
-        {showQR && <JoinQR url={base} onClose={() => setShowQR(false)} />}
+        {showQR && (
+          <JoinQR
+            url={`${window.location.origin}${window.location.pathname}?connect=${encodeURIComponent(base)}`}
+            label={base}
+            onClose={() => setShowQR(false)}
+          />
+        )}
       </div>
     );
   }
