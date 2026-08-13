@@ -1,11 +1,25 @@
-# Render.com deploy for the HVAS backend. New → Blueprint → point at this repo.
+# Render.com deploy for the HVAS backend — free, no credit card required.
+# New → Blueprint → point at this repo (or paste https://dashboard.render.com/select-repo?type=blueprint
+# and pick the fork). Render reads this file automatically.
 services:
   - type: web
     name: hvas-backend
     runtime: docker
     dockerfilePath: ./server/Dockerfile
     dockerContext: ./server
-    plan: starter            # SSE + always-live: do NOT use a plan that sleeps
+    # free = $0, no card. Two real tradeoffs, be aware of both:
+    #  1) sleeps after 15 min idle, ~30-60s cold start on the next request —
+    #     fine for bingo/party/booking (they poll every few seconds anyway),
+    #     not fine for the live door SSE board staying instant 24/7.
+    #  2) Render's FREE plan cannot attach a persistent disk at all, so /data
+    #     (the SQLite DB — members, payments, HitKoin) resets to EMPTY on
+    #     every restart. Good for a demo / testing this live tonight; do NOT
+    #     use this for a real event where members' data has to survive.
+    #     For real, durable member data, either self-host on a device you
+    #     already own (SELF_HOST.md — genuinely free, genuinely persistent)
+    #     or upgrade this to "starter" + uncomment the disk block below
+    #     (that plan costs money — SELF_HOST.md doesn't).
+    plan: free
     healthCheckPath: /health
     envVars:
       - key: HVAS_DATA_DIR
@@ -14,7 +28,7 @@ services:
         sync: false          # set in the dashboard
       - key: HVAS_HOST_CODE
         sync: false
-    disk:
-      name: hvas-data
-      mountPath: /data
-      sizeGB: 1
+    # disk:                  # uncomment only on a paid plan — free can't attach one
+    #   name: hvas-data
+    #   mountPath: /data
+    #   sizeGB: 1
