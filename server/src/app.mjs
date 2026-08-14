@@ -15,6 +15,14 @@ import {
 } from './crypto.mjs';
 import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
+import { connectUrl } from '../oauth.js';
+
+// member id is carried through OAuth as `state` so the callback knows who connected
+const SOCIAL_CONNECT_URL = {
+  tiktok: (memberId) => connectUrl.tiktok(memberId),
+  instagram: (memberId) => connectUrl.meta(memberId),
+  facebook: (memberId) => connectUrl.meta(memberId),
+};
 
 const TIERS = {
   Daily: { days: 1, vip: false, price: 20 }, Weekly: { days: 7, vip: false, price: 100 },
@@ -266,6 +274,40 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const id = `PMT-${randomBytes(4).toString('hex').toUpperCase()}`;
       commit('payment.claim', { id, member_id: c.sub, tier, rail, amount: t.price, reference: (reference || '').slice(0, 120), at: Date.now() });
       json(res, 200, { id, tier, rail, amount: t.price, status: 'pending' });
+    },
+    // ── social publishing: connect an account, then post a take ──────────
+    // OAuth is done once per account; publishing hands the platform a public
+    // clip URL. See ../SOCIAL_PUBLISHING.md for the app-review requirements.
+    'GET /social/accounts': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT platform, handle, connected_at FROM social_accounts WHERE member_id=?`).all(c.sub);
+      json(res, 200, { accounts: rows });
+    },
+    'GET /social/connect': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const platform = new URL(req.url, 'http://x').searchParams.get('platform');
+      const url = SOCIAL_CONNECT_URL[platform]?.(c.sub);
+      if (!url) return json(res, 400, { error: 'unknown platform' });
+      res.writeHead(302, { Location: url }); res.end();
+    },
+    'POST /social/publish': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { videoUrl, caption } = await readBody(req);
+      if (!/^https:\/\//.test(videoUrl || '')) return json(res, 400, { error: 'videoUrl must be a public https URL' });
+      const rows = db.prepare(`SELECT platform, token, ref FROM social_accounts WHERE member_id=?`).all(c.sub);
+      if (!rows.length) return json(res, 400, { error: 'no connected accounts' });
+      const accounts = {};
+      for (const r of rows) {
+        if (r.platform === 'tiktok') accounts.tiktok = { token: r.token };
+        if (r.platform === 'instagram') accounts.instagram = { token: r.token, userId: r.ref };
+        if (r.platform === 'facebook') accounts.facebook = { token: r.token, pageId: r.ref };
+      }
+      try {
+        const { publishEverywhere } = await import('../social-publish.js');
+        const result = await publishEverywhere({ videoUrl, caption: caption || '', accounts });
+        commit('social.publish', { member_id: c.sub, at: Date.now(), result });
+        json(res, 200, { result });
+      } catch (e) { json(res, 502, { error: String(e.message || e) }); }
     },
     'GET /pay/pending': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });

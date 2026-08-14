@@ -62,6 +62,17 @@ export function openDb(path) {
       at INTEGER NOT NULL,
       PRIMARY KEY (a, b)
     );
+    CREATE TABLE IF NOT EXISTS social_accounts (   -- connected TikTok / IG / FB
+      member_id    TEXT NOT NULL,
+      platform     TEXT NOT NULL,                    -- tiktok | instagram | facebook
+      token        TEXT NOT NULL,
+      refresh      TEXT,
+      ref          TEXT,                             -- ig user id / fb page id
+      handle       TEXT,
+      expires_at   INTEGER,
+      connected_at INTEGER NOT NULL,
+      PRIMARY KEY (member_id, platform)
+    );
     CREATE TABLE IF NOT EXISTS messages (             -- chat history (converges via mesh)
       id TEXT PRIMARY KEY,                    -- op id (dedup)
       from_id TEXT NOT NULL,
