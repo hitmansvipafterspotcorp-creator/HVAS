@@ -202,6 +202,50 @@ export function openDb(path) {
   if (!cardCols.includes('covered')) {
     db.exec(`ALTER TABLE bingo_cards ADD COLUMN covered TEXT NOT NULL DEFAULT '[]'`); // JSON array of item ids the player has tapped
   }
+  // ── Lip Sync Battles ──
+  // A LIP SYNC square can't just be tapped — you have to perform it. When a
+  // lip-sync square is called and 2+ players hold it, they battle: perform,
+  // get voted on, and only the winner may cover it. Declining forfeits the
+  // square for that member, permanently.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lipsync_battles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id TEXT NOT NULL,                  -- the called square being battled for
+      artist TEXT, song TEXT,
+      status TEXT NOT NULL DEFAULT 'pending', -- pending | performing | voting | done | void
+      stage TEXT NOT NULL DEFAULT 'phones',   -- phones | tv  (host decides where it shows)
+      started_at INTEGER NOT NULL,
+      performing_member_id TEXT,              -- whose turn it is right now
+      performance_ends_at INTEGER,
+      voting_ends_at INTEGER,
+      winner_member_id TEXT,
+      resolved_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS lipsync_battle_players (
+      battle_id INTEGER NOT NULL REFERENCES lipsync_battles(id),
+      member_id TEXT NOT NULL REFERENCES members(id),
+      state TEXT NOT NULL DEFAULT 'invited',  -- invited | accepted | declined | performed
+      performed_at INTEGER,
+      PRIMARY KEY (battle_id, member_id)
+    );
+    CREATE TABLE IF NOT EXISTS lipsync_battle_votes (
+      battle_id INTEGER NOT NULL REFERENCES lipsync_battles(id),
+      voter_id TEXT NOT NULL,                 -- one vote per member per battle
+      member_id TEXT NOT NULL,                -- who they voted for
+      at INTEGER NOT NULL,
+      PRIMARY KEY (battle_id, voter_id)
+    );
+    -- A member who declined (or lost) is barred from covering that square.
+    CREATE TABLE IF NOT EXISTS lipsync_locks (
+      member_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
+      reason TEXT NOT NULL,                   -- declined | lost
+      at INTEGER NOT NULL,
+      PRIMARY KEY (member_id, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_battle_item ON lipsync_battles(item_id, status);
+  `);
+
   const entryCols = db.prepare(`PRAGMA table_info(entries)`).all().map((c) => c.name);
   if (!entryCols.includes('left_at')) {
     db.exec(`ALTER TABLE entries ADD COLUMN left_at INTEGER`); // set when the member checks out / leaves — null = still inside

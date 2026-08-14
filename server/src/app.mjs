@@ -267,6 +267,62 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (it) commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
     } catch { /* media is a bonus, never a blocker */ }
   };
+  // Votes per performer, highest first — drives both the live meter and the
+  // automatic winner when the host closes voting.
+  const battleTally = (battleId) => db.prepare(`
+    SELECT p.member_id AS memberId, m.name, m.number, p.state,
+           (SELECT COUNT(*) FROM lipsync_battle_votes v WHERE v.battle_id=p.battle_id AND v.member_id=p.member_id) AS votes
+    FROM lipsync_battle_players p JOIN members m ON m.id=p.member_id
+    WHERE p.battle_id=? ORDER BY votes DESC, m.name ASC`).all(battleId);
+
+  const battlePublic = (b, viewerId) => {
+    const players = battleTally(b.id);
+    const total = players.reduce((n, p) => n + p.votes, 0);
+    return {
+      id: b.id, itemId: b.item_id, artist: b.artist, song: b.song,
+      status: b.status, stage: b.stage,
+      performingMemberId: b.performing_member_id, performanceEndsAt: b.performance_ends_at,
+      votingEndsAt: b.voting_ends_at, winnerMemberId: b.winner_member_id,
+      totalVotes: total,
+      // share of the vote — the on-screen meter during voting
+      players: players.map((p) => ({ ...p, share: total ? Math.round((p.votes / total) * 100) : 0 })),
+      me: players.find((p) => p.memberId === viewerId) || null,
+      myVote: db.prepare('SELECT member_id FROM lipsync_battle_votes WHERE battle_id=? AND voter_id=?').get(b.id, viewerId)?.member_id || null,
+    };
+  };
+
+  // Who is allowed to cover a given LIP SYNC square. You must have won its
+  // battle — or, when you were the only player holding it, have performed it.
+  const lipSyncGate = (memberId, itemId) => {
+    const locked = db.prepare('SELECT reason FROM lipsync_locks WHERE member_id=? AND item_id=?').get(memberId, itemId);
+    if (locked) {
+      return { ok: false, error: locked.reason === 'declined' ? 'you declined this battle' : 'you lost this battle' };
+    }
+    const battle = db.prepare(`SELECT * FROM lipsync_battles WHERE item_id=? ORDER BY id DESC LIMIT 1`).get(itemId);
+    if (!battle) return { ok: false, error: 'lip sync squares must be performed' };
+    if (battle.status !== 'done') return { ok: false, error: 'battle not finished', battleId: battle.id };
+    if (battle.winner_member_id !== memberId) return { ok: false, error: 'you did not win this battle', battleId: battle.id };
+    return { ok: true };
+  };
+
+  // A called LIP SYNC square opens a battle between everyone holding it. Two
+  // or more is a real battle; a single holder still has to perform it solo
+  // before the square counts.
+  const openBattleFor = (item) => {
+    if (item?.type !== 'lipsync') return null;
+    const existing = db.prepare(`SELECT id FROM lipsync_battles WHERE item_id=? AND status NOT IN ('done','void')`).get(item.id);
+    if (existing) return existing.id;
+    const holders = db.prepare('SELECT member_id, card FROM bingo_cards').all()
+      .filter((r) => JSON.parse(r.card).some((s) => s && s.id === item.id))
+      .map((r) => r.member_id)
+      // someone who already forfeited this square isn't dragged back in
+      .filter((m) => !db.prepare('SELECT 1 FROM lipsync_locks WHERE member_id=? AND item_id=?').get(m, item.id));
+    if (holders.length === 0) return null;
+    const id = Date.now();
+    commit('battle.open', { id, item_id: item.id, artist: item.artist, song: item.song, members: holders, at: Date.now() });
+    return id;
+  };
+
   const bingoCallNext = async () => {
     const r = getBingoRound();
     if (r.status !== 'live') return null;
@@ -276,6 +332,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const item = { ...remaining[Math.floor(Math.random() * remaining.length)], at: Date.now() };
     commit('bingo.call', { calls: [...r.calls, item] });
     autoResolveMedia(item);
+    openBattleFor(item);            // LIP SYNC squares must be performed for
     return item;
   };
   // Each call swaps the YouTube video on the TV, so the gap between calls IS
@@ -743,10 +800,122 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (!itemId) return json(res, 400, { error: 'itemId required' });
       const row = db.prepare('SELECT card FROM bingo_cards WHERE member_id=?').get(c.sub);
       if (!row) return json(res, 400, { error: 'join first' });
-      if (!JSON.parse(row.card).some((it) => it.id === itemId)) return json(res, 400, { error: 'not on your card' });
+      const square = JSON.parse(row.card).find((it) => it.id === itemId);
+      if (!square) return json(res, 400, { error: 'not on your card' });
+      // A LIP SYNC square is earned by performing, never by tapping. Covering
+      // one requires having won its battle; declining or losing locks it out.
+      if (covered && square.type === 'lipsync') {
+        const gate = lipSyncGate(c.sub, itemId);
+        if (!gate.ok) return json(res, 403, { error: gate.error, battleId: gate.battleId ?? null });
+      }
       commit('bingo.mark', { member_id: c.sub, item_id: itemId, covered: !!covered });
       json(res, 200, { ok: true });
     },
+    // ── Lip Sync Battles ──
+    // Live view of a battle: who's in, who's up, votes so far. Members see it
+    // to perform/vote; the TV and host poll the same shape.
+    // Several squares can be mid-battle at once (one per called lip-sync
+    // square), so this can be aimed at a specific square; with no itemId it
+    // returns the most recent open one, which is what the TV/host want.
+    'GET /battle/current': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const itemId = new URL(req.url, 'http://x').searchParams.get('itemId');
+      const b = itemId
+        ? db.prepare(`SELECT * FROM lipsync_battles WHERE item_id=? ORDER BY id DESC LIMIT 1`).get(itemId)
+        : db.prepare(`SELECT * FROM lipsync_battles WHERE status NOT IN ('done','void') ORDER BY id DESC LIMIT 1`).get();
+      if (!b) return json(res, 200, { battle: null });
+      json(res, 200, { battle: battlePublic(b, c.sub) });
+    },
+    // Every battle a member is personally in and hasn't answered yet — the
+    // "you've been called out" prompt on their card.
+    'GET /battle/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT b.* FROM lipsync_battles b
+        JOIN lipsync_battle_players p ON p.battle_id=b.id AND p.member_id=?
+        WHERE b.status NOT IN ('done','void') ORDER BY b.id ASC`).all(c.sub);
+      json(res, 200, { battles: rows.map((b) => battlePublic(b, c.sub)) });
+    },
+    'POST /battle/respond': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, accept } = await readBody(req);
+      const p = db.prepare('SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?').get(battleId, c.sub);
+      if (!p) return json(res, 404, { error: 'not in this battle' });
+      if (p.state !== 'invited') return json(res, 400, { error: 'already responded' });
+      commit('battle.respond', { battle_id: battleId, member_id: c.sub, accept: !!accept, at: Date.now() });
+      // Nobody willing to perform → the battle dies and the square goes uncovered.
+      const left = db.prepare(`SELECT COUNT(*) n FROM lipsync_battle_players WHERE battle_id=? AND state IN ('invited','accepted')`).get(battleId).n;
+      if (left === 0) commit('battle.void', { battle_id: battleId, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    // Host runs the floor: who performs now, where it shows, when voting opens.
+    'POST /battle/stage': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, stage } = await readBody(req);
+      commit('battle.stage', { battle_id: battleId, stage });
+      json(res, 200, { ok: true, stage: stage === 'tv' ? 'tv' : 'phones' });
+    },
+    'POST /battle/perform': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, memberId, seconds } = await readBody(req);
+      const p = db.prepare('SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?').get(battleId, memberId);
+      if (!p) return json(res, 404, { error: 'not in this battle' });
+      if (p.state !== 'accepted') return json(res, 400, { error: 'that member has not accepted' });
+      const ms = Math.max(5, Number(seconds) || BINGO_LIPSYNC_MS / 1000) * 1000;
+      commit('battle.perform', { battle_id: battleId, member_id: memberId, ends_at: Date.now() + ms });
+      json(res, 200, { ok: true, endsAt: Date.now() + ms });
+    },
+    // The performer's own device reports the take is finished.
+    'POST /battle/performed': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId } = await readBody(req);
+      commit('battle.performed', { battle_id: battleId, member_id: c.sub, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    'POST /battle/voting': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, seconds } = await readBody(req);
+      const performed = db.prepare(`SELECT COUNT(*) n FROM lipsync_battle_players WHERE battle_id=? AND state='performed'`).get(battleId).n;
+      if (performed === 0) return json(res, 400, { error: 'nobody has performed yet' });
+      const ms = Math.max(5, Number(seconds) || 30) * 1000;
+      commit('battle.voting', { battle_id: battleId, ends_at: Date.now() + ms });
+      json(res, 200, { ok: true, endsAt: Date.now() + ms });
+    },
+    // Any member in the room votes — one vote each, changeable while open.
+    'POST /battle/vote': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, memberId } = await readBody(req);
+      const b = db.prepare('SELECT status FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      if (b.status !== 'voting') return json(res, 400, { error: 'voting is not open' });
+      const target = db.prepare(`SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?`).get(battleId, memberId);
+      if (!target || target.state !== 'performed') return json(res, 400, { error: 'can only vote for someone who performed' });
+      // Performers don't vote for themselves — that's the whole "fair" part.
+      if (memberId === c.sub) return json(res, 400, { error: 'you cannot vote for yourself' });
+      commit('battle.vote', { battle_id: battleId, voter_id: c.sub, member_id: memberId, at: Date.now() });
+      json(res, 200, { ok: true });
+    },
+    // Close it out: most votes wins, host breaks a tie by passing winnerId.
+    'POST /battle/resolve': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, winnerId } = await readBody(req);
+      const b = db.prepare('SELECT * FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      if (b.status === 'done' || b.status === 'void') return json(res, 400, { error: 'already resolved' });
+      const tally = battleTally(battleId);
+      let winner = winnerId || null;
+      if (!winner) {
+        const top = tally[0];
+        const tied = top && tally.filter((t) => t.votes === top.votes).length > 1;
+        if (!top || top.votes === 0) return json(res, 400, { error: 'no votes yet — pass winnerId to decide it' });
+        if (tied) return json(res, 409, { error: 'tie — pass winnerId to break it', tally });
+        winner = top.memberId;
+      }
+      const ok = db.prepare(`SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?`).get(battleId, winner);
+      if (!ok || ok.state !== 'performed') return json(res, 400, { error: 'winner must have performed' });
+      commit('battle.resolve', { battle_id: battleId, winner_id: winner, at: Date.now() });
+      json(res, 200, { ok: true, winnerId: winner, tally });
+    },
+
     'POST /bingo/claim': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const r = getBingoRound();

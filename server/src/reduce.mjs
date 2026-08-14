@@ -174,6 +174,13 @@ export function applyOp(db, op) {
     case 'bingo.reset':
       db.prepare(`DELETE FROM bingo_cards`).run();
       db.prepare(`DELETE FROM bingo_claims`).run();
+      // Battles and their forfeits belong to the game that spawned them. A
+      // reset deals brand new cards, so carrying locks over would bar someone
+      // from a square they've never even been offered in this game.
+      db.prepare(`DELETE FROM lipsync_battle_votes`).run();
+      db.prepare(`DELETE FROM lipsync_battle_players`).run();
+      db.prepare(`DELETE FROM lipsync_battles`).run();
+      db.prepare(`DELETE FROM lipsync_locks`).run();
       db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL,
         now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]' WHERE id=1`)
         .run(d.deck_id ?? null, d.pattern ?? 'line', d.custom_pattern ? 1 : 0);
@@ -194,6 +201,62 @@ export function applyOp(db, op) {
     case 'bingo.media':
       db.prepare(`UPDATE bingo_round SET now_playing=? WHERE id=1`)
         .run(d.video ? JSON.stringify({ ...d.video, at: d.at ?? ts }) : null);
+      break;
+
+    // ── Lip Sync Battles ──
+    case 'battle.open':
+      db.prepare(`INSERT OR IGNORE INTO lipsync_battles(id,item_id,artist,song,status,stage,started_at)
+        VALUES(?,?,?,?,'pending',?,?)`).run(d.id, d.item_id, d.artist ?? null, d.song ?? null, d.stage || 'phones', d.at ?? ts);
+      for (const m of d.members || []) {
+        db.prepare(`INSERT OR IGNORE INTO lipsync_battle_players(battle_id,member_id,state) VALUES(?,?,'invited')`).run(d.id, m);
+      }
+      break;
+    case 'battle.respond': {
+      db.prepare(`UPDATE lipsync_battle_players SET state=? WHERE battle_id=? AND member_id=? AND state='invited'`)
+        .run(d.accept ? 'accepted' : 'declined', d.battle_id, d.member_id);
+      // Declining forfeits the square for good — that's the whole deterrent.
+      if (!d.accept) {
+        const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+        if (b) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'declined',?)`)
+          .run(d.member_id, b.item_id, d.at ?? ts);
+      }
+      break;
+    }
+    case 'battle.stage':                                  // host moves it to the TV (or back to phones)
+      db.prepare(`UPDATE lipsync_battles SET stage=? WHERE id=?`).run(d.stage === 'tv' ? 'tv' : 'phones', d.battle_id);
+      break;
+    case 'battle.perform':                                // a performer takes the floor
+      db.prepare(`UPDATE lipsync_battles SET status='performing', performing_member_id=?, performance_ends_at=? WHERE id=?`)
+        .run(d.member_id, d.ends_at ?? null, d.battle_id);
+      break;
+    case 'battle.performed':
+      db.prepare(`UPDATE lipsync_battle_players SET state='performed', performed_at=? WHERE battle_id=? AND member_id=?`)
+        .run(d.at ?? ts, d.battle_id, d.member_id);
+      db.prepare(`UPDATE lipsync_battles SET performing_member_id=NULL, performance_ends_at=NULL WHERE id=?`).run(d.battle_id);
+      break;
+    case 'battle.voting':
+      db.prepare(`UPDATE lipsync_battles SET status='voting', voting_ends_at=? WHERE id=?`).run(d.ends_at ?? null, d.battle_id);
+      break;
+    case 'battle.vote':                                   // one vote per member, changeable while voting is open
+      db.prepare(`INSERT INTO lipsync_battle_votes(battle_id,voter_id,member_id,at) VALUES(?,?,?,?)
+        ON CONFLICT(battle_id,voter_id) DO UPDATE SET member_id=excluded.member_id, at=excluded.at`)
+        .run(d.battle_id, d.voter_id, d.member_id, d.at ?? ts);
+      break;
+    case 'battle.resolve': {
+      db.prepare(`UPDATE lipsync_battles SET status='done', winner_member_id=?, resolved_at=? WHERE id=?`)
+        .run(d.winner_id ?? null, d.at ?? ts, d.battle_id);
+      const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+      if (!b) break;
+      // Everyone in the battle except the winner is locked out of the square.
+      for (const row of db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(d.battle_id)) {
+        if (row.member_id === d.winner_id) continue;
+        db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'lost',?)`)
+          .run(row.member_id, b.item_id, d.at ?? ts);
+      }
+      break;
+    }
+    case 'battle.void':                                   // nobody accepted — square dies with it
+      db.prepare(`UPDATE lipsync_battles SET status='void', resolved_at=? WHERE id=?`).run(d.at ?? ts, d.battle_id);
       break;
 
     // ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──

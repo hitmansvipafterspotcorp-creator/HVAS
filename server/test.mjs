@@ -215,12 +215,42 @@ for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, s
 const claimBeforeMarking = await call('POST', '/bingo/claim', {}, mtok);
 ok(claimBeforeMarking.status === 400, 'even with everything called, claim fails until the player actually taps squares covered');
 
+// Win a LIP SYNC square the only way it can be won: accept the battle,
+// perform, take the vote. Used wherever a test needs one covered.
+const winLipSync = async (itemId, winnerTok, winnerId, voterTok) => {
+  const b = (await call('GET', `/battle/current?itemId=${encodeURIComponent(itemId)}`, null, winnerTok)).body.battle;
+  if (!b) return false;
+  for (const p of b.players) {
+    const tok = p.memberId === winnerId ? winnerTok : voterTok;
+    await call('POST', '/battle/respond', { battleId: b.id, accept: p.memberId === winnerId }, tok);
+  }
+  await call('POST', '/battle/perform', { battleId: b.id, memberId: winnerId, seconds: 5 }, stok);
+  await call('POST', '/battle/performed', { battleId: b.id }, winnerTok);
+  await call('POST', '/battle/voting', { battleId: b.id, seconds: 30 }, stok);
+  await call('POST', '/battle/vote', { battleId: b.id, memberId: winnerId }, voterTok);
+  const r = await call('POST', '/battle/resolve', { battleId: b.id }, stok);
+  return r.status === 200;
+};
+
+// Cover any square the legitimate way: plain squares are tapped, LIP SYNC
+// squares have to be won in a battle first.
+const cover = async (item, tok, memberId, voterTok) => {
+  if (item?.type === 'lipsync') await winLipSync(item.id, tok, memberId, voterTok);
+  return call('POST', '/bingo/mark', { itemId: item.id, covered: true }, tok);
+};
+
 // tap every non-free square on Tasha's card covered (this is the real
-// gameplay action — marking is never automatic anymore).
+// gameplay action — marking is never automatic anymore). LIP SYNC squares
+// can't be tapped at all: they have to be performed for and won.
 for (const item of join1.body.card) {
   if (item.free) continue;
+  if (item.type === 'lipsync') {
+    const blocked = await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok);
+    ok(blocked.status === 403, `lip sync square ${item.id} cannot simply be tapped`);
+    await winLipSync(item.id, mtok, verify.body.member.id, mtok2);
+  }
   const m = await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok);
-  if (m.status !== 200) { ok(false, `mark failed for ${item.id}`); break; }
+  if (m.status !== 200) { ok(false, `mark failed for ${item.id} (${m.body.error})`); break; }
 }
 const claim = await call('POST', '/bingo/claim', {}, mtok);
 ok(claim.status === 200 && claim.body.pending, 'valid bingo claim accepted once covered squares match the call history');
@@ -250,7 +280,7 @@ ok(cornerJoin.body.card.length === 25, 'Rell gets a fresh card on the new deck')
 await call('POST', '/bingo/start', {}, stok);
 for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
 const corners = [cornerJoin.body.card[0], cornerJoin.body.card[4], cornerJoin.body.card[20], cornerJoin.body.card[24]];
-for (const item of corners) await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok2);
+for (const item of corners) await cover(item, mtok2, v2.body.member.id, mtok);
 const cornerClaim = await call('POST', '/bingo/claim', {}, mtok2);
 ok(cornerClaim.status === 200, 'covering only the four corners is enough to win under the Four Corners pattern');
 
@@ -269,7 +299,7 @@ await call('POST', '/bingo/start', {}, stok);
 for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
 
 // Cover the top row -> one line.
-for (const i of [0, 1, 2, 3, 4]) await call('POST', '/bingo/mark', { itemId: ladCard[i].id, covered: true }, mtok);
+for (const i of [0, 1, 2, 3, 4]) await cover(ladCard[i], mtok, verify.body.member.id, mtok2);
 const r1 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r1.status === 200, 'one line is a valid claim in round 1');
 let pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
@@ -285,7 +315,7 @@ const tooSoon = await call('POST', '/bingo/claim', {}, mtok);
 ok(tooSoon.status === 400, 'a single line is no longer enough once round 2 starts');
 
 // Cover the left column too -> a second line.
-for (const i of [5, 10, 15, 20]) await call('POST', '/bingo/mark', { itemId: ladCard[i].id, covered: true }, mtok);
+for (const i of [5, 10, 15, 20]) await cover(ladCard[i], mtok, verify.body.member.id, mtok2);
 const r2 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r2.status === 200, 'two lines is a valid claim in round 2');
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
@@ -296,7 +326,7 @@ ok(lad.body.pattern === 'blackout', 'round 3 is the full card');
 
 // Blackout: cover everything that has actually been called.
 const called = new Set(lad.body.calls.map((c) => c.id));
-for (const it of ladCard) if (it && called.has(it.id)) await call('POST', '/bingo/mark', { itemId: it.id, covered: true }, mtok);
+for (const it of ladCard) if (it && called.has(it.id)) await cover(it, mtok, verify.body.member.id, mtok2);
 const r3 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r3.status === 200, 'a full card is a valid claim in round 3');
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
@@ -313,11 +343,87 @@ ok(oneOff.body.customPattern === true && oneOff.body.pattern === 'four_corners',
 const ooCard = (await call('POST', '/bingo/join', {}, mtok)).body.card;
 await call('POST', '/bingo/start', {}, stok);
 for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
-for (const i of [0, 4, 20, 24]) await call('POST', '/bingo/mark', { itemId: ooCard[i].id, covered: true }, mtok);
+for (const i of [0, 4, 20, 24]) await cover(ooCard[i], mtok, verify.body.member.id, mtok2);
 await call('POST', '/bingo/claim', {}, mtok);
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
 const ooRes = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
 ok(ooRes.body.status === 'ended', 'a one-off pattern round ends on the first win, no ladder');
+
+console.log('LIP SYNC BATTLES');
+// Fresh round so we control exactly which lip-sync square is in play.
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter' }, stok);
+const bcA = (await call('POST', '/bingo/join', {}, mtok)).body.card;   // Tasha
+await call('POST', '/bingo/join', {}, mtok2);                          // Rell
+await call('POST', '/bingo/start', {}, stok);
+for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
+
+const lipSquare = bcA.find((s) => s && s.type === 'lipsync');
+ok(!!lipSquare, 'the dealt card contains at least one LIP SYNC square to battle over');
+
+const tappedRaw = await call('POST', '/bingo/mark', { itemId: lipSquare.id, covered: true }, mtok);
+ok(tappedRaw.status === 403, 'a LIP SYNC square cannot be covered by tapping — you have to perform');
+
+let bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
+ok(!!bat && bat.itemId === lipSquare.id, 'calling a LIP SYNC square opens a battle for it automatically');
+ok(bat.players.length >= 1, 'everyone holding that square is pulled into the battle');
+ok(bat.stage === 'phones', 'battles start on phones until the host throws it to the TV');
+
+const staged = await call('POST', '/battle/stage', { battleId: bat.id, stage: 'tv' }, stok);
+ok(staged.body.stage === 'tv', 'host can project the battle to the TV');
+const memberStage = await call('POST', '/battle/stage', { battleId: bat.id, stage: 'phones' }, mtok);
+ok(memberStage.status === 401, 'members cannot decide where the battle is shown');
+
+// Perform gating: you must accept before the host can put you up.
+const performBeforeAccept = await call('POST', '/battle/perform', { battleId: bat.id, memberId: verify.body.member.id, seconds: 5 }, stok);
+ok(performBeforeAccept.status === 400, 'the host cannot put up someone who has not accepted');
+
+await call('POST', '/battle/respond', { battleId: bat.id, accept: true }, mtok);
+const twice = await call('POST', '/battle/respond', { battleId: bat.id, accept: false }, mtok);
+ok(twice.status === 400, 'a member cannot flip their answer after responding');
+
+const up = await call('POST', '/battle/perform', { battleId: bat.id, memberId: verify.body.member.id, seconds: 5 }, stok);
+ok(up.status === 200 && up.body.endsAt > Date.now(), 'host puts a performer up with a timed window');
+bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
+ok(bat.status === 'performing' && bat.performingMemberId === verify.body.member.id, 'battle shows who is performing right now');
+
+const earlyVote = await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.member.id }, mtok2);
+ok(earlyVote.status === 400, 'voting is closed until performances are done');
+
+await call('POST', '/battle/performed', { battleId: bat.id }, mtok);
+const openVote = await call('POST', '/battle/voting', { battleId: bat.id, seconds: 30 }, stok);
+ok(openVote.status === 200, 'host opens voting once someone has performed');
+
+const selfVote = await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.member.id }, mtok);
+ok(selfVote.status === 400, 'you cannot vote for yourself');
+const voteNonPerformer = await call('POST', '/battle/vote', { battleId: bat.id, memberId: v2.body.member.id }, mtok);
+ok(voteNonPerformer.status === 400, 'you cannot vote for someone who never performed');
+
+await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.member.id }, mtok2);
+bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
+const perf = bat.players.find((p) => p.memberId === verify.body.member.id);
+ok(perf.votes === 1 && perf.share === 100, 'the live meter reflects the vote share');
+// one vote per member — a second vote replaces, never stacks
+await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.member.id }, mtok2);
+bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
+ok(bat.totalVotes === 1, 'a member voting again replaces their vote instead of stacking');
+
+const resolved = await call('POST', '/battle/resolve', { battleId: bat.id }, stok);
+ok(resolved.status === 200 && resolved.body.winnerId === verify.body.member.id, 'most votes wins the battle');
+const nowCover = await call('POST', '/bingo/mark', { itemId: lipSquare.id, covered: true }, mtok);
+ok(nowCover.status === 200, 'the battle winner may finally cover the square');
+
+console.log('LIP SYNC BATTLES: DECLINING FORFEITS THE SQUARE');
+const dSquare = (await call('GET', '/bingo/state', null, mtok2)).body.me.card.find(
+  (s) => s && s.type === 'lipsync' && s.id !== lipSquare.id);
+if (dSquare) {
+  const dBat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(dSquare.id)}`, null, mtok2)).body.battle;
+  await call('POST', '/battle/respond', { battleId: dBat.id, accept: false }, mtok2);
+  const afterDecline = await call('POST', '/bingo/mark', { itemId: dSquare.id, covered: true }, mtok2);
+  ok(afterDecline.status === 403 && /declined/.test(afterDecline.body.error || ''),
+    'declining a battle permanently forfeits that square');
+} else {
+  ok(false, 'expected a second lip sync square on the other card to test declining');
+}
 
 console.log('YOUTUBE AS THE SONG RUNNER');
 const ytState = await call('GET', '/bingo/state');
