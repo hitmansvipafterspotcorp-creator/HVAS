@@ -3965,11 +3965,15 @@ button {
    called), so it gets the size; the song is the disambiguator (Beyoncé
    appears twice in a deck) so it stays but is smaller. Both clamp to 2 lines
    with an ellipsis instead of overflowing. */
+/* Real square art from the Lip Sync Bingo sheets (sheet 09), not a CSS box:
+   the ornate gold-cornered tile is the empty state, and its dark centre is
+   what keeps the artist/song text readable on top. */
 .bingo-cell {
   position: relative;
   aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2px;
-  line-height: 1.12; padding: 4px 3px; border-radius: 8px; color: #cdb6f2;
-  background: rgba(255,255,255,.03); border: 1px solid rgba(176,107,255,.22); overflow: hidden;
+  line-height: 1.12; padding: 6px 5px; color: #cdb6f2;
+  background: url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_09_086_94x96.png") no-repeat center center / 100% 100%;
+  border: none; border-radius: 0; overflow: hidden;
   font-family: inherit; cursor: default; hyphens: auto;
 }
 .bingo-cell:disabled { cursor: default; }
@@ -3984,15 +3988,29 @@ button {
 /* Lip-sync squares are ~20% of a deck and mean "perform this one" — worth
    flagging, but as a corner mark rather than a full-width pill that used to
    consume an entire line of the square's very limited vertical space. */
+/* The sheet's own neon mic tile, corner-mounted. Text is hidden (the emoji in
+   the markup is a fallback for when the art can't load). */
+/* Long artist names wrap to two lines and used to run under this badge, so
+   the square reserves room for it rather than letting them collide. */
+.bingo-cell:has(.bingo-cell-tag) { padding-top: 15px; }
 .bingo-cell-tag {
-  position: absolute; top: 2px; right: 2px; z-index: 1;
-  width: 13px; height: 13px; display: grid; place-items: center;
-  font-size: 7px; line-height: 1; border-radius: 50%;
-  background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600;
-  box-shadow: 0 0 5px rgba(255,214,106,.6);
+  position: absolute; top: 1px; left: 1px; z-index: 1;
+  width: 15px; height: 15px; font-size: 0; color: transparent;
+  background: url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_09_090_98x97.png") no-repeat center center / 100% 100%;
+  filter: drop-shadow(0 0 4px rgba(255,60,180,.7));
 }
-.bingo-cell.marked { background: linear-gradient(180deg, rgba(176,107,255,.42), rgba(122,31,214,.42)); border-color: #b06bff; box-shadow: 0 0 10px rgba(176,107,255,.4) inset; }
+/* Covered: same tile, tinted, plus the sheet's gold marker stamped in the
+   corner. The stamp is deliberately a corner overlay rather than the full
+   gold-gem tile from the sheet — that tile is opaque through the middle and
+   would bury the artist/song text the square exists to show. */
+.bingo-cell.marked {
+  background:
+    url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_09_088_103x95.png") no-repeat right 2px bottom 2px / 26px auto,
+    linear-gradient(180deg, rgba(176,107,255,.5), rgba(122,31,214,.5)),
+    url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_09_086_94x96.png") no-repeat center center / 100% 100%;
+}
 .bingo-cell.marked .bingo-cell-song { color: #eaddff; }
+.bingo-cell.marked .bingo-cell-artist { color: #fff; }
 /* Covered squares get an explicit check, not just a colour shift — colour
    alone is easy to miss at a glance (and invisible to colour-blind players). */
 .bingo-cell-check {
@@ -4000,7 +4018,12 @@ button {
   font-size: 11px; font-weight: 900; color: #7dffb0; line-height: 1;
   text-shadow: 0 0 6px rgba(82,255,168,.9);
 }
-.bingo-cell.free { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; border-color: #ffd66b; font-weight: 900; font-size: 10px; }
+/* The sheet's FREE SPACE tile already has its label baked in, so the text is
+   hidden rather than drawn twice (kept in the DOM for screen readers). */
+.bingo-cell.free {
+  background: url("/HVAS/assets/ui/complete_ui_set/sliced_clean/by_type/buttons/source_09_091_97x96.png") no-repeat center center / 100% 100%;
+  font-size: 0; color: transparent;
+}
 /* A called-but-untapped square is the ONE thing a player has to spot on a
    glance at a phone in a dark room. A thin border + soft glow wasn't enough —
    these now carry a real gold wash and a solid border so they jump out of the
@@ -4055,7 +4078,7 @@ button {
 .solo-cpu.close .solo-cpu-prog { color: #ff8aa0; }
 .bingo-winner-banner.lost { background: linear-gradient(135deg, rgba(255,84,112,.22), rgba(122,31,214,.18)); border-color: rgba(255,84,112,.5); }
 /* the corner mic badge, reused inline inside the NOW CALLING panel */
-.bingo-cell-tag.static { position: static; margin-bottom: 2px; }
+.bingo-cell-tag.static { position: static; width: 26px; height: 26px; margin-bottom: 2px; }
 
 .bingo-waiting {
   margin: 0 0 8px; padding: 7px 10px; border-radius: 10px; text-align: center;

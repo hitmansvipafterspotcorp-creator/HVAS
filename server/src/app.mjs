@@ -30,18 +30,35 @@ const SESSION_TTL = 12 * 3600 * 1000;
 // client — a leaked key gets used up by anyone), playback itself needs no
 // login at all since the IFrame Player embeds public videos directly.
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+// How long a called square holds the TV before the next one is called — the
+// performance window. A plain song square is a minute; a LIP SYNC square is an
+// actual performance on the floor, so it gets two. Overridable per venue, and
+// kept short in tests.
+const BINGO_SONG_MS = Math.max(3, Number(process.env.BINGO_SONG_SECONDS) || 60) * 1000;
+const BINGO_LIPSYNC_MS = Math.max(3, Number(process.env.BINGO_LIPSYNC_SECONDS) || 120) * 1000;
+const bingoWindowFor = (item) => (item?.type === 'lipsync' ? BINGO_LIPSYNC_MS : BINGO_SONG_MS);
 
 // ── Lip Sync Bingo ──
 const FREE_ITEM = { id: 'FREE', free: true, artist: '', song: '', type: 'free' };
-const BINGO_PATTERN_IDS = ['line', 'four_corners', 'x', 'around_the_world', 'blackout'];
+const BINGO_PATTERN_IDS = ['line', 'two_lines', 'four_corners', 'x', 'around_the_world', 'blackout'];
+// The spec'd three-round game (qa/device_checklist.md): round 1 is any single
+// line, round 2 needs two lines, round 3 is the full card. A round's pattern
+// comes from here unless the host has explicitly picked a one-off pattern.
+const BINGO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
+const BINGO_FINAL_ROUND = 3;
 // 5x5 card, index 12 is the free center square.
 const BINGO_LINES = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
   [0, 5, 10, 15, 20], [1, 6, 11, 16, 21], [2, 7, 12, 17, 22], [3, 8, 13, 18, 23], [4, 9, 14, 19, 24],
   [0, 6, 12, 18, 24], [4, 8, 12, 16, 20],
 ];
+const bingoLineCount = (m) => BINGO_LINES.filter((line) => line.every((i) => m[i])).length;
 const BINGO_PATTERNS = {
   line: (m) => BINGO_LINES.some((line) => line.every((i) => m[i])),
+  // Two DISTINCT completed lines. They may legitimately share the free centre
+  // (e.g. a row and a column both through index 12) — that's still two lines
+  // by the normal bingo reading, so no overlap rule beyond being different lines.
+  two_lines: (m) => bingoLineCount(m) >= 2,
   four_corners: (m) => [0, 4, 20, 24].every((i) => m[i]),
   x: (m) => [0, 6, 12, 18, 24, 4, 8, 16, 20].every((i) => m[i]),
   around_the_world: (m) => [0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 19, 20, 21, 22, 23, 24].every((i) => m[i]),
@@ -223,10 +240,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ── Lip Sync Bingo helpers ──
   const getBingoRound = () => {
     const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
+    const roundNo = r.round_no || 1;
+    // Playing the round ladder, the pattern is derived from the round number.
+    // Only a host-picked one-off pattern overrides it.
+    const pattern = r.custom_pattern ? (r.pattern || 'line') : (BINGO_ROUND_PATTERN[roundNo] || 'line');
     return {
       ...r, phrases: JSON.parse(r.phrases), calls: JSON.parse(r.calls),
       nowPlaying: r.now_playing ? JSON.parse(r.now_playing) : null,
-      deckId: r.deck_id || DEFAULT_DECK_ID, pattern: r.pattern || 'line',
+      deckId: r.deck_id || DEFAULT_DECK_ID, pattern,
+      roundNo, finalRound: BINGO_FINAL_ROUND, customPattern: !!r.custom_pattern,
+      roundWins: JSON.parse(r.round_wins || '[]'),
     };
   };
   // No manual links, ever: the moment a real song gets called, search
@@ -250,12 +273,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const calledIds = new Set(r.calls.map((c) => c.id));
     const remaining = r.phrases.filter((p) => !calledIds.has(p.id));
     if (!remaining.length) return null;
-    const item = remaining[Math.floor(Math.random() * remaining.length)];
+    const item = { ...remaining[Math.floor(Math.random() * remaining.length)], at: Date.now() };
     commit('bingo.call', { calls: [...r.calls, item] });
     autoResolveMedia(item);
     return item;
   };
-  setInterval(() => { bingoCallNext().catch(() => {}); }, 6000).unref?.();
+  // Each call swaps the YouTube video on the TV, so the gap between calls IS
+  // how long a song gets to play. At the old flat 6s the video was replaced
+  // before anyone could lip sync to it — the whole point of the game. Now a
+  // called song holds the screen for a real performance window, and the
+  // ticker only advances once that window is up. A host pressing "Call Song"
+  // still overrides immediately (that goes through bingoCallNext directly).
+  setInterval(() => {
+    const r = getBingoRound();
+    if (r.status !== 'live') return;
+    const last = r.calls[r.calls.length - 1];
+    if (last?.at && Date.now() - last.at < bingoWindowFor(last)) return;   // current song still playing
+    bingoCallNext().catch(() => {});
+  }, 2000).unref?.();
 
   const emitBoard = () => {
     const payload = `data: ${JSON.stringify(board())}\n\n`;
@@ -670,6 +705,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, {
         status: r.status, calls: r.calls, startedAt: r.started_at,
         deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
+        roundNo: r.roundNo, finalRound: r.finalRound, customPattern: r.customPattern, roundWins: r.roundWins,
+        songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: !!YOUTUBE_API_KEY,
+        // window for the square currently on screen (lip sync squares run longer)
+        currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
         pendingClaims, winner, me, nowPlaying: r.nowPlaying,
       });
@@ -741,8 +780,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const { claimId, approve } = await readBody(req);
       const claim = db.prepare(`SELECT * FROM bingo_claims WHERE id=? AND status='pending'`).get(claimId);
       if (!claim) return json(res, 404, { error: 'no pending claim' });
-      commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub, at: Date.now() });
-      json(res, 200, { ok: true });
+      commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub, at: Date.now(), final_round: BINGO_FINAL_ROUND });
+      const after = getBingoRound();
+      json(res, 200, { ok: true, roundNo: after.roundNo, pattern: after.pattern, status: after.status });
     },
     // Reset also sets up the NEXT game's deck/pattern — chosen here, before
     // anyone joins, so nobody's card ever gets dealt from a deck that later
@@ -751,9 +791,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       const { deckId, pattern } = await readBody(req);
       const validDeckId = BINGO_DECKS[deckId] ? deckId : DEFAULT_DECK_ID;
-      const validPattern = BINGO_PATTERN_IDS.includes(pattern) ? pattern : 'line';
-      commit('bingo.reset', { deck_id: validDeckId, pattern: validPattern, at: Date.now() });
-      json(res, 200, { ok: true, deckId: validDeckId, pattern: validPattern });
+      // No pattern given → play the standard three-round ladder. An explicit
+      // pattern means the host wants that one pattern for a single round.
+      const custom = BINGO_PATTERN_IDS.includes(pattern);
+      const validPattern = custom ? pattern : 'line';
+      commit('bingo.reset', { deck_id: validDeckId, pattern: validPattern, custom_pattern: custom, at: Date.now() });
+      json(res, 200, { ok: true, deckId: validDeckId, pattern: validPattern, rounds: custom ? 1 : BINGO_FINAL_ROUND });
     },
     'GET /bingo/board': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });

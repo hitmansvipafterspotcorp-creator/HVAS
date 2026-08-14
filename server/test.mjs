@@ -232,7 +232,10 @@ const claimId = board.body.claims[0].id;
 const resolve = await call('POST', '/bingo/resolve', { claimId, approve: true }, stok);
 ok(resolve.status === 200, 'host approves the claim');
 state = await call('GET', '/bingo/state');
-ok(state.body.status === 'ended' && state.body.winner?.name === 'Tasha', 'round ends with the right winner');
+// Default game plays the three-round ladder, so winning a line takes round 1
+// and moves everyone to round 2 — it no longer ends the whole game outright.
+ok(state.body.status === 'live' && state.body.roundNo === 2, 'winning a line takes round 1 and advances to round 2');
+ok(state.body.roundWins.at(-1)?.round === 1, 'the round-1 win is recorded');
 
 const reset = await call('POST', '/bingo/reset', { deckId: 'tally-after-dark', pattern: 'four_corners' }, stok);
 ok(reset.status === 200 && reset.body.deckId === 'tally-after-dark' && reset.body.pattern === 'four_corners', 'host resets into a different deck + pattern for the next game');
@@ -253,6 +256,91 @@ ok(cornerClaim.status === 200, 'covering only the four corners is enough to win 
 
 const resetBadDeck = await call('POST', '/bingo/reset', { deckId: 'not-a-real-deck', pattern: 'not-a-real-pattern' }, stok);
 ok(resetBadDeck.body.deckId === 'after-spot-starter' && resetBadDeck.body.pattern === 'line', 'unrecognized deck/pattern falls back to a safe default instead of erroring');
+
+console.log('LIP SYNC BINGO: THREE-ROUND LADDER (line -> 2 lines -> full card)');
+// No pattern passed => play the standard ladder, not a one-off pattern.
+const ladderReset = await call('POST', '/bingo/reset', { deckId: 'after-spot-starter' }, stok);
+ok(ladderReset.body.rounds === 3, 'a reset with no pattern sets up the 3-round ladder');
+let lad = await call('GET', '/bingo/state');
+ok(lad.body.roundNo === 1 && lad.body.pattern === 'line', 'round 1 is a single line');
+
+const ladCard = (await call('POST', '/bingo/join', {}, mtok)).body.card;
+await call('POST', '/bingo/start', {}, stok);
+for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
+
+// Cover the top row -> one line.
+for (const i of [0, 1, 2, 3, 4]) await call('POST', '/bingo/mark', { itemId: ladCard[i].id, covered: true }, mtok);
+const r1 = await call('POST', '/bingo/claim', {}, mtok);
+ok(r1.status === 200, 'one line is a valid claim in round 1');
+let pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
+const adv1 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+ok(adv1.body.roundNo === 2 && adv1.body.status === 'live', 'winning round 1 advances to round 2, game stays live');
+lad = await call('GET', '/bingo/state');
+ok(lad.body.pattern === 'two_lines', 'round 2 requires two lines');
+const mineR2 = await call('GET', '/bingo/state', null, mtok);
+ok(mineR2.body.me.covered.length === 5, 'players keep the squares they already covered across rounds');
+
+// Still only one line covered — not enough for round 2.
+const tooSoon = await call('POST', '/bingo/claim', {}, mtok);
+ok(tooSoon.status === 400, 'a single line is no longer enough once round 2 starts');
+
+// Cover the left column too -> a second line.
+for (const i of [5, 10, 15, 20]) await call('POST', '/bingo/mark', { itemId: ladCard[i].id, covered: true }, mtok);
+const r2 = await call('POST', '/bingo/claim', {}, mtok);
+ok(r2.status === 200, 'two lines is a valid claim in round 2');
+pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
+const adv2 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+ok(adv2.body.roundNo === 3 && adv2.body.status === 'live', 'winning round 2 advances to round 3');
+lad = await call('GET', '/bingo/state');
+ok(lad.body.pattern === 'blackout', 'round 3 is the full card');
+
+// Blackout: cover everything that has actually been called.
+const called = new Set(lad.body.calls.map((c) => c.id));
+for (const it of ladCard) if (it && called.has(it.id)) await call('POST', '/bingo/mark', { itemId: it.id, covered: true }, mtok);
+const r3 = await call('POST', '/bingo/claim', {}, mtok);
+ok(r3.status === 200, 'a full card is a valid claim in round 3');
+pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
+const adv3 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+ok(adv3.body.status === 'ended', 'winning the final round ends the game rather than advancing');
+lad = await call('GET', '/bingo/state');
+ok(lad.body.winner?.number === buy.body.member.number, 'the final-round winner is the game winner');
+ok(lad.body.roundWins.length === 3, 'every round win is recorded');
+
+// A host-picked one-off pattern is not the ladder — it ends after one win.
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter', pattern: 'four_corners' }, stok);
+const oneOff = await call('GET', '/bingo/state');
+ok(oneOff.body.customPattern === true && oneOff.body.pattern === 'four_corners', 'an explicit pattern opts out of the ladder');
+const ooCard = (await call('POST', '/bingo/join', {}, mtok)).body.card;
+await call('POST', '/bingo/start', {}, stok);
+for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }
+for (const i of [0, 4, 20, 24]) await call('POST', '/bingo/mark', { itemId: ooCard[i].id, covered: true }, mtok);
+await call('POST', '/bingo/claim', {}, mtok);
+pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
+const ooRes = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+ok(ooRes.body.status === 'ended', 'a one-off pattern round ends on the first win, no ladder');
+
+console.log('YOUTUBE AS THE SONG RUNNER');
+const ytState = await call('GET', '/bingo/state');
+ok(typeof ytState.body.songMs === 'number' && ytState.body.songMs >= 3000,
+  'state exposes the performance window so the TV/host can run a countdown');
+ok(ytState.body.lipSyncMs > ytState.body.songMs,
+  'a LIP SYNC square gets a longer performance window than a plain song square');
+ok(ytState.body.youtubeEnabled === false,
+  'state reports YouTube is not configured in this env, instead of failing silently');
+// Every call carries when it was called — that timestamp is what paces the
+// auto-advance and drives the on-screen "time left" for the current song.
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter' }, stok);
+await call('POST', '/bingo/join', {}, mtok);
+await call('POST', '/bingo/start', {}, stok);
+const firstCall = await call('POST', '/bingo/call', {}, stok);
+ok(firstCall.status === 200 && typeof firstCall.body.item.at === 'number',
+  'a called song is stamped with the moment it was called');
+const paced = await call('GET', '/bingo/state');
+ok(paced.body.calls.at(-1).at === firstCall.body.item.at, 'that timestamp reaches every device via /bingo/state');
+// The host can always force the next song immediately, regardless of pacing.
+const forced = await call('POST', '/bingo/call', {}, stok);
+ok(forced.status === 200 && forced.body.item.id !== firstCall.body.item.id,
+  'the host can call the next song immediately without waiting out the window');
 
 console.log('YOUTUBE AUTO-MEDIA');
 const search = await call('GET', '/media/youtube-search?q=test', null, stok);

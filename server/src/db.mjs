@@ -184,7 +184,19 @@ export function openDb(path) {
     db.exec(`ALTER TABLE bingo_round ADD COLUMN deck_id TEXT`); // which BINGO_DECKS key this round deals from
   }
   if (!cols.includes('pattern')) {
-    db.exec(`ALTER TABLE bingo_round ADD COLUMN pattern TEXT NOT NULL DEFAULT 'line'`); // line | four_corners | x | around_the_world | blackout
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN pattern TEXT NOT NULL DEFAULT 'line'`); // line | two_lines | four_corners | x | around_the_world | blackout
+  }
+  // Three-round game: 1 = any line, 2 = two lines, 3 = full card.
+  if (!cols.includes('round_no')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN round_no INTEGER NOT NULL DEFAULT 1`);
+  }
+  // Set when the host picks a one-off pattern instead of playing the rounds.
+  if (!cols.includes('custom_pattern')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN custom_pattern INTEGER NOT NULL DEFAULT 0`);
+  }
+  // Winners of each completed round, JSON [{round, memberId, at}].
+  if (!cols.includes('round_wins')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN round_wins TEXT NOT NULL DEFAULT '[]'`);
   }
   const cardCols = db.prepare(`PRAGMA table_info(bingo_cards)`).all().map((c) => c.name);
   if (!cardCols.includes('covered')) {

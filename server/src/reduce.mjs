@@ -148,18 +148,35 @@ export function applyOp(db, op) {
     case 'bingo.claim':
       db.prepare(`INSERT INTO bingo_claims(member_id,at,status) VALUES(?,?,'pending')`).run(d.member_id, d.at ?? ts);
       break;
-    case 'bingo.resolve':
+    // An approved claim wins the CURRENT round. Rounds 1 and 2 advance to the
+    // next one (harder pattern, same cards and call history — you keep what
+    // you've covered); winning the final round ends the game. A host playing a
+    // one-off custom pattern isn't running the round ladder, so that still
+    // ends immediately.
+    case 'bingo.resolve': {
       db.prepare(`UPDATE bingo_claims SET status=?, resolved_by=?, resolved_at=? WHERE id=?`)
         .run(d.approve ? 'approved' : 'rejected', d.by ?? null, d.at ?? ts, d.claim_id);
-      if (d.approve) {
-        db.prepare(`UPDATE bingo_round SET status='ended', winner_member_id=? WHERE id=1`).run(d.member_id);
+      if (!d.approve) break;
+      const r = db.prepare('SELECT round_no, custom_pattern, round_wins FROM bingo_round WHERE id=1').get();
+      const wins = JSON.parse(r?.round_wins || '[]');
+      wins.push({ round: r?.round_no ?? 1, memberId: d.member_id, at: d.at ?? ts });
+      const isLadder = !r?.custom_pattern;
+      const nextRound = (r?.round_no ?? 1) + 1;
+      if (isLadder && nextRound <= (d.final_round ?? 3)) {
+        db.prepare(`UPDATE bingo_round SET round_no=?, round_wins=?, winner_member_id=NULL WHERE id=1`)
+          .run(nextRound, JSON.stringify(wins));
+      } else {
+        db.prepare(`UPDATE bingo_round SET status='ended', winner_member_id=?, round_wins=? WHERE id=1`)
+          .run(d.member_id, JSON.stringify(wins));
       }
       break;
+    }
     case 'bingo.reset':
       db.prepare(`DELETE FROM bingo_cards`).run();
       db.prepare(`DELETE FROM bingo_claims`).run();
-      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL, now_playing=NULL, deck_id=?, pattern=? WHERE id=1`)
-        .run(d.deck_id ?? null, d.pattern ?? 'line');
+      db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL,
+        now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]' WHERE id=1`)
+        .run(d.deck_id ?? null, d.pattern ?? 'line', d.custom_pattern ? 1 : 0);
       break;
     // Player taps a square to mark it covered — only actually called items
     // count toward a win (checked at claim time), but tapping itself is
