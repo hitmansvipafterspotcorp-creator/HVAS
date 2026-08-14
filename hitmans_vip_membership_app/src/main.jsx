@@ -2790,7 +2790,9 @@ function StaffDashboardScreen({ navigate }) {
     let live = true;
     const poll = async () => { try { const b = await apiDoorBoard(); if (live) setBoard(b); } catch { /* ignore */ } };
     poll();
-    const id = setInterval(poll, 4000);
+    // Fast enough that a staff Pay & Verify shows up on every other staff
+    // device's dashboard within ~1.5s, not the old 4s worst case.
+    const id = setInterval(poll, 1500);
     return () => { live = false; clearInterval(id); };
   }, [backend]);
   useEffect(() => {
