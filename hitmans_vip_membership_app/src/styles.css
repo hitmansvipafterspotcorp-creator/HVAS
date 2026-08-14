@@ -4057,6 +4057,10 @@ button {
 .bingo-now-song { color: #e6d3ff; font-size: 12.5px; }
 /* — Solo vs CPU — */
 .bingo-mode-tabs { margin-bottom: 12px; }
+.sfx-toggle {
+  flex: 0 0 auto; width: 42px; padding: 10px 0; border-radius: 10px; cursor: pointer;
+  background: rgba(20,10,32,.7); border: 1px solid rgba(176,107,255,.35); font-size: 15px; line-height: 1;
+}
 .solo-roster { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 14px; }
 .solo-chip {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border-radius: 999px;

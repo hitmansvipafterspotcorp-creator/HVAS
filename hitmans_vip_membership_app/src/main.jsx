@@ -14,6 +14,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiBookingRequest, apiBookingMine, apiBookingCancel, apiBookingBoard, apiBookingDecide } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
+import { playSfx, sfxMuted, setSfxMuted } from './sfx.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -3650,6 +3651,7 @@ function SoloBingoGame({ onExit }) {
         if (!g || g.status !== 'playing') return g;
         if (g.calledCount >= g.order.length) return { ...g, status: 'draw' };
         const item = g.order[g.calledCount];
+        playSfx('call');
         // Each CPU covers this square (if they hold it) after its own delay —
         // scheduled outside state so the timers don't rerun on every render.
         g.cpus.forEach((cpu, ci) => {
@@ -3661,6 +3663,7 @@ function SoloBingoGame({ onExit }) {
               const cpus = cur.cpus.map((c, i) => (i === ci ? { ...c, covered: new Set([...c.covered, item.id]) } : c));
               const won = cpus[ci];
               if (soloHasLine(won.card, won.covered)) {
+                playSfx('buzz');
                 return { ...cur, cpus, status: 'lost', winner: won.name };
               }
               return { ...cur, cpus };
@@ -3680,8 +3683,10 @@ function SoloBingoGame({ onExit }) {
       const called = new Set(g.order.slice(0, g.calledCount).map((c) => c.id));
       if (!called.has(item.id)) return g;              // can only cover what's been called
       const covered = new Set(g.covered);
-      covered.has(item.id) ? covered.delete(item.id) : covered.add(item.id);
-      if (soloHasLine(g.card, covered)) return { ...g, covered, status: 'won', winner: 'you' };
+      const wasCovered = covered.has(item.id);
+      wasCovered ? covered.delete(item.id) : covered.add(item.id);
+      if (!wasCovered) playSfx('mark');
+      if (soloHasLine(g.card, covered)) { playSfx('win'); return { ...g, covered, status: 'won', winner: 'you' }; }
       return { ...g, covered };
     });
   };
@@ -3905,6 +3910,24 @@ function TvDisplayScreen() {
 }
 
 // Member: join + ready up before the round starts.
+// Sound is great in an empty room and terrible when staff are running a door
+// three feet from a speaker — so it's one tap to kill, and the choice sticks.
+function SfxToggle() {
+  const [muted, setMuted] = useState(() => sfxMuted());
+  const toggle = () => {
+    const next = !muted;
+    setSfxMuted(next);
+    setMuted(next);
+    if (!next) playSfx('mark');   // unmuting confirms itself audibly
+  };
+  return (
+    <button type="button" className="sfx-toggle" onClick={toggle}
+      aria-pressed={muted} title={muted ? 'Sound off — tap to turn on' : 'Sound on — tap to mute'}>
+      {muted ? '🔇' : '🔊'}
+    </button>
+  );
+}
+
 function LobbyScreen({ navigate }) {
   // Two ways to play, and solo has to work with no venue backend at all —
   // so the mode switch lives ABOVE the connection check, not behind it.
@@ -3914,6 +3937,7 @@ function LobbyScreen({ navigate }) {
       <div className="staff-hub-tabs bingo-mode-tabs">
         <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
         <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
+        <SfxToggle />
       </div>
       {mode === 'solo' ? <SoloBingoGame /> : <VenueLobby navigate={navigate} />}
     </div>
@@ -3966,6 +3990,14 @@ function PlayerCardScreen({ navigate }) {
   const calledIds = new Set(calls.map((c) => c.id));
   const nowCalling = calls[calls.length - 1] || null;
   const covered = new Set(localCovered ?? me?.covered ?? []);
+  // Ring the call sting when a genuinely new song lands (poll-driven, so guard
+  // against re-firing on every 2.5s refresh of the same call).
+  const lastHeard = useRef(null);
+  useEffect(() => {
+    if (!nowCalling) return;
+    if (lastHeard.current === null) { lastHeard.current = nowCalling.id; return; } // don't shout on first load
+    if (lastHeard.current !== nowCalling.id) { lastHeard.current = nowCalling.id; playSfx('call'); }
+  }, [nowCalling?.id]);
   // How many called squares are sitting on this card still untapped — the
   // thing a player actually needs to know at a glance on a phone.
   const waiting = me?.card ? me.card.filter((it, i) => i !== 12 && calledIds.has(it.id) && !covered.has(it.id)).length : 0;
@@ -3980,6 +4012,7 @@ function PlayerCardScreen({ navigate }) {
     const next = new Set(covered);
     const wasCovered = next.has(item.id);
     wasCovered ? next.delete(item.id) : next.add(item.id);
+    if (!wasCovered) playSfx('mark');
     setLocalCovered([...next]);
     try { await apiBingoMark(item.id, !wasCovered); } catch { setLocalCovered(null); } // reconcile from server on failure
   };
