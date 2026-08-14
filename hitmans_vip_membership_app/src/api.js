@@ -70,6 +70,7 @@ export function apiSignOut() {
 // Optional: mirror a membership purchase to the backend so the pass is real.
 export function apiPurchase(tier, payment) { return call('POST', '/membership/purchase', { tier, payment }, apiToken()); }
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
+export function apiMyTimeline() { return call('GET', '/me/timeline', null, apiToken()); }
 // Server-authoritative on-the-way / left-venue signals — so a different
 // staff device (the door dashboard) actually sees them, not just this device.
 export function apiSetOtw(on) { return call('POST', '/signal/otw', { on }, apiToken()); }
@@ -100,6 +101,9 @@ export function apiDoorVerify(payload) { return call('POST', '/door/verify', pay
 export function apiDoorBoard() { return call('GET', '/door/board', null, apiStaffToken()); }
 export function apiDoorCheckout(number) { return call('POST', '/door/checkout', { number }, apiStaffToken()); }
 export function apiMembersSearch(q) { return call('GET', `/members/search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
+export function apiMemberTimeline(number) { return call('GET', `/members/timeline?number=${encodeURIComponent(number)}`, null, apiStaffToken()); }
+export function apiMemberManage(number, action, reason) { return call('POST', '/members/manage', { number, action, reason }, apiStaffToken()); }
+export function apiMemberFlags() { return call('GET', '/members/flags', null, apiStaffToken()); }
 
 // ── Lip Sync Bingo — one shared live round, same on every device ──
 // State is public (the TV Display runs unattended with no login) but carries

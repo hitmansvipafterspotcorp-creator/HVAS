@@ -194,6 +194,37 @@ export function openDb(path) {
   if (!entryCols.includes('left_at')) {
     db.exec(`ALTER TABLE entries ADD COLUMN left_at INTEGER`); // set when the member checks out / leaves — null = still inside
   }
+  // Full timestamped timeline: every admit/checkout, including re-entries after
+  // a "Left" (entries only holds current state — one row per member+night — so
+  // a comeback overwrites it; this is the append-only history behind it).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS entry_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_id TEXT NOT NULL REFERENCES members(id),
+      night TEXT NOT NULL,
+      kind TEXT NOT NULL,               -- 'admit' | 'checkout'
+      at INTEGER NOT NULL,
+      by_staff TEXT,
+      searched INTEGER NOT NULL DEFAULT 0  -- staff marked "wanded/searched" at this admit
+    );
+    CREATE INDEX IF NOT EXISTS idx_entry_events_member_night ON entry_events(member_id, night, at);
+  `);
+  const eventCols = db.prepare(`PRAGMA table_info(entry_events)`).all().map((c) => c.name);
+  if (!eventCols.includes('searched')) {
+    db.exec(`ALTER TABLE entry_events ADD COLUMN searched INTEGER NOT NULL DEFAULT 0`);
+  }
+  // Manual staff flags — trespass/banned/suspended set directly from a
+  // member's profile, independent of any door scan. One row per member;
+  // clearing it (member.flag with kind=null) deletes the row.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS member_flags (
+      member_id TEXT PRIMARY KEY REFERENCES members(id),
+      kind TEXT NOT NULL,               -- 'banned' | 'trespass' | 'suspended'
+      reason TEXT,
+      by_staff TEXT,
+      at INTEGER NOT NULL
+    );
+  `);
   return db;
 }
 

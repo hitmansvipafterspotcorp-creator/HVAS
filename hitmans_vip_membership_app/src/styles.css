@@ -3745,7 +3745,33 @@ button {
 .dash-status-pill.onTheWay { background: rgba(255,178,76,.16); color: #ffb24c; border: 1px solid rgba(255,178,76,.4); }
 .dash-status-pill.signedIn { background: rgba(107,199,255,.14); color: #6bc7ff; border: 1px solid rgba(107,199,255,.35); }
 .dash-status-pill.left { background: rgba(138,123,168,.14); color: #b8aec2; border: 1px solid rgba(138,123,168,.35); }
+.dash-status-pill.backinside { background: rgba(107,199,255,.16); color: #8ad4ff; border: 1px solid rgba(107,199,255,.45); }
+.dash-status-pill.trespass { background: rgba(255,210,58,.14); color: #ffd23a; border: 1px solid rgba(255,210,58,.4); }
+.dash-status-pill.banned { background: rgba(255,84,112,.16); color: #ff8aa0; border: 1px solid rgba(255,84,112,.45); }
+.dash-status-pill.suspended { background: rgba(255,177,74,.16); color: #ffb24c; border: 1px solid rgba(255,177,74,.4); }
 .dash-roster-right { flex: none !important; align-items: flex-end !important; gap: 6px; }
+.dash-row.tappable { cursor: pointer; border-radius: 12px; transition: background .15s ease; }
+.dash-row.tappable:hover, .dash-row.tappable:focus-visible { background: rgba(176,107,255,.08); outline: none; }
+
+/* — member profile overlay (staff: tap a roster row) — */
+.mem-profile-overlay { position: fixed; inset: 0; background: rgba(6,3,14,.88); display: grid; place-items: center; z-index: 85; padding: 16px; overflow-y: auto; animation: alertfade .18s ease; }
+.mem-profile-card { position: relative; background: #140a20; border: 1px solid #3a2350; border-radius: 18px; padding: 24px 20px 20px; max-width: 460px; width: 100%; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.mem-profile-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #b8aec2; font-size: 16px; cursor: pointer; padding: 4px 8px; }
+.mem-profile-card h2 { color: #ffe8a3; font-size: 22px; margin: 0 0 2px; }
+.mem-profile-sub { color: #d6b8ff; font-size: 13px; margin: 0 0 2px; }
+.mem-profile-contact { color: #9a7ac0; font-size: 12px; margin: 0 0 10px; }
+.mem-profile-status-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.mem-profile-flag { margin: 10px 0; padding: 10px 12px; border-radius: 12px; background: rgba(255,84,112,.12); border: 1px solid rgba(255,84,112,.4); color: #ffc2cd; font-size: 13px; }
+.mem-profile-reason { width: 100%; box-sizing: border-box; margin-top: 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid #3a2860; background: rgba(255,255,255,.04); color: #f4ecff; font-size: 13px; }
+.mem-profile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.door-act.suspend { border: 2px solid #ffb14a; color: #ffdca6; box-shadow: 0 0 14px rgba(255,177,74,.35), inset 0 0 12px rgba(255,177,74,.12); }
+.door-act.suspend:hover { box-shadow: 0 0 22px rgba(255,177,74,.6); }
+.door-act:disabled { opacity: .5; cursor: default; transform: none !important; }
+.mem-profile-timeline-head { color: #d6b8ff; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 8px; }
+.mem-profile-timeline { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.mem-timeline-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 12px; }
+.mem-timeline-kind { color: #e6d3ff; }
+.mem-timeline-time { color: #8a7aa0; white-space: nowrap; }
 
 /* — auth: member sign-in + staff/host code gate — */
 .landing-account { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 8px 14px; border: 1px solid #3a2860; border-radius: 12px; background: rgba(30, 16, 52, 0.5); color: #d7c8ff; font-size: 13px; }

@@ -39,20 +39,63 @@ export function applyOp(db, op) {
         ON CONFLICT(member_id) DO UPDATE SET on_the_way=excluded.on_the_way, at=excluded.at
         WHERE excluded.at >= signals.at OR signals.at IS NULL`)
         .run({ member_id: d.member_id, on: d.on ? 1 : 0, ts });
+      // log the "heading over" moment into the same timeline as admit/checkout
+      // (only the on-flip — toggling off isn't an event worth surfacing to staff)
+      if (d.on && d.night) {
+        db.prepare('INSERT INTO entry_events(member_id,night,kind,at) VALUES(?,?,\'otw\',?)')
+          .run(d.member_id, d.night, ts);
+      }
       break;
-    case 'entry.admit':
-      db.prepare('INSERT OR IGNORE INTO entries(member_id,night,at,by_staff) VALUES(?,?,?,?)')
-        .run(d.member_id, d.night, d.at, d.by_staff ?? null);
+    // entries holds CURRENT state (one row per member+night); entry_events is
+    // the append-only history behind it. A member who left and gets scanned
+    // again is a real "back inside" event, not a no-op — re-admitting clears
+    // left_at so entries reflects that, and only a state change (first
+    // arrival, or a genuine comeback) gets logged, so duplicate scans of an
+    // already-inside member don't spam the timeline.
+    case 'entry.admit': {
+      const existing = db.prepare('SELECT * FROM entries WHERE member_id=? AND night=?').get(d.member_id, d.night);
+      let changed = false;
+      if (!existing) {
+        db.prepare('INSERT INTO entries(member_id,night,at,by_staff) VALUES(?,?,?,?)')
+          .run(d.member_id, d.night, d.at, d.by_staff ?? null);
+        changed = true;
+      } else if (existing.left_at) {
+        db.prepare('UPDATE entries SET left_at=NULL WHERE member_id=? AND night=?').run(d.member_id, d.night);
+        changed = true;
+      }
+      if (changed) {
+        db.prepare('INSERT INTO entry_events(member_id,night,kind,at,by_staff,searched) VALUES(?,?,\'admit\',?,?,?)')
+          .run(d.member_id, d.night, d.at, d.by_staff ?? null, d.searched ? 1 : 0);
+      }
       // arriving clears the on-the-way signal (idempotent)
       db.prepare('UPDATE signals SET on_the_way=0 WHERE member_id=?').run(d.member_id);
       break;
-    case 'entry.checkout':                              // member marked "left" for the night — idempotent
-      db.prepare('UPDATE entries SET left_at=? WHERE member_id=? AND night=? AND left_at IS NULL')
+    }
+    case 'entry.checkout': {                             // member marked "left" for the night — idempotent
+      const info = db.prepare('UPDATE entries SET left_at=? WHERE member_id=? AND night=? AND left_at IS NULL')
         .run(d.at ?? ts, d.member_id, d.night);
+      if (info.changes > 0) {
+        db.prepare('INSERT INTO entry_events(member_id,night,kind,at,by_staff) VALUES(?,?,\'checkout\',?,?)')
+          .run(d.member_id, d.night, d.at ?? ts, d.by_staff ?? null);
+      }
       break;
+    }
     case 'decision':
       db.prepare('INSERT INTO decisions(member_id,number,status,at,by_staff) VALUES(?,?,?,?,?)')
         .run(d.member_id ?? null, d.number ?? null, d.status, d.at, d.by_staff ?? null);
+      break;
+    // Manual staff flag (ban/trespass/suspend) set from a member's profile —
+    // kind:null clears it. Last-write-wins by ts so two staff devices setting
+    // conflicting flags converge instead of duplicating rows.
+    case 'member.flag':
+      if (!d.kind) {
+        db.prepare('DELETE FROM member_flags WHERE member_id=?').run(d.member_id);
+      } else {
+        db.prepare(`INSERT INTO member_flags(member_id,kind,reason,by_staff,at) VALUES(@member_id,@kind,@reason,@by_staff,@ts)
+          ON CONFLICT(member_id) DO UPDATE SET kind=excluded.kind, reason=excluded.reason,
+            by_staff=excluded.by_staff, at=excluded.at WHERE excluded.at >= member_flags.at`)
+          .run({ member_id: d.member_id, kind: d.kind, reason: d.reason ?? null, by_staff: d.by_staff ?? null, ts });
+      }
       break;
 
     // ── networking (top-down venues) ──

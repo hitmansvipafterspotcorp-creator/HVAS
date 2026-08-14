@@ -86,6 +86,83 @@ await call('POST', '/door/verify', { pass: fresh2.body.pass }, stok);
 const me = await call('GET', '/me', null, mtok);
 ok(me.body.member.entries === 1, 'admission idempotent per night (entries=1)');
 
+console.log('LEFT → RE-SCANNED → BACK INSIDE');
+const checkout1 = await call('POST', '/signal/leave', {}, mtok);
+ok(checkout1.status === 200, 'member marks themselves left');
+let meLeft = await call('GET', '/me', null, mtok);
+ok(meLeft.body.member.insideTonight === false && meLeft.body.member.leftTonight === true, 'now reads Left, not Inside');
+b = await call('GET', '/door/board', null, stok);
+ok(b.body.inside.length === 0, 'no longer in the Inside list');
+const leftMember = b.body.allMembers.find((x) => x.number === buy.body.member.number);
+ok(leftMember?.doorStatus === 'left', 'door dashboard roster shows Left');
+// staff re-scans the SAME member later — this used to silently no-op
+// (INSERT OR IGNORE on a UNIQUE(member_id,night) row) and leave them stuck
+// showing "Left" forever even though they were physically let back in.
+const freshAfterLeave = await call('GET', '/pass/current', null, mtok);
+const regrant = await call('POST', '/door/verify', { pass: freshAfterLeave.body.pass, searched: true }, stok);
+ok(regrant.body.ok && regrant.body.status === 'granted', 'rescanning a Left member grants again, not silently ignored');
+let meBack = await call('GET', '/me', null, mtok);
+ok(meBack.body.member.insideTonight === true && meBack.body.member.leftTonight === false, 'reads Inside again after re-admit');
+ok(meBack.body.member.backInside === true, 'flagged as a genuine back-inside, not a first arrival');
+ok(meBack.body.member.entries === 1, 'still one night on record (entries table tracks nights, not re-entry count)');
+b = await call('GET', '/door/board', null, stok);
+const backMember = b.body.allMembers.find((x) => x.number === buy.body.member.number);
+ok(backMember?.doorStatus === 'inside' && backMember?.backInside === true, 'roster shows Inside + back-inside flag');
+
+const timeline = await call('GET', `/members/timeline?number=${buy.body.member.number}`, null, stok);
+ok(timeline.status === 200, 'staff can pull a member timeline');
+const myTimeline = await call('GET', '/me/timeline', null, mtok);
+ok(myTimeline.status === 200, 'a member can pull their OWN timeline');
+ok(JSON.stringify(myTimeline.body.events) === JSON.stringify(timeline.body.events), 'member sees the exact same events staff do');
+const myTimelineNoAuth = await call('GET', '/me/timeline', null, stok);
+ok(myTimelineNoAuth.status === 401, 'staff tokens cannot use the member-only /me/timeline');
+const kinds = timeline.body.events.map((e) => e.kind);
+ok(kinds.includes('signup') && kinds.includes('membership'), 'timeline includes signup + membership purchase');
+ok(kinds.filter((k) => k === 'admit').length === 2, 'timeline shows both admits (first arrival + re-entry)');
+ok(kinds.filter((k) => k === 'checkout').length === 1, 'timeline shows the one checkout in between');
+ok(kinds.includes('otw'), 'timeline includes the earlier On the way signal');
+const secondAdmit = timeline.body.events.filter((e) => e.kind === 'admit')[1];
+ok(secondAdmit.searched === true, 'the "searched" flag from the re-admit door scan is recorded');
+ok(timeline.body.events.every((e, i, arr) => i === 0 || arr[i - 1].at <= e.at), 'events are in chronological order');
+const timelineNoAuth = await call('GET', `/members/timeline?number=${buy.body.member.number}`, null, mtok);
+ok(timelineNoAuth.status === 401, 'members cannot pull the staff-only timeline');
+
+console.log('MANUAL STAFF ACTIONS (profile buttons — no scan needed)');
+const s3 = await call('POST', '/auth/member/start', { contact: '850-555-4321' });
+const v3 = await call('POST', '/auth/member/verify', { contact: '850-555-4321', code: s3.body.devCode, name: 'Marcus' });
+const mtok3 = v3.body.token;
+await call('POST', '/membership/purchase', { tier: 'Daily', payment: 'Cash' }, mtok3);
+const marcus = (await call('GET', '/me', null, mtok3)).body.member;
+
+const manageNoAuth = await call('POST', '/members/manage', { number: marcus.number, action: 'grant' }, mtok3);
+ok(manageNoAuth.status === 401, 'members cannot use the manual staff-action endpoint');
+
+const manualGrant = await call('POST', '/members/manage', { number: marcus.number, action: 'grant' }, stok);
+ok(manualGrant.status === 200 && manualGrant.body.member.insideTonight === true, 'manual "grant" admits without a QR scan');
+
+const manualDeny = await call('POST', '/members/manage', { number: marcus.number, action: 'deny' }, stok);
+ok(manualDeny.status === 200 && manualDeny.body.member.insideTonight === true, '"deny" logs a decision but does not change entry status');
+
+const ban = await call('POST', '/members/manage', { number: marcus.number, action: 'banned', reason: 'Fighting' }, stok);
+ok(ban.body.member.flag?.kind === 'banned' && ban.body.member.flag?.reason === 'Fighting', 'ban sets a standing flag with reason');
+
+const flagsList = await call('GET', '/members/flags', null, stok);
+ok(flagsList.body.members.some((x) => x.number === marcus.number), 'banned member shows up on the shared venue watchlist');
+
+const freshMarcus = await call('GET', '/pass/current', null, mtok3);
+const bannedScan = await call('POST', '/door/verify', { pass: freshMarcus.body.pass }, stok);
+ok(!bannedScan.body.ok && bannedScan.body.status === 'banned', 'a banned member is denied at the door even with a valid pass');
+
+const unflag = await call('POST', '/members/manage', { number: marcus.number, action: 'unflag' }, stok);
+ok(unflag.body.member.flag === null, 'clearing the flag removes it');
+const freshMarcus2 = await call('GET', '/pass/current', null, mtok3);
+const unflaggedScan = await call('POST', '/door/verify', { pass: freshMarcus2.body.pass }, stok);
+ok(unflaggedScan.body.ok && unflaggedScan.body.status === 'granted', 'once cleared, the same member scans in normally again');
+
+const marcusTimeline = await call('GET', `/members/timeline?number=${marcus.number}`, null, stok);
+const mKinds = marcusTimeline.body.events.map((e) => e.kind);
+ok(mKinds.filter((k) => k === 'decision').length >= 3, 'deny/ban/etc all show up as decision events in the timeline');
+
 console.log('DENY CASES');
 const trespass = await call('POST', '/door/verify', { number: 'HV-0000-0000' }, stok);
 ok(!trespass.body.ok && trespass.body.status === 'trespass', 'unknown number → TRESPASS');

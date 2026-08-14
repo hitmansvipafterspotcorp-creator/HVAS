@@ -186,6 +186,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const insideTonight = !!entryRow && !entryRow.left_at;
     const leftTonight = !!entryRow && !!entryRow.left_at;
     const sig = db.prepare('SELECT * FROM signals WHERE member_id=?').get(m.id);
+    // How many times they've been ADMITTED tonight — >1 means they left and
+    // got scanned back in ("back inside"), not just their first arrival.
+    const admitsTonight = db.prepare(`SELECT COUNT(*) c FROM entry_events WHERE member_id=? AND night=? AND kind='admit'`)
+      .get(m.id, nightKey()).c;
+    const flagRow = db.prepare('SELECT * FROM member_flags WHERE member_id=?').get(m.id);
     return {
       id: m.id, name: m.name, number: m.number, contact: m.contact ?? null,
       tier: ms?.tier || null, vip: !!ms?.vip, payment: ms?.payment || null,
@@ -193,7 +198,27 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       entries: nights, insideTonight, leftTonight,
       enteredAt: entryRow?.at || null, leftAt: entryRow?.left_at || null,
       onTheWay: !!sig?.on_the_way && !insideTonight, onTheWayAt: sig?.at || null,
+      backInside: insideTonight && admitsTonight > 1,
+      flag: flagRow ? { kind: flagRow.kind, reason: flagRow.reason, by: flagRow.by_staff, at: flagRow.at } : null,
     };
+  };
+  // Full timestamped timeline for one member: signup, membership purchase,
+  // and the complete on-the-way / admit / checkout history (every re-entry
+  // included, not just tonight's current state) — one place staff can see
+  // everything about a member instead of piecing it together.
+  const memberTimeline = (m) => {
+    const ms = membershipOf(m.id);
+    const events = [];
+    events.push({ kind: 'signup', at: m.created_at });
+    if (ms) events.push({ kind: 'membership', at: ms.purchased_at, tier: ms.tier, vip: !!ms.vip, payment: ms.payment });
+    for (const e of db.prepare('SELECT * FROM entry_events WHERE member_id=? ORDER BY at ASC').all(m.id)) {
+      events.push({ kind: e.kind, at: e.at, night: e.night, byStaff: e.by_staff || null, searched: !!e.searched });
+    }
+    for (const d of db.prepare(`SELECT * FROM decisions WHERE member_id=? AND status!='granted' ORDER BY at ASC`).all(m.id)) {
+      events.push({ kind: 'decision', at: d.at, status: d.status, byStaff: d.by_staff || null });
+    }
+    events.sort((a, b) => a.at - b.at);
+    return events;
   };
   // ── Lip Sync Bingo helpers ──
   const getBingoRound = () => {
@@ -240,7 +265,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const nk = nightKey();
     const onTheWay = db.prepare(`SELECT m.* FROM signals s JOIN members m ON m.id=s.member_id
        WHERE s.on_the_way=1 AND m.id NOT IN (SELECT member_id FROM entries WHERE night=?)`).all(nk).map(publicMember);
-    const inside = db.prepare(`SELECT m.* FROM entries e JOIN members m ON m.id=e.member_id WHERE e.night=?`).all(nk).map(publicMember);
+    const inside = db.prepare(`SELECT m.* FROM entries e JOIN members m ON m.id=e.member_id WHERE e.night=? AND e.left_at IS NULL`).all(nk).map(publicMember);
     // Full recent audit trail (venue-wide, every staff device sees the same
     // list) — the door dashboard's "Recent door decisions" panel. Includes the
     // member's name via a join so staff don't have to look up bare numbers.
@@ -348,6 +373,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
     },
+    // A member's own full timeline — same event set staff see on the door
+    // dashboard, so "everything tracked and timestamped" is true on both
+    // ends, not just the staff side.
+    'GET /me/timeline': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const m = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
+      if (!m) return json(res, 404, { error: 'not found' });
+      json(res, 200, { events: memberTimeline(m) });
+    },
     // HitKoin: a member's own wallet + reward history. No wallet exists
     // until their first mint (their first real, confirmed payment).
     'GET /wallet': (req, res) => {
@@ -414,7 +448,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'POST /signal/otw': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const { on } = await readBody(req);
-      commit('signal.otw', { member_id: c.sub, on: on ? 1 : 0 });
+      commit('signal.otw', { member_id: c.sub, on: on ? 1 : 0, night: nightKey() });
       json(res, 200, { ok: true });
     },
     // Member marks themselves as having left the venue tonight — shows up as
@@ -513,7 +547,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // per night. Returns the outcome the door UI shows.
     'POST /door/verify': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      const { pass, number } = await readBody(req);
+      const { pass, number, searched } = await readBody(req);
       let num = number, checked = { ok: !!number };
       if (pass) { checked = verifyPass(keys.publicKey, pass); num = checked.number; }
       const decide = (status, member) => {
@@ -523,12 +557,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (pass && !checked.ok) return decide(checked.reason === 'expired-qr' ? 'expired-qr' : 'trespass', null);
       const m = memberByNumber(num);
       if (!m) return decide('trespass', null);
+      const flag = db.prepare('SELECT * FROM member_flags WHERE member_id=?').get(m.id);
+      if (flag) return decide(flag.kind, m);   // manual staff flag always wins, regardless of membership state
       const ms = membershipOf(m.id);
       if (!ms) return decide('trespass', m);
       if (ms.status === 'suspended') return decide('suspended', m);
       if (Date.now() > ms.expires_at) return decide('expired', m);
-      // grant → admission op (idempotent per night; clears OTW in the reducer)
-      commit('entry.admit', { member_id: m.id, night: nightKey(), at: Date.now(), by_staff: c.sub });
+      // grant → admission op (idempotent per night; clears OTW in the reducer;
+      // re-admits someone who'd left as a real "back inside" event)
+      commit('entry.admit', { member_id: m.id, night: nightKey(), at: Date.now(), by_staff: c.sub, searched: !!searched });
       return decide('granted', m);
     },
 
@@ -561,6 +598,51 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       ).all(like, like, like);
       json(res, 200, { members: rows.map(publicMember) });
     },
+    // Full timeline for one member — signup, membership/payment, every OTW /
+    // admit / checkout / re-entry, and any non-grant door decisions — so
+    // staff can see everything about a member in one place instead of piecing
+    // it together across the roster.
+    'GET /members/timeline': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const number = (new URL(req.url, 'http://x').searchParams.get('number') || '').trim();
+      const m = memberByNumber(number);
+      if (!m) return json(res, 404, { error: 'not found' });
+      json(res, 200, { member: publicMember(m), events: memberTimeline(m) });
+    },
+    // Manual staff action from a member's profile — no scan needed. Covers
+    // the buttons the door needs beyond "scan and see what happens": approve
+    // entry by hand, deny on the spot, or set/clear a standing flag (trespass
+    // / banned / suspended) that auto-denies every future scan until cleared.
+    'POST /members/manage': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { number, action, reason } = await readBody(req);
+      const m = memberByNumber(number);
+      if (!m) return json(res, 404, { error: 'not found' });
+      const at = Date.now();
+      if (action === 'grant') {
+        commit('entry.admit', { member_id: m.id, night: nightKey(), at, by_staff: c.sub });
+        commit('decision', { member_id: m.id, number: m.number, status: 'granted', at, by_staff: c.sub });
+      } else if (action === 'deny') {
+        commit('decision', { member_id: m.id, number: m.number, status: 'denied', at, by_staff: c.sub });
+      } else if (action === 'trespass' || action === 'banned' || action === 'suspended') {
+        commit('member.flag', { member_id: m.id, kind: action, reason: reason || null, by_staff: c.sub });
+        commit('decision', { member_id: m.id, number: m.number, status: action, at, by_staff: c.sub });
+      } else if (action === 'unflag') {
+        commit('member.flag', { member_id: m.id, kind: null, by_staff: c.sub });
+      } else {
+        return json(res, 400, { error: 'unknown action' });
+      }
+      json(res, 200, { ok: true, member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(m.id)) });
+    },
+
+    // The venue watchlist — every member currently flagged, on every staff
+    // device (backend-shared, unlike a per-device local list).
+    'GET /members/flags': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT m.* FROM member_flags f JOIN members m ON m.id = f.member_id ORDER BY f.at DESC`).all();
+      json(res, 200, { members: rows.map(publicMember) });
+    },
+
     'GET /door/stream': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
@@ -817,6 +899,8 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'expired-qr': 'Pass expired — ask them to refresh their QR.',
     suspended: 'Membership suspended — do not admit.',
     trespass: 'No matching member — unauthorized. Do not admit.',
+    banned: 'Banned from the venue — do not admit.',
+    denied: 'Denied by staff — do not admit.',
   };
 
   const server = createServer(async (req, res) => {

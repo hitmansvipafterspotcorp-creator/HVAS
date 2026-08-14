@@ -3,10 +3,11 @@ import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
-import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe,
+import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
   apiSetOtw, apiSignalLeave,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
+  apiMemberTimeline, apiMemberManage, apiMemberFlags,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -192,7 +193,17 @@ export function purchaseTier(tierName, payment, amount) {
   }
   // Also mirror to a real backend if one is connected, so the server mints the
   // membership and the rolling QR pass is server-verifiable at the door.
-  if (apiEnabled() && apiToken()) apiPurchase(tierName, payment).catch(() => {});
+  // Reconciles the local card with the response immediately — without this,
+  // the card (and the QR it renders) keeps the client-generated `number`
+  // above until the next background sync (up to 8s later, see
+  // syncMemberFromBackend), during which it doesn't match what the door
+  // actually has on file for this member.
+  if (apiEnabled() && apiToken()) {
+    apiPurchase(tierName, payment).then((r) => {
+      const m = r?.member;
+      if (m?.number) commitMember({ ...(memberState || {}), number: m.number, name: m.name || name, entries: m.entries ?? 0 });
+    }).catch(() => {});
+  }
 }
 
 // Pull the member's OWN real state back from the backend. Needed for the
@@ -2928,6 +2939,98 @@ function PenaltyControls({ member }) {
   );
 }
 
+const STATUS_LABEL = { inside: 'Inside', onTheWay: 'On the way', signedIn: 'Signed in', left: 'Left' };
+const TIMELINE_LABEL = {
+  signup: '📝 Signed up',
+  membership: '💳 Bought membership',
+  otw: '🚗 On the way',
+  admit: '✅ Admitted',
+  checkout: '🚪 Left',
+  decision: '⚠️ Staff decision',
+};
+const DECISION_LABEL = { trespass: 'Trespassed', banned: 'Banned', suspended: 'Suspended', denied: 'Denied', expired: 'Expired', valid: 'Granted', 'expired-qr': 'QR expired' };
+
+// Tap a member on the door dashboard's roster → this. Real, shared-backend
+// version of the grant/deny/trespass/ban controls (see PenaltyControls below
+// for the local-demo equivalent) plus the full timestamped timeline: signup,
+// membership purchase, every on-the-way/admit/checkout/re-entry, and any
+// staff decision — everything in one place instead of piecing it together.
+function MemberProfileOverlay({ number, onClose, onChanged }) {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('');
+
+  const load = async () => {
+    try { setData(await apiMemberTimeline(number)); } catch { /* ignore */ }
+  };
+  useEffect(() => { load(); }, [number]);
+
+  const act = async (action) => {
+    setBusy(true);
+    try { await apiMemberManage(number, action, reason.trim() || undefined); await load(); onChanged?.(); }
+    catch { /* ignore */ }
+    finally { setBusy(false); }
+  };
+
+  const m = data?.member;
+  const events = data?.events || [];
+  const flag = m?.flag;
+  const doorStatus = !m ? '' : m.insideTonight ? 'inside' : m.leftTonight ? 'left' : m.onTheWay ? 'onTheWay' : 'signedIn';
+
+  return (
+    <div className="mem-profile-overlay" onClick={onClose}>
+      <div className="mem-profile-card" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="mem-profile-close" onClick={onClose} aria-label="Close">✕</button>
+        {!m ? <p className="dash-empty">Loading…</p> : (
+          <>
+            <h2>{m.name || 'Member'}</h2>
+            <p className="mem-profile-sub">{m.tier}{m.vip ? ' VIP' : ''} · {m.number}</p>
+            {m.contact && <p className="mem-profile-contact">{m.contact}</p>}
+            <div className="mem-profile-status-row">
+              <span className={`dash-status-pill ${doorStatus}`}>{STATUS_LABEL[doorStatus]}</span>
+              {m.backInside && <span className="dash-status-pill backinside">↩ Back inside</span>}
+            </div>
+            {flag && (
+              <div className={`mem-profile-flag ${flag.kind}`}>
+                <strong>{DECISION_LABEL[flag.kind] || flag.kind}</strong>
+                {flag.reason && <span> · {flag.reason}</span>}
+                {flag.by && <span> · by {flag.by}</span>}
+                <span> · {fmtDateTime(flag.at)}</span>
+              </div>
+            )}
+
+            <input className="mem-profile-reason" type="text" placeholder="Reason (optional, for trespass/ban/suspend)"
+              value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="mem-profile-actions">
+              <button type="button" className="door-act grant" disabled={busy} onClick={() => act('grant')}><span className="door-act-ic" aria-hidden="true">🛡</span>Grant access</button>
+              <button type="button" className="door-act deny" disabled={busy} onClick={() => act('deny')}><span className="door-act-ic" aria-hidden="true">✋</span>Deny</button>
+              <button type="button" className="door-act trespass" disabled={busy} onClick={() => act('trespass')}><span className="door-act-ic" aria-hidden="true">⚠️</span>Trespass</button>
+              <button type="button" className="door-act ban" disabled={busy} onClick={() => act('banned')}><span className="door-act-ic" aria-hidden="true">⛔</span>Ban</button>
+              <button type="button" className="door-act suspend" disabled={busy} onClick={() => act('suspended')}><span className="door-act-ic" aria-hidden="true">⏸</span>Suspend</button>
+              {flag && <button type="button" className="door-act clear" disabled={busy} onClick={() => act('unflag')}>Clear flag</button>}
+            </div>
+
+            <h3 className="mem-profile-timeline-head">Timeline</h3>
+            <div className="mem-profile-timeline">
+              {events.length === 0 ? <p className="dash-empty">No activity yet.</p> : events.slice().reverse().map((e, i) => (
+                <div className={`mem-timeline-row ${e.kind}`} key={i}>
+                  <span className="mem-timeline-kind">
+                    {e.kind === 'decision' ? `⚠️ ${DECISION_LABEL[e.status] || e.status}` : TIMELINE_LABEL[e.kind] || e.kind}
+                    {e.kind === 'membership' ? ` · ${e.tier}${e.vip ? ' VIP' : ''} · ${e.payment || ''}` : ''}
+                    {e.searched ? ' · searched' : ''}
+                    {e.byStaff ? ` · by ${e.byStaff}` : ''}
+                  </span>
+                  <span className="mem-timeline-time">{fmtDateTime(e.at)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Connected to a venue backend: shows EVERY member the shared board knows
 // about (poll GET /door/board every 4s) — not just this device's own local
 // member. With no backend it falls back to the single local member, same as
@@ -2969,7 +3072,6 @@ function StaffDashboardScreen({ navigate }) {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
   };
   const clockStr = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-  const normStatus = (s) => (s === 'granted' ? 'valid' : s === 'expired-qr' ? 'expired' : s === 'suspended' ? 'trespass' : s);
 
   const insideList = backend ? (board?.inside || []) : (isInsideTonight(member) ? [member] : []);
   // Full roster — every member the venue knows about, always visible (not
@@ -2982,7 +3084,6 @@ function StaffDashboardScreen({ navigate }) {
     enteredAt: member.verifiedAt || null,
     leftAt: member.checkedOutAt || null,
   }] : []);
-  const STATUS_LABEL = { inside: 'Inside', onTheWay: 'On the way', signedIn: 'Signed in', left: 'Left' };
   const STATUS_DOT = { inside: 'green', onTheWay: 'amber', signedIn: 'blue', left: 'grey' };
   const rosterWhen = (m) => (
     m.doorStatus === 'inside' ? `In ${elapsed(m.enteredAt)}` :
@@ -3001,13 +3102,18 @@ function StaffDashboardScreen({ navigate }) {
   // log from the shared backend; local/demo mode falls back to just this
   // device's own last scan, same as before.
   const recentDecisions = backend
-    ? (board?.recentDecisions || []).map((d) => ({ status: normStatus(d.status), when: d.at, number: d.number, name: d.name }))
+    ? (board?.recentDecisions || []).map((d) => ({ status: d.status === 'granted' ? 'valid' : d.status, when: d.at, number: d.number, name: d.name }))
     : (member && member.verifiedAt ? [{ status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt, number: member.number, name: member.name }] : []);
 
   const insideCount = insideList.length;
   const entriesTotal = backend ? insideCount : (member?.entries || 0);
   const [spark, setSpark] = useState(() => Array.from({ length: 14 }, () => insideCount));
   useEffect(() => { setSpark((s) => [...s.slice(1), insideCount]); }, [insideCount]);
+
+  // Tap a member on a real backend → full profile: timeline + grant/deny/
+  // trespass/ban/suspend. Local demo mode keeps the inline PenaltyControls.
+  const [profileNumber, setProfileNumber] = useState(null);
+  const refreshBoard = async () => { if (backend) { try { setBoard(await apiDoorBoard()); } catch { /* ignore */ } } };
 
   return (
     <div className="staff-dash">
@@ -3020,18 +3126,21 @@ function StaffDashboardScreen({ navigate }) {
 
       <AppPanel className="dash-roster-panel" title="All members" subtitle="Inside → on the way → signed in → left, live">
         {roster.length > 0 ? roster.map((m) => (
-          <div className={`dash-row roster ${m.doorStatus}`} key={m.number}>
+          <div className={`dash-row roster ${m.doorStatus}${backend ? ' tappable' : ''}`} key={m.number}
+            onClick={backend ? () => setProfileNumber(m.number) : undefined} role={backend ? 'button' : undefined} tabIndex={backend ? 0 : undefined}>
             <span className={`dash-dot ${STATUS_DOT[m.doorStatus]}`} />
             <div className="dash-info">
               <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
               <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
               <span className={`dash-status-pill ${m.doorStatus}`}>{STATUS_LABEL[m.doorStatus]}</span>
+              {m.backInside && <span className="dash-status-pill backinside">↩ Back inside</span>}
+              {m.flag && <span className={`dash-status-pill ${m.flag.kind}`}>{DECISION_LABEL[m.flag.kind] || m.flag.kind}</span>}
               {!backend && <PenaltyControls member={m} />}
             </div>
             <div className="dash-roster-right">
               <span className="dash-when">{rosterWhen(m)}</span>
               {m.doorStatus === 'inside' && (
-                <button type="button" className="dash-pen clear" onClick={() => checkoutMember(m)}>Mark left</button>
+                <button type="button" className="dash-pen clear" onClick={(e) => { e.stopPropagation(); checkoutMember(m); }}>Mark left</button>
               )}
             </div>
           </div>
@@ -3039,13 +3148,16 @@ function StaffDashboardScreen({ navigate }) {
           <p className="dash-empty">No members yet.</p>
         )}
       </AppPanel>
+      {backend && profileNumber && (
+        <MemberProfileOverlay number={profileNumber} onClose={() => setProfileNumber(null)} onChanged={refreshBoard} />
+      )}
 
       <AppPanel className="dash-scroll-panel" title="Recent door decisions" subtitle="Tonight's check-in log">
         {recentDecisions.length > 0 ? recentDecisions.map((d, i) => (
           <div className={`dash-row ${d.status}`} key={`${d.number}-${d.when}-${i}`}>
-            <img className="dash-chip" src={STATUS_CHIP[d.status] || STATUS_CHIP.expired} alt={d.status} />
+            <img className="dash-chip" src={STATUS_CHIP[d.status] || STATUS_CHIP.trespass} alt={d.status} />
             <div>
-              <strong>{d.status === 'valid' ? 'Granted' : 'Denied'}{d.name ? ` · ${d.name}` : ''}</strong>
+              <strong>{DECISION_LABEL[d.status] || 'Denied'}{d.name ? ` · ${d.name}` : ''}</strong>
               <span className="dash-num">{d.number}</span>
             </div>
             <span className="dash-when">{ago(d.when)}</span>
@@ -3065,32 +3177,53 @@ function StaffDashboardScreen({ navigate }) {
   );
 }
 
-// The venue watchlist: every member currently flagged trespass/banned, pulled
-// from the hub op-log so it's the same list on every staff device. Staff can
-// lift a flag here; that too converges everywhere.
+// The venue watchlist: every member currently flagged trespass/banned. On a
+// real backend this is the shared server-side list (same on every staff
+// device); with no backend it falls back to the local-device demo list.
 function WatchlistScreen() {
+  const backend = apiEnabled() && apiStaffToken();
   const [, tick] = useState(0);
-  useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(id); }, []);
-  const rows = penalizedMembers();
-  const lift = (m) => { penalizeMember(m.number, m.name, 'cleared', ''); tick((n) => n + 1); };
+  const [remoteRows, setRemoteRows] = useState(null);
+  const [profileNumber, setProfileNumber] = useState(null);
+  useEffect(() => {
+    if (!backend) return undefined;
+    let live = true;
+    const poll = async () => { try { const r = await apiMemberFlags(); if (live) setRemoteRows(r.members); } catch { /* ignore */ } };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => { live = false; clearInterval(id); };
+  }, [backend]);
+  useEffect(() => { if (backend) return undefined; const id = setInterval(() => tick((n) => n + 1), 5000); return () => clearInterval(id); }, [backend]);
+
+  const rows = backend
+    ? (remoteRows || []).map((m) => ({ number: m.number, name: m.name, kind: m.flag?.kind, reason: m.flag?.reason, by: m.flag?.by, at: m.flag?.at }))
+    : penalizedMembers();
+  const lift = async (m) => {
+    if (backend) { try { await apiMemberManage(m.number, 'unflag'); setRemoteRows((await apiMemberFlags()).members); } catch { /* ignore */ } }
+    else { penalizeMember(m.number, m.name, 'cleared', ''); tick((n) => n + 1); }
+  };
   return (
     <div className="staff-dash">
-      <AppPanel title="Watchlist" subtitle="Trespassed & banned — visible to all staff">
+      <AppPanel title="Watchlist" subtitle={backend ? 'Trespassed, banned & suspended — shared with every staff device' : 'Trespassed & banned — visible to all staff'}>
         {rows.length === 0 ? (
           <p className="dash-empty">No flagged members. The list is clear.</p>
         ) : rows.map((m) => (
-          <div key={m.number} className={`dash-row ${m.kind}`}>
-            <img className="dash-chip" src={STATUS_CHIP[m.kind]} alt={m.kind} />
+          <div key={m.number} className={`dash-row ${m.kind}${backend ? ' tappable' : ''}`}
+            onClick={backend ? () => setProfileNumber(m.number) : undefined} role={backend ? 'button' : undefined} tabIndex={backend ? 0 : undefined}>
+            <img className="dash-chip" src={STATUS_CHIP[m.kind] || STATUS_CHIP.trespass} alt={m.kind} />
             <div className="dash-info">
-              <strong>{m.name || 'Member'} <span className={`dash-flag ${m.kind}`}>{PENALTY_LABEL[m.kind]}</span></strong>
+              <strong>{m.name || 'Member'} <span className={`dash-flag ${m.kind}`}>{DECISION_LABEL[m.kind] || PENALTY_LABEL[m.kind] || m.kind}</span></strong>
               <span className="dash-num">{m.number}</span>
               <span className="dash-reason">{m.reason || '—'}{m.by ? ` · by ${m.by}` : ''} · {fmtDateTime(m.at)}</span>
             </div>
-            <button type="button" className="dash-pen clear" onClick={() => lift(m)}>Lift</button>
+            <button type="button" className="dash-pen clear" onClick={(e) => { e.stopPropagation(); lift(m); }}>Lift</button>
           </div>
         ))}
       </AppPanel>
       <p className="mem-fineprint">Flagging a member at the door adds them here and warns every scanner. Lifting a flag restores their access everywhere.</p>
+      {backend && profileNumber && (
+        <MemberProfileOverlay number={profileNumber} onClose={() => setProfileNumber(null)} onChanged={async () => setRemoteRows((await apiMemberFlags()).members)} />
+      )}
     </div>
   );
 }
@@ -4136,31 +4269,63 @@ function ProfileScreen() {
   );
 }
 
+// Turns a /me/timeline event into the row shape this screen already renders.
+function timelineEventToRow(e) {
+  switch (e.kind) {
+    case 'signup': return { ic: '◇', tone: 'muted', title: 'Member account created', sub: 'Welcome', t: e.at, status: 'Done' };
+    case 'membership': return { ic: '★', tone: 'gold', title: `${e.tier}${e.vip ? ' VIP' : ''} membership activated`, sub: e.payment ? `Paid with ${e.payment}` : 'Membership active', t: e.at, status: 'Success' };
+    case 'otw': return { ic: '🚗', tone: 'ok', title: 'On the way', sub: 'Signaled heading to the venue', t: e.at, status: 'Sent' };
+    case 'admit': return { ic: '✓', tone: 'ok', title: 'Verified at the door', sub: 'Entry approved' + (e.searched ? ' · searched' : ''), t: e.at, status: 'Approved' };
+    case 'checkout': return { ic: '🚪', tone: 'muted', title: 'Left the venue', sub: 'Checked out for the night', t: e.at, status: 'Left' };
+    case 'decision': return { ic: '⚑', tone: 'bad', title: DECISION_LABEL[e.status] || 'Flagged', sub: 'Recorded by staff', t: e.at, status: DECISION_LABEL[e.status] || 'Flag' };
+    default: return null;
+  }
+}
+
 function HistoryScreen() {
   const member = useMember();
   const auth = useAuth();
   const { rank } = rankFor(member?.entries || 0);
+  const backend = apiEnabled() && apiToken();
+  const [remoteEvents, setRemoteEvents] = useState(null);
 
-  // Build the activity feed from REAL state only — no sample rows.
-  const rows = [];
-  if (member) {
-    if (member.verifiedAt) rows.push({
-      ic: '✓', tone: 'ok', title: 'Verified at the door',
-      sub: member.number ? `Entry approved · ${member.number}` : 'Entry approved',
-      t: member.verifiedAt, status: 'Approved',
-    });
-    if (member.purchasedAt) rows.push({
-      ic: '★', tone: 'gold', title: `${member.tier} membership activated`,
-      sub: member.payment ? `Paid with ${member.payment}` : 'Membership active',
-      t: member.purchasedAt, status: 'Success',
-    });
-  }
-  const since = auth?.member?.since;
-  if (since) rows.push({ ic: '◇', tone: 'muted', title: 'Member account created', sub: auth.member.name ? `Welcome, ${auth.member.name}` : 'Welcome', t: since, status: 'Done' });
-  // real penalty events (trespass / ban) recorded for this member
-  if (member?.number) {
-    penalizedMembers().filter((d) => String(d.number).toUpperCase() === String(member.number).toUpperCase())
-      .forEach((d) => rows.push({ ic: '⚑', tone: 'bad', title: d.kind === 'ban' ? 'Banned' : 'Trespass flag', sub: d.reason || 'Flagged by security', t: d.at || Date.now(), status: d.kind === 'ban' ? 'Ban' : 'Flag' }));
+  useEffect(() => {
+    if (!backend) return undefined;
+    let live = true;
+    const poll = async () => { try { const r = await apiMyTimeline(); if (live) setRemoteEvents(r.events); } catch { /* ignore */ } };
+    poll();
+    const id = setInterval(poll, 10000);
+    return () => { live = false; clearInterval(id); };
+  }, [backend]);
+
+  // Backend timeline is the complete, authoritative picture (every OTW,
+  // admit, checkout, re-entry, and staff decision — not just this device's
+  // local guesses) — use it whenever connected. Local/demo mode keeps the
+  // original state-derived feed.
+  let rows;
+  if (backend && remoteEvents) {
+    rows = remoteEvents.map(timelineEventToRow).filter(Boolean);
+  } else {
+    rows = [];
+    if (member) {
+      if (member.verifiedAt) rows.push({
+        ic: '✓', tone: 'ok', title: 'Verified at the door',
+        sub: member.number ? `Entry approved · ${member.number}` : 'Entry approved',
+        t: member.verifiedAt, status: 'Approved',
+      });
+      if (member.purchasedAt) rows.push({
+        ic: '★', tone: 'gold', title: `${member.tier} membership activated`,
+        sub: member.payment ? `Paid with ${member.payment}` : 'Membership active',
+        t: member.purchasedAt, status: 'Success',
+      });
+    }
+    const since = auth?.member?.since;
+    if (since) rows.push({ ic: '◇', tone: 'muted', title: 'Member account created', sub: auth.member.name ? `Welcome, ${auth.member.name}` : 'Welcome', t: since, status: 'Done' });
+    // real penalty events (trespass / ban) recorded for this member
+    if (member?.number) {
+      penalizedMembers().filter((d) => String(d.number).toUpperCase() === String(member.number).toUpperCase())
+        .forEach((d) => rows.push({ ic: '⚑', tone: 'bad', title: d.kind === 'ban' ? 'Banned' : 'Trespass flag', sub: d.reason || 'Flagged by security', t: d.at || Date.now(), status: d.kind === 'ban' ? 'Ban' : 'Flag' }));
+    }
   }
   rows.sort((a, b) => b.t - a.t);
 
