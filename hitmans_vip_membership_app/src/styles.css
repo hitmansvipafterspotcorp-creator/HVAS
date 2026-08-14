@@ -3525,8 +3525,9 @@ button {
 .qr-scanline2 { position: absolute; left: 10%; right: 10%; height: 3px; z-index: 3;
   background: linear-gradient(90deg, transparent, #52ffe0 20%, #ff4acc 50%, #52ffe0 80%, transparent);
   box-shadow: 0 0 12px #ff4acc, 0 0 26px #7f3cff; animation: qr-scan-sweep 2.6s cubic-bezier(.5,0,.5,1) infinite; }
-/* ALIGN label pinned to the bottom */
-.qr-align { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; z-index: 4;
+/* ALIGN label — sits under the scan frame, not overlapping the camera feed
+   or the bottom corner brackets (which used to share this same position). */
+.qr-align { display: block; text-align: center;
   color: #ff7ae0; font-weight: 800; font-size: 11px; letter-spacing: .14em; text-shadow: 0 0 8px rgba(255,60,200,.85); }
 
 .mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }

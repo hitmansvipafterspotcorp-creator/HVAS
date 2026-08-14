@@ -3201,10 +3201,11 @@ function SecurityVerifyScreen() {
             <span className="qr-br tr" aria-hidden="true" />
             <span className="qr-br bl" aria-hidden="true" />
             <span className="qr-br br" aria-hidden="true" />
-            <span className="qr-align">★ ALIGN QR CODE HERE ★</span>
             {!scanning && <div className="qr-cam-off">Camera off</div>}
             {scanning && !ready && <div className="qr-cam-off starting">Starting camera…</div>}
           </div>
+          {/* Below the frame, not overlapping the camera feed / brackets. */}
+          <span className="qr-align">★ ALIGN QR CODE HERE ★</span>
           {scanning
             ? <button type="button" className="mem-cancel" onClick={stopScan}>Stop camera</button>
             : <button type="button" className="asset-cta" onClick={startScan} aria-label="Scan app"><img src={ui.buttons.scan} alt="Scan app" /></button>}
