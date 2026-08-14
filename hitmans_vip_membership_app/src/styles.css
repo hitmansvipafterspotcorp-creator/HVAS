@@ -3958,21 +3958,48 @@ button {
 .bingo-btn.gold { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; box-shadow: 0 0 18px rgba(255,180,60,.4); }
 .bingo-status-row { display: flex; justify-content: space-between; align-items: center; color: #b9a4e0; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
 .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 10px 0; }
+/* A 5x5 grid on a phone gives ~67px per square, and real deck entries run as
+   long as "Whitney Houston / I Wanna Dance With Somebody" — at the old sizes
+   that overflowed and got clipped by overflow:hidden, so squares were
+   literally unreadable. Artist is the primary scan target (it's what gets
+   called), so it gets the size; the song is the disambiguator (Beyoncé
+   appears twice in a deck) so it stays but is smaller. Both clamp to 2 lines
+   with an ellipsis instead of overflowing. */
 .bingo-cell {
-  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1px;
-  font-size: 9px; line-height: 1.15; padding: 4px 3px; border-radius: 8px; color: #cdb6f2;
+  position: relative;
+  aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2px;
+  line-height: 1.12; padding: 4px 3px; border-radius: 8px; color: #cdb6f2;
   background: rgba(255,255,255,.03); border: 1px solid rgba(176,107,255,.22); overflow: hidden;
-  font-family: inherit; cursor: default;
+  font-family: inherit; cursor: default; hyphens: auto;
 }
 .bingo-cell:disabled { cursor: default; }
-.bingo-cell-artist { font-weight: 900; color: #fff; font-size: 9.5px; }
-.bingo-cell-song { opacity: .85; font-size: 8.5px; }
-.bingo-cell-tag {
-  font-size: 6.5px; font-weight: 900; letter-spacing: .06em; color: #2a1600; background: #ffd66b;
-  border-radius: 999px; padding: 1px 5px; margin-bottom: 1px;
+.bingo-cell-artist {
+  font-weight: 900; color: #fff; font-size: 11px; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.bingo-cell.marked { background: linear-gradient(180deg, rgba(176,107,255,.35), rgba(122,31,214,.35)); border-color: #b06bff; box-shadow: 0 0 10px rgba(176,107,255,.4) inset; }
-.bingo-cell.marked .bingo-cell-song { opacity: 1; color: #eaddff; }
+.bingo-cell-song {
+  color: #c3a9ea; font-size: 8.5px; font-weight: 600;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* Lip-sync squares are ~20% of a deck and mean "perform this one" — worth
+   flagging, but as a corner mark rather than a full-width pill that used to
+   consume an entire line of the square's very limited vertical space. */
+.bingo-cell-tag {
+  position: absolute; top: 2px; right: 2px; z-index: 1;
+  width: 13px; height: 13px; display: grid; place-items: center;
+  font-size: 7px; line-height: 1; border-radius: 50%;
+  background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600;
+  box-shadow: 0 0 5px rgba(255,214,106,.6);
+}
+.bingo-cell.marked { background: linear-gradient(180deg, rgba(176,107,255,.42), rgba(122,31,214,.42)); border-color: #b06bff; box-shadow: 0 0 10px rgba(176,107,255,.4) inset; }
+.bingo-cell.marked .bingo-cell-song { color: #eaddff; }
+/* Covered squares get an explicit check, not just a colour shift — colour
+   alone is easy to miss at a glance (and invisible to colour-blind players). */
+.bingo-cell-check {
+  position: absolute; bottom: 1px; right: 3px; z-index: 1;
+  font-size: 11px; font-weight: 900; color: #7dffb0; line-height: 1;
+  text-shadow: 0 0 6px rgba(82,255,168,.9);
+}
 .bingo-cell.free { background: linear-gradient(180deg, #ffe08a, #d68f1a); color: #2a1600; border-color: #ffd66b; font-weight: 900; font-size: 10px; }
 /* A called-but-untapped square is the ONE thing a player has to spot on a
    glance at a phone in a dark room. A thin border + soft glow wasn't enough —
@@ -4005,6 +4032,31 @@ button {
 .bingo-now-label { font-size: 9px; font-weight: 900; letter-spacing: .16em; color: #ffd66b; }
 .bingo-now-calling strong { color: #fff; font-size: 17px; line-height: 1.15; }
 .bingo-now-song { color: #e6d3ff; font-size: 12.5px; }
+/* — Solo vs CPU — */
+.bingo-mode-tabs { margin-bottom: 12px; }
+.solo-roster { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 14px; }
+.solo-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border-radius: 999px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(176,107,255,.3); color: #d6c4f5; font-size: 12px; font-weight: 700;
+}
+.solo-chip b, .solo-cpu b {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: linear-gradient(180deg, #7a3fd0, #4a1f8f); color: #fff; font-size: 11px; font-weight: 900;
+}
+.solo-cpus { display: flex; gap: 6px; margin: 8px 0 10px; }
+.solo-cpu {
+  flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border-radius: 10px;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(176,107,255,.22);
+}
+.solo-cpu-name { flex: 1; min-width: 0; color: #cdb6f2; font-size: 11.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.solo-cpu-prog { color: #9a7ac0; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* one square away from a line — this is the tell that you're about to lose */
+.solo-cpu.close { border-color: rgba(255,90,110,.6); background: rgba(255,90,110,.12); }
+.solo-cpu.close .solo-cpu-prog { color: #ff8aa0; }
+.bingo-winner-banner.lost { background: linear-gradient(135deg, rgba(255,84,112,.22), rgba(122,31,214,.18)); border-color: rgba(255,84,112,.5); }
+/* the corner mic badge, reused inline inside the NOW CALLING panel */
+.bingo-cell-tag.static { position: static; margin-bottom: 2px; }
+
 .bingo-waiting {
   margin: 0 0 8px; padding: 7px 10px; border-radius: 10px; text-align: center;
   background: rgba(255,214,107,.12); border: 1px solid rgba(255,214,106,.35);

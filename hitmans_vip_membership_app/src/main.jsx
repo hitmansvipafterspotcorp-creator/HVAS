@@ -3486,6 +3486,285 @@ function useBingoState(pollMs = 3000) {
   }, [pollMs]);
   return { state, err, refresh };
 }
+// ── Solo Bingo vs CPU ────────────────────────────────────────────────────
+// Fully client-side on purpose: solo play must work with no venue backend,
+// no host, and no other players — on the couch, on the way over, anywhere.
+// Deck is generated from the real server decks (server/src/decks.mjs), all
+// four merged and de-duped BY ARTIST+SONG, so solo squares are the same songs
+// the venue actually calls. De-duping by the server's own id is not enough:
+// the same song can exist as both a plain and a lip-sync square in different
+// decks (different server ids, `-lip` suffix), which collapsed to one client
+// id here and dealt visible duplicate squares onto a single card.
+// Tuples keep the bundle small: [artist, song, isLipSync].
+const SOLO_DECK_RAW = [
+  ["Usher","Yeah!",1],
+  ["Mary J. Blige","Family Affair",1],
+  ["Outkast","Hey Ya!",0],
+  ["Drake","Nice For What",0],
+  ["T-Pain","Buy U A Drank",0],
+  ["Aaliyah","Rock The Boat",1],
+  ["Missy Elliott","Work It",0],
+  ["Bruno Mars","Uptown Funk",0],
+  ["Rihanna","Work",1],
+  ["Latto","Big Energy",0],
+  ["Beyoncé","Crazy in Love",0],
+  ["Lil Wayne","A Milli",1],
+  ["Chris Brown","No Guidance",1],
+  ["SZA","Kill Bill",0],
+  ["Cardi B","Up",1],
+  ["Ciara","1, 2 Step",0],
+  ["Migos","Bad and Boujee",1],
+  ["Whitney Houston","I Wanna Dance With Somebody",1],
+  ["TLC","No Scrubs",0],
+  ["Future","Mask Off",0],
+  ["Beyoncé","Cuff It",1],
+  ["Nicki Minaj","Super Bass",1],
+  ["Glorilla","Tomorrow 2",1],
+  ["Luther Vandross","Never Too Much",1],
+  ["Kodak Black","No Flockin",0],
+  ["Rick Ross","Aston Martin Music",1],
+  ["T-Pain","Bartender",0],
+  ["Plies","Bust It Baby Pt. 2",1],
+  ["Sexyy Red","SkeeYee",1],
+  ["Lil Wayne","Lollipop",1],
+  ["Travis Scott","SICKO MODE",0],
+  ["City Girls","Act Up",1],
+  ["Moneybagg Yo","Wockesha",0],
+  ["Lil Baby","Drip Too Hard",0],
+  ["21 Savage","A Lot",0],
+  ["Trina","Pull Over",1],
+  ["OutKast","So Fresh, So Clean",0],
+  ["Ludacris","Move Bitch",1],
+  ["Gucci Mane","Wasted",0],
+  ["2 Chainz","No Lie",0],
+  ["Young Dolph","Get Paid",1],
+  ["T-Pain","I'm Sprung",1],
+  ["Lil Jon","Get Low",1],
+  ["Ying Yang Twins","Salt Shaker",0],
+  ["Future","March Madness",1],
+  ["Trick Daddy","I'm a Thug",0],
+  ["City Girls","Twerk",1],
+  ["Flo Milli","Beef FloMix",0],
+  ["Young Jeezy","Soul Survivor",0],
+  ["Webbie","Independent",1],
+  ["Boosie Badazz","Wipe Me Down",0],
+  ["Pastor Troy","Vice Versa",0],
+  ["Ying Yang Twins","Wait (The Whisper Song)",0],
+  ["Boyz II Men","I'll Make Love to You",0],
+  ["Jodeci","Freek'n You",0],
+  ["Usher","Confessions Part II",0],
+  ["Ginuwine","So Anxious",1],
+  ["SZA","Snooze",0],
+  ["Jill Scott","A Long Walk",1],
+  ["Musiq Soulchild","Just Friends",0],
+  ["H.E.R.","Best Part",0],
+  ["Whitney Houston","I Will Always Love You",1],
+  ["Toni Braxton","Un-Break My Heart",0],
+  ["Brandy","Have You Ever?",1],
+  ["Monica","Angel of Mine",0],
+  ["Trey Songz","Can't Help But Wait",1],
+  ["Keith Sweat","Nobody",0],
+  ["Beyoncé","Dangerously in Love",1],
+  ["Ne-Yo","So Sick",0],
+  ["Mariah Carey","We Belong Together",1],
+  ["Anita Baker","Sweet Love",0],
+  ["Jagged Edge","Let's Get Married",1],
+  ["Silk","Freak Me",0],
+  ["Case","Happily Ever After",0],
+];
+const SOLO_DECK = (() => {
+  const byId = new Map();
+  for (const [artist, song, lip] of SOLO_DECK_RAW) {
+    const id = `${artist}-${song}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    // Belt and braces: `covered` is keyed by id, so a duplicate id would both
+    // show the same square twice on one card and cover both at once.
+    if (!byId.has(id)) byId.set(id, { id, artist, song, type: lip ? 'lipsync' : 'song' });
+  }
+  return [...byId.values()];
+})();
+
+const CPU_PLAYERS = [
+  { name: 'Rell',  avatar: 'R', delay: [900, 2600] },
+  { name: 'Tasha', avatar: 'T', delay: [700, 2100] },
+  { name: 'Marcus', avatar: 'M', delay: [1100, 3000] },
+];
+
+const shuffled = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// 25 squares, index 12 is the free centre.
+const dealCard = (deck) => { const picks = shuffled(deck).slice(0, 24); return [...picks.slice(0, 12), null, ...picks.slice(12)]; };
+
+// Win check for a 5x5 card: any full row, column, or diagonal. The centre
+// (index 12) is free and always counts as covered.
+const SOLO_LINES = (() => {
+  const lines = [];
+  for (let r = 0; r < 5; r++) lines.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));
+  for (let c = 0; c < 5; c++) lines.push([0, 1, 2, 3, 4].map((r) => r * 5 + c));
+  lines.push([0, 6, 12, 18, 24]);
+  lines.push([4, 8, 12, 16, 20]);
+  return lines;
+})();
+const soloHasLine = (card, covered) =>
+  SOLO_LINES.some((line) => line.every((i) => i === 12 || covered.has(card[i].id)));
+const soloLineProgress = (card, covered) =>
+  Math.max(...SOLO_LINES.map((line) => line.filter((i) => i === 12 || covered.has(card[i].id)).length));
+
+// Solo round vs CPU opponents. Calls fire on a timer (there's no host), the
+// player taps their own called squares, and each CPU covers theirs after a
+// short random delay — so you can watch them close in on a line. First
+// completed line wins.
+// Faster than the venue round's ~6s: solo has no crowd, no host patter and no
+// performance between calls, so the same pacing just reads as dead air on a
+// phone. ~2.2s keeps a round in the 60–90s arcade range.
+const SOLO_CALL_MS = 2200;
+function SoloBingoGame({ onExit }) {
+  const [game, setGame] = useState(null);
+  const timerRef = useRef(null);
+  const cpuTimersRef = useRef([]);
+
+  const clearTimers = () => {
+    clearInterval(timerRef.current);
+    cpuTimersRef.current.forEach(clearTimeout);
+    cpuTimersRef.current = [];
+  };
+  useEffect(() => clearTimers, []);
+
+  const start = () => {
+    clearTimers();
+    setGame({
+      order: shuffled(SOLO_DECK),
+      calledCount: 0,
+      card: dealCard(SOLO_DECK),
+      covered: new Set(),
+      cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(SOLO_DECK), covered: new Set() })),
+      status: 'playing',
+      winner: null,
+    });
+  };
+
+  // The call loop + CPU marking. Kept in one effect keyed on status so it
+  // tears down cleanly the moment somebody wins.
+  useEffect(() => {
+    if (game?.status !== 'playing') return undefined;
+    timerRef.current = setInterval(() => {
+      setGame((g) => {
+        if (!g || g.status !== 'playing') return g;
+        if (g.calledCount >= g.order.length) return { ...g, status: 'draw' };
+        const item = g.order[g.calledCount];
+        // Each CPU covers this square (if they hold it) after its own delay —
+        // scheduled outside state so the timers don't rerun on every render.
+        g.cpus.forEach((cpu, ci) => {
+          if (!cpu.card.some((s) => s && s.id === item.id)) return;
+          const [lo, hi] = cpu.delay;
+          const t = setTimeout(() => {
+            setGame((cur) => {
+              if (!cur || cur.status !== 'playing') return cur;
+              const cpus = cur.cpus.map((c, i) => (i === ci ? { ...c, covered: new Set([...c.covered, item.id]) } : c));
+              const won = cpus[ci];
+              if (soloHasLine(won.card, won.covered)) {
+                return { ...cur, cpus, status: 'lost', winner: won.name };
+              }
+              return { ...cur, cpus };
+            });
+          }, lo + Math.random() * (hi - lo));
+          cpuTimersRef.current.push(t);
+        });
+        return { ...g, calledCount: g.calledCount + 1 };
+      });
+    }, SOLO_CALL_MS);
+    return () => clearTimers();
+  }, [game?.status]);
+
+  const tap = (item) => {
+    setGame((g) => {
+      if (!g || g.status !== 'playing' || !item) return g;
+      const called = new Set(g.order.slice(0, g.calledCount).map((c) => c.id));
+      if (!called.has(item.id)) return g;              // can only cover what's been called
+      const covered = new Set(g.covered);
+      covered.has(item.id) ? covered.delete(item.id) : covered.add(item.id);
+      if (soloHasLine(g.card, covered)) return { ...g, covered, status: 'won', winner: 'you' };
+      return { ...g, covered };
+    });
+  };
+
+  if (!game) {
+    return (
+      <AppPanel title="Solo vs CPU" subtitle="Play a round on your own — no host, no wifi needed">
+        <p className="mem-fineprint">You against three regulars. Squares get called every few seconds — tap yours before they fill a line.</p>
+        <div className="solo-roster">
+          {CPU_PLAYERS.map((c) => <span key={c.name} className="solo-chip"><b>{c.avatar}</b>{c.name}</span>)}
+        </div>
+        <button type="button" className="bingo-btn gold" onClick={start}>Start Solo Round</button>
+        {onExit && <button type="button" className="bingo-btn ghost" onClick={onExit}>← Back</button>}
+      </AppPanel>
+    );
+  }
+
+  const called = new Set(game.order.slice(0, game.calledCount).map((c) => c.id));
+  const nowCalling = game.calledCount > 0 ? game.order[game.calledCount - 1] : null;
+  const waiting = game.card.filter((it) => it && called.has(it.id) && !game.covered.has(it.id)).length;
+  const over = game.status !== 'playing';
+
+  return (
+    <>
+      {over && (
+        <div className={`bingo-winner-banner${game.status === 'won' ? '' : ' lost'}`}>
+          <strong>{game.status === 'won' ? '🏆 BINGO — you win!' : game.status === 'lost' ? `${game.winner} got it first` : 'Deck ran out — draw'}</strong>
+        </div>
+      )}
+      <AppPanel title="Solo vs CPU" subtitle={over ? 'Round over' : `Live · ${game.calledCount} called`}>
+        {!over && nowCalling && (
+          <div className="bingo-now-calling">
+            <span className="bingo-now-label">NOW CALLING</span>
+            {nowCalling.type === 'lipsync' && <span className="bingo-cell-tag static">🎤</span>}
+            <strong>{nowCalling.artist}</strong>
+            <span className="bingo-now-song">{nowCalling.song}</span>
+          </div>
+        )}
+        {!over && waiting > 0 && (
+          <p className="bingo-waiting">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
+        )}
+
+        <div className="solo-cpus">
+          {game.cpus.map((c) => {
+            const p = soloLineProgress(c.card, c.covered);
+            return (
+              <div key={c.name} className={`solo-cpu${p >= 4 ? ' close' : ''}`}>
+                <b>{c.avatar}</b>
+                <span className="solo-cpu-name">{c.name}</span>
+                <span className="solo-cpu-prog">{p}/5</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="bingo-grid">
+          {game.card.map((item, i) => {
+            const isFree = i === 12;
+            const isCalled = !isFree && called.has(item.id);
+            const isCovered = isFree || game.covered.has(item.id);
+            const cls = ['bingo-cell', isFree ? 'free' : '', isCovered ? 'marked' : '', !isFree && isCalled && !isCovered && !over ? 'tappable' : ''].filter(Boolean).join(' ');
+            return (
+              <button type="button" key={isFree ? 'free' : item.id} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled || over}>
+                {isFree ? 'FREE SPACE' : (
+                  <>
+                    {item.type === 'lipsync' && <span className="bingo-cell-tag" title="Lip sync square" aria-label="Lip sync square">🎤</span>}
+                    <span className="bingo-cell-artist">{item.artist}</span>
+                    <span className="bingo-cell-song">{item.song}</span>
+                  </>
+                )}
+                {isCovered && !isFree && <span className="bingo-cell-check" aria-hidden="true">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {over && <button type="button" className="bingo-btn gold" onClick={start}>Play Again</button>}
+        {onExit && <button type="button" className="bingo-btn ghost" onClick={onExit}>← Back</button>}
+      </AppPanel>
+    </>
+  );
+}
+
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
 const BINGO_PATTERN_LABEL = {
   line: 'complete a line', four_corners: 'cover all four corners', x: 'cover an X',
@@ -3627,27 +3906,47 @@ function TvDisplayScreen() {
 
 // Member: join + ready up before the round starts.
 function LobbyScreen({ navigate }) {
+  // Two ways to play, and solo has to work with no venue backend at all —
+  // so the mode switch lives ABOVE the connection check, not behind it.
+  const [mode, setMode] = useState('venue');
+  return (
+    <div className="staff-dash">
+      <div className="staff-hub-tabs bingo-mode-tabs">
+        <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
+        <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
+      </div>
+      {mode === 'solo' ? <SoloBingoGame /> : <VenueLobby navigate={navigate} />}
+    </div>
+  );
+}
+
+function VenueLobby({ navigate }) {
   const { state, err, refresh } = useBingoState(3000);
   const [busy, setBusy] = useState(false);
-  if (err === 'not-connected') return <NotConnectedBingo title="Lip Sync Bingo" />;
+  if (err === 'not-connected') {
+    return (
+      <AppPanel title="Venue Round" subtitle="Not connected to a venue">
+        <p className="dash-empty">Connect to the venue to join tonight's round with everyone else.</p>
+        <p className="mem-fineprint">No connection? Solo vs CPU works anywhere — switch tabs above.</p>
+      </AppPanel>
+    );
+  }
   const me = state?.me;
   const join = async () => { setBusy(true); try { await apiBingoJoin(); await refresh(); } catch { /* ignore */ } setBusy(false); };
   const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); await refresh(); } catch { /* ignore */ } setBusy(false); };
   return (
-    <div className="staff-dash">
-      <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
-        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
-        {!me ? (
-          <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
-        ) : (
-          <>
-            <button type="button" className={`bingo-btn${me.ready ? ' ready' : ''}`} disabled={busy} onClick={toggleReady}>{me.ready ? '✓ Ready' : 'Mark Ready'}</button>
-            <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>Go to My Card →</button>
-          </>
-        )}
-        {state?.status === 'live' && <p className="mem-fineprint">The round is live — head to your card to play!</p>}
-      </AppPanel>
-    </div>
+    <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+      <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
+      {!me ? (
+        <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
+      ) : (
+        <>
+          <button type="button" className={`bingo-btn${me.ready ? ' ready' : ''}`} disabled={busy} onClick={toggleReady}>{me.ready ? '✓ Ready' : 'Mark Ready'}</button>
+          <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>Go to My Card →</button>
+        </>
+      )}
+      {state?.status === 'live' && <p className="mem-fineprint">The round is live — head to your card to play!</p>}
+    </AppPanel>
   );
 }
 
@@ -3727,11 +4026,12 @@ function PlayerCardScreen({ navigate }) {
               <button type="button" key={`${i}-${item.id}`} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled}>
                 {isFree ? 'FREE SPACE' : (
                   <>
-                    {item.type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+                    {item.type === 'lipsync' && <span className="bingo-cell-tag" title="Lip sync square" aria-label="Lip sync square">🎤</span>}
                     <span className="bingo-cell-artist">{item.artist}</span>
                     <span className="bingo-cell-song">{item.song}</span>
                   </>
                 )}
+                {isCovered && !isFree && <span className="bingo-cell-check" aria-hidden="true">✓</span>}
               </button>
             );
           })}
