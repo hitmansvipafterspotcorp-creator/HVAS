@@ -4,8 +4,9 @@ import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe,
+  apiSetOtw, apiSignalLeave,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
-  apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiMembersSearch,
+  apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -210,22 +211,26 @@ export async function syncMemberFromBackend() {
     if (!m || !m.tier) return;
     const prev = memberState || {};
     const nk = nightKey();
-    const wasInside = prev.lastEntryNight === nk;
-    // insideTonight/entries are server-authoritative (computed from the real
-    // entries table) — this is what makes a REAL staff admission, done on a
-    // completely different device at the door, actually show up as "inside"
-    // here too. Comparing only tier/status/expiresAt used to skip every
-    // admission sync outright, since admission doesn't touch any of those.
+    const wasInside = prev.lastEntryNight === nk && prev.checkedOutNight !== nk;
+    const wasLeft = prev.lastEntryNight === nk && prev.checkedOutNight === nk;
+    // insideTonight/leftTonight/entries are server-authoritative (computed
+    // from the real entries table) — this is what makes a REAL staff
+    // admission or checkout, done on a completely different device at the
+    // door, actually show up here too. Comparing only tier/status/expiresAt
+    // used to skip every admission/checkout sync outright, since neither
+    // touches those fields.
     if (prev.tier === m.tier && prev.status === m.status && prev.expiresAt === m.expiresAt
-      && wasInside === !!m.insideTonight && (prev.entries ?? 0) === (m.entries ?? 0)) return; // truly no change
+      && wasInside === !!m.insideTonight && wasLeft === !!m.leftTonight
+      && (prev.entries ?? 0) === (m.entries ?? 0)) return; // truly no change
     commitMember({
       ...prev,
       tier: m.tier, vip: !!m.vip, payment: m.payment || prev.payment || 'Zelle',
       status: m.status || 'active', expiresAt: m.expiresAt, number: m.number || prev.number,
       name: m.name || prev.name, entries: m.entries ?? prev.entries ?? 0,
       purchasedAt: prev.purchasedAt || Date.now(), verifiedAt: prev.verifiedAt ?? null,
-      lastEntryNight: m.insideTonight ? nk : prev.lastEntryNight,
-      onTheWay: m.insideTonight ? false : (m.onTheWay ?? prev.onTheWay),
+      lastEntryNight: (m.insideTonight || m.leftTonight) ? nk : prev.lastEntryNight,
+      checkedOutNight: m.leftTonight ? nk : prev.checkedOutNight,
+      onTheWay: (m.insideTonight || m.leftTonight) ? false : (m.onTheWay ?? prev.onTheWay),
     });
   } catch { /* ignore — never break the screen over a background sync */ }
 }
@@ -274,32 +279,51 @@ function admitTonight(m) {
   const nk = nightKey();
   const perk = TIER_PERKS[m.tier] || TIER_PERKS.Daily;
   if (m.lastEntryNight === nk) {
-    // already counted tonight — just keep perks fresh across a 3AM rollover
-    if (m.ticketsNight === nk) return { ...m, onTheWay: false };
-    return { ...m, onTheWay: false, tickets: perk.tickets, ticketsNight: nk, mealUsed: false };
+    // already counted tonight — just keep perks fresh across a 3AM rollover,
+    // and clear "left" in case this is a re-admission after checking out
+    if (m.ticketsNight === nk) return { ...m, onTheWay: false, checkedOutNight: null };
+    return { ...m, onTheWay: false, checkedOutNight: null, tickets: perk.tickets, ticketsNight: nk, mealUsed: false };
   }
   return {
     ...m,
     onTheWay: false,                 // arrived — clear the incoming signal
+    checkedOutNight: null,
     entries: (m.entries || 0) + 1,
     loyalty: (m.loyalty || 0) + 10,
     lastEntryNight: nk,
     tickets: perk.tickets, ticketsNight: nk, mealUsed: false,
   };
 }
-// Has this member already been admitted for the current night?
+// Has this member already been admitted for the current night — and not yet
+// marked as having left. (lastEntryNight itself never gets cleared: it's the
+// permanent attendance record used for loyalty/entries counts.)
 export function isInsideTonight(m = memberState) {
-  return !!(m && m.lastEntryNight === nightKey());
+  return !!(m && m.lastEntryNight === nightKey() && m.checkedOutNight !== nightKey());
+}
+// Was admitted tonight AND has since checked out — distinct from never having
+// come at all, so the door dashboard can tell "left" apart from "signed in".
+export function isLeftTonight(m = memberState) {
+  return !!(m && m.lastEntryNight === nightKey() && m.checkedOutNight === nightKey());
 }
 // Member "on the way" signal — set when they flip the OTW toggle, stored on the
 // shared member record so door staff can see who's incoming. Timestamped, and
-// cleared automatically on admission (in admitTonight).
+// cleared automatically on admission (in admitTonight). Mirrored to a real
+// backend when connected, so a DIFFERENT staff device (the door dashboard)
+// actually sees it — a purely local flag here would never leave this phone.
 export function setOnTheWay(flag) {
   if (!memberState) return;
   commitMember({ ...memberState, onTheWay: !!flag, onTheWayAt: flag ? Date.now() : null });
+  if (apiEnabled() && apiToken()) apiSetOtw(!!flag).catch(() => {});
 }
 export function isOnTheWay(m = memberState) {
   return !!(m && m.onTheWay && !isInsideTonight(m));
+}
+// Member marks themselves as having left the venue tonight — shows as "Left"
+// on the door dashboard instead of staying "Inside" forever.
+export function leaveVenue() {
+  if (!memberState || !isInsideTonight(memberState)) return;
+  commitMember({ ...memberState, checkedOutNight: nightKey() });
+  if (apiEnabled() && apiToken()) apiSignalLeave().catch(() => {});
 }
 // Auto-logged when a member checks in (self) — same idempotent path the door
 // uses, so member-side check-in and staff verification stay consistent.
@@ -1055,6 +1079,7 @@ function App() {
   const member = useMember();                    // subscribe: door verification updates this
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
+  const left = isLeftTonight(member);            // was inside tonight, has since checked out
   const [transition, setTransition] = useState({
     active: true,
     from: 'Loading',
@@ -1248,8 +1273,10 @@ function App() {
               role={roleById(role)}
               onTheWay={onTheWay}
               inside={inside}
+              left={left}
               hasMember={!!member}
               onToggleOtw={() => setOnTheWay(!onTheWay)}
+              onLeave={leaveVenue}
               onSwitch={switchRole}
             />
           ) : (
@@ -1791,7 +1818,7 @@ function CodeGateScreen({ role, onBack, onDone }) {
 // Compact header on the role home: current role, an "on the way" toggle a
 // member flips when heading over (not entry — that's the door verification),
 // an INSIDE indicator once verified, and a way back to the role picker.
-function RoleBadge({ role, onTheWay, inside, hasMember, onToggleOtw, onSwitch }) {
+function RoleBadge({ role, onTheWay, inside, left, hasMember, onToggleOtw, onLeave, onSwitch }) {
   return (
     <header className="role-badge">
       <div className="role-badge-id">
@@ -1804,10 +1831,14 @@ function RoleBadge({ role, onTheWay, inside, hasMember, onToggleOtw, onSwitch })
       <div className="role-badge-actions">
         {role.id === 'member' && hasMember && (
           inside ? (
-            <span className="role-badge-checkin inside">● Inside</span>
+            <button type="button" className="role-badge-checkin inside" onClick={onLeave} aria-label="Mark that you've left">
+              ● Inside
+            </button>
+          ) : left ? (
+            <span className="role-badge-checkin left">○ Left</span>
           ) : (
-            <button type="button" className={`role-badge-checkin ${onTheWay ? 'on' : ''}`} onClick={onToggleOtw}>
-              {onTheWay ? '● On the way' : '○ On the way'}
+            <button type="button" className={`role-badge-checkin ${onTheWay ? 'on' : 'signedin'}`} onClick={onToggleOtw}>
+              {onTheWay ? '● On the way' : '✓ Signed in'}
             </button>
           )
         )}
@@ -2495,6 +2526,20 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <small>Your access is suspended. See a manager at the door.</small>
         </div>
       )}
+      {/* Status: Signed in / On the way / Inside (tap to mark left) / Left.
+          Lives here — not just RoleBadge's 'home' screen — because members
+          land straight on My Pass and never actually visit 'home'. */}
+      <div className="mem-status-row">
+        {isInsideTonight(member) ? (
+          <button type="button" className="role-badge-checkin inside" onClick={leaveVenue} aria-label="Mark that you've left">● Inside</button>
+        ) : isLeftTonight(member) ? (
+          <span className="role-badge-checkin left">○ Left</span>
+        ) : (
+          <button type="button" className={`role-badge-checkin ${isOnTheWay(member) ? 'on' : 'signedin'}`} onClick={() => setOnTheWay(!isOnTheWay(member))}>
+            {isOnTheWay(member) ? '● On the way' : '✓ Signed in'}
+          </button>
+        )}
+      </div>
       <div className="mem-tabs">
         <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>Pass</button>
         <button type="button" className={`mem-tab${tab === 'loyalty' ? ' on' : ''}`} onClick={() => setTab('loyalty')}>Loyalty &amp; Access</button>
@@ -2784,6 +2829,9 @@ function StaffDashboardScreen({ navigate }) {
   const member = useMember();
   const backend = apiEnabled() && apiStaffToken();
   const [board, setBoard] = useState(null);
+  // Live clock — also drives every "Xm ago" / elapsed timer below, so they
+  // count up in real time instead of only refreshing on the next poll.
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     if (!backend) return;
@@ -2800,16 +2848,48 @@ function StaffDashboardScreen({ navigate }) {
     const id = setInterval(() => setBoard((b) => ({ ...b })), 30000); // force a re-render tick
     return () => clearInterval(id);
   }, [backend]);
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
 
   const ago = (ts) => {
     if (!ts) return '';
-    const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+    const mins = Math.max(0, Math.round((now - ts) / 60000));
     return mins < 1 ? 'just now' : mins === 1 ? '1 min ago' : `${mins} mins ago`;
   };
+  const elapsed = (ts) => {
+    if (!ts) return '—';
+    const s = Math.max(0, Math.floor((now - ts) / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+  const clockStr = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const normStatus = (s) => (s === 'granted' ? 'valid' : s === 'expired-qr' ? 'expired' : s === 'suspended' ? 'trespass' : s);
 
   const onTheWayList = backend ? (board?.onTheWay || []) : (isOnTheWay(member) ? [member] : []);
   const insideList = backend ? (board?.inside || []) : (isInsideTonight(member) ? [member] : []);
+  // Full roster — every member the venue knows about, always visible (not
+  // just whoever's currently on-the-way/inside), so staff have full
+  // situational awareness at a glance: exactly what's needed to notice
+  // something's wrong (a lost phone, someone who never showed, etc).
+  const roster = backend ? (board?.allMembers || []) : (member ? [{
+    ...member,
+    doorStatus: isInsideTonight(member) ? 'inside' : isLeftTonight(member) ? 'left' : isOnTheWay(member) ? 'onTheWay' : 'signedIn',
+    enteredAt: member.verifiedAt || null,
+    leftAt: member.checkedOutAt || null,
+  }] : []);
+  const STATUS_LABEL = { inside: 'Inside', onTheWay: 'On the way', signedIn: 'Signed in', left: 'Left' };
+  const STATUS_DOT = { inside: 'green', onTheWay: 'amber', signedIn: 'blue', left: 'grey' };
+  const rosterWhen = (m) => (
+    m.doorStatus === 'inside' ? `In ${elapsed(m.enteredAt)}` :
+    m.doorStatus === 'onTheWay' ? `${elapsed(m.onTheWayAt)} ago` :
+    m.doorStatus === 'left' ? `Left ${ago(m.leftAt)}` : ''
+  );
+  async function checkoutMember(m) {
+    if (backend) {
+      try { await apiDoorCheckout(m.number); setBoard(await apiDoorBoard()); } catch { /* ignore */ }
+    } else if (memberState && memberState.number === m.number) {
+      leaveVenue();
+    }
+  }
   // Recent door decisions — the venue-wide audit trail (formerly a separate,
   // broken "Check-In Log" screen). Connected devices get the real multi-entry
   // log from the shared backend; local/demo mode falls back to just this
@@ -2825,11 +2905,34 @@ function StaffDashboardScreen({ navigate }) {
 
   return (
     <div className="staff-dash">
+      <div className="dash-clock"><span className="dash-clock-dot" aria-hidden="true" />{clockStr}</div>
       <div className="stat-widgets">
         <StatWidget src={ui.widgets.entries} label="TODAY’S ENTRIES" sub="TOTAL CHECK-INS" value={entriesTotal} series={spark} />
         <StatWidget src={ui.widgets.event} label="EVENT ACCESS" sub="THIS EVENT" value={entriesTotal} cap={150} />
         <StatWidget src={ui.widgets.venue} label="VENUE ACCESS" sub="CURRENTLY INSIDE" value={insideCount} cap={100} />
       </div>
+
+      <AppPanel title="All members" subtitle="Inside → on the way → signed in → left, live">
+        {roster.length > 0 ? roster.map((m) => (
+          <div className={`dash-row roster ${m.doorStatus}`} key={m.number}>
+            <span className={`dash-dot ${STATUS_DOT[m.doorStatus]}`} />
+            <div className="dash-info">
+              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
+              <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
+              <span className={`dash-status-pill ${m.doorStatus}`}>{STATUS_LABEL[m.doorStatus]}</span>
+            </div>
+            <div className="dash-roster-right">
+              <span className="dash-when">{rosterWhen(m)}</span>
+              {m.doorStatus === 'inside' && (
+                <button type="button" className="dash-pen clear" onClick={() => checkoutMember(m)}>Mark left</button>
+              )}
+            </div>
+          </div>
+        )) : (
+          <p className="dash-empty">No members yet.</p>
+        )}
+      </AppPanel>
+
       <AppPanel title="On the way" subtitle="Members heading over">
         {onTheWayList.length > 0 ? onTheWayList.map((m) => (
           <div className="dash-row incoming" key={m.number}>

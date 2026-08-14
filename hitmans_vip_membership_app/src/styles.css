@@ -3007,7 +3007,10 @@ button {
   color: #fff8e8;
 }
 .role-badge-checkin.on { border-color: #52ffa8; color: #52ffa8; }
+.role-badge-checkin.signedin { border-color: rgba(255, 214, 107, 0.5); color: #ffd66b; }
+.role-badge-checkin.left { border-color: rgba(255, 255, 255, 0.25); color: #b8aec2; cursor: default; }
 .role-badge-switch { border-color: rgba(255, 43, 214, 0.5); color: #ff9ce8; }
+.mem-status-row { display: flex; justify-content: center; margin: 0 0 10px; }
 
 .menu-flow-row.locked {
   opacity: 0.5;
@@ -3690,8 +3693,27 @@ button {
 .dash-dot { width: 12px; height: 12px; border-radius: 999px; flex: none; }
 .dash-dot.amber { background: #ffb24c; box-shadow: 0 0 10px #ffb24c; }
 .dash-dot.green { background: #52ffa8; box-shadow: 0 0 10px #52ffa8; }
+.dash-dot.blue { background: #6bc7ff; box-shadow: 0 0 10px #6bc7ff; }
+.dash-dot.grey { background: #8a7ba8; box-shadow: none; }
 .dash-chip { height: 34px; width: auto; flex: none; }
 .dash-empty { color: #8a6fb0; font-size: 13px; margin: 4px 0; }
+
+/* — door dashboard: live clock + full member roster (safety overview) — */
+.dash-clock {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: 0.06em;
+  color: #ffd66b; font-size: 15px; padding: 6px 0 2px;
+}
+.dash-clock-dot { width: 8px; height: 8px; border-radius: 999px; background: #52ffa8; box-shadow: 0 0 8px #52ffa8; }
+.dash-status-pill {
+  display: inline-block; width: fit-content; margin-top: 2px; padding: 2px 9px;
+  border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: 0.06em;
+}
+.dash-status-pill.inside { background: rgba(82,255,168,.16); color: #52ffa8; border: 1px solid rgba(82,255,168,.4); }
+.dash-status-pill.onTheWay { background: rgba(255,178,76,.16); color: #ffb24c; border: 1px solid rgba(255,178,76,.4); }
+.dash-status-pill.signedIn { background: rgba(107,199,255,.14); color: #6bc7ff; border: 1px solid rgba(107,199,255,.35); }
+.dash-status-pill.left { background: rgba(138,123,168,.14); color: #b8aec2; border: 1px solid rgba(138,123,168,.35); }
+.dash-roster-right { flex: none !important; align-items: flex-end !important; gap: 6px; }
 
 /* — auth: member sign-in + staff/host code gate — */
 .landing-account { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 8px 14px; border: 1px solid #3a2860; border-radius: 12px; background: rgba(30, 16, 52, 0.5); color: #d7c8ff; font-size: 13px; }

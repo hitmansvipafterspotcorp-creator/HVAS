@@ -9,6 +9,7 @@
 //   member.upsert / membership.upsert → last-write-wins by op.ts (updated_at)
 //   signal.otw                        → last-write-wins by op.ts
 //   entry.admit                       → insert-once (member+night unique)
+//   entry.checkout                    → set-once (only while left_at is still null)
 //   decision                          → append (deduped by op id upstream)
 export function applyOp(db, op) {
   const ts = op.ts;
@@ -44,6 +45,10 @@ export function applyOp(db, op) {
         .run(d.member_id, d.night, d.at, d.by_staff ?? null);
       // arriving clears the on-the-way signal (idempotent)
       db.prepare('UPDATE signals SET on_the_way=0 WHERE member_id=?').run(d.member_id);
+      break;
+    case 'entry.checkout':                              // member marked "left" for the night — idempotent
+      db.prepare('UPDATE entries SET left_at=? WHERE member_id=? AND night=? AND left_at IS NULL')
+        .run(d.at ?? ts, d.member_id, d.night);
       break;
     case 'decision':
       db.prepare('INSERT INTO decisions(member_id,number,status,at,by_staff) VALUES(?,?,?,?,?)')

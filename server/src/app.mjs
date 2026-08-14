@@ -182,13 +182,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     if (!m) return null;
     const ms = membershipOf(m.id);
     const nights = db.prepare('SELECT COUNT(*) c FROM entries WHERE member_id=?').get(m.id).c;
-    const insideTonight = !!db.prepare('SELECT 1 FROM entries WHERE member_id=? AND night=?').get(m.id, nightKey());
+    const entryRow = db.prepare('SELECT * FROM entries WHERE member_id=? AND night=?').get(m.id, nightKey());
+    const insideTonight = !!entryRow && !entryRow.left_at;
+    const leftTonight = !!entryRow && !!entryRow.left_at;
     const sig = db.prepare('SELECT * FROM signals WHERE member_id=?').get(m.id);
     return {
-      id: m.id, name: m.name, number: m.number,
+      id: m.id, name: m.name, number: m.number, contact: m.contact ?? null,
       tier: ms?.tier || null, vip: !!ms?.vip, payment: ms?.payment || null,
       status: ms?.status || null, expiresAt: ms?.expires_at || null,
-      entries: nights, insideTonight, onTheWay: !!sig?.on_the_way && !insideTonight, onTheWayAt: sig?.at || null,
+      entries: nights, insideTonight, leftTonight,
+      enteredAt: entryRow?.at || null, leftAt: entryRow?.left_at || null,
+      onTheWay: !!sig?.on_the_way && !insideTonight, onTheWayAt: sig?.at || null,
     };
   };
   // ── Lip Sync Bingo helpers ──
@@ -243,7 +247,23 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     const recentDecisions = db.prepare(
       `SELECT d.*, m.name FROM decisions d LEFT JOIN members m ON m.id = d.member_id ORDER BY d.at DESC LIMIT 25`
     ).all();
-    return { onTheWay, inside, lastDecision: recentDecisions[0] || null, recentDecisions };
+    // Full member roster for the door dashboard's safety view — every member,
+    // always visible, not just whoever is currently on-the-way/inside. Lets
+    // staff see at a glance who's signed in but hasn't shown, who's left, etc.
+    // (e.g. flagging a lost phone or a no-show). Ordered inside → on the way
+    // → signed in → left, and by most-recently-relevant timestamp within each
+    // group, so the most actionable members surface first.
+    const STATUS_ORDER = { inside: 0, onTheWay: 1, signedIn: 2, left: 3 };
+    const allMembers = db.prepare('SELECT * FROM members').all().map(publicMember).map((pm) => ({
+      ...pm,
+      doorStatus: pm.insideTonight ? 'inside' : pm.leftTonight ? 'left' : pm.onTheWay ? 'onTheWay' : 'signedIn',
+    })).sort((a, b) => {
+      const byStatus = STATUS_ORDER[a.doorStatus] - STATUS_ORDER[b.doorStatus];
+      if (byStatus) return byStatus;
+      const atOf = (x) => (x.doorStatus === 'inside' ? x.enteredAt : x.doorStatus === 'onTheWay' ? x.onTheWayAt : x.doorStatus === 'left' ? x.leftAt : 0);
+      return (atOf(b) || 0) - (atOf(a) || 0);
+    });
+    return { onTheWay, inside, lastDecision: recentDecisions[0] || null, recentDecisions, allMembers };
   };
 
   const auth = (req, role) => {
@@ -397,6 +417,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       commit('signal.otw', { member_id: c.sub, on: on ? 1 : 0 });
       json(res, 200, { ok: true });
     },
+    // Member marks themselves as having left the venue tonight — shows up as
+    // "Left" on the door dashboard instead of staying "Inside" forever.
+    'POST /signal/leave': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      commit('entry.checkout', { member_id: c.sub, night: nightKey(), at: Date.now() });
+      json(res, 200, { ok: true });
+    },
 
     // ── social: presence in the top-down venue (with their top-down character) ──
     'POST /presence': async (req, res) => {
@@ -508,6 +535,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'GET /door/board': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       json(res, 200, board());
+    },
+
+    // Staff checks a member out — marks them "Left" on the roster instead of
+    // staying "Inside" indefinitely. Same op member self-checkout uses.
+    'POST /door/checkout': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { number } = await readBody(req);
+      const m = memberByNumber(number);
+      if (!m) return json(res, 404, { error: 'not found' });
+      commit('entry.checkout', { member_id: m.id, night: nightKey(), at: Date.now() });
+      json(res, 200, { ok: true, member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(m.id)) });
     },
 
     // Staff/host lookup by name, member number, or contact — every device

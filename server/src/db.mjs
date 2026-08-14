@@ -190,6 +190,10 @@ export function openDb(path) {
   if (!cardCols.includes('covered')) {
     db.exec(`ALTER TABLE bingo_cards ADD COLUMN covered TEXT NOT NULL DEFAULT '[]'`); // JSON array of item ids the player has tapped
   }
+  const entryCols = db.prepare(`PRAGMA table_info(entries)`).all().map((c) => c.name);
+  if (!entryCols.includes('left_at')) {
+    db.exec(`ALTER TABLE entries ADD COLUMN left_at INTEGER`); // set when the member checks out / leaves — null = still inside
+  }
   return db;
 }
 

@@ -70,6 +70,10 @@ export function apiSignOut() {
 // Optional: mirror a membership purchase to the backend so the pass is real.
 export function apiPurchase(tier, payment) { return call('POST', '/membership/purchase', { tier, payment }, apiToken()); }
 export function apiMe() { return call('GET', '/me', null, apiToken()); }
+// Server-authoritative on-the-way / left-venue signals — so a different
+// staff device (the door dashboard) actually sees them, not just this device.
+export function apiSetOtw(on) { return call('POST', '/signal/otw', { on }, apiToken()); }
+export function apiSignalLeave() { return call('POST', '/signal/leave', {}, apiToken()); }
 
 // HitKoin — a member's own wallet + reward history. No wallet exists until
 // their first real, confirmed payment mints one.
@@ -94,6 +98,7 @@ export function apiStaffSignOut() {
 }
 export function apiDoorVerify(payload) { return call('POST', '/door/verify', payload, apiStaffToken()); }
 export function apiDoorBoard() { return call('GET', '/door/board', null, apiStaffToken()); }
+export function apiDoorCheckout(number) { return call('POST', '/door/checkout', { number }, apiStaffToken()); }
 export function apiMembersSearch(q) { return call('GET', `/members/search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
 
 // ── Lip Sync Bingo — one shared live round, same on every device ──
