@@ -255,7 +255,11 @@ export function applyOp(db, op) {
       }
       break;
     }
-    case 'battle.void':                                   // nobody accepted — square dies with it
+    case 'battle.say':                                    // live comment or emoji burst
+      db.prepare(`INSERT INTO lipsync_battle_comments(battle_id,member_id,kind,body,at) VALUES(?,?,?,?,?)`)
+        .run(d.battle_id, d.member_id, d.kind === 'reaction' ? 'reaction' : 'comment', String(d.body).slice(0, 200), d.at ?? ts);
+      break;
+    case 'battle.void':                                 // nobody accepted — square dies with it
       db.prepare(`UPDATE lipsync_battles SET status='void', resolved_at=? WHERE id=?`).run(d.at ?? ts, d.battle_id);
       break;
 

@@ -407,10 +407,42 @@ await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.mem
 bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
 ok(bat.totalVotes === 1, 'a member voting again replaces their vote instead of stacking');
 
+console.log('LIP SYNC BATTLES: LIVE COMMENTS + EMOJI');
+await call('POST', '/battle/say', { battleId: bat.id, body: 'GO OFF 🔥', kind: 'comment' }, mtok2);
+await call('POST', '/battle/say', { battleId: bat.id, body: '🔥', kind: 'reaction' }, mtok2);
+await call('POST', '/battle/say', { battleId: bat.id, body: '🔥', kind: 'reaction' }, mtok);
+await call('POST', '/battle/say', { battleId: bat.id, body: '💯', kind: 'reaction' }, mtok);
+let live = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
+ok(live.comments.length === 1 && live.comments[0].body === 'GO OFF 🔥', 'live comments come back with the commenter name');
+ok(live.comments[0].name === 'Rell', 'comments carry who said them');
+const fire = live.reactions.find((r) => r.emoji === '🔥');
+ok(fire?.n === 2, 'emoji reactions tally across the room');
+ok(live.reactions[0].emoji === '🔥', 'reactions are ordered by popularity');
+const emptySay = await call('POST', '/battle/say', { battleId: bat.id, body: '   ' }, mtok);
+ok(emptySay.status === 400, 'empty comments are refused');
+const anonSay = await call('POST', '/battle/say', { battleId: bat.id, body: 'hi' }, null);
+ok(anonSay.status === 401, 'commenting requires a member session');
+
 const resolved = await call('POST', '/battle/resolve', { battleId: bat.id }, stok);
 ok(resolved.status === 200 && resolved.body.winnerId === verify.body.member.id, 'most votes wins the battle');
 const nowCover = await call('POST', '/bingo/mark', { itemId: lipSquare.id, covered: true }, mtok);
 ok(nowCover.status === 200, 'the battle winner may finally cover the square');
+
+console.log("HOST'S OWN YOUTUBE ACCOUNT");
+const keyBefore = await call('GET', '/bingo/youtube-key', null, stok);
+ok(keyBefore.body.usingHostKey === false, 'no host key set to begin with');
+const setKey = await call('POST', '/bingo/youtube-key', { key: 'AIzaHostOwnKey1234' }, stok);
+ok(setKey.status === 200 && setKey.body.usingHostKey === true, 'host can point the venue at their own YouTube key');
+ok(setKey.body.youtubeEnabled === true, 'YouTube switches on the moment the host supplies a key');
+const keyAfter = await call('GET', '/bingo/youtube-key', null, stok);
+ok(keyAfter.body.hint === '••••1234' && !JSON.stringify(keyAfter.body).includes('AIzaHostOwnKey'),
+  'the key is never echoed back — only a masked hint');
+const memberKey = await call('POST', '/bingo/youtube-key', { key: 'nope' }, mtok);
+ok(memberKey.status === 401, 'members cannot change the venue YouTube key');
+const stateWithKey = await call('GET', '/bingo/state');
+ok(stateWithKey.body.youtubeEnabled === true, 'every device sees YouTube is live once the host connects theirs');
+const clearKey = await call('POST', '/bingo/youtube-key', { key: '' }, stok);
+ok(clearKey.body.usingHostKey === false, 'clearing the host key falls back to the venue default');
 
 console.log('LIP SYNC BATTLES: DECLINING FORFEITS THE SQUARE');
 const dSquare = (await call('GET', '/bingo/state', null, mtok2)).body.me.card.find(
@@ -561,7 +593,23 @@ ok(afterCancel.body.bookings[0].status === 'cancelled', 'booking now shows cance
 const board2 = await call('GET', '/booking/board', null, stok);
 ok(board2.body.bookings.every((b) => b.night >= tonight), 'staff board only shows tonight-or-later, never past nights');
 
+console.log("SIGN IN WITH GOOGLE (host's own YouTube account)");
+const gStatus = await call('GET', '/auth/google/status', null, stok);
+ok(gStatus.status === 200 && gStatus.body.connected === false, 'host starts out not connected to Google');
+ok(gStatus.body.configured === false, 'reports the venue has no Google client configured in this env');
+const gStart = await call('GET', '/auth/google/start', null, stok);
+ok(gStart.status === 503, 'sign-in refuses cleanly (not a crash) when no Google client is configured');
+const gStatusMember = await call('GET', '/auth/google/status', null, mtok);
+ok(gStatusMember.status === 401, 'members cannot see or change the venue Google connection');
+const gDisconnectMember = await call('POST', '/auth/google/disconnect', {}, mtok);
+ok(gDisconnectMember.status === 401, 'members cannot disconnect the venue Google account');
+const gCb = await call('GET', '/auth/google/callback?error=access_denied', null, null);
+ok(gCb.status === 200, 'a cancelled Google sign-in lands on a friendly page rather than erroring');
+const gDisconnect = await call('POST', '/auth/google/disconnect', {}, stok);
+ok(gDisconnect.status === 200 && gDisconnect.body.connected === false, 'host can disconnect their Google account');
+
 console.log(`\n${pass} passed, ${fail} failed`);
+
 server.close();
 try { rmSync(dataDir, { recursive: true, force: true }); } catch {}
 process.exit(fail ? 1 : 0);

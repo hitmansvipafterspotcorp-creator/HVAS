@@ -4477,3 +4477,7 @@ button {
 .tv-battle-votes { color: #ffd66b; font-weight: 900; font-size: clamp(13px, 2vw, 20px); }
 .tv-battle-up { display: block; margin-top: 4px; color: #ff7ae0; font-weight: 900; font-size: 12px; letter-spacing: .1em; }
 .tv-battle-cta { margin-top: 18px; color: #ffd66b; font-weight: 900; font-size: clamp(16px, 3vw, 28px); letter-spacing: .12em; }
+.share-take { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.share-preview { width: min(100%, 220px); aspect-ratio: 9/16; border-radius: 14px; background: #05030a; border: 2px solid #ffd66b; }
+.share-title { color: #ffe8a3; font-weight: 900; font-size: 14px; margin: 4px 0 0; }
+.share-take .bingo-btn { width: 100%; }

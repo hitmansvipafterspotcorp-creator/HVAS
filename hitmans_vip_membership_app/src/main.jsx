@@ -3015,8 +3015,52 @@ function useMicLevel(stream, active) {
   return level;
 }
 
+// Post your take to Instagram / TikTok / YouTube Shorts.
+//
+// Deliberately the native share sheet, not per-platform "post" APIs: neither
+// Instagram nor TikTok exposes a public web endpoint that lets an arbitrary
+// app publish a video on a user's behalf (both gate it behind a Business
+// account and app review). The share sheet needs no OAuth, no review, and no
+// stored credentials — the member picks the app themselves and lands in its
+// own composer, which is what every consumer app actually does on mobile.
+// Desktop and older browsers get a plain save instead.
+function SharePerformance({ blob, artist, song }) {
+  const [msg, setMsg] = useState('');
+  const name = `HVAS-lipsync-${String(artist || 'take').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.webm`;
+  const file = new File([blob], name, { type: blob.type || 'video/webm' });
+  const canShareFile = typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] });
+
+  const share = async () => {
+    try {
+      await navigator.share({ files: [file], title: 'My Lip Sync Battle', text: `${artist} — ${song} · HITMANS VIP After Spot` });
+    } catch (e) {
+      if (e?.name !== 'AbortError') setMsg('Sharing was blocked — save it and post from your camera roll.');
+    }
+  };
+  const save = () => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setMsg('Saved — post it from your camera roll.');
+  };
+
+  return (
+    <div className="share-take">
+      <video className="share-preview" src={URL.createObjectURL(blob)} controls playsInline />
+      <p className="share-title">🎬 Your take is ready</p>
+      {canShareFile
+        ? <button type="button" className="bingo-btn gold" onClick={share}>Share to Instagram · TikTok · Shorts</button>
+        : <p className="mem-fineprint">Direct sharing isn't available on this browser — save it and post from your camera roll.</p>}
+      <button type="button" className="bingo-btn ghost" onClick={save}>Save video</button>
+      {msg && <p className="mem-fineprint">{msg}</p>}
+    </div>
+  );
+}
+
 // The performer's screen: portrait, camera filling it, record the take.
-function BattleStage({ battle, onDone }) {
+function BattleStage({ battle, onDone, onTake }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const recRef = useRef(null);
@@ -3073,7 +3117,18 @@ function BattleStage({ battle, onDone }) {
     } catch { setErr('Recording is not supported on this browser.'); }
   };
   const stop = async () => {
-    try { recRef.current?.stop(); } catch { /* ignore */ }
+    // Grab the finished blob before tearing down — this is the take the
+    // member gets to keep and post.
+    const rec = recRef.current;
+    if (rec && rec.state !== 'inactive') {
+      await new Promise((resolve) => { rec.onstop = resolve; try { rec.stop(); } catch { resolve(); } });
+    }
+    if (chunksRef.current.length) {
+      // Hand it to the panel — this component unmounts the moment the
+      // performance registers (the battle leaves 'performing'), so a take
+      // held in local state would vanish before it could be shared.
+      onTake?.(new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'video/webm' }));
+    }
     setRecording(false);
     try { await apiBattlePerformed(battle.id); } catch { /* ignore */ }
     onDone?.();
@@ -3099,6 +3154,7 @@ function BattleStage({ battle, onDone }) {
 // Everything that isn't your own take: the call-out, the vote, the result.
 function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
   const [busy, setBusy] = useState(false);
+  const [myTake, setMyTake] = useState(null);   // survives BattleStage unmounting
   const act = async (fn) => { setBusy(true); try { await fn(); await onChanged?.(); } catch { /* ignore */ } setBusy(false); };
   if (!battle) return null;
 
@@ -3121,7 +3177,8 @@ function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
       )}
       {mine?.state === 'declined' && <p className="battle-lost">You declined — this square is out for you.</p>}
       {iAmIn && battle.status === 'pending' && <p className="mem-fineprint">You're in. Waiting on the host to put you up.</p>}
-      {performing && battle.status === 'performing' && <BattleStage battle={battle} onDone={onChanged} />}
+      {performing && battle.status === 'performing' && <BattleStage battle={battle} onDone={onChanged} onTake={setMyTake} />}
+      {myTake && <SharePerformance blob={myTake} artist={battle.artist} song={battle.song} />}
 
       {/* live standings — doubles as the vote UI once voting opens */}
       <div className="battle-players">

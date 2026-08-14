@@ -244,6 +244,23 @@ export function openDb(path) {
       PRIMARY KEY (member_id, item_id)
     );
     CREATE INDEX IF NOT EXISTS idx_battle_item ON lipsync_battles(item_id, status);
+    -- Live chat + emoji reactions during a battle (the IG-Live layer).
+    CREATE TABLE IF NOT EXISTS lipsync_battle_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      battle_id INTEGER NOT NULL,
+      member_id TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'comment',  -- comment | reaction
+      body TEXT NOT NULL,
+      at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_battle_comments ON lipsync_battle_comments(battle_id, at);
+    -- Runtime venue settings the host can change without a redeploy or a
+    -- restart (e.g. their own YouTube API key).
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   const entryCols = db.prepare(`PRAGMA table_info(entries)`).all().map((c) => c.name);

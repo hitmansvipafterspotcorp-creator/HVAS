@@ -29,7 +29,17 @@ const SESSION_TTL = 12 * 3600 * 1000;
 // YouTube auto-media: search is a server-held API key (never shipped to the
 // client — a leaked key gets used up by anyone), playback itself needs no
 // login at all since the IFrame Player embeds public videos directly.
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+// Venue-wide fallback key from env. The host can override it at runtime with
+// their OWN key (see POST /bingo/youtube-key) — the reason being ads: a host
+// signed into their own YouTube/Premium account on the TV browser gets their
+// own playback experience, and search then runs on their quota, not ours.
+const YOUTUBE_ENV_KEY = process.env.YOUTUBE_API_KEY || '';
+// "Sign in with Google" for the host. Needs a Google Cloud OAuth client
+// (console.cloud.google.com -> Credentials -> OAuth client ID -> Web app),
+// with this backend's /auth/google/callback as an authorised redirect URI.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 // How long a called square holds the TV before the next one is called — the
 // performance window. A plain song square is a minute; a LIP SYNC square is an
 // actual performance on the floor, so it gets two. Overridable per venue, and
@@ -238,6 +248,35 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return events;
   };
   // ── Lip Sync Bingo helpers ──
+  // ── Host's Google / YouTube account ──
+  const setting = (k) => db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value || '';
+  const putSetting = (k, v) => {
+    if (!v) return db.prepare('DELETE FROM settings WHERE key=?').run(k);
+    return db.prepare(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`).run(k, v, Date.now());
+  };
+  // Swap the stored refresh token for a live access token. Google access
+  // tokens last ~1h, so this runs per burst of calls rather than being cached
+  // to disk where it would go stale mid-night.
+  const googleAccessToken = async () => {
+    const refresh = setting('google_refresh_token');
+    if (!refresh || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return '';
+    try {
+      const r = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, refresh_token: refresh, grant_type: 'refresh_token' }),
+      });
+      const d = await r.json();
+      return d.access_token || '';
+    } catch { return ''; }
+  };
+
+  // Host-supplied key wins over the env key when present.
+  const youtubeKey = () => {
+    const row = db.prepare(`SELECT value FROM settings WHERE key='youtube_api_key'`).get();
+    return (row?.value || '').trim() || YOUTUBE_ENV_KEY;
+  };
+
   const getBingoRound = () => {
     const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
     const roundNo = r.round_no || 1;
@@ -257,11 +296,14 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // — if it fails or no key is configured, the call itself already landed
   // and gameplay keeps going regardless.
   const autoResolveMedia = async (item) => {
-    if (!YOUTUBE_API_KEY || !item || item.free || !item.artist) return;
+    const ytKey = youtubeKey();
+    const ytToken = await googleAccessToken();
+    if ((!ytKey && !ytToken) || !item || item.free || !item.artist) return;
     try {
       const q = `${item.artist} ${item.song}`;
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoEmbeddable=true&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
-      const r = await fetch(url);
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1&videoEmbeddable=true&q=${encodeURIComponent(q)}${ytToken ? '' : `&key=${ytKey}`}`;
+      // Signed-in host → the search runs on THEIR account and quota.
+      const r = await fetch(url, ytToken ? { headers: { Authorization: `Bearer ${ytToken}` } } : undefined);
       const data = await r.json();
       const it = data.items?.[0];
       if (it) commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
@@ -286,6 +328,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       totalVotes: total,
       // share of the vote — the on-screen meter during voting
       players: players.map((p) => ({ ...p, share: total ? Math.round((p.votes / total) * 100) : 0 })),
+      // Live IG-Live layer: the last stretch of chat, plus running emoji totals.
+      comments: db.prepare(`SELECT c.id, c.member_id AS memberId, m.name, c.body, c.at
+        FROM lipsync_battle_comments c JOIN members m ON m.id=c.member_id
+        WHERE c.battle_id=? AND c.kind='comment' ORDER BY c.at DESC LIMIT 40`).all(b.id).reverse(),
+      reactions: db.prepare(`SELECT body AS emoji, COUNT(*) n FROM lipsync_battle_comments
+        WHERE battle_id=? AND kind='reaction' GROUP BY body ORDER BY n DESC`).all(b.id),
       me: players.find((p) => p.memberId === viewerId) || null,
       myVote: db.prepare('SELECT member_id FROM lipsync_battle_votes WHERE battle_id=? AND voter_id=?').get(b.id, viewerId)?.member_id || null,
     };
@@ -426,7 +474,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
       paypalMe: process.env.PAYPAL_ME || process.env.VITE_PAYPAL_ME || '',
       zelle: process.env.HVAS_ZELLE || process.env.VITE_ZELLE_HANDLE || '',
-      features: { social: true, pay: true, mesh: !!meshPort, youtube: !!YOUTUBE_API_KEY, hitkoin: hitkoinEnabled() },
+      features: { social: true, pay: true, mesh: !!meshPort, youtube: !!youtubeKey(), hitkoin: hitkoinEnabled() },
       hitkoinPerDollar: Number(process.env.HITKOIN_PER_DOLLAR || 100),
     }),
 
@@ -763,7 +811,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         status: r.status, calls: r.calls, startedAt: r.started_at,
         deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
         roundNo: r.roundNo, finalRound: r.finalRound, customPattern: r.customPattern, roundWins: r.roundWins,
-        songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: !!YOUTUBE_API_KEY,
+        songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: !!youtubeKey(),
         // window for the square currently on screen (lip sync squares run longer)
         currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
@@ -881,6 +929,115 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { ok: true, endsAt: Date.now() + ms });
     },
     // Any member in the room votes — one vote each, changeable while open.
+    // ── Sign in with Google (host's own YouTube account) ──
+    // Step 1: hand the host the consent URL. `redirect` is this backend's own
+    // callback, which must be registered in the Google Cloud OAuth client.
+    'GET /auth/google/start': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google sign-in is not configured for this venue yet (set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).' });
+      const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+      const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: `${origin}/auth/google/callback`,
+        response_type: 'code',
+        scope: GOOGLE_SCOPE,
+        // offline + consent is what actually yields a refresh token, so the
+        // host stays signed in across restarts instead of re-authing nightly
+        access_type: 'offline',
+        prompt: 'consent',
+        include_granted_scopes: 'true',
+      });
+      json(res, 200, { url, redirectUri: `${origin}/auth/google/callback` });
+    },
+    // Step 2: Google sends the host back here with a code. Exchange it for a
+    // refresh token and store it. Renders a plain page — this opens in a
+    // browser tab, not the app.
+    'GET /auth/google/callback': async (req, res) => {
+      const q = new URL(req.url, 'http://x').searchParams;
+      const code = q.get('code');
+      const page = (title, msg) => {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(`<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+          <body style="background:#140a20;color:#f4ecff;font:16px system-ui;display:grid;place-items:center;height:100vh;margin:0;text-align:center">
+          <div><h2 style="color:#ffd66b">${title}</h2><p>${msg}</p><p style="opacity:.7">You can close this tab.</p></div>`);
+      };
+      if (q.get('error')) return page('Sign-in cancelled', 'Nothing was changed.');
+      if (!code) return page('Sign-in failed', 'No authorisation code came back from Google.');
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return page('Not configured', 'This venue has no Google client configured.');
+      try {
+        const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+        const r = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+            redirect_uri: `${origin}/auth/google/callback`, grant_type: 'authorization_code',
+          }),
+        });
+        const d = await r.json();
+        if (!d.refresh_token) return page('Sign-in incomplete', 'Google did not return a refresh token. Remove the app at myaccount.google.com/permissions and try once more.');
+        putSetting('google_refresh_token', d.refresh_token);
+        putSetting('google_connected_at', String(Date.now()));
+        page('YouTube connected', 'This venue now runs song lookups on your own Google account.');
+      } catch {
+        page('Sign-in failed', 'Could not reach Google to complete sign-in.');
+      }
+    },
+    'GET /auth/google/status': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, {
+        configured: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
+        connected: !!setting('google_refresh_token'),
+        connectedAt: Number(setting('google_connected_at')) || null,
+      });
+    },
+    'POST /auth/google/disconnect': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      putSetting('google_refresh_token', '');
+      putSetting('google_connected_at', '');
+      json(res, 200, { ok: true, connected: false });
+    },
+
+    // The host points the venue at THEIR OWN YouTube account. Playback ads are
+    // the reason: a host signed into their own (Premium) account on the TV
+    // browser gets their own playback, and search runs on their quota. Send an
+    // empty key to fall back to whatever the venue was configured with.
+    'POST /bingo/youtube-key': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { key } = await readBody(req);
+      const clean = String(key || '').trim();
+      if (clean) {
+        db.prepare(`INSERT INTO settings(key,value,updated_at) VALUES('youtube_api_key',?,?)
+          ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`).run(clean, Date.now());
+      } else {
+        db.prepare(`DELETE FROM settings WHERE key='youtube_api_key'`).run();
+      }
+      // Never echo the key back — it's a credential.
+      json(res, 200, { ok: true, usingHostKey: !!clean, youtubeEnabled: !!youtubeKey() });
+    },
+    'GET /bingo/youtube-key': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const row = db.prepare(`SELECT value, updated_at FROM settings WHERE key='youtube_api_key'`).get();
+      json(res, 200, {
+        usingHostKey: !!row,
+        youtubeEnabled: !!youtubeKey(),
+        // enough to confirm which key is live without exposing it
+        hint: row ? `••••${String(row.value).slice(-4)}` : null,
+        updatedAt: row?.updated_at || null,
+      });
+    },
+
+    // Live chat + emoji during a battle. Open to any member in the room —
+    // the crowd reacting IS the show.
+    'POST /battle/say': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, body, kind } = await readBody(req);
+      if (!body || !String(body).trim()) return json(res, 400, { error: 'empty' });
+      const b = db.prepare('SELECT status FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      if (b.status === 'done' || b.status === 'void') return json(res, 400, { error: 'battle is over' });
+      commit('battle.say', { battle_id: battleId, member_id: c.sub, kind, body: String(body).trim(), at: Date.now() });
+      json(res, 200, { ok: true });
+    },
     'POST /battle/vote': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const { battleId, memberId } = await readBody(req);
@@ -1072,10 +1229,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // same way a bingo call does. ──
     'GET /media/youtube-search': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      if (!YOUTUBE_API_KEY) return json(res, 503, { error: 'YouTube search isn’t connected for this venue yet.' });
+      const searchToken = await googleAccessToken();
+      const searchKey = youtubeKey();
+      if (!searchKey && !searchToken) return json(res, 503, { error: 'YouTube search isn’t connected for this venue yet.' });
       const q = (new URL(req.url, 'http://x').searchParams.get('q') || '').trim();
       if (q.length < 2) return json(res, 200, { results: [] });
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=6&videoEmbeddable=true&q=${encodeURIComponent(q)}&key=${YOUTUBE_API_KEY}`;
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=6&videoEmbeddable=true&q=${encodeURIComponent(q)}${searchToken ? '' : `&key=${searchKey}`}`;
       try {
         const r = await fetch(url);
         const data = await r.json();
