@@ -475,6 +475,16 @@ button {
   padding: 16px;
 }
 
+/* Door dashboard list panels can grow to any number of members/decisions —
+   bounded so the PANEL scrolls internally instead of the whole page (the
+   roster in particular has no cap by design: it's meant to show everyone). */
+.dash-scroll-panel .app-panel-body,
+.dash-roster-panel .app-panel-body {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.dash-roster-panel .app-panel-body { max-height: 260px; }
+
 .home-dashboard,
 .access-screen-grid,
 .venue-screen-grid,
@@ -3562,12 +3572,21 @@ button {
 .renews-right small { color: #9a7ac0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .renews-time { color: #ffd66b; font-family: ui-monospace, monospace; font-size: 18px; font-weight: 800; letter-spacing: .04em; }
 
-.loyalty { margin-top: 20px; }
+/* Opaque card backing — this section has no art of its own, so without one
+   the animated ambient background (the crown / HitKoin logo glow behind the
+   whole app, see .dynamic-bg) shows straight through and clashes with the
+   rank badges and text at its bright phase. */
+.loyalty {
+  margin-top: 20px;
+  padding: 14px 14px 16px;
+  border: 1px solid rgba(255, 214, 109, 0.32);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(80, 11, 110, 0.3), transparent 40%), rgba(8, 2, 14, 0.86);
+}
 .loyalty h3, .prefs h3 { color: #ffe8a3; font-size: 15px; margin: 0 0 12px; }
 .loyalty-warn { color: #ffcf8f; font-size: 12.5px; line-height: 1.4; background: rgba(120,70,20,.28); border: 1px solid #7a5a2a; border-radius: 10px; padding: 9px 12px; margin: 0 0 12px; }
 .loyalty-warn b { color: #ffe3b0; }
 .loyalty-badges { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-/* Badges have their own art — no dark box around them (matches the tier cards). */
 .loyalty-badge { display: grid; place-items: center; padding: 6px 4px; border: none; background: none; opacity: .4; filter: grayscale(.55); transition: opacity .15s, filter .15s, transform .15s; }
 .loyalty-badge.earned { opacity: 1; filter: none; }
 .loyalty-badge.current { opacity: 1; filter: drop-shadow(0 0 9px rgba(255,214,107,.9)); }
@@ -4028,7 +4047,11 @@ button {
    regardless of specificity ties with earlier same-specificity selectors —
    two real bugs (brand stamp, QR size not shrinking) came from this exact
    trap when the block lived earlier in the file. */
-@media (max-width: 720px) {
+/* max-width covers portrait phones; max-height covers the SAME phones
+   turned sideways, where width jumps past 720px but height drops to
+   ~350-430px — without this OR, every trim below silently stopped applying
+   the moment the phone rotated, and content overflowed again. */
+@media (max-width: 720px), (max-height: 460px) {
   /* Swipeable tier carousel — one card centered, neighbors peeking at the
      edges as a swipe hint. Replaces the old 2-column grid (three tall rows
      for 5 tiers) with one short row, which is most of why this screen used
@@ -4126,16 +4149,16 @@ button {
      stacking to nearly 4x screen height on a phone. Trimmed each piece,
      not just padding — the two logo images (pass art + brand stamp) were
      the single biggest cost. */
-  .mem-pass-card { padding: 12px; gap: 6px; }
-  .mem-pass-art { width: 64px; }
+  .mem-pass-card { padding: 10px; gap: 4px; }
+  .mem-pass-art { width: 60px; }
   .mem-pass-tier { font-size: 18px; }
-  .mem-pass-meta { gap: 4px 16px; margin: 6px 0 0; }
+  .mem-pass-meta { gap: 4px 16px; margin: 4px 0 0; }
   .mem-pass-meta dt { font-size: 10px; }
   .mem-pass-meta dd { font-size: 13px; margin-top: 0; }
-  .qr-clean img, .qr-clean .qr-load { width: 100px; height: 100px; }
-  .mem-qr img, .mem-qr-load { width: 100px; height: 100px; }
-  .qr-clean { padding: 6px; }
-  .mem-qr { gap: 3px; }
+  .qr-clean img, .qr-clean .qr-load { width: 88px; height: 88px; }
+  .mem-qr img, .mem-qr-load { width: 88px; height: 88px; }
+  .qr-clean { padding: 5px; }
+  .mem-qr { gap: 2px; }
   /* The pass-art crown/shield above already carries full branding — a
      second logo watermark under the QR was pure duplication on a screen
      already fighting for every pixel. (Scoped selector, not just
@@ -4150,16 +4173,93 @@ button {
   .mem-chip-row { margin: 4px 0; gap: 6px; }
   .mem-pass-eyebrow { font-size: 10px; }
 
-  .perks { margin-top: 10px; }
-  .perks h3, .loyalty h3, .prefs h3 { font-size: 15px; margin-bottom: 8px; }
-  .perk-tickets { padding: 10px; gap: 10px; }
-  .ticket-stub { width: 64px; padding: 6px 4px; }
-  .ticket-stub b { font-size: 22px; }
+  .perks { margin-top: 6px; }
+  .perks h3, .loyalty h3, .prefs h3 { font-size: 15px; margin-bottom: 6px; }
+  .perk-tickets { padding: 8px; gap: 8px; }
+  .ticket-stub { width: 60px; padding: 5px 4px; }
+  .ticket-stub b { font-size: 20px; }
   .ticket-stub span { font-size: 9px; }
-  .perk-body p { font-size: 12px; margin: 0 0 6px; }
-  .perk-use { padding: 8px 12px; font-size: 13px; }
+  .perk-body p { font-size: 12px; margin: 0 0 4px; }
+  .perk-use { padding: 6px 12px; font-size: 13px; }
 
-  .renews-bar { margin-top: 10px; padding: 10px 14px; }
+  .renews-bar { margin-top: 6px; padding: 7px 14px; }
   .renews-tier { font-size: 13px; }
   .renews-time { font-size: 15px; }
+
+  /* Status row + tabs: added after the original Pass-tab budget above was
+     tuned, which pushed the renewal bar back off the bottom of the screen. */
+  .mem-status-row { margin: 0 0 6px; }
+  .mem-status-row .role-badge-checkin { padding: 5px 12px; font-size: 11px; }
+  .mem-tabs { margin-bottom: 8px; }
+  .mem-tab { padding: 7px 6px; font-size: 11.5px; }
+}
+
+/* Landscape phones specifically (short height, but plenty of width unlike
+   portrait) — reflow the Pass tab into two columns instead of stacking,
+   since stacked it needs roughly 2x the height a landscape phone has. Scoped
+   with min-width so this never fires on portrait's narrow-but-tall screens. */
+@media (max-height: 460px) and (min-width: 560px) {
+  .mem-pass-body { display: flex; align-items: flex-start; gap: 14px; }
+  .mem-pass-card { flex: 1 1 50%; grid-template-columns: 56px 1fr auto; gap: 10px; padding: 10px; }
+  .mem-pass-side { flex: 1 1 50%; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .mem-pass-art { width: 44px; }
+  .qr-clean img, .qr-clean .qr-load { width: 72px; height: 72px; }
+  .mem-qr img, .mem-qr-load { width: 72px; height: 72px; }
+  .mem-qr span { display: none; }
+  .perks { margin-top: 0; }
+  .perks h3 { font-size: 13px; margin-bottom: 4px; }
+  .perk-tickets { padding: 6px; gap: 6px; }
+  .perk-body p { font-size: 11px; }
+  .renews-bar { margin-top: 0; }
+
+  /* Header chrome — with only ~390px of height total, the title block +
+     status pill + tabs were eating over a third of the screen before any
+     actual pass content even started. */
+  .screen-myPass .screen-header p,
+  .screen-membership .screen-header p,
+  .screen-profile .screen-header p { display: none; }
+  .screen-myPass .screen-header,
+  .screen-membership .screen-header,
+  .screen-profile .screen-header { margin: 0 auto 2px; }
+  .screen-myPass .screen-header h1,
+  .screen-membership .screen-header h1,
+  .screen-profile .screen-header h1 { font-size: 17px; margin: 0; }
+  .screen-myPass .back-to-menu,
+  .screen-membership .back-to-menu,
+  .screen-profile .back-to-menu { padding: 5px 12px; font-size: 12px; }
+  .mem-status-row { margin: 0 0 4px; }
+  .mem-status-row .role-badge-checkin { padding: 3px 10px; }
+  .mem-tabs { margin-bottom: 6px; }
+  .mem-tab { padding: 5px 6px; }
+  .mem-pass-meta { gap: 2px 12px; }
+  .mem-meta-expiry { display: none; } /* "Valid until" — same info is in the renewal bar below */
+  .mem-screen { padding: 4px 4px 4px; } /* base rule carries a flat 40px bottom pad meant for portrait scroll room */
+  .mem-pass-card { padding: 8px; gap: 8px; }
+  .mem-pass-side { gap: 4px; }
+
+  /* Door Dashboard: 6 stacked children at the base 14px gap add up fast. */
+  .staff-dash { gap: 8px; }
+  .dash-clock { padding: 2px 0; font-size: 13px; }
+
+  /* Generic screen header (icon + eyebrow + title + subtitle), for every
+     screen that isn't one of the specifically-scoped ones above. The
+     820px-wide media query elsewhere trims this for portrait but was never
+     extended to landscape, so on a sideways phone every screen's header
+     reverted to full desktop size. */
+  .screen-header { gap: 8px; margin: 0 auto 6px; }
+  .screen-header h1 { font-size: 22px; margin: 2px 0; }
+  .screen-header p { font-size: 12px; margin: 0; }
+
+  /* The stat-widget tiles use fixed-aspect frame art (height scales with
+     width), so at full landscape width they'd need to be badly squashed to
+     fit at all. The roster below is the content that actually matters here. */
+  .staff-dash .stat-widgets { display: none; }
+  .dash-roster-panel .app-panel-body { max-height: 110px; padding: 6px 16px; }
+  .dash-scroll-panel .app-panel-body { max-height: 80px; padding: 6px 16px; }
+  .staff-dash .app-panel header { padding: 6px 14px; }
+  .staff-dash .app-panel h2 { font-size: 18px; }
+  .staff-dash .app-panel header span { font-size: 10px; }
+  .staff-dash .asset-cta.wide img { height: 34px; }
+  .staff-dash .dash-watchlist-link { padding: 5px; font-size: 12px; margin-top: 4px; }
+  .staff-dash { gap: 6px; }
 }

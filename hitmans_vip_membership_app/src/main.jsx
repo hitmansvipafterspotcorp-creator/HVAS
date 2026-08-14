@@ -2547,6 +2547,10 @@ function MemberPass({ member, checkedIn, onRenew }) {
       </div>
       {tab === 'pass' && (
       <>
+      {/* Wrapper so landscape (short height, wide width) can lay the pass
+          card and everything below it side by side instead of stacking —
+          stacked, this tab alone needs ~2x the height a landscape phone has. */}
+      <div className="mem-pass-body">
       {/* — the pass card — */}
       <div className="mem-pass-card" style={{ '--tier-accent': isVip ? '#ffd66b' : '#b06bff' }}>
         <img className="mem-pass-art" src={PASS_SRC[member.tier]} alt={`${member.tier} pass`} />
@@ -2561,7 +2565,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
             {member.name && <div><dt>Name</dt><dd>{member.name}</dd></div>}
             <div><dt>Member #</dt><dd className="mem-number">{member.number}</dd></div>
             {member.contact && <div><dt>Contact</dt><dd>{member.contact}</dd></div>}
-            <div><dt>Valid until</dt><dd>{fmtDate(member.expiresAt)}</dd></div>
+            <div className="mem-meta-expiry"><dt>Valid until</dt><dd>{fmtDate(member.expiresAt)}</dd></div>
             <div><dt>Paid with</dt><dd>{member.payment}</dd></div>
           </dl>
           {verified && <img className="mem-verified-alert" src={ui.verify.entryVerified} alt="Entry status: verified" />}
@@ -2578,6 +2582,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
         </div>
       </div>
 
+      <div className="mem-pass-side">
       {/* — tonight's perks: hospitality tickets (entry OR a Cafe8Fifty meal) — */}
       <section className="perks">
         <h3>Tonight’s perks</h3>
@@ -2603,6 +2608,8 @@ function MemberPass({ member, checkedIn, onRenew }) {
       <div className={`renews-bar${expired ? ' expiredbar' : soon ? ' soon' : ''}`}>
         <span className="renews-tier">{member.tier}{isVip ? ' VIP' : ''} MEMBER<small>{expired ? 'Expired · renew now' : 'Active · thank you!'}</small></span>
         <span className="renews-right"><small>{expired ? 'Status' : 'Renews in'}</small>{expired ? <span className="renews-time exp">EXPIRED</span> : <RenewsIn expiresAt={member.expiresAt} />}</span>
+      </div>
+      </div>
       </div>
       </>
       )}
@@ -2864,7 +2871,6 @@ function StaffDashboardScreen({ navigate }) {
   const clockStr = new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const normStatus = (s) => (s === 'granted' ? 'valid' : s === 'expired-qr' ? 'expired' : s === 'suspended' ? 'trespass' : s);
 
-  const onTheWayList = backend ? (board?.onTheWay || []) : (isOnTheWay(member) ? [member] : []);
   const insideList = backend ? (board?.inside || []) : (isInsideTonight(member) ? [member] : []);
   // Full roster — every member the venue knows about, always visible (not
   // just whoever's currently on-the-way/inside), so staff have full
@@ -2912,7 +2918,7 @@ function StaffDashboardScreen({ navigate }) {
         <StatWidget src={ui.widgets.venue} label="VENUE ACCESS" sub="CURRENTLY INSIDE" value={insideCount} cap={100} />
       </div>
 
-      <AppPanel title="All members" subtitle="Inside → on the way → signed in → left, live">
+      <AppPanel className="dash-roster-panel" title="All members" subtitle="Inside → on the way → signed in → left, live">
         {roster.length > 0 ? roster.map((m) => (
           <div className={`dash-row roster ${m.doorStatus}`} key={m.number}>
             <span className={`dash-dot ${STATUS_DOT[m.doorStatus]}`} />
@@ -2920,6 +2926,7 @@ function StaffDashboardScreen({ navigate }) {
               <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
               <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
               <span className={`dash-status-pill ${m.doorStatus}`}>{STATUS_LABEL[m.doorStatus]}</span>
+              {!backend && <PenaltyControls member={m} />}
             </div>
             <div className="dash-roster-right">
               <span className="dash-when">{rosterWhen(m)}</span>
@@ -2933,39 +2940,7 @@ function StaffDashboardScreen({ navigate }) {
         )}
       </AppPanel>
 
-      <AppPanel title="On the way" subtitle="Members heading over">
-        {onTheWayList.length > 0 ? onTheWayList.map((m) => (
-          <div className="dash-row incoming" key={m.number}>
-            <span className="dash-dot amber" />
-            <div className="dash-info">
-              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
-              <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
-              {!backend && <PenaltyControls member={m} />}
-            </div>
-            <span className="dash-when">{ago(m.onTheWayAt)}</span>
-          </div>
-        )) : (
-          <p className="dash-empty">No members signalled on the way right now.</p>
-        )}
-      </AppPanel>
-
-      <AppPanel title="Inside tonight" subtitle="Verified at the door">
-        {insideList.length > 0 ? insideList.map((m) => (
-          <div className="dash-row inside" key={m.number}>
-            <span className="dash-dot green" />
-            <div className="dash-info">
-              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
-              <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
-              {!backend && <PenaltyControls member={m} />}
-            </div>
-            <span className="dash-when">entry #{m.entries}</span>
-          </div>
-        )) : (
-          <p className="dash-empty">Nobody verified inside yet tonight.</p>
-        )}
-      </AppPanel>
-
-      <AppPanel title="Recent door decisions" subtitle="Tonight's check-in log">
+      <AppPanel className="dash-scroll-panel" title="Recent door decisions" subtitle="Tonight's check-in log">
         {recentDecisions.length > 0 ? recentDecisions.map((d, i) => (
           <div className={`dash-row ${d.status}`} key={`${d.number}-${d.when}-${i}`}>
             <img className="dash-chip" src={STATUS_CHIP[d.status] || STATUS_CHIP.expired} alt={d.status} />
