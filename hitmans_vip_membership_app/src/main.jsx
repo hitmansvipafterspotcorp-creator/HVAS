@@ -3106,7 +3106,12 @@ function StaffDashboardScreen({ navigate }) {
     : (member && member.verifiedAt ? [{ status: member.status === 'expired' ? 'expired' : 'valid', when: member.verifiedAt, number: member.number, name: member.name }] : []);
 
   const insideCount = insideList.length;
-  const entriesTotal = backend ? insideCount : (member?.entries || 0);
+  // Tonight's total admissions (inside + left — everyone who was actually let
+  // in tonight, not just who's still here right now) vs. who's still inside
+  // vs. who's headed over — three genuinely different numbers, not the same
+  // "currently inside" count relabeled three times.
+  const admittedTonight = backend ? roster.filter((m) => m.doorStatus === 'inside' || m.doorStatus === 'left').length : (member?.entries || 0);
+  const onTheWayCount = roster.filter((m) => m.doorStatus === 'onTheWay').length;
   const [spark, setSpark] = useState(() => Array.from({ length: 14 }, () => insideCount));
   useEffect(() => { setSpark((s) => [...s.slice(1), insideCount]); }, [insideCount]);
 
@@ -3119,8 +3124,8 @@ function StaffDashboardScreen({ navigate }) {
     <div className="staff-dash">
       <div className="dash-clock"><span className="dash-clock-dot" aria-hidden="true" />{clockStr}</div>
       <div className="stat-widgets">
-        <StatWidget src={ui.widgets.entries} label="TODAY’S ENTRIES" sub="TOTAL CHECK-INS" value={entriesTotal} series={spark} />
-        <StatWidget src={ui.widgets.event} label="EVENT ACCESS" sub="THIS EVENT" value={entriesTotal} cap={150} />
+        <StatWidget src={ui.widgets.entries} label="TODAY’S ENTRIES" sub="TOTAL ADMITTED" value={admittedTonight} series={spark} />
+        <StatWidget src={ui.widgets.event} label="ON THE WAY" sub="HEADING OVER NOW" value={onTheWayCount} cap={150} />
         <StatWidget src={ui.widgets.venue} label="VENUE ACCESS" sub="CURRENTLY INSIDE" value={insideCount} cap={100} />
       </div>
 
@@ -3130,7 +3135,7 @@ function StaffDashboardScreen({ navigate }) {
             onClick={backend ? () => setProfileNumber(m.number) : undefined} role={backend ? 'button' : undefined} tabIndex={backend ? 0 : undefined}>
             <span className={`dash-dot ${STATUS_DOT[m.doorStatus]}`} />
             <div className="dash-info">
-              <strong>{m.name || 'Member'} · {m.tier}{m.vip ? ' VIP' : ''}</strong>
+              <strong>{m.name || 'Member'}{m.tier ? ` · ${m.tier}${m.vip ? ' VIP' : ''}` : ' · No membership'}</strong>
               <span className="dash-num">{m.number}{m.contact ? ` · ${m.contact}` : ''}</span>
               <span className={`dash-status-pill ${m.doorStatus}`}>{STATUS_LABEL[m.doorStatus]}</span>
               {m.backInside && <span className="dash-status-pill backinside">↩ Back inside</span>}
