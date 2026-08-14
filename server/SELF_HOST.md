@@ -58,6 +58,18 @@ Tunnel (see the full section below for what this does and why it's free):
 ```powershell
 cd $HOME
 curl.exe -L -o cloudflared.exe https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
+```
+
+**Fastest path — no domain, no account, one double-click every time you open
+tonight:** run `start-hvas.bat` in the repo root. It starts the backend in
+its own window, starts a fresh quick tunnel, prints the public link the
+moment it's ready, and opens the app already connected to it — no manual
+copy-paste. Downside: the link changes every time you start it (quick
+tunnels are anonymous/ephemeral by design), so re-share **Show join QR**
+each night. Good enough for most venues; skip straight to step 7.
+
+**Permanent path — same link forever, needs a domain (~$10-12/yr):**
+```powershell
 .\cloudflared.exe tunnel login
 .\cloudflared.exe tunnel create hvas
 .\cloudflared.exe tunnel route dns hvas app.yourdomain.com
@@ -69,7 +81,7 @@ folder, fill in the tunnel id + `app.yourdomain.com` (Windows paths look like
 .\cloudflared.exe service install --config C:\Users\you\hvas\server\cloudflared\config.yml
 ```
 That runs it as a Windows service from now on — starts on its own, survives
-reboots, no window to babysit.
+reboots, no window to babysit, and the link/QR never changes.
 
 **7. Play it.** Open the app at
 `https://hitmansvipafterspotcorp-creator.github.io/HVAS/` on any phone → on
