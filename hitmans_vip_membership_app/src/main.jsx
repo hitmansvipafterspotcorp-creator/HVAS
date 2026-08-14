@@ -2148,7 +2148,7 @@ function useQrDataUrl(text, badgeSrc) {
       .catch(() => {
         // Fall back to a plain standard QR if anything about the custom
         // render fails — a real code that scans beats no code at all.
-        QRCode.toDataURL(text, { margin: 1, width: 260, errorCorrectionLevel: 'M', color: { dark: '#1b0b2e', light: '#f7ecff' } })
+        QRCode.toDataURL(text, { margin: 1, width: 480, errorCorrectionLevel: 'M', color: { dark: '#1b0b2e', light: '#f7ecff' } })
           .then((qrUrl) => { if (live) setUrl(qrUrl); }).catch(() => {});
       });
     return () => { live = false; };
@@ -2177,7 +2177,7 @@ function renderSoundwaveQr(text, badgeSrc) {
   // scanners lock on exactly as they would on a standard QR code.
   const isFinderZone = (r, c) => (r < 8 && c < 8) || (r < 8 && c >= size - 8) || (r >= size - 8 && c < 8);
 
-  const W = 260;
+  const W = 480; // rendered large so it stays crisp blown up full-screen at the door
   const margin = 2; // quiet-zone modules, same as a standard QR's border
   const totalModules = size + margin * 2;
   const cell = W / totalModules;
@@ -2597,6 +2597,9 @@ function MemberPass({ member, checkedIn, onRenew }) {
   const togglePref = (k) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
   // Member self-verify: same gate the door uses — pops GRANTED / DENIED / etc.
   const [verifyResult, setVerifyResult] = useState(null);
+  // Tap the QR to blow it up full-screen — a real "hold it out at the door"
+  // card, not a small code buried in the pass layout.
+  const [bigQr, setBigQr] = useState(false);
   // Pass / Loyalty & Access / Account — three focused screens instead of one
   // long stack. Nothing was removed, it's just not all on screen at once.
   const [tab, setTab] = useState('pass');
@@ -2656,15 +2659,28 @@ function MemberPass({ member, checkedIn, onRenew }) {
           {verified && <img className="mem-verified-alert" src={ui.verify.entryVerified} alt="Entry status: verified" />}
         </div>
         <div className="mem-qr">
-          <div className="qr-clean">
+          <button type="button" className="qr-clean qr-tap" onClick={() => qr && setBigQr(true)} aria-label="Hold up at the door">
             {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
-          </div>
-          <span>Show at the door to get scanned</span>
+          </button>
+          <span>Tap to hold up at the door</span>
           <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(previewCardStatus(member.number))} aria-label="Verify membership">
             <img src={ui.verify.verifyCard} alt="Verify membership" />
           </button>
         </div>
       </div>
+
+      {bigQr && (
+        <div className="big-qr-overlay" onClick={() => setBigQr(false)}>
+          <div className="big-qr-card" onClick={(e) => e.stopPropagation()}>
+            <div className="big-qr-frame">
+              {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
+            </div>
+            <strong className="big-qr-name">{member.name || 'Member'}</strong>
+            <span className="big-qr-number">{member.tier}{isVip ? ' VIP' : ''} · {member.number}</span>
+            <button type="button" className="big-qr-close" onClick={() => setBigQr(false)}>Done</button>
+          </div>
+        </div>
+      )}
 
       <div className="mem-pass-side">
       {/* — tonight's perks: hospitality tickets (entry OR a Cafe8Fifty meal) — */}

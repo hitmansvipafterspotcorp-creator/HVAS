@@ -3407,7 +3407,6 @@ button {
 .mem-pass-meta dd { color: #f4ecff; font-size: 15px; margin: 2px 0 0; font-weight: 600; }
 .mem-number { font-family: ui-monospace, monospace; letter-spacing: .06em; }
 .mem-qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.mem-qr img { width: 150px; height: 150px; border-radius: 12px; background: #f7ecff; padding: 6px; }
 .mem-qr-load { width: 150px; height: 150px; display: grid; place-items: center; color: #9a7ac0; background: #150a24; border-radius: 12px; }
 .mem-qr span { color: #9a7ac0; font-size: 11px; }
 
@@ -3639,10 +3638,23 @@ button {
 .renews-bar.expiredbar { border-color: #7d2f3f; background: linear-gradient(90deg, #2a0f18, #34101a); }
 .renews-time.exp { color: #ff8aa0; }
 
-/* clean member QR (no scanner frame — that's for security) */
-.qr-clean { background: #f7ecff; border: 3px solid #b06bff; border-radius: 12px; padding: 8px; box-shadow: 0 0 18px rgba(176,107,255,.4); }
-.qr-clean img { width: 190px; height: 190px; display: block; }
-.qr-clean .qr-load { width: 190px; height: 190px; display: grid; place-items: center; color: #6b3fa0; }
+/* clean member QR (no scanner frame — that's for security). Thin frame on
+   purpose — this is a tap target that opens the full-screen version, so the
+   embedded preview should read mostly as CODE, not white card chrome. */
+.qr-clean { background: #f7ecff; border: 2px solid #b06bff; border-radius: 12px; padding: 5px; box-shadow: 0 0 18px rgba(176,107,255,.4); }
+.qr-clean.qr-tap { appearance: none; -webkit-appearance: none; cursor: pointer; display: inline-flex; }
+.qr-clean img { width: 210px; height: 210px; display: block; }
+.qr-clean .qr-load { width: 210px; height: 210px; display: grid; place-items: center; color: #6b3fa0; }
+
+/* full-screen "hold it out at the door" QR — the actual digital card */
+.big-qr-overlay { position: fixed; inset: 0; background: rgba(6,3,14,.92); display: grid; place-items: center; z-index: 90; padding: 16px; overflow-y: auto; animation: alertfade .18s ease; }
+.big-qr-card { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: auto; }
+.big-qr-frame { background: #f7ecff; border: 3px solid #b06bff; border-radius: 22px; padding: 5px; box-shadow: 0 0 50px rgba(176,107,255,.6); }
+.big-qr-frame img { display: block; width: min(80vw, 58vh, 460px); height: min(80vw, 58vh, 460px); }
+.big-qr-frame .qr-load { display: grid; place-items: center; width: min(80vw, 58vh, 460px); height: min(80vw, 58vh, 460px); color: #6b3fa0; }
+.big-qr-name { color: #fff; font-size: 20px; font-weight: 800; text-align: center; }
+.big-qr-number { color: #d6b8ff; font-family: ui-monospace, monospace; font-size: 13px; letter-spacing: .04em; text-align: center; }
+.big-qr-close { background: transparent; border: 1px solid #6b3fa0; color: #e6d3ff; border-radius: 999px; padding: 10px 28px; font-weight: 700; font-size: 15px; flex-shrink: 0; }
 
 /* tonight's perks */
 .perks { margin-top: 18px; }
@@ -4147,11 +4159,10 @@ button {
   .mem-pass-meta { gap: 4px 16px; margin: 4px 0 0; }
   .mem-pass-meta dt { font-size: 10px; }
   .mem-pass-meta dd { font-size: 13px; margin-top: 0; }
-  .qr-clean img, .qr-clean .qr-load { width: 128px; height: 128px; }
-  .mem-qr img, .mem-qr-load { width: 128px; height: 128px; }
-  .qr-clean { padding: 6px; }
+  .qr-clean img, .qr-clean .qr-load { width: 148px; height: 148px; }
+  .qr-clean { padding: 4px; }
   .mem-qr { gap: 2px; }
-  .mem-qr span { display: none; } /* "Show at the door to get scanned" — the QR itself makes that obvious */
+  .mem-qr span { display: none; } /* caption hidden — tapping the QR itself is the obvious action here */
   .verify-self.asset-cta.compact img { height: 42px; }
   .mem-verified-alert { height: 24px; }
   .verify-self { margin-top: 2px; }
@@ -4190,8 +4201,8 @@ button {
   .mem-pass-card { flex: 1 1 50%; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 8px; }
   .mem-pass-side { flex: 1 1 50%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .mem-pass-art { width: 36px; }
-  .qr-clean img, .qr-clean .qr-load { width: 104px; height: 104px; }
-  .mem-qr img, .mem-qr-load { width: 104px; height: 104px; }
+  .qr-clean img, .qr-clean .qr-load { width: 118px; height: 118px; }
+  .qr-clean { padding: 4px; }
   .mem-qr span { display: none; }
   .perks { margin-top: 0; }
   .perks h3 { font-size: 13px; margin-bottom: 3px; }
