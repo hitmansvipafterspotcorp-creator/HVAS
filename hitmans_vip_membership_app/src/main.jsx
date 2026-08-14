@@ -2141,46 +2141,136 @@ function ScanAlert({ result, onDismiss, onRescan, onGrant, onDeny }) {
   );
 }
 
-// Renders a QR of `text`. If `logo` is given, it's composited into the center on
-// a canvas — the QR uses high error correction (30% recovery) so it still scans
-// with the badge over the middle. Logo load failure falls back to the plain QR.
-function useQrDataUrl(text, logo) {
+// Renders a QR of `text` in our own custom style — real, standard QR data
+// (every module sampled at its exact standard grid position; nothing about
+// WHERE the data lives ever changes) drawn as vertical rounded bars in a
+// brand-color gradient instead of flat black squares, so runs of adjacent
+// dark modules read as little "sound wave"/equalizer bars. Finder patterns
+// (the 3 big corner squares scanners lock onto) stay solid, ungradiented,
+// standard squares for reliable detection. If `badgeSrc` is given, that
+// image sits in the center on a dark plate, well within H-level
+// error-correction tolerance (~8% of the code's area, vs. the 30% H allows).
+function useQrDataUrl(text, badgeSrc) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     let live = true;
     if (!text) { setUrl(''); return undefined; }
-    const W = 260;
-    QRCode.toDataURL(text, { margin: 1, width: W, errorCorrectionLevel: logo ? 'H' : 'M', color: { dark: '#1b0b2e', light: '#f7ecff' } })
-      .then((qrUrl) => {
-        if (!logo) { if (live) setUrl(qrUrl); return; }
-        const qrImg = new Image();
-        qrImg.onload = () => {
-          const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = W;
-          const ctx = canvas.getContext('2d'); ctx.drawImage(qrImg, 0, 0, W, W);
-          const badge = new Image();
-          badge.onload = () => {
-            const s = Math.round(W * 0.24), x = (W - s) / 2, y = (W - s) / 2, pad = Math.round(s * 0.14), r = 12;
-            const px = x - pad, py = y - pad, pw = s + pad * 2, ph = s + pad * 2;
-            ctx.fillStyle = '#f7ecff';                 // clear plate so modules don't fight the logo
-            ctx.beginPath();
-            ctx.moveTo(px + r, py);
-            ctx.arcTo(px + pw, py, px + pw, py + ph, r);
-            ctx.arcTo(px + pw, py + ph, px, py + ph, r);
-            ctx.arcTo(px, py + ph, px, py, r);
-            ctx.arcTo(px, py, px + pw, py, r);
-            ctx.closePath(); ctx.fill();
-            ctx.drawImage(badge, x, y, s, s);
-            if (live) setUrl(canvas.toDataURL('image/png'));
-          };
-          badge.onerror = () => { if (live) setUrl(qrUrl); };
-          badge.src = logo;
-        };
-        qrImg.onerror = () => { if (live) setUrl(qrUrl); };
-        qrImg.src = qrUrl;
-      }).catch(() => {});
+    renderSoundwaveQr(text, badgeSrc)
+      .then((dataUrl) => { if (live) setUrl(dataUrl); })
+      .catch(() => {
+        // Fall back to a plain standard QR if anything about the custom
+        // render fails — a real code that scans beats no code at all.
+        QRCode.toDataURL(text, { margin: 1, width: 260, errorCorrectionLevel: 'M', color: { dark: '#1b0b2e', light: '#f7ecff' } })
+          .then((qrUrl) => { if (live) setUrl(qrUrl); }).catch(() => {});
+      });
     return () => { live = false; };
-  }, [text, logo]);
+  }, [text, badgeSrc]);
   return url;
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function renderSoundwaveQr(text, badgeSrc) {
+  const qr = QRCode.create(text, { errorCorrectionLevel: 'H' });
+  const size = qr.modules.size;
+  const data = qr.modules.data;
+  const isDark = (r, c) => !!data[r * size + c];
+  // The 3 finder-pattern corners (7x7 bullseye + 1-module separator ring) —
+  // kept as plain solid squares, untouched by the bar/gradient styling, so
+  // scanners lock on exactly as they would on a standard QR code.
+  const isFinderZone = (r, c) => (r < 8 && c < 8) || (r < 8 && c >= size - 8) || (r >= size - 8 && c < 8);
+
+  const W = 260;
+  const margin = 2; // quiet-zone modules, same as a standard QR's border
+  const totalModules = size + margin * 2;
+  const cell = W / totalModules;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = W;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#f7ecff';
+  ctx.fillRect(0, 0, W, W);
+
+  const ox = (c) => (c + margin) * cell;
+  const oy = (r) => (r + margin) * cell;
+
+  const gradient = ctx.createLinearGradient(0, 0, W, W);
+  gradient.addColorStop(0, '#6b1fb8');
+  gradient.addColorStop(0.55, '#c62bd6');
+  gradient.addColorStop(1, '#ff5c9d');
+
+  // Plain fillRect, no rounding: rounding each module individually here left
+  // hairline gaps between adjacent finder-pattern cells, breaking the solid
+  // square scanners detect against — confirmed by decoding the actual output
+  // with jsQR (this exact bug made every real QR fail to scan).
+  ctx.fillStyle = '#1b0b2e';
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (isDark(r, c) && isFinderZone(r, c)) {
+        ctx.fillRect(ox(c), oy(r), cell, cell);
+      }
+    }
+  }
+
+  // Data modules: merge each column's contiguous dark runs into one rounded
+  // bar (the "sound wave" look) — every original module's center point is
+  // still fully covered, so a scanner reads the exact same bits either way.
+  // NOTE: the corner radius here is capped low deliberately — verified by
+  // decoding the actual output with jsQR. A higher radius (tried 0.45) still
+  // *looked* fine but rounded isolated single-module bars down to near-
+  // circles and broke real scanning; 0.22 is confirmed to decode reliably.
+  ctx.fillStyle = gradient;
+  for (let c = 0; c < size; c++) {
+    let r = 0;
+    while (r < size) {
+      if (isFinderZone(r, c) || !isDark(r, c)) { r++; continue; }
+      let r2 = r;
+      while (r2 + 1 < size && !isFinderZone(r2 + 1, c) && isDark(r2 + 1, c)) r2++;
+      const x = ox(c) + cell * 0.1;
+      const y = oy(r) + cell * 0.1;
+      const w = cell * 0.8;
+      const h = (r2 - r + 1) * cell - cell * 0.2;
+      roundRectPath(ctx, x, y, w, h, Math.min(w, h) * 0.22);
+      ctx.fill();
+      r = r2 + 1;
+    }
+  }
+
+  if (!badgeSrc) return Promise.resolve(canvas.toDataURL('image/png'));
+
+  return new Promise((resolve) => {
+    const finish = () => resolve(canvas.toDataURL('image/png'));
+    const badge = new Image();
+    badge.onload = () => {
+      const s = Math.round(W * 0.24);
+      const x = (W - s) / 2, y = (W - s) / 2;
+      const ar = badge.naturalWidth / badge.naturalHeight;
+      const bh = s, bw = s * ar;
+      const bx = x + (s - bw) / 2, by = y;
+      const pad = Math.round(s * 0.16);
+      const px = x - pad, py = y - pad, pw = s + pad * 2, ph = s + pad * 2;
+      ctx.fillStyle = '#1b0b2e';
+      roundRectPath(ctx, px, py, pw, ph, 12);
+      ctx.fill();
+      ctx.strokeStyle = '#ffd66b';
+      ctx.lineWidth = 2;
+      roundRectPath(ctx, px + 1, py + 1, pw - 2, ph - 2, 11);
+      ctx.stroke();
+      ctx.drawImage(badge, bx, by, bw, bh);
+      finish();
+    };
+    badge.onerror = finish;                     // no badge beats a broken canvas
+    badge.src = badgeSrc;
+  });
 }
 
 // Live HH:MM:SS countdown to a target timestamp. Ticks every second; returns
