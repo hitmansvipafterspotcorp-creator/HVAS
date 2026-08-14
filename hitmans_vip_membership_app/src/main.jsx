@@ -3469,18 +3469,22 @@ function EntryScreen() {
 function useBingoState(pollMs = 3000) {
   const [state, setState] = useState(null);
   const [err, setErr] = useState('');
+  const liveRef = useRef(true);
+  // Exposed so an action (join / ready / claim) can pull fresh state the
+  // moment it lands. Without this the screen sits unchanged until the next
+  // poll — up to `pollMs` of the button looking like it did nothing.
+  const refresh = async () => {
+    try { const s = await apiBingoState(); if (liveRef.current) { setState(s); setErr(''); } }
+    catch { if (liveRef.current) setErr('Could not reach the venue backend.'); }
+  };
   useEffect(() => {
     if (!apiEnabled()) { setErr('not-connected'); return undefined; }
-    let live = true;
-    const poll = async () => {
-      try { const s = await apiBingoState(); if (live) { setState(s); setErr(''); } }
-      catch { if (live) setErr('Could not reach the venue backend.'); }
-    };
-    poll();
-    const id = setInterval(poll, pollMs);
-    return () => { live = false; clearInterval(id); };
+    liveRef.current = true;
+    refresh();
+    const id = setInterval(refresh, pollMs);
+    return () => { liveRef.current = false; clearInterval(id); };
   }, [pollMs]);
-  return { state, err };
+  return { state, err, refresh };
 }
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
 const BINGO_PATTERN_LABEL = {
@@ -3623,12 +3627,12 @@ function TvDisplayScreen() {
 
 // Member: join + ready up before the round starts.
 function LobbyScreen({ navigate }) {
-  const { state, err } = useBingoState(3000);
+  const { state, err, refresh } = useBingoState(3000);
   const [busy, setBusy] = useState(false);
   if (err === 'not-connected') return <NotConnectedBingo title="Lip Sync Bingo" />;
   const me = state?.me;
-  const join = async () => { setBusy(true); try { await apiBingoJoin(); } catch { /* ignore */ } setBusy(false); };
-  const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); } catch { /* ignore */ } setBusy(false); };
+  const join = async () => { setBusy(true); try { await apiBingoJoin(); await refresh(); } catch { /* ignore */ } setBusy(false); };
+  const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); await refresh(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
       <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
@@ -3653,17 +3657,22 @@ function LobbyScreen({ navigate }) {
 // reconciled by the next poll, but the server is the one that ultimately
 // decides whether a claim is real — see bingoHasWin() on the backend.
 function PlayerCardScreen({ navigate }) {
-  const { state, err } = useBingoState(2500);
+  const { state, err, refresh } = useBingoState(2500);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [localCovered, setLocalCovered] = useState(null); // optimistic override until the next poll lands
   if (err === 'not-connected') return <NotConnectedBingo title="Your Card" />;
   const me = state?.me;
-  const calledIds = new Set((state?.calls || []).map((c) => c.id));
+  const calls = state?.calls || [];
+  const calledIds = new Set(calls.map((c) => c.id));
+  const nowCalling = calls[calls.length - 1] || null;
   const covered = new Set(localCovered ?? me?.covered ?? []);
+  // How many called squares are sitting on this card still untapped — the
+  // thing a player actually needs to know at a glance on a phone.
+  const waiting = me?.card ? me.card.filter((it, i) => i !== 12 && calledIds.has(it.id) && !covered.has(it.id)).length : 0;
   const claim = async () => {
     setBusy(true); setMsg('');
-    try { await apiBingoClaim(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
+    try { await apiBingoClaim(); await refresh(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
     catch (e) { setMsg(e.message === 'not a bingo yet' ? 'Not a bingo yet — cover a full pattern first!' : 'Could not submit — try again.'); }
     setBusy(false);
   };
@@ -3693,6 +3702,20 @@ function PlayerCardScreen({ navigate }) {
         </div>
       )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+        {/* What was just called, on the player's own screen. Without this you
+            had to watch the TV to know what to look for — which defeats the
+            point of holding your card on your phone. */}
+        {nowCalling && (
+          <div className="bingo-now-calling">
+            <span className="bingo-now-label">NOW CALLING</span>
+            {nowCalling.type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+            <strong>{nowCalling.artist}</strong>
+            <span className="bingo-now-song">{nowCalling.song}</span>
+          </div>
+        )}
+        {waiting > 0 && (
+          <p className="bingo-waiting">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
+        )}
         <p className="mem-fineprint">Tap a square once the host calls it — {BINGO_PATTERN_LABEL[state?.pattern] || 'complete a line'} to win.</p>
         <div className="bingo-grid">
           {me.card.map((item, i) => {
