@@ -2203,10 +2203,17 @@ function renderSoundwaveQr(text, badgeSrc) {
   const ox = (c) => (c + margin) * cell;
   const oy = (r) => (r + margin) * cell;
 
+  // All three stops kept deliberately dark (relative luminance ~50-65 out of
+  // 255) against the ~240 cream background — confirmed by an independent
+  // decoder (ZBar/pyzbar, not just jsQR) that the lighter pink this used to
+  // fade to (~131 luminance) was the actual cause of real phones failing to
+  // scan it: low-contrast modules are the first thing blur or distance turn
+  // into ambiguous gray, which is exactly what happens scanning a QR code
+  // off of another phone's screen instead of print.
   const gradient = ctx.createLinearGradient(0, 0, W, W);
-  gradient.addColorStop(0, '#6b1fb8');
-  gradient.addColorStop(0.55, '#c62bd6');
-  gradient.addColorStop(1, '#ff5c9d');
+  gradient.addColorStop(0, '#5b17a3');
+  gradient.addColorStop(0.55, '#a4189c');
+  gradient.addColorStop(1, '#c11458');
 
   // Plain fillRect, no rounding: rounding each module individually here left
   // hairline gaps between adjacent finder-pattern cells, breaking the solid
