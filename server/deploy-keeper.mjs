@@ -17,7 +17,7 @@
 //   KEEPER_REPO_ROOT        git repo root to track            default parent of this dir
 //   KEEPER_BRANCH           branch to deploy from              default: whatever is checked out
 //   KEEPER_POLL_SECONDS     how often to check for commits    default 120
-//   KEEPER_TEST_CMD         must exit 0 before a deploy ships default "npm test"
+//   KEEPER_TEST_CMD         must exit 0 before a deploy ships default "node test.mjs"
 //   KEEPER_STATUS_FILE      where live status JSON is written default ./data/keeper-status.json
 //   KEEPER_NOTIFY_WEBHOOK   optional URL, POSTed on events (fire-and-forget, never blocks a deploy)
 //
@@ -33,7 +33,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CWD = process.env.KEEPER_CWD || __dirname;
 const REPO_ROOT = process.env.KEEPER_REPO_ROOT || resolve(__dirname, '..');
 const CMD = process.env.KEEPER_CMD || 'node host.mjs';
-const TEST_CMD = process.env.KEEPER_TEST_CMD || 'npm test';
+// "node test.mjs" directly, not "npm test" — on Windows, npm resolves to
+// npm.cmd, which itself shells out to npm.ps1, and PowerShell's default
+// execution policy blocks running .ps1 scripts. That makes the test
+// command exit non-zero before the real suite ever runs, so every deploy
+// gets falsely rejected as "tests failed" even when the code is fine.
+// Calling node directly skips npm entirely — no shell, no policy to trip.
+const TEST_CMD = process.env.KEEPER_TEST_CMD || 'node test.mjs';
 const POLL_MS = Number(process.env.KEEPER_POLL_SECONDS || 120) * 1000;
 const STATUS_FILE = process.env.KEEPER_STATUS_FILE || resolve(CWD, 'data', 'keeper-status.json');
 const WEBHOOK = process.env.KEEPER_NOTIFY_WEBHOOK || '';
@@ -127,7 +133,13 @@ async function checkForDeploy() {
 
     const test = await run(TEST_CMD, CWD);
     if (!test.ok) {
-      await notify('deploy-rejected', `tests failed against ${remote.slice(0, 7)} — rolled back to ${local.slice(0, 7)}`);
+      // Print the actual failure, not just "tests failed" — that's the one
+      // piece of information an operator needs to tell "the code is really
+      // broken" apart from "the test command itself couldn't run" (e.g. a
+      // shell/PATH/policy issue outside the test suite's control).
+      console.log('[keeper] test output (last 4000 chars):');
+      console.log(test.out.slice(-4000));
+      await notify('deploy-rejected', `tests failed against ${remote.slice(0, 7)} (exit ${test.code}) — rolled back to ${local.slice(0, 7)}`);
       await git(['reset', '--hard', local]);
       deploying = false;
       return;
