@@ -33,6 +33,17 @@ button {
   overflow-x: hidden;
 }
 
+/* Unmissable — this app running with no real backend behind it looks
+   identical to the real thing otherwise, and that's exactly what caused
+   real members to "join" without ever reaching the venue. */
+.demo-mode-banner {
+  position: sticky; top: 0; z-index: 50;
+  background: repeating-linear-gradient(135deg, #ffb300, #ffb300 10px, #1a1400 10px, #1a1400 20px);
+  color: #1a1400; font-weight: 900; font-size: 12px; text-align: center;
+  padding: 8px 12px; line-height: 1.4;
+  text-shadow: 0 1px 0 rgba(255,255,255,.35);
+}
+
 .menu-shell {
   grid-template-columns: 1fr;
 }

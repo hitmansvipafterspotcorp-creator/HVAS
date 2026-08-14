@@ -956,7 +956,65 @@ const prefixAssets = (node) => {
 };
 [ui, screens, loadingPhases, ROLES].forEach(prefixAssets);
 
+// Shown the instant a "?connect=" link is present, before the request even
+// resolves — an unreachable address can take a while to actually reject, and
+// without this the normal door screen (or silent demo mode) would flash up
+// first and could get tapped through before the failure even registers.
+function ConnectingScreen() {
+  return (
+    <section className="screen screen-door">
+      <div className="door-wrap">
+        <span className="door-eyebrow">CONNECTING</span>
+        <h1 className="door-title">Reaching the venue…</h1>
+        <p className="door-tag">One second.</p>
+      </div>
+    </section>
+  );
+}
+
+// A scanned venue QR pointed here but the app couldn't reach it — almost
+// always means this phone isn't on the same network the link needs (venue
+// wifi vs. cellular data, or a different wifi entirely). Blocks the app
+// entirely rather than quietly landing in local demo mode: someone who
+// "joins" there gets a real-looking pass and QR that no door scan will ever
+// recognize, with nothing telling them it wasn't real until it's too late.
+function ConnectFailedScreen({ url, onRetry, onDemo }) {
+  let host = url;
+  try { host = new URL(url).host; } catch { /* show the raw string */ }
+  return (
+    <section className="screen screen-door">
+      <div className="door-wrap">
+        <span className="door-eyebrow">CONNECTION FAILED</span>
+        <h1 className="door-title">Can’t reach<span>{host}</span></h1>
+        <p className="door-tag">
+          This usually means you're not on the same network as the venue —
+          switch to the venue's wifi (not cellular data) and try again, or
+          ask staff for the current link.
+        </p>
+        <div className="door-actions">
+          <button type="button" className="door-primary" onClick={onRetry}>Try again →</button>
+          <button type="button" className="door-secondary" onClick={onDemo}>Continue without connecting (demo only — won't work at the door)</button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
+  // Set only when a scanned "?connect=" link fails to reach the venue — this
+  // BLOCKS the normal boot flow so a failed connect can never silently slide
+  // into local demo/hub mode looking exactly like the real thing. Someone who
+  // "joined" in hub mode gets a working-looking pass + QR that no door scan
+  // will ever recognize, with nothing telling them it wasn't real.
+  const [connectError, setConnectError] = useState(null); // { url } | null
+  // Set synchronously (not in an effect) so the VERY FIRST render already
+  // blocks on it — otherwise a pending fetch() to an unreachable venue can
+  // take a long time to actually reject, and the normal door screen (or
+  // worse, silent hub/demo mode) would flash up in the meantime.
+  const [connecting, setConnecting] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get('connect');
+    return !!(p && !apiEnabled());
+  });
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
   const [role, setRole] = useState(null);       // null until the user picks a role
@@ -992,7 +1050,7 @@ function App() {
           window.history.replaceState(null, '', clean);
           window.location.reload();
         })
-        .catch(() => {}); // bad/unreachable link — fall through to normal boot below
+        .catch(() => { setConnecting(false); setConnectError({ url: toConnect }); }); // loud, not swallowed
       return;
     }
     // The app IS the backend by default: it runs its own in-browser hub in
@@ -1100,6 +1158,33 @@ function App() {
     return setGate(id);
   }
 
+  if (connecting) {
+    return <ConnectingScreen />;
+  }
+
+  if (connectError) {
+    return (
+      <ConnectFailedScreen
+        url={connectError.url}
+        onRetry={() => {
+          const url = connectError.url;
+          setConnectError(null);
+          setConnecting(true);
+          connectVenue(url)
+            .then(() => window.location.reload())
+            .catch(() => { setConnecting(false); setConnectError({ url }); });
+        }}
+        onDemo={() => {
+          window.history.replaceState(null, '', window.location.pathname);
+          // startHub() is async (awaits WebMesh init before flipping the
+          // localStorage flag hubOn() reads) — leave this screen only once
+          // it's actually done, so the very next render already sees it.
+          startHub().then(() => setConnectError(null));
+        }}
+      />
+    );
+  }
+
   return (
     <main className="app-shell menu-shell">
       <div className="dynamic-bg" aria-hidden="true">
@@ -1107,6 +1192,13 @@ function App() {
         <span className="dynamic-bg-layer dynamic-bg-vip" />
       </div>
       <TransitionOverlay transition={transition} destination={targetScreen} />
+      {hubOn() && (
+        <div className="demo-mode-banner">
+          🧪 DEMO MODE — not connected to a real venue. Anything you do here (join, pay, get a QR)
+          stays on this device only and won't work at a real door. Connect to venue at the bottom
+          of the sign-in screen to go live.
+        </div>
+      )}
       {!role ? (
         gate === 'member' ? (
           <MemberAuthScreen onBack={() => setGate(null)} onDone={() => enterMember()} />

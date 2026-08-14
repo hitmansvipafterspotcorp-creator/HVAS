@@ -13,10 +13,24 @@ export const apiToken = () => ls('hvas_api_token');
 export const apiMemberId = () => ls('hvas_api_member_id');
 
 // Connect the app to a venue backend at runtime: validate it, cache its config.
+// An unreachable address (wrong network, typo, venue offline) can otherwise
+// hang far longer than anyone will wait before assuming it's broken — an
+// explicit timeout makes "can't reach it" fail fast and clearly instead.
 export async function connectVenue(url) {
   const base = String(url || '').trim().replace(/\/+$/, '');
   if (!/^https?:\/\//.test(base)) throw new Error('Enter a full https:// URL');
-  const cfg = await fetch(base + '/config').then((r) => { if (!r.ok) throw new Error('not an HVAS backend'); return r.json(); });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  let cfg;
+  try {
+    const r = await fetch(base + '/config', { signal: controller.signal });
+    if (!r.ok) throw new Error('not an HVAS backend');
+    cfg = await r.json();
+  } catch (e) {
+    throw e.name === 'AbortError' ? new Error('Timed out reaching that venue') : e;
+  } finally {
+    clearTimeout(timer);
+  }
   localStorage.setItem('hvas_api_base', base);
   localStorage.setItem('hvas_cfg', JSON.stringify(cfg));
   return cfg;
