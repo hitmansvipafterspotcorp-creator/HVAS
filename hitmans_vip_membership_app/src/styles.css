@@ -4150,14 +4150,18 @@ button {
      not just padding — the two logo images (pass art + brand stamp) were
      the single biggest cost. */
   .mem-pass-card { padding: 10px; gap: 4px; }
-  .mem-pass-art { width: 60px; }
+  /* Pass art shrunk further than before so the QR below — the one thing on
+     this screen someone ELSE actually has to scan — can be big enough to
+     read reliably from a normal arm's-length distance instead of squinting
+     a phone camera at a postage stamp. */
+  .mem-pass-art { width: 46px; }
   .mem-pass-tier { font-size: 18px; }
   .mem-pass-meta { gap: 4px 16px; margin: 4px 0 0; }
   .mem-pass-meta dt { font-size: 10px; }
   .mem-pass-meta dd { font-size: 13px; margin-top: 0; }
-  .qr-clean img, .qr-clean .qr-load { width: 88px; height: 88px; }
-  .mem-qr img, .mem-qr-load { width: 88px; height: 88px; }
-  .qr-clean { padding: 5px; }
+  .qr-clean img, .qr-clean .qr-load { width: 128px; height: 128px; }
+  .mem-qr img, .mem-qr-load { width: 128px; height: 128px; }
+  .qr-clean { padding: 6px; }
   .mem-qr { gap: 2px; }
   /* The pass-art crown/shield above already carries full branding — a
      second logo watermark under the QR was pure duplication on a screen
@@ -4165,7 +4169,8 @@ button {
      .qr-brand-full, because that class ties with the base .qr-brand
      { display:flex } rule on specificity and loses on source order.) */
   .mem-qr .qr-brand-full { display: none; }
-  .mem-qr span { font-size: 10px; }
+  .mem-qr span { display: none; } /* "Show at the door to get scanned" — the QR itself makes that obvious */
+  .verify-self.asset-cta.compact img { height: 42px; }
   .mem-verified-alert { height: 24px; }
   .verify-self { margin-top: 2px; }
   .asset-cta.compact img { height: 34px; }
@@ -4173,7 +4178,7 @@ button {
   .mem-chip-row { margin: 4px 0; gap: 6px; }
   .mem-pass-eyebrow { font-size: 10px; }
 
-  .perks { margin-top: 6px; }
+  .perks { margin-top: 4px; }
   .perks h3, .loyalty h3, .prefs h3 { font-size: 15px; margin-bottom: 6px; }
   .perk-tickets { padding: 8px; gap: 8px; }
   .ticket-stub { width: 60px; padding: 5px 4px; }
@@ -4182,7 +4187,7 @@ button {
   .perk-body p { font-size: 12px; margin: 0 0 4px; }
   .perk-use { padding: 6px 12px; font-size: 13px; }
 
-  .renews-bar { margin-top: 6px; padding: 7px 14px; }
+  .renews-bar { margin-top: 4px; padding: 6px 14px; }
   .renews-tier { font-size: 13px; }
   .renews-time { font-size: 15px; }
 
@@ -4199,18 +4204,21 @@ button {
    since stacked it needs roughly 2x the height a landscape phone has. Scoped
    with min-width so this never fires on portrait's narrow-but-tall screens. */
 @media (max-height: 460px) and (min-width: 560px) {
-  .mem-pass-body { display: flex; align-items: flex-start; gap: 14px; }
-  .mem-pass-card { flex: 1 1 50%; grid-template-columns: 56px 1fr auto; gap: 10px; padding: 10px; }
-  .mem-pass-side { flex: 1 1 50%; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .mem-pass-art { width: 44px; }
-  .qr-clean img, .qr-clean .qr-load { width: 72px; height: 72px; }
-  .mem-qr img, .mem-qr-load { width: 72px; height: 72px; }
+  .mem-pass-body { display: flex; align-items: flex-start; gap: 10px; }
+  .mem-pass-card { flex: 1 1 50%; grid-template-columns: 56px 1fr auto; gap: 8px; padding: 8px; }
+  .mem-pass-side { flex: 1 1 50%; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .mem-pass-art { width: 36px; }
+  .qr-clean img, .qr-clean .qr-load { width: 104px; height: 104px; }
+  .mem-qr img, .mem-qr-load { width: 104px; height: 104px; }
   .mem-qr span { display: none; }
   .perks { margin-top: 0; }
-  .perks h3 { font-size: 13px; margin-bottom: 4px; }
-  .perk-tickets { padding: 6px; gap: 6px; }
-  .perk-body p { font-size: 11px; }
-  .renews-bar { margin-top: 0; }
+  .perks h3 { font-size: 13px; margin-bottom: 3px; }
+  .perk-tickets { padding: 5px; gap: 5px; }
+  .ticket-stub { width: 50px; padding: 4px 3px; }
+  .ticket-stub b { font-size: 17px; }
+  .perk-body p { font-size: 11px; margin: 0 0 3px; }
+  .perk-use { padding: 4px 10px; font-size: 12px; }
+  .renews-bar { margin-top: 0; padding: 5px 12px; }
 
   /* Header chrome — with only ~390px of height total, the title block +
      status pill + tabs were eating over a third of the screen before any
