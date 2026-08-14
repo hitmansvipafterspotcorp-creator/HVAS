@@ -3606,16 +3606,17 @@ button {
 .loyalty-badge.current img { transform: scale(1.06); }
 .loyalty-badge img { width: 100%; max-width: 72px; height: auto; transition: transform .15s; }
 .loyalty-progress { margin: 12px 0 10px; }
-/* per-badge loyalty bar — each rank asset gets its own art track + gold fill */
-.lb-bar { position: relative; width: 100%; max-width: 72px; height: 8px; margin-top: 5px; overflow: visible;
+/* ONE continuous loyalty track under the whole rank row. This replaced six
+   disconnected per-badge slivers, which rendered as a broken line. The row
+   needs vertical breathing room because the marker is taller than the track
+   and must not clip — hence the margin here rather than on the track alone. */
+.loyalty-track { position: relative; width: 100%; height: 9px; margin: 9px 0 12px; overflow: visible;
   background: url("/HVAS/assets/ui/rank/loy_track.png") no-repeat center center / 100% 100%; }
-.lb-bar .lb-fill { display: block; height: 100%; min-width: 0;
-  background: url("/HVAS/assets/ui/rank/loy_fill.png") no-repeat left center / 100% 100%; transition: width .35s; }
-.lb-bar .lb-marker { position: absolute; top: 50%; height: 210%; width: auto;
-  transform: translate(-50%, -50%); pointer-events: none; transition: left .35s;
-  filter: drop-shadow(0 0 4px rgba(196,107,255,.85)); }
-/* locked tiers: dim their empty track to match the grayed-out badge */
-.loyalty-badge:not(.earned) .lb-bar { opacity: .5; }
+.loyalty-track-fill { display: block; height: 100%; min-width: 0; border-radius: 999px;
+  background: url("/HVAS/assets/ui/rank/loy_fill.png") no-repeat left center / 100% 100%; transition: width .35s ease; }
+.loyalty-track-marker { position: absolute; top: 50%; height: 250%; width: auto;
+  transform: translate(-50%, -50%); pointer-events: none; transition: left .35s ease;
+  filter: drop-shadow(0 0 5px rgba(196,107,255,.9)); }
 .loyalty-progress p { color: #c9b8ff; font-size: 13px; margin: 8px 0 0; }
 .loyalty-progress b { color: #ffe8a3; }
 .loyalty-log { margin-top: 4px; background: #241436; color: #d8c4ff; border: 1px solid #4a2f6a; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-weight: 700; font-size: 13px; }

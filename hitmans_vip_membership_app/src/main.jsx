@@ -2624,6 +2624,17 @@ function MemberPass({ member, checkedIn, onRenew }) {
   const entries = member.entries || 0;
   const { rank, next } = rankFor(entries);
   const progress = next ? Math.min(100, Math.round(((entries - rank.min) / (next.min - rank.min)) * 100)) : 100;
+  // Where the marker sits on the single continuous loyalty track. Badges are
+  // an even 6-column grid, so rank i's badge centre is at (i + 0.5)/6 — the
+  // marker parks under your current badge and slides toward the next one as
+  // nights accrue. Top tier pins to the far end.
+  const rankIdx = RANKS.findIndex((r) => r.name === rank.name);
+  const trackPos = !next
+    ? 100
+    : ((rankIdx + 0.5 + Math.min(1, Math.max(0, (entries - rank.min) / (next.min - rank.min)))) / RANKS.length) * 100;
+  // The marker is centred on its position, so at the very ends half of it
+  // would hang off the track — keep it just inside instead.
+  const markerPos = Math.min(97.8, Math.max(2.2, trackPos));
   // live membership state
   const msLeft = member.expiresAt - Date.now();
   const expired = msLeft <= 0;
@@ -2764,24 +2775,20 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <p className="loyalty-warn">⚠️ Keep a <b>paid membership</b> active to save your loyalty — if it lapses, your rank and nights start over.</p>
         )}
         <div className="loyalty-badges">
-          {RANKS.map((r, i) => {
-            const nextMin = RANKS[i + 1] ? RANKS[i + 1].min : null;
-            const fill = entries < r.min ? 0
-              : nextMin == null ? 100
-              : Math.min(100, Math.max(0, Math.round(((entries - r.min) / (nextMin - r.min)) * 100)));
-            const isCurrent = r.name === rank.name;
-            return (
-              <div key={r.name} className={`loyalty-badge${isCurrent ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>
-                <img src={r.src} alt={r.name} />
-                <div className="lb-bar">
-                  <span className="lb-fill" style={{ width: `${fill}%` }} />
-                  {isCurrent && fill > 0 && fill < 100 && (
-                    <img className="lb-marker" src={`${A_}assets/ui/rank/loy_marker.png`} style={{ left: `${fill}%` }} alt="" />
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {RANKS.map((r) => (
+            <div key={r.name} className={`loyalty-badge${r.name === rank.name ? ' current' : ''}${entries >= r.min ? ' earned' : ''}`}>
+              <img src={r.src} alt={r.name} />
+            </div>
+          ))}
+        </div>
+        {/* ONE continuous track under the whole rank row (this used to be six
+            disconnected per-badge slivers, which read as a broken line). The
+            marker sits directly under the badge you're on and slides toward
+            the next — badges are an even 6-col grid, so rank i's badge centre
+            is at (i + 0.5)/6 of the width. */}
+        <div className="loyalty-track">
+          <span className="loyalty-track-fill" style={{ width: `${trackPos}%` }} />
+          <img className="loyalty-track-marker" src={`${A_}assets/ui/rank/loy_marker.png`} style={{ left: `${markerPos}%` }} alt="" />
         </div>
         <div className="loyalty-progress">
           <p>{next
