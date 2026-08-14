@@ -1487,7 +1487,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   // the individual screens below.
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
   if (activeScreen === 'history') return <HistoryScreen />;
-  if (activeScreen === 'staffDashboard') return <StaffDashboardScreen navigate={navigate} />;
+  if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
   if (activeScreen === 'searchMember' || activeScreen === 'payVerify' || activeScreen === 'entry' || activeScreen === 'verification') return <SecurityVerifyScreen />;
@@ -1860,6 +1860,10 @@ function RoleBadge({ role, onTheWay, inside, left, hasMember, onToggleOtw, onLea
 }
 
 function HomeScreen({ role, session, navigate }) {
+  // Staff had 5 separate full-screen destinations for tools used together,
+  // all night, back-to-back — a tab flow (same pattern as My Pass) keeps
+  // them one tap apart instead of round-tripping through this menu each time.
+  if (role.id === 'staff') return <StaffHubScreen />;
   return (
     <div className="home-dashboard">
       <div className="app-menu-board">
@@ -1882,6 +1886,32 @@ function HomeScreen({ role, session, navigate }) {
         </AppPanel>
       </div>
       {role.id === 'member' && <MemberStatsBar navigate={navigate} />}
+    </div>
+  );
+}
+
+const STAFF_TABS = [
+  { id: 'staffDashboard', label: 'Dashboard' },
+  { id: 'verification', label: 'Verify' },
+  { id: 'watchlist', label: 'Watchlist' },
+  { id: 'payments', label: 'Payments' },
+  { id: 'bookingBoard', label: 'Bookings' },
+];
+
+// Staff Check-In as one tab flow: Dashboard / Verify / Watchlist / Payments /
+// Bookings switch instantly (no full-screen transition) since these get used
+// together, constantly, all night — the same reason My Pass is Pass/Loyalty/
+// Account tabs instead of three separate screens.
+function StaffHubScreen() {
+  const [tab, setTab] = useState('staffDashboard');
+  return (
+    <div className="staff-hub">
+      <div className="staff-hub-tabs">
+        {STAFF_TABS.map((t) => (
+          <button key={t.id} type="button" className={`staff-hub-tab${tab === t.id ? ' on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      <ScreenBody activeScreen={tab} navigate={setTab} session={{}} />
     </div>
   );
 }
@@ -3035,7 +3065,7 @@ function MemberProfileOverlay({ number, onClose, onChanged }) {
 // about (poll GET /door/board every 4s) — not just this device's own local
 // member. With no backend it falls back to the single local member, same as
 // before.
-function StaffDashboardScreen({ navigate }) {
+function StaffDashboardScreen() {
   const member = useMember();
   const backend = apiEnabled() && apiStaffToken();
   const [board, setBoard] = useState(null);
@@ -3171,13 +3201,6 @@ function StaffDashboardScreen({ navigate }) {
           <p className="dash-empty">No scans yet this shift.</p>
         )}
       </AppPanel>
-
-      <button type="button" className="asset-cta wide" onClick={() => navigate('verification')} aria-label="Verify at the door">
-        <img src={ui.verify.verifyCard} alt="Verify at the door" />
-      </button>
-      <button type="button" className="dash-watchlist-link" onClick={() => navigate('watchlist')}>
-        ⚠ Watchlist — trespassed &amp; banned members
-      </button>
     </div>
   );
 }
