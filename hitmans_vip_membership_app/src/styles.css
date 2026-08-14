@@ -3641,8 +3641,8 @@ button {
 
 /* clean member QR (no scanner frame — that's for security) */
 .qr-clean { background: #f7ecff; border: 3px solid #b06bff; border-radius: 12px; padding: 8px; box-shadow: 0 0 18px rgba(176,107,255,.4); }
-.qr-clean img { width: 138px; height: 138px; display: block; }
-.qr-clean .qr-load { width: 138px; height: 138px; display: grid; place-items: center; color: #6b3fa0; }
+.qr-clean img { width: 190px; height: 190px; display: block; }
+.qr-clean .qr-load { width: 190px; height: 190px; display: grid; place-items: center; color: #6b3fa0; }
 
 /* tonight's perks */
 .perks { margin-top: 18px; }
@@ -3804,19 +3804,6 @@ button {
 .join-qr span { color: #52ffa8; font-size: 13px; font-weight: 800; }
 .join-qr small { color: #7a6a9a; font-size: 11px; word-break: break-all; text-align: center; }
 .join-qr .auth-back { background: none; border: none; color: #ff9ae0; font-weight: 700; cursor: pointer; margin-top: 4px; }
-
-/* ── QR brand stamp: logo + neon-pink AFTER SPOT under every generated QR ── */
-.qr-brand { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 8px; }
-/* compound selector so it beats .mem-qr img / .motion-qr img sizing + bg */
-.qr-brand .qr-brand-logo { width: 72px; height: auto; background: none; padding: 0; border-radius: 0;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,.5)); }
-.qr-brand.compact .qr-brand-logo { width: 54px; }
-/* full-logo brand stamp (logo already reads AFTER SPOT) */
-.qr-brand-full .qr-brand-logo { width: 132px; filter: drop-shadow(0 0 10px rgba(150,60,255,.45)); }
-.qr-brand-full.compact .qr-brand-logo { width: 104px; }
-.qr-brand-after { font-weight: 900; font-size: 13px; letter-spacing: .42em; text-indent: .42em; color: #ff3ac4;
-  text-shadow: 0 0 8px rgba(255,26,168,.9), 0 0 18px rgba(255,0,150,.55); }
-.qr-brand.compact .qr-brand-after { font-size: 11px; }
 
 /* ── Scan result: name + tier + number + date ── */
 .scan-result-name { font-size: 20px; font-weight: 900; color: #fff; letter-spacing: .01em; }
@@ -4164,12 +4151,6 @@ button {
   .mem-qr img, .mem-qr-load { width: 128px; height: 128px; }
   .qr-clean { padding: 6px; }
   .mem-qr { gap: 2px; }
-  /* The pass-art crown/shield above already carries full branding — a
-     second logo watermark under the QR was pure duplication on a screen
-     already fighting for every pixel. (Scoped selector, not just
-     .qr-brand-full, because that class ties with the base .qr-brand
-     { display:flex } rule on specificity and loses on source order.) */
-  .mem-qr .qr-brand-full { display: none; }
   .mem-qr span { display: none; } /* "Show at the door to get scanned" — the QR itself makes that obvious */
   .verify-self.asset-cta.compact img { height: 42px; }
   .mem-verified-alert { height: 24px; }

@@ -2025,18 +2025,6 @@ const PASS_SRC = Object.fromEntries(ui.passes.map((p) => [p.name, p.src]));
 // Door-result status -> its alert chip graphic.
 const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespass: ui.verify.trespass, banned: ui.verify.trespass };
 
-// Brand stamp shown UNDER every generated QR: the HITMANS VIP logo with the
-// neon-pink "AFTER SPOT" wordmark, matching the logo art. Makes each pass
-// unmistakably ours (the QR payload itself is already unique per member).
-function BrandStamp({ compact = false }) {
-  // The full logo already reads "HITMANS VIP AFTER SPOT" — no separate text needed.
-  return (
-    <div className={`qr-brand qr-brand-full${compact ? ' compact' : ''}`}>
-      <img className="qr-brand-logo" src={ui.fullLogoClear} alt="HITMANS VIP AFTER SPOT" />
-    </div>
-  );
-}
-
 // A dashboard stat widget (frame + icon art only) with all text and the bottom
 // bar rebuilt live: neon label + number (the logo's pink-neon look), and either
 // a live sparkline tracker (entries) or a dynamic capacity meter (event/venue).
@@ -2671,7 +2659,6 @@ function MemberPass({ member, checkedIn, onRenew }) {
           <div className="qr-clean">
             {qr ? <img src={qr} alt="Member QR code" /> : <div className="qr-load">QR…</div>}
           </div>
-          <BrandStamp compact />
           <span>Show at the door to get scanned</span>
           <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(previewCardStatus(member.number))} aria-label="Verify membership">
             <img src={ui.verify.verifyCard} alt="Verify membership" />
