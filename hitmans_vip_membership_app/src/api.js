@@ -118,6 +118,20 @@ export function apiBingoCall() { return call('POST', '/bingo/call', {}, apiStaff
 export function apiBingoResolve(claimId, approve) { return call('POST', '/bingo/resolve', { claimId, approve }, apiStaffToken()); }
 export function apiBingoReset(deckId, pattern) { return call('POST', '/bingo/reset', { deckId, pattern }, apiStaffToken()); }
 export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiStaffToken()); }
+// ── Lip Sync Battles ──
+// Read endpoints accept either token (members perform/vote, staff run the floor).
+export function apiBattleCurrent(itemId) {
+  const q = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
+  return call('GET', `/battle/current${q}`, null, apiToken() || apiStaffToken());
+}
+export function apiBattleMine() { return call('GET', '/battle/mine', null, apiToken()); }
+export function apiBattleRespond(battleId, accept) { return call('POST', '/battle/respond', { battleId, accept }, apiToken()); }
+export function apiBattlePerformed(battleId) { return call('POST', '/battle/performed', { battleId }, apiToken()); }
+export function apiBattleVote(battleId, memberId) { return call('POST', '/battle/vote', { battleId, memberId }, apiToken()); }
+export function apiBattleStage(battleId, stage) { return call('POST', '/battle/stage', { battleId, stage }, apiStaffToken()); }
+export function apiBattlePerform(battleId, memberId, seconds) { return call('POST', '/battle/perform', { battleId, memberId, seconds }, apiStaffToken()); }
+export function apiBattleVoting(battleId, seconds) { return call('POST', '/battle/voting', { battleId, seconds }, apiStaffToken()); }
+export function apiBattleResolve(battleId, winnerId) { return call('POST', '/battle/resolve', { battleId, winnerId }, apiStaffToken()); }
 export function apiBingoDecks() { return call('GET', '/bingo/decks', null, apiStaffToken()); }
 export function apiYoutubeSearch(q) { return call('GET', `/media/youtube-search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
 export function apiBingoPlayMedia(videoId, title) { return call('POST', '/bingo/media', { videoId, title }, apiStaffToken()); }

@@ -8,6 +8,8 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
+  apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePerformed, apiBattleVote,
+  apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -2977,6 +2979,192 @@ function PenaltyControls({ member }) {
   );
 }
 
+// ── Lip Sync Battle ──────────────────────────────────────────────────────
+// A LIP SYNC square can't be tapped — you perform for it. This is the whole
+// floor: the call-out prompt, the TikTok-style portrait recorder with a live
+// mic meter, and the vote.
+
+// Live mic level, 0..1, straight off the analyser. This is the "meter" during
+// a performance — it reacts to the room, so a performer who's actually going
+// for it visibly drives it.
+function useMicLevel(stream, active) {
+  const [level, setLevel] = useState(0);
+  useEffect(() => {
+    if (!stream || !active) return undefined;
+    let raf = 0, ctx = null;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 512;
+      src.connect(an);
+      const buf = new Uint8Array(an.frequencyBinCount);
+      const tick = () => {
+        an.getByteFrequencyData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i];
+        // smooth it so the bar doesn't strobe on every frame
+        setLevel((prev) => prev * 0.72 + Math.min(1, sum / buf.length / 90) * 0.28);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    } catch { /* no mic analysis — the meter just stays flat */ }
+    return () => { cancelAnimationFrame(raf); ctx?.close?.().catch(() => {}); };
+  }, [stream, active]);
+  return level;
+}
+
+// The performer's screen: portrait, camera filling it, record the take.
+function BattleStage({ battle, onDone }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const recRef = useRef(null);
+  const chunksRef = useRef([]);
+  const [stream, setStream] = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [err, setErr] = useState('');
+  const [left, setLeft] = useState(null);
+  const level = useMicLevel(stream, recording);
+
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        // portrait-shaped constraints — this is a phone-held performance
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 1280 } },
+          audio: true,
+        });
+        if (!live) { s.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = s; setStream(s);
+        if (videoRef.current) { videoRef.current.srcObject = s; await videoRef.current.play().catch(() => {}); }
+      } catch {
+        setErr('Camera and mic access is needed to perform. Allow it, then tap Retry.');
+      }
+    })();
+    return () => { live = false; streamRef.current?.getTracks().forEach((t) => t.stop()); };
+  }, []);
+
+  // Countdown against the server's window so every device agrees on time left.
+  useEffect(() => {
+    if (!battle?.performanceEndsAt) { setLeft(null); return undefined; }
+    const id = setInterval(() => setLeft(Math.max(0, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000))), 250);
+    return () => clearInterval(id);
+  }, [battle?.performanceEndsAt]);
+
+  // Auto-stop when the window runs out — the host's clock ends the take, not
+  // the performer deciding they're done.
+  useEffect(() => {
+    if (recording && left === 0) stop();
+  }, [left, recording]);
+
+  const start = () => {
+    const s = streamRef.current;
+    if (!s) return;
+    chunksRef.current = [];
+    try {
+      const rec = new MediaRecorder(s);
+      rec.ondataavailable = (e) => { if (e.data?.size) chunksRef.current.push(e.data); };
+      rec.start(250);
+      recRef.current = rec;
+      setRecording(true);
+      playSfx('battle');
+    } catch { setErr('Recording is not supported on this browser.'); }
+  };
+  const stop = async () => {
+    try { recRef.current?.stop(); } catch { /* ignore */ }
+    setRecording(false);
+    try { await apiBattlePerformed(battle.id); } catch { /* ignore */ }
+    onDone?.();
+  };
+
+  return (
+    <div className="battle-stage">
+      <div className="battle-portrait">
+        <video ref={videoRef} className="battle-cam" playsInline muted autoPlay />
+        {recording && <span className="battle-rec">● REC</span>}
+        {left != null && <span className="battle-clock">{String(Math.floor(left / 60)).padStart(2, '0')}:{String(left % 60).padStart(2, '0')}</span>}
+        <div className="battle-meter" aria-hidden="true"><span style={{ width: `${Math.round(level * 100)}%` }} /></div>
+      </div>
+      {err && <p className="gate-err">{err}</p>}
+      <p className="battle-song"><b>{battle.artist}</b> — {battle.song}</p>
+      {!recording
+        ? <button type="button" className="bingo-btn gold" onClick={start} disabled={!stream}>● Start performing</button>
+        : <button type="button" className="bingo-btn" onClick={stop}>Finish take</button>}
+    </div>
+  );
+}
+
+// Everything that isn't your own take: the call-out, the vote, the result.
+function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
+  const [busy, setBusy] = useState(false);
+  const act = async (fn) => { setBusy(true); try { await fn(); await onChanged?.(); } catch { /* ignore */ } setBusy(false); };
+  if (!battle) return null;
+
+  const mine = battle.me;
+  const performing = battle.performingMemberId === meId;
+  const invited = mine?.state === 'invited';
+  const iAmIn = mine?.state === 'accepted' || mine?.state === 'performed';
+
+  return (
+    <AppPanel className="battle-panel" title="Lip Sync Battle" subtitle={`${battle.artist} — ${battle.song}`}>
+      {invited && (
+        <div className="battle-callout">
+          <strong>🎤 You've been called out!</strong>
+          <p>Perform this one to claim the square. Declining gives it up for good.</p>
+          <div className="battle-callout-acts">
+            <button type="button" className="bingo-btn gold" disabled={busy} onClick={() => act(() => apiBattleRespond(battle.id, true))}>Accept battle</button>
+            <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(() => apiBattleRespond(battle.id, false))}>Decline</button>
+          </div>
+        </div>
+      )}
+      {mine?.state === 'declined' && <p className="battle-lost">You declined — this square is out for you.</p>}
+      {iAmIn && battle.status === 'pending' && <p className="mem-fineprint">You're in. Waiting on the host to put you up.</p>}
+      {performing && battle.status === 'performing' && <BattleStage battle={battle} onDone={onChanged} />}
+
+      {/* live standings — doubles as the vote UI once voting opens */}
+      <div className="battle-players">
+        {battle.players.map((p) => (
+          <div key={p.memberId} className={`battle-player${battle.winnerMemberId === p.memberId ? ' won' : ''}`}>
+            <div className="battle-player-top">
+              <strong>{p.name}</strong>
+              <span className={`battle-state ${p.state}`}>{p.state}</span>
+              {battle.status !== 'pending' && <span className="battle-votes">{p.votes}</span>}
+            </div>
+            <div className="battle-share"><span style={{ width: `${p.share}%` }} /></div>
+            {battle.status === 'voting' && p.state === 'performed' && p.memberId !== meId && (
+              <button type="button" className={`bingo-btn${battle.myVote === p.memberId ? ' ready' : ' ghost'}`} disabled={busy}
+                onClick={() => act(() => apiBattleVote(battle.id, p.memberId))}>
+                {battle.myVote === p.memberId ? '✓ Voted' : `Vote ${p.name}`}
+              </button>
+            )}
+            {isHost && battle.status === 'pending' && p.state === 'accepted' && (
+              <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattlePerform(battle.id, p.memberId, 120))}>Put {p.name} up</button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {isHost && (
+        <div className="battle-host-acts">
+          <button type="button" className="bingo-btn ghost" disabled={busy}
+            onClick={() => act(() => apiBattleStage(battle.id, battle.stage === 'tv' ? 'phones' : 'tv'))}>
+            {battle.stage === 'tv' ? '📺 On TV — send back to phones' : '📺 Project to TV'}
+          </button>
+          {battle.status === 'performing' && (
+            <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattleVoting(battle.id, 30))}>Open voting</button>
+          )}
+          {battle.status === 'voting' && (
+            <button type="button" className="bingo-btn gold" disabled={busy} onClick={() => act(() => apiBattleResolve(battle.id))}>Close voting &amp; crown</button>
+          )}
+        </div>
+      )}
+      {battle.status === 'voting' && <p className="mem-fineprint">Voting is open — you can't vote for yourself.</p>}
+    </AppPanel>
+  );
+}
+
 const STATUS_LABEL = { inside: 'Inside', onTheWay: 'On the way', signedIn: 'Signed in', left: 'Left' };
 const TIMELINE_LABEL = {
   signup: '📝 Signed up',
@@ -3880,8 +4068,41 @@ function YouTubeStage({ video }) {
 
 function TvDisplayScreen() {
   const { state, err } = useBingoState(3000);
+  // A battle the host has thrown to the TV takes the whole screen — that's
+  // the point of projecting it.
+  const [battle, setBattle] = useState(null);
+  useEffect(() => {
+    if (!apiEnabled()) return undefined;
+    const poll = async () => { try { setBattle((await apiBattleCurrent()).battle); } catch { /* ignore */ } };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, []);
   if (err === 'not-connected') return <NotConnectedBingo title="TV Display" />;
   const calls = state?.calls || [];
+  const onTv = battle && battle.stage === 'tv' && battle.status !== 'done' && battle.status !== 'void';
+  if (onTv) {
+    return (
+      <div className="staff-dash tv-battle">
+        <div className="tv-battle-head">
+          <span className="bingo-now-label">LIP SYNC BATTLE</span>
+          <strong>{battle.artist}</strong><span className="bingo-now-song">{battle.song}</span>
+        </div>
+        <div className="tv-battle-players">
+          {battle.players.map((p) => (
+            <div key={p.memberId} className={`tv-battle-player${battle.performingMemberId === p.memberId ? ' up' : ''}${battle.winnerMemberId === p.memberId ? ' won' : ''}`}>
+              <strong>{p.name}</strong>
+              <div className="battle-share big"><span style={{ width: `${p.share}%` }} /></div>
+              <span className="tv-battle-votes">{p.votes} {p.votes === 1 ? 'vote' : 'votes'}</span>
+              {battle.performingMemberId === p.memberId && <span className="tv-battle-up">● PERFORMING</span>}
+            </div>
+          ))}
+        </div>
+        {battle.status === 'voting' && <p className="tv-battle-cta">VOTE ON YOUR PHONE</p>}
+        {battle.winnerMemberId && <div className="bingo-winner-banner"><strong>🏆 {battle.players.find((p) => p.memberId === battle.winnerMemberId)?.name} takes it</strong></div>}
+      </div>
+    );
+  }
   return (
     <div className="staff-dash">
       <YouTubeStage video={state?.nowPlaying} />
@@ -4001,6 +4222,17 @@ function PlayerCardScreen({ navigate }) {
   // How many called squares are sitting on this card still untapped — the
   // thing a player actually needs to know at a glance on a phone.
   const waiting = me?.card ? me.card.filter((it, i) => i !== 12 && calledIds.has(it.id) && !covered.has(it.id)).length : 0;
+  // Any battle this member is personally in takes over the screen — being
+  // called out is time-critical and must not be buried under the card.
+  const [myBattles, setMyBattles] = useState([]);
+  const loadBattles = async () => { try { setMyBattles((await apiBattleMine()).battles || []); } catch { /* ignore */ } };
+  useEffect(() => {
+    if (!apiEnabled() || !apiToken()) return undefined;
+    loadBattles();
+    const id = setInterval(loadBattles, 2500);
+    return () => clearInterval(id);
+  }, []);
+  const activeBattle = myBattles[0] || null;
   const claim = async () => {
     setBusy(true); setMsg('');
     try { await apiBingoClaim(); await refresh(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
@@ -4032,6 +4264,9 @@ function PlayerCardScreen({ navigate }) {
         <div className="bingo-winner-banner">
           <strong>🏆 {state.winner.name} won!</strong>
         </div>
+      )}
+      {activeBattle && (
+        <LipSyncBattlePanel battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} isHost={false} />
       )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
         {/* What was just called, on the player's own screen. Without this you
@@ -4081,6 +4316,21 @@ function PlayerCardScreen({ navigate }) {
 }
 
 // Host: run the round — start/call, watch players, approve/reject claims.
+// Whatever battle is live, surfaced at the top of Host Control so the host
+// can run the floor without hunting for it.
+function HostBattleControl() {
+  const [battle, setBattle] = useState(null);
+  const load = async () => { try { setBattle((await apiBattleCurrent()).battle); } catch { /* ignore */ } };
+  useEffect(() => {
+    if (!apiEnabled() || !apiStaffToken()) return undefined;
+    load();
+    const id = setInterval(load, 2500);
+    return () => clearInterval(id);
+  }, []);
+  if (!battle || battle.status === 'done' || battle.status === 'void') return null;
+  return <LipSyncBattlePanel battle={battle} meId={null} onChanged={load} isHost />;
+}
+
 function HostScreen() {
   const [board, setBoard] = useState(null);
   const [err, setErr] = useState('');
@@ -4103,6 +4353,7 @@ function HostScreen() {
   const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); await poll(); } catch { /* ignore */ } setBusy(false); };
   return (
     <div className="staff-dash">
+      <HostBattleControl />
       <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
         <div className="bingo-status-row">
           <span>{board ? `${board.players.length} players` : ''}</span>
