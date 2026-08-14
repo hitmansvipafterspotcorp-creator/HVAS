@@ -209,13 +209,23 @@ export async function syncMemberFromBackend() {
     const m = r?.member;
     if (!m || !m.tier) return;
     const prev = memberState || {};
-    if (prev.tier === m.tier && prev.status === m.status && prev.expiresAt === m.expiresAt) return; // no change
+    const nk = nightKey();
+    const wasInside = prev.lastEntryNight === nk;
+    // insideTonight/entries are server-authoritative (computed from the real
+    // entries table) — this is what makes a REAL staff admission, done on a
+    // completely different device at the door, actually show up as "inside"
+    // here too. Comparing only tier/status/expiresAt used to skip every
+    // admission sync outright, since admission doesn't touch any of those.
+    if (prev.tier === m.tier && prev.status === m.status && prev.expiresAt === m.expiresAt
+      && wasInside === !!m.insideTonight && (prev.entries ?? 0) === (m.entries ?? 0)) return; // truly no change
     commitMember({
       ...prev,
       tier: m.tier, vip: !!m.vip, payment: m.payment || prev.payment || 'Zelle',
       status: m.status || 'active', expiresAt: m.expiresAt, number: m.number || prev.number,
       name: m.name || prev.name, entries: m.entries ?? prev.entries ?? 0,
       purchasedAt: prev.purchasedAt || Date.now(), verifiedAt: prev.verifiedAt ?? null,
+      lastEntryNight: m.insideTonight ? nk : prev.lastEntryNight,
+      onTheWay: m.insideTonight ? false : (m.onTheWay ?? prev.onTheWay),
     });
   } catch { /* ignore — never break the screen over a background sync */ }
 }
@@ -297,10 +307,10 @@ export function logEntry() {
   if (!memberState) return;
   commitMember(admitTonight(memberState));
 }
-// Returns one of three door outcomes: valid (grant), expired (deny), or
-// trespass (deny — the number isn't a member at all). Security shows the
-// matching alert graphic for each.
-export function verifyByNumber(number) {
+// Shared grant/deny logic — no side effects, never admits anyone. Used by
+// both the real (offline-fallback) door check below and the member's own
+// read-only card preview, so they always agree on the same verdict.
+function determineStatus(number) {
   const m = memberState;
   const clean = (number || '').trim().toUpperCase();
   if (!m || !m.number || m.number.toUpperCase() !== clean) {
@@ -310,18 +320,38 @@ export function verifyByNumber(number) {
   const pen = memberPenalty(clean);
   if (pen) {
     return {
-      ok: false, status: pen.kind === 'banned' ? 'banned' : 'trespass', member: m,
+      ok: false, status: pen.kind === 'banned' ? 'banned' : 'trespass',
       reason: `${PENALTY_LABEL[pen.kind] || 'FLAGGED'} — ${pen.reason || 'do not admit'}${pen.by ? ` · flagged by ${pen.by}` : ''}`,
     };
   }
-  if (Date.now() > m.expiresAt) {
-    commitMember({ ...m, status: 'expired' });
-    return { ok: false, status: 'expired', member: memberState, reason: 'Membership expired — renewal required.' };
+  if (Date.now() > m.expiresAt) return { ok: false, status: 'expired', reason: 'Membership expired — renewal required.' };
+  return { ok: true, status: 'valid', reason: 'Membership active.' };
+}
+// Returns one of three door outcomes: valid (grant), expired (deny), or
+// trespass (deny — the number isn't a member at all). Security shows the
+// matching alert graphic for each. THIS ADMITS ON A GRANT — only call it from
+// an actual door check (verifyAtDoor's offline fallback below), never from
+// the member's own device. A member previewing their own card should never
+// be able to mark themselves "inside" without staff actually scanning them —
+// see previewCardStatus for that.
+export function verifyByNumber(number) {
+  const result = determineStatus(number);
+  if (!result.ok) {
+    if (result.status === 'expired') commitMember({ ...memberState, status: 'expired' });
+    return { ...result, member: memberState };
   }
   // Grant = admission: verify the pass AND log tonight's entry (idempotent),
   // so the member's loyalty rank, ribbons, and perks update from this one event.
-  commitMember(admitTonight({ ...m, status: 'verified', verifiedAt: Date.now() }));
+  commitMember(admitTonight({ ...memberState, status: 'verified', verifiedAt: Date.now() }));
   return { ok: true, status: 'valid', member: memberState, reason: 'Member verified — grant entry. Night logged.' };
+}
+// Read-only: a member checking their OWN card sees the same grant/deny verdict
+// a real door scan would give, but nothing here ever admits them. They stay
+// "on the way" (or neutral) until staff actually scans them or types their
+// number at the door — that's the only thing that can flip them to "inside."
+export function previewCardStatus(number) {
+  const result = determineStatus(number);
+  return { ...result, member: memberState };
 }
 export function resetMembership() { commitMember(null); }
 
@@ -2497,7 +2527,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
           </div>
           <BrandStamp compact />
           <span>Show at the door to get scanned</span>
-          <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(verifyByNumber(member.number))} aria-label="Verify membership">
+          <button type="button" className="asset-cta compact verify-self" onClick={() => setVerifyResult(previewCardStatus(member.number))} aria-label="Verify membership">
             <img src={ui.verify.verifyCard} alt="Verify membership" />
           </button>
         </div>
