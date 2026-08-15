@@ -4461,6 +4461,11 @@ function PlayerCardScreen({ navigate }) {
         {/* What was just called, on the player's own screen. Without this you
             had to watch the TV to know what to look for — which defeats the
             point of holding your card on your phone. */}
+        {/* Everything that isn't the card lives in one column so landscape can
+            put it BESIDE the card instead of above it — a 5x5 card is square,
+            so in landscape it has to be sized off height, and that leaves a
+            wide empty gutter that this fills. */}
+        <div className="bingo-side">
         {nowCalling && (
           <div className="bingo-now-calling">
             <span className="bingo-now-label">NOW CALLING</span>
@@ -4473,6 +4478,7 @@ function PlayerCardScreen({ navigate }) {
           <p className="bingo-waiting">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
         )}
         <p className="mem-fineprint">Tap a square once the host calls it — {BINGO_PATTERN_LABEL[state?.pattern] || 'complete a line'} to win.</p>
+        </div>
         <div className="bingo-grid">
           {me.card.map((item, i) => {
             const isFree = i === 12;
