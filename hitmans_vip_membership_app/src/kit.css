@@ -696,3 +696,21 @@
   font: 900 7.5px/1.3 var(--k-font); letter-spacing: .12em; color: var(--k-violet-lt);
 }
 .roster-card:not(.is-leading) .roster-lead { display: none; }
+
+/* ── Host tools (member side) ─────────────────────────────────────────── */
+.host-tools { display: grid; gap: 7px; }
+.host-tool {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left;
+  padding: 10px 12px; border-radius: var(--k-r); cursor: pointer;
+  border: 1px solid var(--k-edge); background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+  color: var(--k-text);
+}
+.host-tool:hover { border-color: var(--k-violet); box-shadow: var(--k-glow-violet); }
+.host-tool strong { font: 900 13.5px/1.15 var(--k-font); text-transform: uppercase; }
+.host-tool span { font: 700 11px/1.25 var(--k-font); color: var(--k-text-dim); }
+.host-code-label { display: flex; flex-direction: column; gap: 5px; font: 900 10px/1 var(--k-font); letter-spacing: .14em; text-transform: uppercase; color: var(--k-violet-lt); }
+.host-code-label input {
+  padding: 11px 12px; border-radius: var(--k-r);
+  border: 1px solid var(--k-edge); background: var(--k-void); color: var(--k-text);
+  font: 900 15px/1 var(--k-font); letter-spacing: .08em;
+}

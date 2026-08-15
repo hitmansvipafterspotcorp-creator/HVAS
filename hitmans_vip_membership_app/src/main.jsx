@@ -977,7 +977,11 @@ const ROLES = [
       { title: 'Book a VIP Table', detail: 'Request a night + party size, staff confirms', chip: ui.chips.vip, target: 'booking' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
-    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking'],
+    // Hosting is a member capability, not a staff one — a member runs the
+    // night from inside Lip Sync Bingo (behind the venue's host code), so the
+    // host screens have to be reachable from the member role.
+    allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle'],
   },
   {
     id: 'staff',
@@ -993,24 +997,6 @@ const ROLES = [
       { title: 'Table Bookings', detail: 'Approve or decline VIP table requests', chip: ui.chips.staff, target: 'bookingBoard' },
     ],
     allowed: ['verification', 'staffDashboard', 'watchlist', 'payVerify', 'searchMember', 'entry', 'payments', 'bookingBoard'],
-  },
-  {
-    id: 'host',
-    label: 'Host / Operator',
-    tagline: 'Lip Sync Bingo night controls',
-    eyebrow: 'OPERATOR',
-    chip: 'staff',
-    menu: [
-      { title: 'Game Menu', detail: 'Round status, start & reset', chip: ui.chips.staff, target: 'bingoStyle' },
-      { title: 'Lobby', detail: 'See who has joined & readied up', chip: ui.chips.active, target: 'lobby' },
-      { title: 'Player Card', detail: 'Preview a player’s live card', chip: ui.chips.checkedIn, target: 'playerCard' },
-      { title: 'Host Control', detail: 'Start, call, approve claims, TV media', chip: ui.chips.staff, target: 'host' },
-      { title: 'Song Queue', detail: 'Every phrase called so far', chip: ui.chips.vip, target: 'songQueue' },
-      { title: 'Winner · Payout', detail: 'Validate the claim, pay out', chip: ui.chips.vip, target: 'winner' },
-      { title: 'TV Display', detail: 'Public call log + auto media', chip: ui.chips.active, target: 'tv' },
-      { title: 'Party Mode', detail: 'Start Battlerz, watch the vote come in live', chip: ui.chips.staff, target: 'party' },
-    ],
-    allowed: ['bingoStyle', 'lobby', 'playerCard', 'host', 'songQueue', 'winner', 'tv', 'party'],
   },
 ];
 const roleById = (id) => ROLES.find((r) => r.id === id) ?? null;
@@ -1572,12 +1558,14 @@ const TEAM_ICONS = {
   ),
 };
 
-// Hidden Team Access — only reachable by the secret taps on the member door.
-// Staff & Host still each need the venue access code (next step).
+// Hidden Team Access — only reachable by the secret taps on the member door,
+// and only the door team lives here now. Hosting moved to where the hosting
+// happens: a tab inside Lip Sync Bingo, on the member side, behind the same
+// venue host code. Whoever runs the night is in the room playing it; making
+// them leave the game and come in through a staff door never matched that.
 function TeamAccessScreen({ onPick, onBack }) {
   const cards = [
     { id: 'staff', label: 'Staff Check-In', tag: 'Door & verification tools', cta: 'Staff code' },
-    { id: 'host', label: 'Host / Operator', tag: 'Lip Sync Bingo night controls', cta: 'Open tools' },
   ];
   return (
     <section className="screen screen-team">
@@ -4520,10 +4508,75 @@ function LobbyScreen({ navigate }) {
       <div className="staff-hub-tabs bingo-mode-tabs">
         <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
         <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
+        <button type="button" className={`staff-hub-tab${mode === 'host' ? ' on' : ''}`} onClick={() => setMode('host')}>Host</button>
         <SfxToggle />
       </div>
-      {mode === 'solo' ? <SoloBingoGame /> : <VenueLobby navigate={navigate} />}
+      {mode === 'solo' ? <SoloBingoGame />
+        : mode === 'host' ? <HostMode navigate={navigate} />
+        : <VenueLobby navigate={navigate} />}
     </div>
+  );
+}
+
+// Hosting, from inside the game. A member unlocks it with the venue's host
+// code once and the device keeps that session, so the person running the
+// night can host and play from the same phone instead of signing out of the
+// member app and back in through a staff door.
+function HostMode({ navigate }) {
+  const [unlocked, setUnlocked] = useState(() => !!apiStaffToken());
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const unlock = async () => {
+    setBusy(true); setErr('');
+    try { await apiStaffLogin(code.trim()); setUnlocked(true); }
+    catch { setErr('That code was not accepted by the venue.'); }
+    setBusy(false);
+  };
+  if (!apiEnabled()) {
+    return (
+      <AppPanel title="Host the night" subtitle="Not connected to a venue">
+        <p className="mem-fineprint">Hosting runs the real round for everyone in the room, so it needs a venue connection. Connect to the venue first.</p>
+      </AppPanel>
+    );
+  }
+  if (!unlocked) {
+    return (
+      <AppPanel title="Host the night" subtitle="Venue host code required">
+        <p className="mem-fineprint">Running the round means calling songs for everyone in the room, so the venue gates it. Ask the venue for tonight's host code.</p>
+        <label className="host-code-label">Host code
+          <input type="text" value={code} autoComplete="off" placeholder="Host code"
+                 onChange={(e) => { setCode(e.target.value); setErr(''); }}
+                 onKeyDown={(e) => e.key === 'Enter' && code.trim() && unlock()} />
+        </label>
+        {err && <p className="gate-err">{err}</p>}
+        <button type="button" className="k-btn k-btn--gold" disabled={!code.trim() || busy} onClick={unlock}>
+          {busy ? 'Checking…' : 'Unlock hosting'}
+        </button>
+      </AppPanel>
+    );
+  }
+  const tools = [
+    { target: 'host', title: 'Host Control', detail: 'Call songs, approve claims, run battles' },
+    { target: 'bingoStyle', title: 'Game Menu', detail: 'Pick the deck and win pattern, start or reset' },
+    { target: 'tv', title: 'TV Display', detail: 'Throw the round on the big screen' },
+    { target: 'songQueue', title: 'Song Queue', detail: 'Everything called so far' },
+    { target: 'winner', title: 'Winner · Payout', detail: 'Validate the claim and pay out' },
+  ];
+  return (
+    <AppPanel title="Host the night" subtitle="You are running this round">
+      <div className="host-tools">
+        {tools.map((t) => (
+          <button type="button" key={t.target} className="host-tool" onClick={() => navigate(t.target)}>
+            <strong>{t.title}</strong>
+            <span>{t.detail}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="k-btn k-btn--tertiary" onClick={() => { apiStaffSignOut(); setUnlocked(false); }}>
+        Stop hosting
+      </button>
+    </AppPanel>
   );
 }
 
