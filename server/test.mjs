@@ -242,16 +242,27 @@ const cover = async (item, tok, memberId, voterTok) => {
 // tap every non-free square on Tasha's card covered (this is the real
 // gameplay action — marking is never automatic anymore). LIP SYNC squares
 // can't be tapped at all: they have to be performed for and won.
+// Cards are dealt at random, so the number of lip sync squares varies from
+// run to run. Assert on the tally rather than once per square, or the suite
+// reports a different total every run and a genuinely deleted test hides in
+// the noise.
+let lipSquares = 0;
+let lipBlocked = 0;
+let markFailure = null;
 for (const item of join1.body.card) {
   if (item.free) continue;
   if (item.type === 'lipsync') {
+    lipSquares += 1;
     const blocked = await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok);
-    ok(blocked.status === 403, `lip sync square ${item.id} cannot simply be tapped`);
+    if (blocked.status === 403) lipBlocked += 1;
     await winLipSync(item.id, mtok, verify.body.member.id, mtok2);
   }
   const m = await call('POST', '/bingo/mark', { itemId: item.id, covered: true }, mtok);
-  if (m.status !== 200) { ok(false, `mark failed for ${item.id} (${m.body.error})`); break; }
+  if (m.status !== 200) { markFailure = `${item.id} (${m.body.error})`; break; }
 }
+ok(lipSquares > 0, 'the dealt card carries at least one lip sync square to test');
+ok(lipBlocked === lipSquares, `all ${lipSquares} lip sync squares refused a plain tap`);
+ok(markFailure === null, `every called square could be covered${markFailure ? ` — failed on ${markFailure}` : ''}`);
 const claim = await call('POST', '/bingo/claim', {}, mtok);
 ok(claim.status === 200 && claim.body.pending, 'valid bingo claim accepted once covered squares match the call history');
 

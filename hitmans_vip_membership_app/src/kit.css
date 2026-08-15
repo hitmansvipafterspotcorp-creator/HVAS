@@ -491,3 +491,35 @@
   .screen-membership .screen-header { margin-bottom: 4px; }
   .screen-membership.screen { padding-top: 6px; padding-bottom: 6px; }
 }
+
+/* ── Round ladder (solo lobby) ────────────────────────────────────────── */
+.k-ladder { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0; }
+.k-ladder-step {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 7px 5px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.k-ladder-step b { font: 900 10px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; color: var(--k-violet-lt); }
+.k-ladder-step i { font: 900 9px/1 var(--k-font); letter-spacing: .08em; color: var(--k-text-dim); font-style: normal; }
+.k-ladder-step u { font: 900 15px/1 var(--k-font); color: var(--k-gold); text-decoration: none; }
+
+/* Solo vs CPU carries more chrome than the venue card — a mode switcher, an
+   opponent strip and a demo-mode banner when no venue is connected — and it
+   still has to fit a square card on a 390px phone without scrolling. */
+@media (max-width: 720px) and (min-height: 461px) {
+  .screen-lobby .screen-header p { display: none; }
+  .screen-lobby .screen-header h1 { font-size: 21px; line-height: 1.1; }
+  .screen-lobby .screen-header { margin-bottom: 6px; }
+  .screen-lobby.screen { padding-top: 8px; padding-bottom: 6px; }
+  /* The panel's own title bar repeats what the screen header and the mode
+     tabs already say ("Lip Sync Bingo Lobby" / "Solo vs CPU"), and it costs
+     about 50px — roughly a row of squares. The call count it carried moves
+     into the HUD label instead. */
+  .screen-lobby .app-panel > header { display: none; }
+  .screen-lobby .app-panel-body { padding: 8px 10px; gap: 6px; }
+  .screen-lobby .bingo-mode-tabs { margin-bottom: 6px; }
+}
+/* The opponent strip is a status readout, not a control — it can be tight. */
+.solo-cpus { display: flex; gap: 5px; }
+.solo-cpu { flex: 1 1 0; min-width: 0; padding: 4px 6px; font-size: 10.5px; }
+.solo-cpu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

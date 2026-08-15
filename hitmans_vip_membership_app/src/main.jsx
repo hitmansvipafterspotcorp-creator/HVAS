@@ -3950,6 +3950,18 @@ const soloHasLine = (card, covered) =>
   SOLO_LINES.some((line) => line.every((i) => i === 12 || covered.has(card[i].id)));
 const soloLineProgress = (card, covered) =>
   Math.max(...SOLO_LINES.map((line) => line.filter((i) => i === 12 || covered.has(card[i].id)).length));
+// Solo runs the same three-round ladder the venue round does, so practising
+// alone teaches the real game: a line, then two lines, then the whole card.
+const SOLO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
+// Mirrors BINGO_FINAL_ROUND on the server. Solo never talks to the backend,
+// so it carries its own copy rather than pretending to read one.
+const BINGO_FINAL_ROUND_CLIENT = 3;
+const soloProgress = (card, covered, pattern) =>
+  bingoProgress(card.map((c) => c || { id: '__free' }), covered, pattern);
+const soloHasPattern = (card, covered, pattern) => {
+  const { done, need } = soloProgress(card, covered, pattern);
+  return done >= need;
+};
 
 // Solo round vs CPU opponents. Calls fire on a timer (there's no host), the
 // player taps their own called squares, and each CPU covers theirs after a
@@ -3971,17 +3983,24 @@ function SoloBingoGame({ onExit }) {
   };
   useEffect(() => clearTimers, []);
 
-  const start = () => {
+  // `round` carries across a deal; everything else is fresh each round.
+  const deal = (round, wins) => ({
+    round,
+    wins,
+    pattern: SOLO_ROUND_PATTERN[round] || 'line',
+    order: shuffled(SOLO_DECK),
+    calledCount: 0,
+    card: dealCard(SOLO_DECK),
+    covered: new Set(),
+    cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(SOLO_DECK), covered: new Set() })),
+    status: 'playing',
+    winner: null,
+  });
+  const start = () => { clearTimers(); setGame(deal(1, 0)); };
+  // Won the round but not the match — deal the next one at the harder pattern.
+  const nextRound = () => {
     clearTimers();
-    setGame({
-      order: shuffled(SOLO_DECK),
-      calledCount: 0,
-      card: dealCard(SOLO_DECK),
-      covered: new Set(),
-      cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(SOLO_DECK), covered: new Set() })),
-      status: 'playing',
-      winner: null,
-    });
+    setGame((g) => deal(Math.min((g?.round || 1) + 1, BINGO_FINAL_ROUND_CLIENT), g?.wins || 0));
   };
 
   // The call loop + CPU marking. Kept in one effect keyed on status so it
@@ -4004,7 +4023,7 @@ function SoloBingoGame({ onExit }) {
               if (!cur || cur.status !== 'playing') return cur;
               const cpus = cur.cpus.map((c, i) => (i === ci ? { ...c, covered: new Set([...c.covered, item.id]) } : c));
               const won = cpus[ci];
-              if (soloHasLine(won.card, won.covered)) {
+              if (soloHasPattern(won.card, won.covered, cur.pattern)) {
                 playSfx('buzz');
                 return { ...cur, cpus, status: 'lost', winner: won.name };
               }
@@ -4028,7 +4047,13 @@ function SoloBingoGame({ onExit }) {
       const wasCovered = covered.has(item.id);
       wasCovered ? covered.delete(item.id) : covered.add(item.id);
       if (!wasCovered) playSfx('mark');
-      if (soloHasLine(g.card, covered)) { playSfx('win'); return { ...g, covered, status: 'won', winner: 'you' }; }
+      if (soloHasPattern(g.card, covered, g.pattern)) {
+        playSfx('win');
+        const wins = g.wins + 1;
+        // Taking round 3 takes the match; anything earlier just moves you up.
+        const done = g.round >= BINGO_FINAL_ROUND_CLIENT;
+        return { ...g, covered, wins, status: done ? 'won' : 'roundWon', winner: 'you' };
+      }
       return { ...g, covered };
     });
   };
@@ -4036,7 +4061,16 @@ function SoloBingoGame({ onExit }) {
   if (!game) {
     return (
       <AppPanel title="Solo vs CPU" subtitle="Play a round on your own — no host, no wifi needed">
-        <p className="mem-fineprint">You against three regulars. Squares get called every few seconds — tap yours before they fill a line.</p>
+        <p className="mem-fineprint">You against three regulars, over three rounds — a line, then two lines, then the whole card. Tap your squares as they're called, before they get there first.</p>
+        <div className="k-ladder">
+          {[1, 2, 3].map((r) => (
+            <span key={r} className="k-ladder-step">
+              <b>Round {r}</b>
+              <i>{BINGO_PATTERN_GOAL[SOLO_ROUND_PATTERN[r]]}</i>
+              <u>${BINGO_ROUND_PRIZE[r]}</u>
+            </span>
+          ))}
+        </div>
         <div className="solo-roster">
           {CPU_PLAYERS.map((c) => <span key={c.name} className="solo-chip"><b>{c.avatar}</b>{c.name}</span>)}
         </div>
@@ -4050,63 +4084,93 @@ function SoloBingoGame({ onExit }) {
   const nowCalling = game.calledCount > 0 ? game.order[game.calledCount - 1] : null;
   const waiting = game.card.filter((it) => it && called.has(it.id) && !game.covered.has(it.id)).length;
   const over = game.status !== 'playing';
+  const myProgress = soloProgress(game.card, game.covered, game.pattern);
 
   return (
     <>
       {over && (
-        <div className={`bingo-winner-banner${game.status === 'won' ? '' : ' lost'}`}>
-          <strong>{game.status === 'won' ? '🏆 BINGO — you win!' : game.status === 'lost' ? `${game.winner} got it first` : 'Deck ran out — draw'}</strong>
+        <div className={`bingo-winner-banner${game.status === 'lost' ? ' lost' : ''}`}>
+          <strong>
+            {game.status === 'won' ? `🏆 BINGO — you took all ${BINGO_FINAL_ROUND_CLIENT} rounds!`
+              : game.status === 'roundWon' ? `🏆 Round ${game.round} is yours — ${game.wins} of ${BINGO_FINAL_ROUND_CLIENT}`
+              : game.status === 'lost' ? `${game.winner} got it first`
+              : 'Deck ran out — draw'}
+          </strong>
         </div>
       )}
       <AppPanel title="Solo vs CPU" subtitle={over ? 'Round over' : `Live · ${game.calledCount} called`}>
-        {!over && nowCalling && (
-          <div className="bingo-now-calling">
-            <span className="bingo-now-label">NOW CALLING</span>
-            {nowCalling.type === 'lipsync' && <span className="bingo-cell-tag static">🎤</span>}
-            <strong>{nowCalling.artist}</strong>
-            <span className="bingo-now-song">{nowCalling.song}</span>
+        <div className="bingo-side">
+          <div className="k-hud">
+            <div className="k-hud-now k-frame k-frame--flat">
+              <span className="k-label">{nowCalling && !over ? `Now calling · ${game.calledCount} called` : 'Standing by'}</span>
+              {nowCalling && !over ? (
+                <>
+                  <strong className="k-value">{nowCalling.artist}</strong>
+                  <span className="k-hud-song k-dim">{nowCalling.song}</span>
+                  {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                </>
+              ) : <span className="k-hud-song k-dim">{over ? 'Round over' : 'Dealing…'}</span>}
+            </div>
+            <div className="k-hud-round k-frame k-frame--gold">
+              <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {game.round} of {BINGO_FINAL_ROUND_CLIENT}</span>
+              <strong className="k-money">${BINGO_ROUND_PRIZE[game.round] ?? 5}</strong>
+              <span className="k-hud-goal">{BINGO_PATTERN_GOAL[game.pattern]}</span>
+            </div>
           </div>
-        )}
-        {!over && waiting > 0 && (
-          <p className="bingo-waiting">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
-        )}
+          {!over && waiting > 0 && (
+            <p className="k-nudge">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
+          )}
+        </div>
 
         <div className="solo-cpus">
           {game.cpus.map((c) => {
-            const p = soloLineProgress(c.card, c.covered);
+            const p = soloProgress(c.card, c.covered, game.pattern);
             return (
-              <div key={c.name} className={`solo-cpu${p >= 4 ? ' close' : ''}`}>
+              <div key={c.name} className={`solo-cpu${p.done >= p.need - 1 ? ' close' : ''}`}>
                 <b>{c.avatar}</b>
                 <span className="solo-cpu-name">{c.name}</span>
-                <span className="solo-cpu-prog">{p}/5</span>
+                <span className="solo-cpu-prog">{p.done}/{p.need}</span>
               </div>
             );
           })}
         </div>
 
-        <div className="bingo-grid">
+        <div className="k-grid">
           {game.card.map((item, i) => {
             const isFree = i === 12;
             const isCalled = !isFree && called.has(item.id);
             const isCovered = isFree || game.covered.has(item.id);
-            const cls = ['bingo-cell', isFree ? 'free' : '', isCovered ? 'marked' : '', !isFree && isCalled && !isCovered && !over ? 'tappable' : ''].filter(Boolean).join(' ');
+            const isLip = !isFree && item.type === 'lipsync';
+            const state3 = isFree ? 'free' : isCovered ? 'covered' : isCalled && !over ? 'called' : '';
+            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync'].filter(Boolean).join(' ');
+            const mark = isCovered && !isFree ? TILE_ART.covered : isCalled && !over ? TILE_ART.called : isLip ? TILE_ART.lipsync : null;
             return (
               <button type="button" key={isFree ? 'free' : item.id} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled || over}>
-                {isFree ? 'FREE SPACE' : (
+                {isFree ? 'Free space' : (
                   <>
-                    {item.type === 'lipsync' && <span className="bingo-cell-tag" title="Lip sync square" aria-label="Lip sync square">🎤</span>}
-                    <span className="bingo-cell-artist">{item.artist}</span>
-                    <span className="bingo-cell-song">{item.song}</span>
+                    <span className="k-tile-artist">{item.artist}</span>
+                    <span className="k-tile-song">{item.song}</span>
                   </>
                 )}
-                {isCovered && !isFree && <span className="bingo-cell-check" aria-hidden="true">✓</span>}
+                {mark && <img className="k-tile-mark" src={mark} alt="" aria-hidden="true" />}
               </button>
             );
           })}
         </div>
+        <div className="k-cardfoot">
+          <div className="k-progressrow">
+            <span className="k-label">{myProgress.done} / {myProgress.need} to bingo</span>
+            <div className="k-progress"><i style={{ width: `${Math.round((myProgress.done / myProgress.need) * 100)}%` }} /></div>
+          </div>
+        </div>
 
-        {over && <button type="button" className="bingo-btn gold" onClick={start}>Play Again</button>}
-        {onExit && <button type="button" className="bingo-btn ghost" onClick={onExit}>← Back</button>}
+        {game.status === 'roundWon' && (
+          <button type="button" className="k-btn k-btn--go" onClick={nextRound}>
+            Round {game.round} won → play round {game.round + 1} ({BINGO_PATTERN_GOAL[SOLO_ROUND_PATTERN[game.round + 1]]})
+          </button>
+        )}
+        {over && game.status !== 'roundWon' && <button type="button" className="k-btn k-btn--gold" onClick={start}>Play Again</button>}
+        {onExit && <button type="button" className="k-btn k-btn--tertiary" onClick={onExit}>← Back</button>}
       </AppPanel>
     </>
   );
