@@ -1,8 +1,18 @@
-name: Deploy HITGEAR OS to GitHub Pages
+name: Deploy HITMANS VIP Membership App to GitHub Pages
+
+# Publishes the pre-built membership app that lives on the `gh-pages` branch
+# (hitmans_vip_membership_app built with base '/HVAS/', trimmed to the assets
+# the bundle actually references — see scripts/extract-asset-refs.mjs, 177 at
+# time of writing). Rebuild + `git push origin gh-pages` to update the live
+# site, or run this workflow manually.
+#
+# This publishes gh-pages, NOT the branch that triggered it. The version that
+# used to sit on claude/members-staff-door deployed HITGEAR OS straight off a
+# source branch, which would have replaced the live membership app.
 
 on:
   push:
-    branches: ["claude/gracious-rubin-3klank", "main"]
+    branches: ["gh-pages", "claude/members-staff-door", "claude/gracious-rubin-3klank"]
   workflow_dispatch:
 
 permissions:
@@ -21,10 +31,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout gh-pages (pre-built app)
         uses: actions/checkout@v4
         with:
-          ref: claude/gracious-rubin-3klank
+          ref: gh-pages
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
