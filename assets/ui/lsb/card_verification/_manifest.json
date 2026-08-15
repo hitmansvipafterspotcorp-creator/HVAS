@@ -1,0 +1,218 @@
+{
+ "card_verification_00": {
+  "x": 10,
+  "y": 57,
+  "w": 666,
+  "h": 176
+ },
+ "card_verification_01": {
+  "x": 1155,
+  "y": 57,
+  "w": 278,
+  "h": 22
+ },
+ "card_verification_02": {
+  "x": 708,
+  "y": 117,
+  "w": 171,
+  "h": 67
+ },
+ "card_verification_03": {
+  "x": 717,
+  "y": 95,
+  "w": 75,
+  "h": 17
+ },
+ "card_verification_04": {
+  "x": 897,
+  "y": 117,
+  "w": 180,
+  "h": 66
+ },
+ "card_verification_05": {
+  "x": 914,
+  "y": 93,
+  "w": 90,
+  "h": 20
+ },
+ "card_verification_06": {
+  "x": 1093,
+  "y": 117,
+  "w": 185,
+  "h": 67
+ },
+ "card_verification_07": {
+  "x": 1101,
+  "y": 93,
+  "w": 97,
+  "h": 20
+ },
+ "card_verification_08": {
+  "x": 680,
+  "y": 197,
+  "w": 139,
+  "h": 18
+ },
+ "card_verification_09": {
+  "x": 919,
+  "y": 197,
+  "w": 127,
+  "h": 18
+ },
+ "card_verification_10": {
+  "x": 1115,
+  "y": 197,
+  "w": 105,
+  "h": 18
+ },
+ "card_verification_11": {
+  "x": 675,
+  "y": 220,
+  "w": 214,
+  "h": 59
+ },
+ "card_verification_12": {
+  "x": 910,
+  "y": 220,
+  "w": 164,
+  "h": 59
+ },
+ "card_verification_13": {
+  "x": 1103,
+  "y": 220,
+  "w": 317,
+  "h": 57
+ },
+ "card_verification_14": {
+  "x": 12,
+  "y": 268,
+  "w": 398,
+  "h": 357
+ },
+ "card_verification_15": {
+  "x": 29,
+  "y": 247,
+  "w": 101,
+  "h": 17
+ },
+ "card_verification_16": {
+  "x": 451,
+  "y": 315,
+  "w": 244,
+  "h": 276
+ },
+ "card_verification_17": {
+  "x": 458,
+  "y": 303,
+  "w": 101,
+  "h": 16
+ },
+ "card_verification_18": {
+  "x": 731,
+  "y": 303,
+  "w": 138,
+  "h": 17
+ },
+ "card_verification_19": {
+  "x": 982,
+  "y": 303,
+  "w": 317,
+  "h": 309
+ },
+ "card_verification_20": {
+  "x": 714,
+  "y": 323,
+  "w": 243,
+  "h": 356
+ },
+ "card_verification_21": {
+  "x": 22,
+  "y": 632,
+  "w": 135,
+  "h": 17
+ },
+ "card_verification_22": {
+  "x": 989,
+  "y": 624,
+  "w": 134,
+  "h": 17
+ },
+ "card_verification_23": {
+  "x": 1215,
+  "y": 624,
+  "w": 148,
+  "h": 17
+ },
+ "card_verification_24": {
+  "x": 6,
+  "y": 650,
+  "w": 430,
+  "h": 193
+ },
+ "card_verification_25": {
+  "x": 977,
+  "y": 643,
+  "w": 215,
+  "h": 69
+ },
+ "card_verification_26": {
+  "x": 1208,
+  "y": 643,
+  "w": 177,
+  "h": 68
+ },
+ "card_verification_27": {
+  "x": 978,
+  "y": 740,
+  "w": 189,
+  "h": 60
+ },
+ "card_verification_28": {
+  "x": 984,
+  "y": 724,
+  "w": 126,
+  "h": 17
+ },
+ "card_verification_29": {
+  "x": 1208,
+  "y": 727,
+  "w": 197,
+  "h": 73
+ },
+ "card_verification_30": {
+  "x": 976,
+  "y": 833,
+  "w": 178,
+  "h": 67
+ },
+ "card_verification_31": {
+  "x": 982,
+  "y": 814,
+  "w": 124,
+  "h": 17
+ },
+ "card_verification_32": {
+  "x": 1186,
+  "y": 838,
+  "w": 129,
+  "h": 16
+ },
+ "card_verification_33": {
+  "x": 436,
+  "y": 843,
+  "w": 179,
+  "h": 16
+ },
+ "card_verification_34": {
+  "x": 1167,
+  "y": 857,
+  "w": 272,
+  "h": 80
+ },
+ "card_verification_35": {
+  "x": 955,
+  "y": 1010,
+  "w": 284,
+  "h": 51
+ }
+}
