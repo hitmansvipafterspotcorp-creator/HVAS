@@ -48,6 +48,15 @@ const BINGO_SONG_MS = Math.max(3, Number(process.env.BINGO_SONG_SECONDS) || 60) 
 // How long the room gets to choose which two of three-or-more contenders
 // actually battle. Short on purpose: it happens while the song is still
 // playing, so it cannot outlast the square it is deciding.
+// After somebody takes a round, the room gets a short sprint to settle second
+// and third rather than the round simply stopping dead on one winner. Long
+// enough to finish squares already called, short enough that the night moves.
+//
+// Read at call time, not at import. As a module-level const it was fixed the
+// instant app.mjs was imported, which in an ES module happens before any
+// statement in the file that imports it — so a test setting the env var could
+// never affect it, and a venue would have to restart to change it.
+const bingoPodiumMs = () => Math.max(5, Number(process.env.BINGO_PODIUM_SECONDS) || 30) * 1000;
 const BATTLE_PICK_MS = Math.max(5, Number(process.env.BATTLE_PICK_SECONDS) || 25) * 1000;
 const BINGO_LIPSYNC_MS = Math.max(3, Number(process.env.BINGO_LIPSYNC_SECONDS) || 120) * 1000;
 const bingoWindowFor = (item) => (item?.type === 'lipsync' ? BINGO_LIPSYNC_MS : BINGO_SONG_MS);
@@ -88,6 +97,26 @@ function bingoHasWin(card, calledIds, coveredIds, pattern) {
   const marked = card.map((item, i) => i === 12 || (coveredIds.has(item.id) && calledIds.has(item.id)));
   return (BINGO_PATTERNS[pattern] || BINGO_PATTERNS.line)(marked);
 }
+// How far a card is toward the round's pattern, as done/need. Same shape the
+// client uses, but the server's version is the one that decides a podium, so
+// it counts only squares that were BOTH called and covered.
+function bingoProgressFor(card, calledIds, coveredIds, pattern) {
+  const marked = card.map((item, i) => i === 12 || (coveredIds.has(item.id) && calledIds.has(item.id)));
+  const lines = BINGO_LINES.filter((l) => l.every((i) => marked[i])).length;
+  const ring = [...Array(25).keys()].filter((i) => i < 5 || i > 19 || i % 5 === 0 || i % 5 === 4);
+  switch (pattern) {
+    case 'two_lines': return { done: Math.min(lines, 2), need: 2, covered: marked.filter(Boolean).length };
+    case 'four_corners': return { done: [0, 4, 20, 24].filter((i) => marked[i]).length, need: 4, covered: marked.filter(Boolean).length };
+    case 'x': return { done: [0, 6, 18, 24, 4, 8, 16, 20].filter((i) => marked[i]).length, need: 8, covered: marked.filter(Boolean).length };
+    case 'around_the_world': return { done: ring.filter((i) => marked[i]).length, need: ring.length, covered: marked.filter(Boolean).length };
+    case 'blackout': return { done: marked.filter(Boolean).length, need: 25, covered: marked.filter(Boolean).length };
+    default: {
+      const best = Math.max(0, ...BINGO_LINES.map((l) => l.filter((i) => marked[i]).length));
+      return { done: lines >= 1 ? 5 : best, need: 5, covered: marked.filter(Boolean).length };
+    }
+  }
+}
+
 function bingoDealCard(items) {
   const pool = [...items];
   for (let i = pool.length - 1; i > 0; i--) {
@@ -296,7 +325,45 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       deckId: r.deck_id || DEFAULT_DECK_ID, pattern,
       roundNo, finalRound: BINGO_FINAL_ROUND, customPattern: !!r.custom_pattern,
       roundWins: JSON.parse(r.round_wins || '[]'),
+      podium: JSON.parse(r.podium || '[]'),
+      podiumEndsAt: r.podium_ends_at,
+      podiumFirst: r.podium_first,
     };
+  };
+
+  // Everyone still in the round, ranked by how close they are to the pattern.
+  // This is what turns one winner into a podium: second and third are decided
+  // on the board, not on who happened to shout first.
+  const bingoStandings = () => {
+    const r = getBingoRound();
+    const calledIds = new Set(r.calls.map((c) => c.id));
+    return db.prepare(`SELECT c.member_id, c.card, c.covered, m.name, m.number
+      FROM bingo_cards c JOIN members m ON m.id=c.member_id`).all()
+      .map((row) => {
+        const p = bingoProgressFor(JSON.parse(row.card), calledIds, new Set(JSON.parse(row.covered)), r.pattern);
+        return {
+          memberId: row.member_id, name: row.name, number: row.number,
+          done: p.done, need: p.need, covered: p.covered,
+          pct: p.need ? Math.round((p.done / p.need) * 100) : 0,
+        };
+      })
+      // Closest to the pattern first; ties break on total squares covered,
+      // then on name so the order never jitters between polls.
+      .sort((a, b) => b.done - a.done || b.covered - a.covered || a.name.localeCompare(b.name));
+  };
+
+  // Settle the podium: the claimant takes first, the sprint decides the rest.
+  const closePodium = () => {
+    const r = getBingoRound();
+    if (r.status !== 'podium') return null;
+    const rest = bingoStandings().filter((p) => p.memberId !== r.podium_first);
+    const winner = bingoStandings().find((p) => p.memberId === r.podium_first);
+    const standings = [
+      { ...(winner || { memberId: r.podium_first, name: '', number: '' }), place: 1 },
+      ...rest.slice(0, 2).map((p, i) => ({ ...p, place: i + 2 })),
+    ];
+    commit('bingo.podium', { standings, first: r.podium_first, at: Date.now(), final_round: BINGO_FINAL_ROUND });
+    return standings;
   };
   // No manual links, ever: the moment a real song gets called, search
   // YouTube for it and send the top result straight to the TV. Best-effort
@@ -403,7 +470,8 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   ];
   // One number behind every title: rounds are worth most, battles next, and
   // simply turning up still counts for something.
-  const playerScore = (s) => (s.roundsWon || 0) * 3 + (s.battlesWon || 0) * 2 + (s.nights || 0);
+  const playerScore = (s) => (s.roundsWon || 0) * 5 + (s.seconds || 0) * 3 + (s.thirds || 0) * 2
+    + (s.battlesWon || 0) * 2 + (s.nights || 0);
   const playerTitle = (s) => {
     const score = playerScore(s);
     let t = PLAYER_TITLES[0].title;
@@ -416,10 +484,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return step ? { title: step.title, need: step.at - score } : null;
   };
   const playerStats = (memberId) => {
-    const row = db.prepare(`SELECT nights, rounds_won AS roundsWon, battles_won AS battlesWon,
+    const row = db.prepare(`SELECT nights, rounds_won AS roundsWon, seconds, thirds, battles_won AS battlesWon,
       battles_lost AS battlesLost, forfeits, squares, performances, streak, best_streak AS bestStreak, last_night AS lastNight
       FROM player_stats WHERE member_id=?`).get(memberId)
-      || { nights: 0, roundsWon: 0, battlesWon: 0, battlesLost: 0, forfeits: 0, squares: 0, performances: 0, streak: 0, bestStreak: 0, lastNight: null };
+      || { nights: 0, roundsWon: 0, seconds: 0, thirds: 0, battlesWon: 0, battlesLost: 0, forfeits: 0, squares: 0, performances: 0, streak: 0, bestStreak: 0, lastNight: null };
     const fought = (row.battlesWon || 0) + (row.battlesLost || 0);
     return {
       ...row,
@@ -503,6 +571,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       try { lockBattleRoster(b.id); } catch { /* one stuck battle must not kill the ticker */ }
     }
     const r = getBingoRound();
+    // A podium sprint that nobody closes must still end on its own, or the
+    // round hangs and the night stops.
+    if (r.status === 'podium') {
+      if (r.podiumEndsAt && Date.now() >= r.podiumEndsAt) { try { closePodium(); } catch { /* never kill the ticker */ } }
+      return;
+    }
     if (r.status !== 'live') return;
     const last = r.calls[r.calls.length - 1];
     if (last?.at && Date.now() - last.at < bingoWindowFor(last)) return;   // current song still playing
@@ -646,14 +720,18 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = auth(req);
       const rows = db.prepare(`
         SELECT s.member_id AS memberId, m.name, m.number,
-               s.rounds_won AS roundsWon, s.battles_won AS battlesWon, s.battles_lost AS battlesLost,
+               s.rounds_won AS roundsWon, s.seconds, s.thirds,
+               s.battles_won AS battlesWon, s.battles_lost AS battlesLost,
                s.nights, s.streak, s.best_streak AS bestStreak, s.squares, s.performances
         FROM player_stats s JOIN members m ON m.id=s.member_id
         WHERE s.nights > 0
-        ORDER BY (s.rounds_won * 3 + s.battles_won * 2 + s.nights) DESC, s.battles_won DESC, m.name ASC
+        ORDER BY (s.rounds_won * 5 + s.seconds * 3 + s.thirds * 2 + s.battles_won * 2 + s.nights) DESC,
+                 s.rounds_won DESC, s.battles_won DESC, m.name ASC
         LIMIT 20`).all();
       json(res, 200, {
-        top: rows.map((r, i) => ({ ...r, place: i + 1, title: playerTitle(r), isMe: r.memberId === c?.sub })),
+        // `score` is published rather than left to each screen to recompute —
+        // one formula, in one place, or the board and the card disagree.
+        top: rows.map((r, i) => ({ ...r, place: i + 1, score: playerScore(r), title: playerTitle(r), isMe: r.memberId === c?.sub })),
         // Longest current run in the venue — a streak is worth chasing only if
         // somebody can see it.
         streaks: db.prepare(`
@@ -950,6 +1028,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         status: r.status, calls: r.calls, startedAt: r.started_at,
         deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
         roundNo: r.roundNo, finalRound: r.finalRound, customPattern: r.customPattern, roundWins: r.roundWins,
+        // The podium sprint: who took it, how long is left, and the live race
+        // for second and third. Every screen shows the same board.
+        podium: r.podium, podiumEndsAt: r.podiumEndsAt, podiumFirst: r.podiumFirst,
+        standings: (r.status === 'podium' || r.status === 'ended') ? bingoStandings().slice(0, 8) : [],
         songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: !!youtubeKey(),
         // window for the square currently on screen (lip sync squares run longer)
         currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
@@ -1050,7 +1132,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // The host can close the picking window early — the room is usually ready
     // long before the timer is.
     'POST /battle/lock': async (req, res) => {
-      const c = auth(req, 'staff'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       const { battleId } = await readBody(req);
       const chosen = lockBattleRoster(battleId);
       if (!chosen) return json(res, 400, { error: 'that battle is not picking' });
@@ -1309,13 +1391,23 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const { claimId, approve } = await readBody(req);
       const claim = db.prepare(`SELECT * FROM bingo_claims WHERE id=? AND status='pending'`).get(claimId);
       if (!claim) return json(res, 404, { error: 'no pending claim' });
-      commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub, at: Date.now(), final_round: BINGO_FINAL_ROUND });
+      commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub,
+        at: Date.now(), final_round: BINGO_FINAL_ROUND,
+        podium_ends_at: approve ? Date.now() + bingoPodiumMs() : null });
       const after = getBingoRound();
       json(res, 200, { ok: true, roundNo: after.roundNo, pattern: after.pattern, status: after.status });
     },
     // Reset also sets up the NEXT game's deck/pattern — chosen here, before
     // anyone joins, so nobody's card ever gets dealt from a deck that later
     // changes out from under them.
+    // Close the podium sprint early — the room is usually done before the
+    // clock is.
+    'POST /bingo/podium/close': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const standings = closePodium();
+      if (!standings) return json(res, 400, { error: 'no podium is open' });
+      json(res, 200, { ok: true, standings });
+    },
     'POST /bingo/reset': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       const { deckId, pattern } = await readBody(req);

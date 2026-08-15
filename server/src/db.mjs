@@ -242,6 +242,8 @@ export function openDb(path) {
       member_id TEXT PRIMARY KEY REFERENCES members(id),
       nights INTEGER NOT NULL DEFAULT 0,
       rounds_won INTEGER NOT NULL DEFAULT 0,
+      seconds INTEGER NOT NULL DEFAULT 0,
+      thirds INTEGER NOT NULL DEFAULT 0,
       battles_won INTEGER NOT NULL DEFAULT 0,
       battles_lost INTEGER NOT NULL DEFAULT 0,
       forfeits INTEGER NOT NULL DEFAULT 0,
@@ -288,6 +290,26 @@ export function openDb(path) {
     );
   `);
 
+  // player_stats shipped before podium places existed, so any venue already
+  // running it has the table WITHOUT these columns — CREATE TABLE IF NOT
+  // EXISTS silently leaves an existing table alone, which is exactly how a
+  // live database ends up throwing "no such column" on a brand-new feature.
+  const pcols = db.prepare(`PRAGMA table_info(player_stats)`).all().map((c) => c.name);
+  if (!pcols.includes('seconds')) db.exec(`ALTER TABLE player_stats ADD COLUMN seconds INTEGER NOT NULL DEFAULT 0`);
+  if (!pcols.includes('thirds')) db.exec(`ALTER TABLE player_stats ADD COLUMN thirds INTEGER NOT NULL DEFAULT 0`);
+
+  const rcols = db.prepare(`PRAGMA table_info(bingo_round)`).all().map((c) => c.name);
+  if (!rcols.includes('podium_ends_at')) {
+    // A round no longer stops dead on one winner: the room gets a short sprint
+    // to settle second and third.
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN podium_ends_at INTEGER`);
+  }
+  if (!rcols.includes('podium')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN podium TEXT NOT NULL DEFAULT '[]'`); // finished standings, top 3
+  }
+  if (!rcols.includes('podium_first')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN podium_first TEXT`);                 // who claimed it
+  }
   const bcols = db.prepare(`PRAGMA table_info(lipsync_battles)`).all().map((c) => c.name);
   if (!bcols.includes('pick_ends_at')) {
     // How long the room gets to choose the two battlers, when there are more

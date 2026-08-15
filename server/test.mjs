@@ -13,6 +13,11 @@ const forgePass = (privateKey, number, issuedAt) => {
   return `${body}.${sig}`;
 };
 
+// The podium sprint auto-closes on a timer. At the shipped 30s the suite was
+// racing it — a slow run would have the window shut underneath the assertions
+// about the sprint being live. Pin it long here so the tests decide the
+// outcome, not the clock.
+process.env.BINGO_PODIUM_SECONDS = '600';
 const dataDir = `/tmp/hvas-test-${Date.now()}`;
 const { server, keys } = createApp({ dataDir });
 await new Promise((r) => server.listen(0, r));
@@ -305,11 +310,23 @@ ok(board.body.deckName === 'After Spot Starter', 'host board shows the human-rea
 const claimId = board.body.claims[0].id;
 const resolve = await call('POST', '/bingo/resolve', { claimId, approve: true }, stok);
 ok(resolve.status === 200, 'host approves the claim');
+// Approving settles FIRST place and opens the podium sprint — the round does
+// not advance until second and third are decided.
+state = await call('GET', '/bingo/state');
+ok(state.body.status === 'podium', 'approving a claim opens the podium sprint rather than ending the round');
+ok(state.body.podiumFirst === verify.body.member.id, 'the claimant is locked in as first');
+ok(typeof state.body.podiumEndsAt === 'number', 'the sprint has a deadline every screen can count down to');
+ok(state.body.standings.length > 0 && state.body.standings.every((p) => typeof p.pct === 'number'),
+  'the live race for second and third is published while the sprint runs');
+const closed = await call('POST', '/bingo/podium/close', {}, stok);
+ok(closed.status === 200 && closed.body.standings[0].place === 1, 'the host can close the sprint early');
 state = await call('GET', '/bingo/state');
 // Default game plays the three-round ladder, so winning a line takes round 1
 // and moves everyone to round 2 — it no longer ends the whole game outright.
 ok(state.body.status === 'live' && state.body.roundNo === 2, 'winning a line takes round 1 and advances to round 2');
 ok(state.body.roundWins.at(-1)?.round === 1, 'the round-1 win is recorded');
+ok(state.body.podium.length >= 1 && state.body.podium[0].memberId === verify.body.member.id,
+  'the finished podium is published, first place first');
 
 const reset = await call('POST', '/bingo/reset', { deckId: 'tally-after-dark', pattern: 'four_corners' }, stok);
 ok(reset.status === 200 && reset.body.deckId === 'tally-after-dark' && reset.body.pattern === 'four_corners', 'host resets into a different deck + pattern for the next game');
@@ -347,8 +364,11 @@ for (const i of [0, 1, 2, 3, 4]) await cover(ladCard[i], mtok, verify.body.membe
 const r1 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r1.status === 200, 'one line is a valid claim in round 1');
 let pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
-const adv1 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
-ok(adv1.body.roundNo === 2 && adv1.body.status === 'live', 'winning round 1 advances to round 2, game stays live');
+await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+const adv1 = await call('POST', '/bingo/podium/close', {}, stok);
+ok(adv1.status === 200, 'closing the podium finishes round 1');
+lad = await call('GET', '/bingo/state');
+ok(lad.body.roundNo === 2 && lad.body.status === 'live', 'winning round 1 advances to round 2, game stays live');
 lad = await call('GET', '/bingo/state');
 ok(lad.body.pattern === 'two_lines', 'round 2 requires two lines');
 const mineR2 = await call('GET', '/bingo/state', null, mtok);
@@ -363,7 +383,9 @@ for (const i of [5, 10, 15, 20]) await cover(ladCard[i], mtok, verify.body.membe
 const r2 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r2.status === 200, 'two lines is a valid claim in round 2');
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
-const adv2 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/podium/close', {}, stok);
+const adv2 = await call('GET', '/bingo/state');
 ok(adv2.body.roundNo === 3 && adv2.body.status === 'live', 'winning round 2 advances to round 3');
 lad = await call('GET', '/bingo/state');
 ok(lad.body.pattern === 'blackout', 'round 3 is the full card');
@@ -374,7 +396,9 @@ for (const it of ladCard) if (it && called.has(it.id)) await cover(it, mtok, ver
 const r3 = await call('POST', '/bingo/claim', {}, mtok);
 ok(r3.status === 200, 'a full card is a valid claim in round 3');
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
-const adv3 = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/podium/close', {}, stok);
+const adv3 = await call('GET', '/bingo/state');
 ok(adv3.body.status === 'ended', 'winning the final round ends the game rather than advancing');
 lad = await call('GET', '/bingo/state');
 ok(lad.body.winner?.number === buy.body.member.number, 'the final-round winner is the game winner');
@@ -390,7 +414,9 @@ for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, s
 for (const i of [0, 4, 20, 24]) await cover(ooCard[i], mtok, verify.body.member.id, mtok2);
 await call('POST', '/bingo/claim', {}, mtok);
 pend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
-const ooRes = await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/resolve', { claimId: pend.id, approve: true }, stok);
+await call('POST', '/bingo/podium/close', {}, stok);
+const ooRes = await call('GET', '/bingo/state');
 ok(ooRes.body.status === 'ended', 'a one-off pattern round ends on the first win, no ladder');
 
 console.log('LIP SYNC BATTLES');
@@ -743,6 +769,71 @@ if (dropped) {
 const relock = await call('POST', '/battle/lock', { battleId: battle.id }, stok);
 ok(relock.status === 400, 'locking an already-locked roster is refused');
 
+console.log('PODIUM — first, second and third every round');
+// A round used to stop dead on one winner and everyone else simply lost at
+// once. Now the claim settles first place and opens a sprint, and second and
+// third are decided on the board by who got closest.
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter', pattern: 'line' }, stok);
+const pod = [];
+for (let i = 0; i < 3; i++) {
+  const st2 = await call('POST', '/auth/member/start', { contact: `850-555-96${i}` });
+  const v2 = await call('POST', '/auth/member/verify', { contact: `850-555-96${i}`, code: st2.body.devCode, name: `Podium${i}` });
+  const j2 = await call('POST', '/bingo/join', {}, v2.body.token);
+  pod.push({ tok: v2.body.token, id: v2.body.member.id, card: j2.body.card, name: `Podium${i}` });
+}
+await call('POST', '/bingo/start', {}, stok);
+for (let i = 0; i < 40; i++) { const c2 = await call('POST', '/bingo/call', {}, stok); if (c2.status !== 200) break; }
+
+// Winner takes a line. The other two cover different amounts, so the sprint
+// has something real to rank.
+const plain = (m) => m.card.filter((sq) => sq && !sq.free && sq.type !== 'lipsync');
+for (const i of [0, 1, 2, 3, 4]) await cover(pod[0].card[i], pod[0].tok, pod[0].id, pod[1].tok);
+for (const sq of plain(pod[1]).slice(0, 8)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[1].tok);
+for (const sq of plain(pod[2]).slice(0, 3)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
+
+const podClaim = await call('POST', '/bingo/claim', {}, pod[0].tok);
+ok(podClaim.status === 200, 'the leader claims a line');
+const podPend = (await call('GET', '/bingo/board', null, stok)).body.claims.find((c) => c.status === 'pending');
+await call('POST', '/bingo/resolve', { claimId: podPend.id, approve: true }, stok);
+
+let podState = (await call('GET', '/bingo/state', null, pod[1].tok)).body;
+ok(podState.status === 'podium', 'the round enters the sprint instead of ending');
+ok(podState.podiumFirst === pod[0].id, 'first place is already locked to the claimant');
+ok(podState.standings.length === 3, 'every player still in the round appears in the live race');
+ok(podState.standings.every((p) => p.done <= p.need && p.pct >= 0 && p.pct <= 100), 'each is ranked by progress toward the pattern');
+const runnerUp = podState.standings.filter((p) => p.memberId !== pod[0].id);
+ok(runnerUp[0].memberId === pod[1].id, 'the player who covered more is ahead in the race for second');
+
+// The sprint is live: covering more during it can still change the result.
+for (const sq of plain(pod[2]).slice(3, 14)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
+podState = (await call('GET', '/bingo/state', null, pod[2].tok)).body;
+const chasers = podState.standings.filter((p) => p.memberId !== pod[0].id);
+ok(chasers[0].memberId === pod[2].id, 'a late sprint overtakes for second — the window is real, not decoration');
+
+const memberClose = await call('POST', '/bingo/podium/close', {}, pod[0].tok);
+ok(memberClose.status === 401, 'players cannot close the podium themselves');
+// The person running the night holds a HOST session, not a staff one — that
+// is the whole point of hosting moving to the member side — so the endpoint
+// has to accept it.
+const hostTok = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
+const podClose = await call('POST', '/bingo/podium/close', {}, hostTok);
+ok(podClose.status === 200, 'a host session closes the sprint, not just a staff one');
+const fin = podClose.body.standings;
+ok(fin.length === 3 && fin[0].place === 1 && fin[1].place === 2 && fin[2].place === 3, 'a full podium comes back: first, second, third');
+ok(fin[0].memberId === pod[0].id, 'the claimant holds first');
+ok(fin[1].memberId === pod[2].id, 'second went to whoever finished closest');
+ok(fin.every((p) => p.name), 'each place carries a name, so every screen can show it');
+
+const podAgain = await call('POST', '/bingo/podium/close', {}, stok);
+ok(podAgain.status === 400, 'closing a podium that is not open is refused');
+
+// Second and third are worth having, not just first.
+const secondPlace = (await call('GET', '/me/stats', null, pod[2].tok)).body.stats;
+const thirdPlace = (await call('GET', '/me/stats', null, pod[1].tok)).body.stats;
+ok(secondPlace.seconds === 1, 'a second place is recorded on that player\'s career');
+ok(thirdPlace.thirds === 1, 'and so is a third');
+ok((await call('GET', '/me/stats', null, pod[0].tok)).body.stats.roundsWon >= 1, 'first place still counts as a round won');
+
 console.log('CAREER STATS & LEADERBOARD');
 // The round resets every night; a player's record does not. That is the whole
 // reason to come back, so it has to survive a reset.
@@ -775,8 +866,11 @@ ok(lb.body.top.length > 0, 'and has players on it once a round has been played')
 ok(lb.body.top.every((r, i) => r.place === i + 1), 'places are numbered from 1');
 ok(lb.body.top.every((r) => r.title), 'every entry carries its title');
 ok(lb.body.top.some((r) => r.isMe), 'a member can find themselves on it');
-const scores = lb.body.top.map((r) => r.roundsWon * 3 + r.battlesWon * 2 + r.nights);
+const scores = lb.body.top.map((r) => r.score);
+ok(scores.every((v) => typeof v === 'number'), 'each row publishes its score, so no screen has to recompute the formula');
 ok(scores.every((v, i) => i === 0 || scores[i - 1] >= v), 'sorted best first');
+ok(lb.body.top.every((r) => typeof r.seconds === 'number' && typeof r.thirds === 'number'),
+  'podium finishes show on the board, not just wins');
 ok(Array.isArray(lb.body.streaks), 'current streaks are published for the TV');
 
 // The record has to outlive the game it was set in.

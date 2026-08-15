@@ -184,18 +184,35 @@ export function applyOp(db, op) {
       db.prepare(`UPDATE bingo_claims SET status=?, resolved_by=?, resolved_at=? WHERE id=?`)
         .run(d.approve ? 'approved' : 'rejected', d.by ?? null, d.at ?? ts, d.claim_id);
       if (!d.approve) break;
-      bumpStat(db, d.member_id, 'rounds_won');
+      // First place is settled. The round does not advance yet — it opens a
+      // short sprint so second and third are decided by how close the rest of
+      // the room got, instead of everyone else simply losing at once.
+      db.prepare(`UPDATE bingo_round SET status='podium', podium_first=?, podium_ends_at=?, podium='[]' WHERE id=1`)
+        .run(d.member_id, d.podium_ends_at ?? null);
+      break;
+    }
+    // The sprint is over. `d.standings` is the finished top three, already
+    // ranked by the caller against the round's pattern.
+    case 'bingo.podium': {
       const r = db.prepare('SELECT round_no, custom_pattern, round_wins FROM bingo_round WHERE id=1').get();
+      const standings = (d.standings || []).slice(0, 3);
+      const first = standings[0]?.memberId ?? d.first ?? null;
+      // Every place on the podium counts toward a career, not just the win.
+      if (standings[0]) bumpStat(db, standings[0].memberId, 'rounds_won');
+      if (standings[1]) bumpStat(db, standings[1].memberId, 'seconds');
+      if (standings[2]) bumpStat(db, standings[2].memberId, 'thirds');
       const wins = JSON.parse(r?.round_wins || '[]');
-      wins.push({ round: r?.round_no ?? 1, memberId: d.member_id, at: d.at ?? ts });
+      wins.push({ round: r?.round_no ?? 1, memberId: first, at: d.at ?? ts, podium: standings });
       const isLadder = !r?.custom_pattern;
       const nextRound = (r?.round_no ?? 1) + 1;
       if (isLadder && nextRound <= (d.final_round ?? 3)) {
-        db.prepare(`UPDATE bingo_round SET round_no=?, round_wins=?, winner_member_id=NULL WHERE id=1`)
-          .run(nextRound, JSON.stringify(wins));
+        db.prepare(`UPDATE bingo_round SET status='live', round_no=?, round_wins=?, winner_member_id=NULL,
+          podium=?, podium_ends_at=NULL, podium_first=NULL WHERE id=1`)
+          .run(nextRound, JSON.stringify(wins), JSON.stringify(standings));
       } else {
-        db.prepare(`UPDATE bingo_round SET status='ended', winner_member_id=?, round_wins=? WHERE id=1`)
-          .run(d.member_id, JSON.stringify(wins));
+        db.prepare(`UPDATE bingo_round SET status='ended', winner_member_id=?, round_wins=?,
+          podium=?, podium_ends_at=NULL, podium_first=NULL WHERE id=1`)
+          .run(first, JSON.stringify(wins), JSON.stringify(standings));
       }
       break;
     }
@@ -211,7 +228,8 @@ export function applyOp(db, op) {
       db.prepare(`DELETE FROM lipsync_battles`).run();
       db.prepare(`DELETE FROM lipsync_locks`).run();
       db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL,
-        now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]' WHERE id=1`)
+        now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]',
+        podium='[]', podium_ends_at=NULL, podium_first=NULL WHERE id=1`)
         .run(d.deck_id ?? null, d.pattern ?? 'line', d.custom_pattern ? 1 : 0);
       break;
     // Player taps a square to mark it covered — only actually called items

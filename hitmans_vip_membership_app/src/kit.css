@@ -794,3 +794,75 @@
 }
 .lb-stat i { font: 900 7px/1.4 var(--k-font); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--k-text-faint); }
 .lb-streak { flex: 0 0 auto; font: 900 11px/1 var(--k-font); color: var(--k-neon-lt); }
+
+/* ── Podium ───────────────────────────────────────────────────────────────
+   A round no longer ends on one name. First place opens a sprint and the room
+   races for second and third; this is that race while it runs, and the
+   finished three when it lands. */
+.podium {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 10px; border-radius: var(--k-r); min-width: 0;
+  border: 1px solid var(--k-gold); background: linear-gradient(180deg, rgba(255, 207, 71, .1), var(--k-ink));
+  box-shadow: var(--k-glow-gold);
+}
+.podium.is-live { border-color: var(--k-neon); box-shadow: var(--k-glow-neon); }
+.podium-head { display: flex; align-items: center; gap: 8px; }
+.podium-clock {
+  margin-left: auto; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--k-neon); background: rgba(255, 61, 240, .12);
+  font: 900 13px/1 var(--k-font); color: var(--k-neon-lt); font-variant-numeric: tabular-nums;
+}
+.podium-hint { margin: 0; font: 700 11px/1.3 var(--k-font); color: var(--k-text-dim); }
+.podium-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.podium-row {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 6px 9px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.podium-row.p1 { border-color: var(--k-gold); background: rgba(255, 207, 71, .1); }
+.podium-row.p2 { border-color: #cfd6e6; }
+.podium-row.p3 { border-color: #d08a4a; }
+.podium-row.is-me { box-shadow: var(--k-glow-cyan); }
+.podium-place { flex: 0 0 auto; font: 900 16px/1 var(--k-font); width: 24px; text-align: center; }
+.podium-who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.podium-who strong {
+  font: 900 12.5px/1.15 var(--k-font); text-transform: uppercase; color: var(--k-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.podium-who small { font: 700 9px/1 var(--k-font); color: var(--k-gold); }
+.podium-meter {
+  flex: 0 1 84px; height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--k-void); border: 1px solid var(--k-edge-soft);
+}
+.podium-meter i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--k-violet), var(--k-neon));
+  transition: width .35s cubic-bezier(.2, .8, .3, 1);
+}
+.podium-num { flex: 0 0 auto; font: 900 11px/1 var(--k-font); color: var(--k-text-dim); font-variant-numeric: tabular-nums; }
+/* On the TV this is the whole screen. */
+.tv-battle .podium { padding: clamp(14px, 3vw, 34px); }
+.tv-battle .podium-row { padding: clamp(8px, 1.6vw, 18px) clamp(10px, 2vw, 22px); }
+.tv-battle .podium-place { font-size: clamp(22px, 4vw, 52px); width: clamp(34px, 6vw, 74px); }
+.tv-battle .podium-who strong { font-size: clamp(16px, 2.8vw, 38px); }
+.tv-battle .podium-meter { flex-basis: clamp(90px, 16vw, 260px); height: clamp(8px, 1.2vw, 16px); }
+.tv-battle .podium-num { font-size: clamp(13px, 2vw, 26px); }
+@media (prefers-reduced-motion: reduce) { .podium-meter i { transition: none; } }
+
+/* On a player's own card the podium shares the screen with the grid, so it
+   runs compact — the full-size version is for the TV, where it is the only
+   thing on screen. */
+.screen-playerCard .podium { padding: 7px 8px; gap: 5px; }
+.screen-playerCard .podium-hint { display: none; }
+.screen-playerCard .podium-row { padding: 4px 7px; gap: 6px; }
+.screen-playerCard .podium-place { font-size: 13px; width: 19px; }
+.screen-playerCard .podium-who strong { font-size: 11px; }
+.screen-playerCard .podium-who small { font-size: 8px; }
+.screen-playerCard .podium-meter { flex-basis: 54px; height: 5px; }
+.screen-playerCard .podium-num { font-size: 10px; }
+/* Landscape has even less height to give it. */
+@media (max-height: 460px) and (min-width: 560px) {
+  .screen-playerCard .podium { padding: 5px 7px; gap: 3px; }
+  .screen-playerCard .podium-row { padding: 3px 6px; }
+  .screen-playerCard .podium-meter { display: none; }
+}

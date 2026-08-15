@@ -120,6 +120,7 @@ export function apiBingoMark(itemId, covered) { return call('POST', '/bingo/mark
 export function apiBingoStart() { return call('POST', '/bingo/start', {}, apiStaffToken()); }
 export function apiBingoCall() { return call('POST', '/bingo/call', {}, apiStaffToken()); }
 export function apiBingoResolve(claimId, approve) { return call('POST', '/bingo/resolve', { claimId, approve }, apiStaffToken()); }
+export function apiBingoPodiumClose() { return call('POST', '/bingo/podium/close', {}, apiStaffToken()); }
 export function apiBingoReset(deckId, pattern) { return call('POST', '/bingo/reset', { deckId, pattern }, apiStaffToken()); }
 export function apiBingoBoard() { return call('GET', '/bingo/board', null, apiStaffToken()); }
 // ── Lip Sync Battles ──

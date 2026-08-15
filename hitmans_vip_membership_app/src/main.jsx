@@ -4240,7 +4240,67 @@ function useCallClock(state) {
   return { left, pct: Math.max(0, Math.min(1, left / window)), text };
 }
 
-// The roster call-out. When three or more players hold the same lip sync
+// The podium. A round used to end the moment one person won and everyone else
+// simply lost at the same time; now first place opens a short sprint and the
+// rest of the room races for second and third. This shows the live race while
+// it runs and the finished three when it lands — on the card, the host screen
+// and the TV, because the whole room is watching the same board.
+function PodiumBoard({ state, meId, isHost = false, onChanged }) {
+  const left = useCountdown(state?.podiumEndsAt);
+  const [busy, setBusy] = useState(false);
+  const running = state?.status === 'podium';
+  const firstId = state?.podiumFirst || state?.podium?.[0]?.memberId;
+  // While the sprint runs the server sends standings ranked purely by
+  // progress. First place is already settled though, so the claimant is
+  // pinned to the top and everybody else is racing for second — otherwise a
+  // chaser who has covered more squares renders with a gold medal next to the
+  // person who actually took the round.
+  const ranked = running
+    ? (() => {
+        const list = state.standings || [];
+        const champ = list.find((p) => p.memberId === firstId);
+        const rest = list.filter((p) => p.memberId !== firstId);
+        return [...(champ ? [{ ...champ, place: 1 }] : []), ...rest.map((p, i) => ({ ...p, place: i + 2 }))];
+      })()
+    : (state?.podium || []);
+  const rows = ranked.slice(0, 5);
+  if (!rows.length) return null;
+  return (
+    <div className={`podium${running ? ' is-live' : ''}`}>
+      <div className="podium-head">
+        <span className="k-chip k-chip--gold k-chip--live">{running ? 'Race for 2nd & 3rd' : 'Podium'}</span>
+        {running && left && <span className="podium-clock">{Math.ceil(left.ms / 1000)}s</span>}
+      </div>
+      {running && <p className="podium-hint">First place is taken. Cover everything you can — closest two take second and third.</p>}
+      <ol className="podium-list">
+        {rows.map((p, i) => {
+          const place = p.place ?? i + 1;
+          return (
+            <li key={p.memberId} className={`podium-row p${Math.min(place, 4)}${p.memberId === meId ? ' is-me' : ''}`}>
+              <span className="podium-place">{place <= 3 ? ['🥇', '🥈', '🥉'][place - 1] : place}</span>
+              <span className="podium-who">
+                <strong>{p.name}{p.memberId === meId ? ' (you)' : ''}</strong>
+                {p.memberId === firstId && <small>took the round</small>}
+              </span>
+              {typeof p.pct === 'number' && (
+                <span className="podium-meter"><i style={{ width: `${p.pct}%` }} /></span>
+              )}
+              <span className="podium-num">{p.done ?? '–'}/{p.need ?? '–'}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {isHost && running && (
+        <button type="button" className="k-btn k-btn--go" disabled={busy}
+                onClick={async () => { setBusy(true); try { await apiBingoPodiumClose(); await onChanged?.(); } catch { /* ignore */ } setBusy(false); }}>
+          Close the podium now
+        </button>
+      )}
+    </div>
+  );
+}
+
+// The roster call-out.// The roster call-out. When three or more players hold the same lip sync
 // square, the whole room — not just the contenders — decides which two
 // perform for it. This renders identically on a player's phone, the host
 // screen and the TV, because everybody is looking at the same decision.
@@ -4420,6 +4480,15 @@ function TvDisplayScreen() {
   if (err === 'not-connected') return <NotConnectedBingo title="TV Display" />;
   const calls = state?.calls || [];
   const onTv = battle && battle.stage === 'tv' && battle.status !== 'done' && battle.status !== 'void';
+  // The podium owns the TV while it runs. It is the one moment every night
+  // when the whole room looks at the same screen at the same time.
+  if (state?.status === 'podium' || (state?.podium?.length > 0 && state?.status === 'ended')) {
+    return (
+      <div className="staff-dash tv-battle">
+        <PodiumBoard state={state} meId={null} />
+      </div>
+    );
+  }
   // Picking takes the TV regardless of stage: the whole room is voting on it,
   // so the whole room has to be able to see the running count.
   if (battle && battle.status === 'picking') {
@@ -4828,7 +4897,11 @@ function PlayerCardScreen({ navigate }) {
   }
   return (
     <div className="staff-dash">
-      {state.winner && (
+      {/* The podium says more than a winner banner ever did: it names all
+          three, and while the sprint runs it is a live race rather than an
+          announcement. */}
+      <PodiumBoard state={state} meId={apiMemberId()} onChanged={refresh} />
+      {state.winner && !state.podium?.length && (
         <div className="bingo-winner-banner">
           <strong>🏆 {state.winner.name} won!</strong>
         </div>
@@ -4870,6 +4943,10 @@ function PlayerCardScreen({ navigate }) {
             a 5x5 card is square, so it is sized off height and leaves a wide
             gutter that this exactly fills. */}
         <div className="bingo-side">
+          {/* Calling stops while the podium is being settled, so "Now playing
+              — Listen" would be telling players to listen to silence. The
+              podium above is the screen at that point. */}
+          {state.status !== 'podium' && (
           <div className="k-hud">
             {/* Deliberately NOT the artist and song. The player is meant to
                 work out what is playing by listening to it — printing the
@@ -4899,6 +4976,7 @@ function PlayerCardScreen({ navigate }) {
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[pattern] || '1 LINE'}</span>
             </div>
           </div>
+          )}
           {msg && <p className={`k-nudge${nope.id ? ' k-nudge--no' : ''}`}>{msg}</p>}
           {/* The already-called list used to live here. It is a list of
               answers — anyone who missed a song could read it off instead of
@@ -5045,6 +5123,9 @@ function HostScreen() {
         ))}
       </div>
 
+      {(board?.status === 'podium' || board?.podium?.length > 0) && (
+        <PodiumBoard state={board} meId={null} isHost onChanged={poll} />
+      )}
       {tab === 'run' && (
         <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
           <div className="bingo-status-row">
