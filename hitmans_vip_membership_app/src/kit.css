@@ -384,6 +384,12 @@
 
 /* ── Already-called list ──────────────────────────────────────────────── */
 .k-recent { min-width: 0; overflow: hidden; }
+/* When the rail is too short for even the heading plus one row, the contents
+   go — but never the box. The box's height comes from flex (basis 0, grow 1),
+   and useFitRows now measures only that, so hiding what is inside cannot
+   change the number that decided to hide it. Collapsing the box itself, which
+   an earlier version did, latched the count at zero permanently. */
+.k-recent[data-empty='y'] > * { display: none; }
 .k-recent ol {
   list-style: none; margin: 3px 0 0; padding: 0;
   display: flex; flex-direction: column; gap: 2px;
@@ -454,3 +460,34 @@
 }
 .app-panel header span { color: var(--k-neon); }
 .app-panel h2 { color: var(--k-text); }
+
+/* ── No-scroll guarantee, the rest of the app ─────────────────────────────
+   A phone on its side is WIDE, so `.screen`'s 34px desktop padding was still
+   in force in landscape — 68px of a 390px window spent on margins before any
+   content. Landscape gets the compact treatment globally rather than screen
+   by screen. */
+@media (max-height: 460px) and (min-width: 560px) {
+  .screen { padding: 6px 14px; }
+  .screen-header { margin-bottom: 6px; }
+  .screen-header h1 { font-size: 20px; }
+  .screen-header p { display: none; }
+  /* The lobby's stacked full-width actions cost two rows of height they do
+     not need when there is 800px of width going spare. */
+  .screen-lobby .app-panel-body { grid-template-columns: 1fr 1fr; align-items: start; }
+  .screen-lobby .app-panel-body > .mem-fineprint,
+  .screen-lobby .app-panel-body > .bingo-status-row,
+  .screen-lobby .app-panel-body > .bingo-lobby-live { grid-column: 1 / -1; }
+  .screen-lobby .bingo-btn { min-height: 38px; padding: 8px 12px; font-size: 12.5px; }
+  .screen-lobby .app-panel { padding: 0; }
+  .screen-lobby .app-panel > header { padding: 8px 12px; }
+  .screen-lobby .app-panel-body { padding: 8px 10px; }
+  .screen-lobby .staff-hub-tabs { margin-bottom: 4px; }
+}
+
+/* Portrait: the pass is a tall card and the screen intro above it was enough
+   to push the bottom edge off a 844px phone. */
+@media (max-width: 720px) and (min-height: 461px) {
+  .screen-membership .screen-header p { display: none; }
+  .screen-membership .screen-header { margin-bottom: 4px; }
+  .screen-membership.screen { padding-top: 6px; padding-bottom: 6px; }
+}

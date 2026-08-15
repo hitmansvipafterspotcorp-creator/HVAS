@@ -4182,7 +4182,13 @@ function bingoProgress(card, coveredIds, pattern) {
 // time — it either clipped a row through the middle or left a heading with
 // nothing under it. This measures instead of guessing, and returns 0 when
 // there is no room, so the whole block can disappear cleanly.
-function useFitRows(active, max = 6, rowPx = 22, headingPx = 15) {
+// `headingPx` is deliberately generous. It stands in for the heading's line
+// box plus the list's top margin, and it cannot be measured from the DOM: the
+// heading is one of the things hidden when nothing fits, so reading it back
+// would reintroduce the feedback loop this function exists to avoid. Being
+// two pixels optimistic slices the last row in half, so it rounds up instead
+// and occasionally shows one row fewer than would strictly fit.
+function useFitRows(active, max = 6, rowPx = 18, headingPx = 22) {
   const [rows, setRows] = useState(max);
   // A callback ref, not useRef: the list only mounts once the round's calls
   // arrive, which is several renders after this component first mounts. With
@@ -4194,17 +4200,15 @@ function useFitRows(active, max = 6, rowPx = 22, headingPx = 15) {
     // sits in a column that grows, so measuring there would read back its own
     // content height and settle at zero forever.
     if (!active || !node || typeof ResizeObserver === 'undefined') { setRows(max); return undefined; }
+    // Measure ONLY the box, never its contents. The box height comes from
+    // flex (basis 0, grow 1), so it does not move when the row count changes
+    // — which is the whole point. Earlier versions measured the list's own
+    // top or hid the box when empty; both fed the result back into the next
+    // measurement and latched the count at whatever it hit first.
     const measure = () => {
-      const ol = node.querySelector('ol');
       const row = node.querySelector('li')?.getBoundingClientRect().height || rowPx;
-      if (!ol) return;
-      // Measure the gap between where the list actually starts and where the
-      // box actually ends. Modelling it instead — heading height plus margin —
-      // was a couple of pixels optimistic, which is enough to slice the last
-      // row in half, and an inline heading's line box is taller than its
-      // bounding rect anyway.
-      const gap = parseFloat(getComputedStyle(ol).rowGap) || 2;
-      const avail = (node.getBoundingClientRect().top + node.clientHeight) - ol.getBoundingClientRect().top;
+      const gap = 2;
+      const avail = node.clientHeight - headingPx;
       setRows(Math.max(0, Math.min(max, Math.floor((avail + gap) / (row + gap)))));
     };
     measure();
@@ -4643,11 +4647,8 @@ function PlayerCardScreen({ navigate }) {
               way to catch up without asking the host; this is also what fills
               the rail in landscape, which was otherwise dead space. */}
           {calls.length > 1 && (
-            <div className="k-recent" ref={recentRef} data-rows={recentRows}>
-              {/* When not even one row fits, the heading carries the count
-                  instead, so the block still says something useful rather
-                  than heading an empty list. */}
-              <span className="k-label">Already called{recentRows === 0 ? ` · ${calls.length - 1}` : ''}</span>
+            <div className="k-recent" ref={recentRef} data-rows={recentRows} data-empty={recentRows === 0 ? 'y' : undefined}>
+              <span className="k-label">Already called</span>
               <ol>
                 {calls.slice(0, -1).reverse().slice(0, recentRows).map((c) => (
                   <li key={c.id} className={covered.has(c.id) ? 'is-mine' : ''}>
