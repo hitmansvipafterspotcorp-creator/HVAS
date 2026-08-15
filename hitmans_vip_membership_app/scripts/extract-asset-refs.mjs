@@ -1,6 +1,5 @@
 // Works out the exact set of public/ assets the built bundle actually
-// references, so a deploy ships those and ONLY those. (public/ also contains a
-// ~480MB dev-only assets/catalog/ tree that must never reach gh-pages.)
+// references, so a deploy ships those and ONLY those.
 //
 // Prints a count line, then one asset path per line.
 //   node scripts/extract-asset-refs.mjs

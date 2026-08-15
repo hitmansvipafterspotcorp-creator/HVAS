@@ -1,3 +1,11 @@
+// Art intake: mirrors raw sheets from the local Downloads folders into
+// public/assets/catalog/ and writes public/data/asset-catalog.json.
+//
+// The generated tree is NOT committed. It was ~480MB sitting inside the
+// deployable public/ folder, no app or runtime code ever loaded it, and all
+// but one file was byte-identical to art already tracked under assets/. Run
+// this only when you want to re-stage new sheets from Downloads; the paths
+// below are Windows-local, so it does nothing useful anywhere else.
 import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
