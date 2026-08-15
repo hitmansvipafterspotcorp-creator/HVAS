@@ -208,6 +208,39 @@ ok(badClaim.status === 400, 'claim rejected when card has no bingo line');
 const badMark = await call('POST', '/bingo/mark', { itemId: 'not-on-my-card', covered: true }, mtok);
 ok(badMark.status === 400, 'cannot mark an item that is not on your own card');
 
+// The player's card does not show which songs have played — working that out
+// by ear is the game — so the server is the only thing standing between a
+// guess and a covered square. Has to run BEFORE the deck is called out below,
+// or there is no unplayed square left to guess at.
+await call('POST', '/bingo/call', {}, stok);
+const early = await call('GET', '/bingo/state', null, mtok);
+const notPlayed = join1.body.card.find((it) => !it.free && it.type !== 'lipsync'
+  && !early.body.calls.some((c) => c.id === it.id));
+ok(!!notPlayed, 'a square whose song has not played yet exists to guess at');
+if (notPlayed) {
+  const guess = await call('POST', '/bingo/mark', { itemId: notPlayed.id, covered: true }, mtok);
+  ok(guess.status === 403 && /has not played/.test(guess.body.error || ''),
+    'guessing a song that has not played is refused');
+  const after = await call('GET', '/bingo/state', null, mtok);
+  ok(!after.body.me.covered.includes(notPlayed.id), 'and the refused guess left the square uncovered');
+}
+// Keep calling until a plain square on Tasha's card has actually played, so
+// the accept case runs every time rather than whenever the deal is kind — a
+// conditional assertion makes the suite's total wander from run to run.
+let alreadyPlayed = null;
+for (let i = 0; i < 60 && !alreadyPlayed; i++) {
+  const now = await call('GET', '/bingo/state', null, mtok);
+  alreadyPlayed = join1.body.card.find((it) => !it.free && it.type !== 'lipsync'
+    && now.body.calls.some((c) => c.id === it.id));
+  if (!alreadyPlayed && (await call('POST', '/bingo/call', {}, stok)).status !== 200) break;
+}
+ok(!!alreadyPlayed, 'a plain square on the card has now played');
+const good = await call('POST', '/bingo/mark', { itemId: alreadyPlayed.id, covered: true }, mtok);
+ok(good.status === 200, 'a song that HAS played can be covered');
+// Uncovering is always allowed: that is how a player undoes their own slip.
+const undo = await call('POST', '/bingo/mark', { itemId: alreadyPlayed.id, covered: false }, mtok);
+ok(undo.status === 200, 'and a covered square can always be uncovered again');
+
 // call out the entire deck's pool — once every item has been called, every
 // card (including Tasha's and Rell's) COULD be fully covered.
 for (let i = 0; i < 40; i++) { const r = await call('POST', '/bingo/call', {}, stok); if (r.status !== 200) break; }

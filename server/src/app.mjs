@@ -857,6 +857,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (!row) return json(res, 400, { error: 'join first' });
       const square = JSON.parse(row.card).find((it) => it.id === itemId);
       if (!square) return json(res, 400, { error: 'not on your card' });
+      // You cover what you HEAR. The player's card deliberately does not show
+      // which songs have been called — only the host and the TV know that, and
+      // working it out by ear is the game — so the server is the only thing
+      // standing between a guess and a covered square. It used to trust the
+      // client entirely here, which was fine only while the client refused to
+      // let you tap an uncalled square in the first place.
+      if (covered && !getBingoRound().calls.some((cl) => cl.id === itemId)) {
+        return json(res, 403, { error: 'that song has not played yet' });
+      }
       // A LIP SYNC square is earned by performing, never by tapping. Covering
       // one requires having won its battle; declining or losing locks it out.
       if (covered && square.type === 'lipsync') {

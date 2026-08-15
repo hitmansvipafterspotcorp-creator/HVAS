@@ -239,7 +239,7 @@
    Portrait: status strip on top, grid, footer.
    Landscape: the same strip becomes the rail beside the grid.
    Neither ever scrolls — the grid is sized off whichever axis is scarce. */
-.k-hud { display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px; }
+.k-hud { display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px; min-width: 0; }
 .k-hud-now {
   flex: 1 1 auto; min-width: 0;
   display: flex; flex-direction: column; justify-content: center; gap: 1px;
@@ -248,6 +248,9 @@
 .k-hud-now .k-value,
 .k-hud-song { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .k-hud-song { font: 700 11.5px/1.2 var(--k-font); }
+/* The listening prompt is an instruction, so it wraps rather than ellipsising
+   — "Find it on your ca…" is worse than two lines. */
+.k-listen + .k-hud-song { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .k-hud-now .k-chip { align-self: flex-start; margin-top: 2px; }
 .k-hud-round {
   flex: 0 0 auto; display: flex; flex-direction: column;
@@ -264,7 +267,7 @@
   background: rgba(34, 211, 238, .12);
   font: 900 11px/1.25 var(--k-font); color: var(--k-cyan-lt);
 }
-.k-cardfoot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.k-cardfoot { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
 .k-progressrow { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .k-cardfoot .k-btn { flex: 0 0 auto; width: auto; min-width: 132px; }
 
@@ -290,6 +293,12 @@
   width: 100%;
   aspect-ratio: 1;
   margin: 0;
+  /* The card sits inside a grid container (.app-panel-body), and a grid item
+     defaults to min-width:auto — it refuses to shrink below its own
+     min-content width, which here is however wide the longest artist name
+     wants to be. Without this the card grew ~35px past the panel and the
+     right-hand column was clipped clean off. */
+  min-width: 0;
 }
 .k-grid > .k-tile { width: auto; height: auto; }
 
@@ -355,9 +364,6 @@
     grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; overflow: hidden;
     display: flex; flex-direction: column; gap: 5px;
   }
-  /* The list is the one thing here that can be any length, so it is the one
-     thing that gives up space — it shows as many as fit and no more. */
-  .screen-playerCard .k-recent { display: block; flex: 1 1 0; min-height: 0; }
   .screen-playerCard .k-cardfoot {
     grid-column: 2; grid-row: 2; margin-top: 0;
     flex-direction: column; align-items: stretch; gap: 5px;
@@ -382,35 +388,9 @@
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
-/* ── Already-called list ──────────────────────────────────────────────── */
-.k-recent { min-width: 0; overflow: hidden; }
-/* When the rail is too short for even the heading plus one row, the contents
-   go — but never the box. The box's height comes from flex (basis 0, grow 1),
-   and useFitRows now measures only that, so hiding what is inside cannot
-   change the number that decided to hide it. Collapsing the box itself, which
-   an earlier version did, latched the count at zero permanently. */
-.k-recent[data-empty='y'] > * { display: none; }
-.k-recent ol {
-  list-style: none; margin: 3px 0 0; padding: 0;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.k-recent li {
-  display: flex; align-items: baseline; gap: 5px;
-  padding: 2px 7px; border-radius: var(--k-r-sm);
-  border: 1px solid var(--k-edge-soft); background: rgba(18, 18, 31, .8);
-  font: 700 10.5px/1.3 var(--k-font); color: var(--k-text-dim);
-  white-space: nowrap; overflow: hidden;
-}
-.k-recent li b { color: var(--k-text); text-transform: uppercase; }
-.k-recent li span { overflow: hidden; text-overflow: ellipsis; color: var(--k-text-faint); }
-/* Ones you already covered read as done, so the list doubles as a checklist. */
-.k-recent li.is-mine { border-color: var(--k-violet); color: var(--k-violet-lt); }
-.k-recent li.is-mine::after { content: '✓'; margin-left: auto; color: var(--k-violet-lt); font-weight: 900; }
-
-/* This list exists to fill the gutter that landscape opens up beside a square
-   card. In every other layout the card already fills the screen, so it is off
-   by default and switched on only in the rail. */
-.k-recent { display: none; }
+/* The already-called list lived here. It was removed with the feature: a list
+   of the songs already played is a list of answers, and the player is meant
+   to work those out by ear. It belongs to the host screen and the TV. */
 
 /* Square type: break inside a word only when a word genuinely cannot fit,
    and go a little tighter in landscape where cells are ~44px wide. */
@@ -431,7 +411,6 @@
    hit first. The heading and the (possibly empty) list are always rendered so
    the geometry the measurement depends on never moves. */
 @media (max-height: 460px) and (min-width: 560px) {
-  .k-recent li { padding: 1px 6px; font-size: 9.5px; }
 }
 
 /* A crown on the round label. Tried the full brand badge as a watermark
@@ -523,3 +502,106 @@
 .solo-cpus { display: flex; gap: 5px; }
 .solo-cpu { flex: 1 1 0; min-width: 0; padding: 4px 6px; font-size: 10.5px; }
 .solo-cpu-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── VFX layer ────────────────────────────────────────────────────────────
+   The particle canvas sits above the app and below anything the user has to
+   touch. It never receives pointer events, so a burst over a square cannot
+   swallow the next tap. */
+.hvas-vfx {
+  position: fixed; inset: 0; z-index: 90;
+  pointer-events: none; touch-action: none;
+}
+
+/* Covering a square. The tile snaps: a fast overshoot and settle, with the
+   glow flaring on the way. Short enough (260ms) that fast tapping during a
+   blackout round still feels responsive rather than queued. */
+@keyframes k-pop {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.16); }
+  70%  { transform: scale(.965); }
+  100% { transform: scale(1); }
+}
+.k-tile--pop { animation: k-pop .26s cubic-bezier(.3, 1.4, .4, 1); z-index: 2; }
+@keyframes k-flare {
+  0%   { box-shadow: 0 0 0 0 rgba(212, 163, 255, .85), var(--k-glow-violet); }
+  100% { box-shadow: 0 0 0 18px rgba(212, 163, 255, 0), var(--k-glow-violet); }
+}
+.k-tile--pop.k-tile--covered { animation: k-pop .26s cubic-bezier(.3, 1.4, .4, 1), k-flare .5s ease-out; }
+
+/* ONE AWAY. This square would finish the pattern. It has to out-shout the
+   ordinary called state without becoming a third colour to learn, so it is
+   the called treatment in gold, breathing rather than blinking. */
+@keyframes k-oneaway {
+  0%, 100% { box-shadow: 0 0 10px rgba(255, 207, 71, .45), inset 0 0 12px rgba(255, 207, 71, .18); }
+  50%      { box-shadow: 0 0 26px rgba(255, 207, 71, .95), inset 0 0 16px rgba(255, 207, 71, .35); }
+}
+.k-tile--oneaway {
+  border-color: var(--k-gold);
+  background: linear-gradient(180deg, rgba(255, 207, 71, .22), rgba(255, 207, 71, .05));
+  animation: k-oneaway 1.1s ease-in-out infinite;
+}
+.k-tile--oneaway .k-tile-artist { color: #fff; }
+.k-tile--oneaway .k-tile-song { color: var(--k-gold-lt); }
+.k-tile--oneaway::after {
+  content: 'ONE AWAY';
+  position: absolute; left: 0; right: 0; bottom: 0;
+  font: 900 6.5px/1.5 var(--k-font); letter-spacing: .12em;
+  color: #241500; background: var(--k-gold);
+}
+
+/* Taking a round: the card itself reacts, not just the banner. */
+@keyframes k-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  15% { transform: translate3d(-5px, 2px, 0) rotate(-.5deg); }
+  35% { transform: translate3d(5px, -2px, 0) rotate(.5deg); }
+  55% { transform: translate3d(-3px, 1px, 0); }
+  75% { transform: translate3d(3px, -1px, 0); }
+}
+.k-grid--win { animation: k-shake .5s ease-in-out; }
+/* A gold sweep across the card, once. */
+.k-grid { position: relative; }
+@keyframes k-sweep { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
+.k-grid--win::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  background: linear-gradient(90deg, transparent, rgba(255, 233, 168, .55), transparent);
+  width: 42%; animation: k-sweep .85s ease-out forwards;
+}
+
+/* The battle frame reacts to the performer's actual mic level (--k-lvl, 0..1)
+   rather than just filling a bar next to them. */
+.battle-live-frame {
+  box-shadow:
+    0 0 calc(12px + var(--k-lvl, 0) * 46px) rgba(255, 61, 240, calc(.25 + var(--k-lvl, 0) * .6)),
+    inset 0 0 calc(6px + var(--k-lvl, 0) * 26px) rgba(255, 157, 247, calc(.1 + var(--k-lvl, 0) * .35));
+  border-color: rgba(255, 61, 240, calc(.5 + var(--k-lvl, 0) * .5));
+  transition: box-shadow .06s linear, border-color .06s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k-tile--pop, .k-tile--oneaway, .k-grid--win, .k-grid--win::after { animation: none; }
+  .battle-live-frame { transition: none; }
+}
+
+/* A wrong guess. The player taps what they think they heard; if that song has
+   not played the server says so, and the square says no. Deliberately short
+   and non-punishing — guessing is the game, not an error state. */
+@keyframes k-nope {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  45% { transform: translateX(4px); }
+  70% { transform: translateX(-2px); }
+}
+.k-tile--nope {
+  animation: k-nope .34s ease-in-out;
+  border-color: var(--k-danger) !important;
+  box-shadow: 0 0 14px rgba(255, 51, 85, .55);
+}
+.k-nudge--no { border-color: var(--k-danger); background: rgba(255, 51, 85, .12); color: #ffb3c1; }
+/* "Listen" replaces the song title on a player's card. It should read as an
+   instruction, not as a missing value. */
+.k-listen { color: var(--k-cyan-lt); letter-spacing: .02em; }
+@media (prefers-reduced-motion: reduce) { .k-tile--nope { animation: none; } }
+
+/* Same reason as .k-grid: these are grid items of .app-panel-body and must be
+   allowed to shrink below their content's natural width. */
+.bingo-side { min-width: 0; }

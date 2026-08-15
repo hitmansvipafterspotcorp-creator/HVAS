@@ -4,6 +4,12 @@ import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
 import './kit.css';
+import { burstCover, celebrate } from './vfx';
+import {
+  BINGO_LINES, BINGO_PATTERN_LABEL, BINGO_PATTERN_NAME, BINGO_PATTERN_IDS, BINGO_PATTERN_GOAL,
+  BINGO_ROUND_PATTERN, BINGO_ROUND_PRIZE, BINGO_FINAL_ROUND as BINGO_FINAL_ROUND_CLIENT,
+  bingoProgress, bingoHasPattern, oneAwayIds,
+} from './bingoRules';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
   apiSetOtw, apiSignalLeave,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
@@ -3230,7 +3236,10 @@ function BattleStage({ battle, onDone, onTake }) {
 
   return (
     <div className="battle-stage">
-      <div className="battle-portrait">
+      {/* The whole frame reacts to how loud the performer actually is, not
+          just the bar beside them — from the stage's point of view the
+          performance IS the light. `--k-lvl` is the smoothed mic level. */}
+      <div className={`battle-portrait${recording ? ' battle-live-frame' : ''}`} style={{ '--k-lvl': level.toFixed(3) }}>
         <video ref={videoRef} className="battle-cam" playsInline muted autoPlay />
         {recording && <span className="battle-rec">● REC</span>}
         {left != null && <span className="battle-clock">{String(Math.floor(left / 60)).padStart(2, '0')}:{String(left % 60).padStart(2, '0')}</span>}
@@ -3952,16 +3961,11 @@ const soloLineProgress = (card, covered) =>
   Math.max(...SOLO_LINES.map((line) => line.filter((i) => i === 12 || covered.has(card[i].id)).length));
 // Solo runs the same three-round ladder the venue round does, so practising
 // alone teaches the real game: a line, then two lines, then the whole card.
-const SOLO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
-// Mirrors BINGO_FINAL_ROUND on the server. Solo never talks to the backend,
-// so it carries its own copy rather than pretending to read one.
-const BINGO_FINAL_ROUND_CLIENT = 3;
-const soloProgress = (card, covered, pattern) =>
-  bingoProgress(card.map((c) => c || { id: '__free' }), covered, pattern);
-const soloHasPattern = (card, covered, pattern) => {
-  const { done, need } = soloProgress(card, covered, pattern);
-  return done >= need;
-};
+// Solo's card holds a literal null in the centre; the shared rules expect an
+// object there, so normalise before handing it over.
+const soloCard = (card) => card.map((c) => c || { id: '__free' });
+const soloProgress = (card, covered, pattern) => bingoProgress(soloCard(card), covered, pattern);
+const soloHasPattern = (card, covered, pattern) => bingoHasPattern(soloCard(card), covered, pattern);
 
 // Solo round vs CPU opponents. Calls fire on a timer (there's no host), the
 // player taps their own called squares, and each CPU covers theirs after a
@@ -3975,6 +3979,9 @@ function SoloBingoGame({ onExit }) {
   const [game, setGame] = useState(null);
   const timerRef = useRef(null);
   const cpuTimersRef = useRef([]);
+  const soloGridRef = useRef(null);
+  const [soloPop, fireSoloPop] = useOneShot(320);
+  const [soloWin, fireSoloWin] = useOneShot(950);
 
   const clearTimers = () => {
     clearInterval(timerRef.current);
@@ -3987,7 +3994,7 @@ function SoloBingoGame({ onExit }) {
   const deal = (round, wins) => ({
     round,
     wins,
-    pattern: SOLO_ROUND_PATTERN[round] || 'line',
+    pattern: BINGO_ROUND_PATTERN[round] || 'line',
     order: shuffled(SOLO_DECK),
     calledCount: 0,
     card: dealCard(SOLO_DECK),
@@ -4038,25 +4045,37 @@ function SoloBingoGame({ onExit }) {
     return () => clearTimers();
   }, [game?.status]);
 
-  const tap = (item) => {
+  const tap = (item, el) => {
+    // Everything that is not a state update happens OUT here. A setGame
+    // updater runs during the render phase, and firing sound, particles and
+    // another component's setState from inside one is both a React warning
+    // and, under StrictMode's double-invoke, a doubled effect.
+    if (!game || game.status !== 'playing' || !item) return;
+    const called = new Set(game.order.slice(0, game.calledCount).map((c) => c.id));
+    if (!called.has(item.id)) return;                  // can only cover what's been called
+    const covered = new Set(game.covered);
+    const wasCovered = covered.has(item.id);
+    wasCovered ? covered.delete(item.id) : covered.add(item.id);
+    const won = !wasCovered && soloHasPattern(game.card, covered, game.pattern);
+    if (!wasCovered) {
+      playSfx('mark');
+      fireSoloPop(item.id);
+      burstCover(el, item.type === 'lipsync' ? 'lipsync' : 'violet');
+    }
+    if (won) {
+      playSfx('win');
+      fireSoloWin('grid');
+      celebrate(soloGridRef.current);
+    }
     setGame((g) => {
-      if (!g || g.status !== 'playing' || !item) return g;
-      const called = new Set(g.order.slice(0, g.calledCount).map((c) => c.id));
-      if (!called.has(item.id)) return g;              // can only cover what's been called
-      const covered = new Set(g.covered);
-      const wasCovered = covered.has(item.id);
-      wasCovered ? covered.delete(item.id) : covered.add(item.id);
-      if (!wasCovered) playSfx('mark');
-      if (soloHasPattern(g.card, covered, g.pattern)) {
-        playSfx('win');
-        const wins = g.wins + 1;
-        // Taking round 3 takes the match; anything earlier just moves you up.
-        const done = g.round >= BINGO_FINAL_ROUND_CLIENT;
-        return { ...g, covered, wins, status: done ? 'won' : 'roundWon', winner: 'you' };
-      }
-      return { ...g, covered };
+      if (!g || g.status !== 'playing') return g;
+      if (!won) return { ...g, covered };
+      // Taking round 3 takes the match; anything earlier just moves you up.
+      const done = g.round >= BINGO_FINAL_ROUND_CLIENT;
+      return { ...g, covered, wins: g.wins + 1, status: done ? 'won' : 'roundWon', winner: 'you' };
     });
   };
+
 
   if (!game) {
     return (
@@ -4066,7 +4085,7 @@ function SoloBingoGame({ onExit }) {
           {[1, 2, 3].map((r) => (
             <span key={r} className="k-ladder-step">
               <b>Round {r}</b>
-              <i>{BINGO_PATTERN_GOAL[SOLO_ROUND_PATTERN[r]]}</i>
+              <i>{BINGO_PATTERN_GOAL[BINGO_ROUND_PATTERN[r]]}</i>
               <u>${BINGO_ROUND_PRIZE[r]}</u>
             </span>
           ))}
@@ -4085,6 +4104,7 @@ function SoloBingoGame({ onExit }) {
   const waiting = game.card.filter((it) => it && called.has(it.id) && !game.covered.has(it.id)).length;
   const over = game.status !== 'playing';
   const myProgress = soloProgress(game.card, game.covered, game.pattern);
+  const soloOneAway = oneAwayIds(soloCard(game.card), game.covered, called, game.pattern);
 
   return (
     <>
@@ -4135,17 +4155,19 @@ function SoloBingoGame({ onExit }) {
           })}
         </div>
 
-        <div className="k-grid">
+        <div className={`k-grid${soloWin.id ? ' k-grid--win' : ''}`} key={`sg${soloWin.token}`} ref={soloGridRef}>
           {game.card.map((item, i) => {
             const isFree = i === 12;
             const isCalled = !isFree && called.has(item.id);
             const isCovered = isFree || game.covered.has(item.id);
             const isLip = !isFree && item.type === 'lipsync';
-            const state3 = isFree ? 'free' : isCovered ? 'covered' : isCalled && !over ? 'called' : '';
-            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync'].filter(Boolean).join(' ');
+            const state3 = isFree ? 'free' : isCovered ? 'covered'
+              : !over && soloOneAway.has(item.id) ? 'oneaway' : isCalled && !over ? 'called' : '';
+            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync',
+              !isFree && soloPop.id === item.id && 'k-tile--pop'].filter(Boolean).join(' ');
             const mark = isCovered && !isFree ? TILE_ART.covered : isCalled && !over ? TILE_ART.called : isLip ? TILE_ART.lipsync : null;
             return (
-              <button type="button" key={isFree ? 'free' : item.id} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled || over}>
+              <button type="button" key={`${isFree ? 'free' : item.id}-${!isFree && soloPop.id === item.id ? soloPop.token : 0}`} className={cls} onClick={(e) => tap(item, e.currentTarget)} disabled={isFree || !isCalled || over}>
                 {isFree ? 'Free space' : (
                   <>
                     <span className="k-tile-artist">{item.artist}</span>
@@ -4166,7 +4188,7 @@ function SoloBingoGame({ onExit }) {
 
         {game.status === 'roundWon' && (
           <button type="button" className="k-btn k-btn--go" onClick={nextRound}>
-            Round {game.round} won → play round {game.round + 1} ({BINGO_PATTERN_GOAL[SOLO_ROUND_PATTERN[game.round + 1]]})
+            Round {game.round} won → play round {game.round + 1} ({BINGO_PATTERN_GOAL[BINGO_ROUND_PATTERN[game.round + 1]]})
           </button>
         )}
         {over && game.status !== 'roundWon' && <button type="button" className="k-btn k-btn--gold" onClick={start}>Play Again</button>}
@@ -4190,113 +4212,25 @@ const KIT_LOGO = KIT('logo_lipsync_bingo');
 const KIT_BADGE = KIT('logo_badge');
 
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
-const BINGO_PATTERN_LABEL = {
-  line: 'complete a line', two_lines: 'complete two lines', four_corners: 'cover all four corners', x: 'cover an X',
-  around_the_world: 'cover the outer ring', blackout: 'cover the whole card',
-};
-const BINGO_PATTERN_NAME = { line: 'Line', two_lines: 'Two Lines', four_corners: 'Four Corners', x: 'X', around_the_world: 'Around The World', blackout: 'Blackout' };
-const BINGO_PATTERN_IDS = ['line', 'two_lines', 'four_corners', 'x', 'around_the_world', 'blackout'];
-// Short goal text for the round chip — the long sentence above does not fit
-// in a 90px panel, and on the card the player only needs the target.
-const BINGO_PATTERN_GOAL = {
-  line: '1 LINE', two_lines: '2 LINES', four_corners: '4 CORNERS', x: 'THE X',
-  around_the_world: 'OUTER RING', blackout: 'FULL CARD',
-};
-// What each round is worth. The art sheet prints these on the round chips, so
-// the numbers live here rather than being invented per screen.
-const BINGO_ROUND_PRIZE = { 1: 5, 2: 10, 3: 20 };
-
-// The 12 winning lines of a 5x5 card, as flat indexes. Used only to show a
-// player how close they are — the server still decides every real claim.
-const BINGO_LINES = (() => {
-  const L = [];
-  for (let r = 0; r < 5; r++) L.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));
-  for (let c = 0; c < 5; c++) L.push([0, 1, 2, 3, 4].map((r) => r * 5 + c));
-  L.push([0, 6, 12, 18, 24]);
-  L.push([4, 8, 12, 16, 20]);
-  return L;
-})();
-
-// How far along the current pattern this card is, as done//needed. Centre
-// square (12) is always free, so it counts as covered everywhere.
-function bingoProgress(card, coveredIds, pattern) {
-  if (!card?.length) return { done: 0, need: 1 };
-  const on = card.map((it, i) => i === 12 || coveredIds.has(it.id));
-  const lines = BINGO_LINES.filter((l) => l.every((i) => on[i])).length;
-  switch (pattern) {
-    case 'two_lines': return { done: Math.min(lines, 2), need: 2 };
-    case 'four_corners': return { done: [0, 4, 20, 24].filter((i) => on[i]).length, need: 4 };
-    case 'x': return { done: [0, 6, 18, 24, 4, 8, 16, 20].filter((i) => on[i]).length, need: 8 };
-    case 'around_the_world': {
-      const ring = [...Array(25).keys()].filter((i) => i < 5 || i > 19 || i % 5 === 0 || i % 5 === 4);
-      return { done: ring.filter((i) => on[i]).length, need: ring.length };
-    }
-    case 'blackout': return { done: on.filter(Boolean).length, need: 25 };
-    default: {
-      // Closest line, so "4 / 5" means one square from a bingo.
-      const best = Math.max(0, ...BINGO_LINES.map((l) => l.filter((i) => on[i]).length));
-      return { done: lines >= 1 ? 5 : best, need: 5 };
-    }
-  }
+// One-shot animation flags, driven by state rather than by touching
+// classList. Adding a class imperatively to a React-rendered element does not
+// survive: the next render reconciles className from the vdom and silently
+// strips it, so the particles fired but the tile never popped. `token` changes
+// on every trigger so tapping the same square twice restarts the animation
+// instead of being a no-op.
+function useOneShot(ms) {
+  const [state, setState] = useState({ id: null, token: 0 });
+  const timer = useRef(0);
+  const fire = (id) => {
+    clearTimeout(timer.current);
+    setState((s) => ({ id, token: s.token + 1 }));
+    timer.current = setTimeout(() => setState((s) => ({ id: null, token: s.token })), ms);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return [state, fire];
 }
 
-// How many rows of a list fit in the box flex actually handed us. The
-// already-called list shares the landscape rail with a HUD whose height moves
-// (a lip sync call adds a chip), so any fixed row count is wrong half the
-// time — it either clipped a row through the middle or left a heading with
-// nothing under it. This measures instead of guessing, and returns 0 when
-// there is no room, so the whole block can disappear cleanly.
-// `headingPx` is deliberately generous. It stands in for the heading's line
-// box plus the list's top margin, and it cannot be measured from the DOM: the
-// heading is one of the things hidden when nothing fits, so reading it back
-// would reintroduce the feedback loop this function exists to avoid. Being
-// two pixels optimistic slices the last row in half, so it rounds up instead
-// and occasionally shows one row fewer than would strictly fit.
-function useFitRows(active, max = 6, rowPx = 18, headingPx = 22) {
-  const [rows, setRows] = useState(max);
-  // A callback ref, not useRef: the list only mounts once the round's calls
-  // arrive, which is several renders after this component first mounts. With
-  // a plain ref the effect ran once against a null node, gave up, and never
-  // re-ran — so the row count stayed at the default and the list clipped.
-  const [node, setNode] = useState(null);
-  useEffect(() => {
-    // Only the landscape rail is height-constrained. Everywhere else the list
-    // sits in a column that grows, so measuring there would read back its own
-    // content height and settle at zero forever.
-    if (!active || !node || typeof ResizeObserver === 'undefined') { setRows(max); return undefined; }
-    // Measure ONLY the box, never its contents. The box height comes from
-    // flex (basis 0, grow 1), so it does not move when the row count changes
-    // — which is the whole point. Earlier versions measured the list's own
-    // top or hid the box when empty; both fed the result back into the next
-    // measurement and latched the count at whatever it hit first.
-    const measure = () => {
-      const row = node.querySelector('li')?.getBoundingClientRect().height || rowPx;
-      const gap = 2;
-      const avail = node.clientHeight - headingPx;
-      setRows(Math.max(0, Math.min(max, Math.floor((avail + gap) / (row + gap)))));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(node);
-    return () => ro.disconnect();
-  }, [active, node, max, rowPx, headingPx]);
-  return [rows, setNode];
-}
 
-// Live match for a media query, so layout-dependent logic and the stylesheet
-// can never disagree about which layout is on screen.
-function useMediaQuery(query) {
-  const [on, setOn] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(query).matches);
-  useEffect(() => {
-    if (typeof matchMedia === 'undefined') return undefined;
-    const mq = matchMedia(query);
-    const fn = (e) => setOn(e.matches);
-    setOn(mq.matches);
-    mq.addEventListener('change', fn);
-    return () => mq.removeEventListener('change', fn);
-  }, [query]);
-  return on;
-}
 
 // Countdown for the square currently on screen. The server stamps every call
 // with `at` and publishes the window it gets (lip sync squares run longer),
@@ -4575,19 +4509,23 @@ function PlayerCardScreen({ navigate }) {
   const pattern = state?.pattern || 'line';
   const progress = bingoProgress(me?.card, covered, pattern);
   const clock = useCallClock(state);
-  const railLayout = useMediaQuery('(max-height: 460px) and (min-width: 560px)');
-  const [recentRows, recentRef] = useFitRows(railLayout);
+  const gridRef = useRef(null);
+  const [pop, firePop] = useOneShot(320);
+  const [win, fireWin] = useOneShot(950);
+  const [nope, fireNope] = useOneShot(420);
   // Ring the call sting when a genuinely new song lands (poll-driven, so guard
   // against re-firing on every 2.5s refresh of the same call).
   const lastHeard = useRef(null);
   useEffect(() => {
     if (!nowCalling) return;
     if (lastHeard.current === null) { lastHeard.current = nowCalling.id; return; } // don't shout on first load
-    if (lastHeard.current !== nowCalling.id) { lastHeard.current = nowCalling.id; playSfx('call'); }
+    if (lastHeard.current === nowCalling.id) return;
+    lastHeard.current = nowCalling.id;
+    playSfx('call');
+    // Nothing points at the square that was just called, on purpose. An
+    // earlier version sparkled it so you could find it quickly, which meant
+    // the app was answering the only question the game asks.
   }, [nowCalling?.id]);
-  // How many called squares are sitting on this card still untapped — the
-  // thing a player actually needs to know at a glance on a phone.
-  const waiting = me?.card ? me.card.filter((it, i) => i !== 12 && calledIds.has(it.id) && !covered.has(it.id)).length : 0;
   // Any battle this member is personally in takes over the screen — being
   // called out is time-critical and must not be buried under the card.
   const [myBattles, setMyBattles] = useState([]);
@@ -4619,14 +4557,41 @@ function PlayerCardScreen({ navigate }) {
     catch (e) { setMsg(e.message === 'not a bingo yet' ? 'Not a bingo yet — cover a full pattern first!' : 'Could not submit — try again.'); }
     setBusy(false);
   };
-  const tap = async (item) => {
-    if (item.free || !calledIds.has(item.id)) return; // can only cover what's actually been called
-    const next = new Set(covered);
-    const wasCovered = next.has(item.id);
-    wasCovered ? next.delete(item.id) : next.add(item.id);
-    if (!wasCovered) playSfx('mark');
+  const tap = async (item, el) => {
+    if (item.free) return;
+    const wasCovered = covered.has(item.id);
+    // Uncovering is always allowed — that is how you undo your own mistake.
+    if (wasCovered) {
+      const next = new Set(covered); next.delete(item.id);
+      setLocalCovered([...next]);
+      try { await apiBingoMark(item.id, false); } catch { setLocalCovered(null); }
+      return;
+    }
+    // Covering is a GUESS. The card does not say which songs have played, so
+    // the server is the only thing that knows whether this one has — ask it
+    // first and let the answer drive the feedback.
+    try {
+      await apiBingoMark(item.id, true);
+    } catch (e) {
+      playSfx('buzz');
+      fireNope(item.id);
+      setMsg(/has not played/.test(e.message) ? "That one hasn't played yet — keep listening."
+        : /battle|declined|lost/.test(e.message) ? e.message
+        : 'Could not mark that — try again.');
+      return;
+    }
+    const next = new Set(covered); next.add(item.id);
+    playSfx('mark');
+    firePop(item.id);
+    burstCover(el, item.type === 'lipsync' ? 'lipsync' : 'violet');
+    setMsg('');
     setLocalCovered([...next]);
-    try { await apiBingoMark(item.id, !wasCovered); } catch { setLocalCovered(null); } // reconcile from server on failure
+    const after = bingoProgress(me.card, next, pattern);
+    if (after.done >= after.need) {
+      playSfx('win');
+      fireWin('grid');
+      celebrate(gridRef.current);
+    }
   };
   if (!me) {
     return (
@@ -4679,13 +4644,16 @@ function PlayerCardScreen({ navigate }) {
             gutter that this exactly fills. */}
         <div className="bingo-side">
           <div className="k-hud">
+            {/* Deliberately NOT the artist and song. The player is meant to
+                work out what is playing by listening to it — printing the
+                answer on their own card is the whole game given away. The
+                host screen and the TV still show it. */}
             <div className="k-hud-now k-frame k-frame--flat">
-              <span className="k-label">{nowCalling ? 'Now calling' : 'Standing by'}</span>
+              <span className="k-label">{nowCalling ? 'Now playing' : 'Standing by'}</span>
               {nowCalling ? (
                 <>
-                  <strong className="k-value">{nowCalling.artist}</strong>
-                  <span className="k-hud-song k-dim">{nowCalling.song}</span>
-                  {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                  <strong className="k-value k-listen">🎧 Listen</strong>
+                  <span className="k-hud-song k-dim">Find it on your card and tap it</span>
                 </>
               ) : <span className="k-hud-song k-dim">Waiting on the host…</span>}
             </div>
@@ -4704,39 +4672,28 @@ function PlayerCardScreen({ navigate }) {
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[pattern] || '1 LINE'}</span>
             </div>
           </div>
-          {waiting > 0 && (
-            <p className="k-nudge">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
-          )}
-          {/* Already-called songs. If you looked away for one song you had no
-              way to catch up without asking the host; this is also what fills
-              the rail in landscape, which was otherwise dead space. */}
-          {calls.length > 1 && (
-            <div className="k-recent" ref={recentRef} data-rows={recentRows} data-empty={recentRows === 0 ? 'y' : undefined}>
-              <span className="k-label">Already called</span>
-              <ol>
-                {calls.slice(0, -1).reverse().slice(0, recentRows).map((c) => (
-                  <li key={c.id} className={covered.has(c.id) ? 'is-mine' : ''}>
-                    <b>{c.artist}</b> <span>{c.song}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
+          {msg && <p className={`k-nudge${nope.id ? ' k-nudge--no' : ''}`}>{msg}</p>}
+          {/* The already-called list used to live here. It is a list of
+              answers — anyone who missed a song could read it off instead of
+              listening — so it belongs to the host screen and the TV, not to
+              a player's card. */}
         </div>
-        <div className="k-grid">
+        <div className={`k-grid${win.id ? ' k-grid--win' : ''}`} key={`g${win.token}`} ref={gridRef}>
           {me.card.map((item, i) => {
             const isFree = i === 12;
-            const isCalled = calledIds.has(item.id);
             const isCovered = isFree || covered.has(item.id);
             const isLip = item.type === 'lipsync';
-            // One state class per square: free > covered > called > idle. A
-            // square can never render as two things at once, which is what
-            // made the old grid hard to read at a glance.
-            const state3 = isFree ? 'free' : isCovered ? 'covered' : isCalled ? 'called' : '';
-            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync'].filter(Boolean).join(' ');
-            const mark = isCovered && !isFree ? TILE_ART.covered : isCalled ? TILE_ART.called : isLip ? TILE_ART.lipsync : null;
+            // Two states only: free and covered. There is deliberately no
+            // "called" state here — lighting up the squares the host has
+            // already played would hand the player every answer. The lip sync
+            // mark stays, because that is a property of the square itself and
+            // not a hint about what is playing.
+            const state3 = isFree ? 'free' : isCovered ? 'covered' : '';
+            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync',
+              pop.id === item.id && 'k-tile--pop', nope.id === item.id && 'k-tile--nope'].filter(Boolean).join(' ');
+            const mark = isCovered && !isFree ? TILE_ART.covered : isLip ? TILE_ART.lipsync : null;
             return (
-              <button type="button" key={`${i}-${item.id}`} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled}>
+              <button type="button" key={`${i}-${item.id}-${pop.id === item.id ? pop.token : 0}-${nope.id === item.id ? nope.token : 0}`} data-item={item.id} className={cls} onClick={(e) => tap(item, e.currentTarget)} disabled={isFree || state.status !== 'live'}>
                 {isFree ? 'Free space' : (
                   <>
                     <span className="k-tile-artist">{item.artist}</span>
@@ -4759,7 +4716,6 @@ function PlayerCardScreen({ navigate }) {
             </button>
           )}
         </div>
-        {msg && <p className="mem-fineprint">{msg}</p>}
       </AppPanel>
     </div>
   );
