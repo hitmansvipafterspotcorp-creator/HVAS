@@ -127,6 +127,9 @@ export function apiBattleCurrent(itemId) {
 export function apiBattleMine() { return call('GET', '/battle/mine', null, apiToken()); }
 export function apiBattleRespond(battleId, accept) { return call('POST', '/battle/respond', { battleId, accept }, apiToken()); }
 export function apiBattlePerformed(battleId) { return call('POST', '/battle/performed', { battleId }, apiToken()); }
+export function apiBattleFrame(battleId, frame) { return call('POST', '/battle/frame', { battleId, frame }, apiToken()); }
+export function apiBattleWatch(battleId) { return call('GET', `/battle/frame?battleId=${encodeURIComponent(battleId)}`, null, apiToken() || apiStaffToken()); }
+export function apiBattleSay(battleId, body, kind) { return call('POST', '/battle/say', { battleId, body, kind }, apiToken()); }
 export function apiBattleVote(battleId, memberId) { return call('POST', '/battle/vote', { battleId, memberId }, apiToken()); }
 export function apiBattleStage(battleId, stage) { return call('POST', '/battle/stage', { battleId, stage }, apiStaffToken()); }
 export function apiBattlePerform(battleId, memberId, seconds) { return call('POST', '/battle/perform', { battleId, memberId, seconds }, apiStaffToken()); }

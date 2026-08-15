@@ -8,7 +8,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
-  apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePerformed, apiBattleVote,
+  apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
   apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
@@ -3015,11 +3015,82 @@ function useMicLevel(stream, active) {
   return level;
 }
 
-// Post your take to Instagram / TikTok / YouTube Shorts.
+// Watch the performance live on any screen that isn't the performer's.
+function BattleWatch({ battleId, label }) {
+  const [frame, setFrame] = useState(null);
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!battleId) return undefined;
+    let on = true;
+    const tick = async () => {
+      try { const r = await apiBattleWatch(battleId); if (on) { setFrame(r.frame); setLive(!!r.live); } }
+      catch { if (on) setLive(false); }
+    };
+    tick();
+    const id = setInterval(tick, 180);
+    return () => { on = false; clearInterval(id); };
+  }, [battleId]);
+  if (!live || !frame) return null;
+  return (
+    <div className="battle-watch">
+      <img src={frame} alt={label || 'Live performance'} />
+      <span className="battle-watch-live">● LIVE</span>
+    </div>
+  );
+}
+
+const BATTLE_EMOJI = ['🔥', '💯', '😂', '👑', '🎤', '💀'];
+
+// The IG-Live layer: comments scrolling up the bottom of the battle screen,
+// one-tap emoji, and running reaction totals.
+function BattleChat({ battle, onChanged }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const logRef = useRef(null);
+  // Pin to the newest comment the way a live chat does.
+  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight; }, [battle?.comments?.length]);
+
+  const say = async (body, kind) => {
+    if (!body?.trim() || sending) return;
+    setSending(true);
+    try { await apiBattleSay(battle.id, body, kind); await onChanged?.(); } catch { /* ignore */ }
+    setSending(false);
+  };
+  const send = async (e) => { e.preventDefault(); const t = text; setText(''); await say(t, 'comment'); };
+
+  return (
+    <div className="battle-chat">
+      <div className="battle-reactions">
+        {BATTLE_EMOJI.map((e) => {
+          const n = battle.reactions?.find((r) => r.emoji === e)?.n || 0;
+          return (
+            <button key={e} type="button" className="battle-emoji" onClick={() => say(e, 'reaction')}>
+              <span>{e}</span>{n > 0 && <b>{n}</b>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="battle-log" ref={logRef}>
+        {(battle.comments || []).length === 0
+          ? <p className="battle-log-empty">Say something…</p>
+          : battle.comments.map((c) => (
+            <p key={c.id} className="battle-line"><b>{c.name}</b> {c.body}</p>
+          ))}
+      </div>
+      <form className="battle-say" onSubmit={send}>
+        <input type="text" value={text} maxLength={200} placeholder="Add a comment…"
+          onChange={(e) => setText(e.target.value)} />
+        <button type="submit" disabled={!text.trim() || sending}>Send</button>
+      </form>
+    </div>
+  );
+}
+
+// Post your take to Instagram / TikTok / Snapchat / YouTube Shorts.
 //
 // Deliberately the native share sheet, not per-platform "post" APIs: neither
 // Instagram nor TikTok exposes a public web endpoint that lets an arbitrary
-// app publish a video on a user's behalf (both gate it behind a Business
+// app publish a video on a user's behalf (they gate it behind a Business
 // account and app review). The share sheet needs no OAuth, no review, and no
 // stored credentials — the member picks the app themselves and lands in its
 // own composer, which is what every consumer app actually does on mobile.
@@ -3051,7 +3122,7 @@ function SharePerformance({ blob, artist, song }) {
       <video className="share-preview" src={URL.createObjectURL(blob)} controls playsInline />
       <p className="share-title">🎬 Your take is ready</p>
       {canShareFile
-        ? <button type="button" className="bingo-btn gold" onClick={share}>Share to Instagram · TikTok · Shorts</button>
+        ? <button type="button" className="bingo-btn gold" onClick={share}>Share to IG · TikTok · Snapchat · Shorts</button>
         : <p className="mem-fineprint">Direct sharing isn't available on this browser — save it and post from your camera roll.</p>}
       <button type="button" className="bingo-btn ghost" onClick={save}>Save video</button>
       {msg && <p className="mem-fineprint">{msg}</p>}
@@ -3065,6 +3136,7 @@ function BattleStage({ battle, onDone, onTake }) {
   const streamRef = useRef(null);
   const recRef = useRef(null);
   const chunksRef = useRef([]);
+  const castRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [recording, setRecording] = useState(false);
   const [err, setErr] = useState('');
@@ -3087,7 +3159,7 @@ function BattleStage({ battle, onDone, onTake }) {
         setErr('Camera and mic access is needed to perform. Allow it, then tap Retry.');
       }
     })();
-    return () => { live = false; streamRef.current?.getTracks().forEach((t) => t.stop()); };
+    return () => { live = false; clearInterval(castRef.current); streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, []);
 
   // Countdown against the server's window so every device agrees on time left.
@@ -3114,9 +3186,30 @@ function BattleStage({ battle, onDone, onTake }) {
       recRef.current = rec;
       setRecording(true);
       playSfx('battle');
+      startBroadcast();
     } catch { setErr('Recording is not supported on this browser.'); }
   };
+  // Push downscaled frames so every other phone and the TV can watch live.
+  // 6fps at 320px wide is plenty for a lip sync battle and stays small enough
+  // to sail over a phone's uplink and the venue tunnel.
+  const startBroadcast = () => {
+    const cv = document.createElement('canvas');
+    const send = async () => {
+      const v = videoRef.current;
+      if (!v || !v.videoWidth) return;
+      const w = 320, h = Math.round((v.videoHeight / v.videoWidth) * w);
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext('2d');
+      cx.translate(w, 0); cx.scale(-1, 1);          // un-mirror for viewers
+      cx.drawImage(v, 0, 0, w, h);
+      try { await apiBattleFrame(battle.id, cv.toDataURL('image/jpeg', 0.5)); } catch { /* a dropped frame costs nothing */ }
+    };
+    castRef.current = setInterval(send, 165);
+  };
+  const stopBroadcast = () => { clearInterval(castRef.current); castRef.current = null; };
+
   const stop = async () => {
+    stopBroadcast();
     // Grab the finished blob before tearing down — this is the take the
     // member gets to keep and post.
     const rec = recRef.current;
@@ -3179,6 +3272,9 @@ function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
       {iAmIn && battle.status === 'pending' && <p className="mem-fineprint">You're in. Waiting on the host to put you up.</p>}
       {performing && battle.status === 'performing' && <BattleStage battle={battle} onDone={onChanged} onTake={setMyTake} />}
       {myTake && <SharePerformance blob={myTake} artist={battle.artist} song={battle.song} />}
+      {!performing && battle.status === 'performing' && (
+        <BattleWatch battleId={battle.id} label={`${battle.artist} — ${battle.song}`} />
+      )}
 
       {/* live standings — doubles as the vote UI once voting opens */}
       <div className="battle-players">
@@ -4145,6 +4241,7 @@ function TvDisplayScreen() {
           <span className="bingo-now-label">LIP SYNC BATTLE</span>
           <strong>{battle.artist}</strong><span className="bingo-now-song">{battle.song}</span>
         </div>
+        <BattleWatch battleId={battle.id} label={`${battle.artist} — ${battle.song}`} />
         <div className="tv-battle-players">
           {battle.players.map((p) => (
             <div key={p.memberId} className={`tv-battle-player${battle.performingMemberId === p.memberId ? ' up' : ''}${battle.winnerMemberId === p.memberId ? ' won' : ''}`}>
@@ -4290,6 +4387,19 @@ function PlayerCardScreen({ navigate }) {
     return () => clearInterval(id);
   }, []);
   const activeBattle = myBattles[0] || null;
+  const [battleOpen, setBattleOpen] = useState(false);
+  // The battle screen is fixed and full-viewport; the page underneath must not
+  // scroll behind it, or a swipe drags the card around under the overlay.
+  useEffect(() => {
+    if (!battleOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [battleOpen]);
+  // Being put up to perform is time-critical — don't make them find it.
+  useEffect(() => {
+    if (activeBattle?.performingMemberId && activeBattle.performingMemberId === apiMemberId()) setBattleOpen(true);
+  }, [activeBattle?.performingMemberId]);
   const claim = async () => {
     setBusy(true); setMsg('');
     try { await apiBingoClaim(); await refresh(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
@@ -4322,8 +4432,30 @@ function PlayerCardScreen({ navigate }) {
           <strong>🏆 {state.winner.name} won!</strong>
         </div>
       )}
-      {activeBattle && (
-        <LipSyncBattlePanel battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} isHost={false} />
+      {/* A battle is its own full screen, never stacked on top of the card —
+          together they were far taller than any phone. The card keeps a slim
+          alert; the battle takes over when you enter it (and takes over on
+          its own the moment you're actually up to perform). */}
+      {activeBattle && !battleOpen && (
+        <button type="button" className="battle-alert" onClick={() => setBattleOpen(true)}>
+          <span className="battle-alert-dot" aria-hidden="true" />
+          <span className="battle-alert-text">
+            <strong>🎤 Lip Sync Battle</strong>
+            <small>{activeBattle.artist} — {activeBattle.song}</small>
+          </span>
+          <span className="battle-alert-go">
+            {activeBattle.me?.state === 'invited' ? 'RESPOND' : activeBattle.status === 'voting' ? 'VOTE' : 'ENTER'}
+          </span>
+        </button>
+      )}
+      {activeBattle && battleOpen && (
+        <div className="battle-fullscreen">
+          <button type="button" className="battle-close" onClick={() => setBattleOpen(false)} aria-label="Back to card">✕ Card</button>
+          <div className="battle-fullscreen-body">
+            <LipSyncBattlePanel battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} isHost={false} />
+          </div>
+          <BattleChat battle={activeBattle} onChanged={loadBattles} />
+        </div>
       )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
         {/* What was just called, on the player's own screen. Without this you
@@ -4472,7 +4604,8 @@ function TvAutoMediaPanel({ nowPlaying, onChange }) {
     setBusy(false);
   };
   const play = async (v) => { setBusy(true); try { await apiBingoPlayMedia(v.videoId, v.title); await onChange?.(); } catch { /* ignore */ } setBusy(false); };
-  const stop = async () => { setBusy(true); try { await apiBingoStopMedia(); await onChange?.(); } catch { /* ignore */ } setBusy(false); };
+  const stop = async () => {
+    setBusy(true); try { await apiBingoStopMedia(); await onChange?.(); } catch { /* ignore */ } setBusy(false); };
   return (
     <AppPanel title="TV Auto Media" subtitle="Search a song, send it to every TV">
       {nowPlaying?.videoId ? (

@@ -386,6 +386,23 @@ ok(up.status === 200 && up.body.endsAt > Date.now(), 'host puts a performer up w
 bat = (await call('GET', `/battle/current?itemId=${encodeURIComponent(lipSquare.id)}`, null, mtok)).body.battle;
 ok(bat.status === 'performing' && bat.performingMemberId === verify.body.member.id, 'battle shows who is performing right now');
 
+console.log('LIVE PERFORMANCE STREAM');
+const tinyFrame = 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+const notPerformer = await call('POST', '/battle/frame', { battleId: bat.id, frame: tinyFrame }, mtok2);
+ok(notPerformer.status === 403, 'only the member actually performing can broadcast to every screen');
+const pushed = await call('POST', '/battle/frame', { battleId: bat.id, frame: tinyFrame }, mtok);
+ok(pushed.status === 200, 'the performer pushes live frames');
+const pulled = await call('GET', `/battle/frame?battleId=${bat.id}`, null, mtok2);
+ok(pulled.body.live === true && pulled.body.frame === tinyFrame, 'every other screen pulls the live frame');
+const staffPull = await call('GET', `/battle/frame?battleId=${bat.id}`, null, stok);
+ok(staffPull.body.live === true, 'the TV (staff session) sees the same stream');
+const anonPull = await call('GET', `/battle/frame?battleId=${bat.id}`, null, null);
+ok(anonPull.status === 401, 'the stream is not public');
+const huge = await call('POST', '/battle/frame', { battleId: bat.id, frame: 'x'.repeat(400001) }, mtok);
+ok(huge.status === 400, 'oversized frames are refused rather than eating memory');
+const noBattle = await call('GET', '/battle/frame?battleId=999999', null, mtok);
+ok(noBattle.body.live === false && noBattle.body.frame === null, 'a battle with no stream reports not-live');
+
 const earlyVote = await call('POST', '/battle/vote', { battleId: bat.id, memberId: verify.body.member.id }, mtok2);
 ok(earlyVote.status === 400, 'voting is closed until performances are done');
 

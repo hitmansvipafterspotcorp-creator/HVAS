@@ -311,6 +311,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   };
   // Votes per performer, highest first — drives both the live meter and the
   // automatic winner when the host closes voting.
+  // Latest live frame per battle. In-memory and intentionally unbounded-free:
+  // one small entry per battle, cleared when the battle resolves.
+  const battleFrames = new Map();
+
   const battleTally = (battleId) => db.prepare(`
     SELECT p.member_id AS memberId, m.name, m.number, p.state,
            (SELECT COUNT(*) FROM lipsync_battle_votes v WHERE v.battle_id=p.battle_id AND v.member_id=p.member_id) AS votes
@@ -1026,6 +1030,35 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       });
     },
 
+    // ── Live performance stream ──
+    // The performer's phone pushes downscaled JPEG frames; every other screen
+    // (phones + TV) pulls the latest. Deliberately NOT WebRTC: a mesh needs
+    // signalling, TURN and NAT traversal per viewer and falls apart past a
+    // handful of phones, whereas this is one small POST and one small GET, it
+    // works over the venue's Cloudflare tunnel unchanged, and a dropped frame
+    // costs nothing. Frames live in memory only — they're ephemeral by nature
+    // and have no business in SQLite or the mesh op-log.
+    'POST /battle/frame': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, frame } = await readBody(req);
+      const b = db.prepare('SELECT performing_member_id, status FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      // Only whoever is actually up can broadcast — nobody else can hijack the screen.
+      if (b.performing_member_id !== c.sub) return json(res, 403, { error: 'you are not performing' });
+      if (typeof frame !== 'string' || frame.length > 400000) return json(res, 400, { error: 'bad frame' });
+      battleFrames.set(String(battleId), { frame, at: Date.now(), by: c.sub });
+      json(res, 200, { ok: true });
+    },
+    'GET /battle/frame': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const id = new URL(req.url, 'http://x').searchParams.get('battleId');
+      const f = battleFrames.get(String(id));
+      // Treat a stale frame as "no stream" so a frozen image never masquerades
+      // as a live performance after the performer's phone drops off.
+      if (!f || Date.now() - f.at > 4000) return json(res, 200, { frame: null, live: false });
+      json(res, 200, { frame: f.frame, at: f.at, live: true });
+    },
+
     // Live chat + emoji during a battle. Open to any member in the room —
     // the crowd reacting IS the show.
     'POST /battle/say': async (req, res) => {
@@ -1070,6 +1103,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const ok = db.prepare(`SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?`).get(battleId, winner);
       if (!ok || ok.state !== 'performed') return json(res, 400, { error: 'winner must have performed' });
       commit('battle.resolve', { battle_id: battleId, winner_id: winner, at: Date.now() });
+      battleFrames.delete(String(battleId));
       json(res, 200, { ok: true, winnerId: winner, tally });
     },
 
