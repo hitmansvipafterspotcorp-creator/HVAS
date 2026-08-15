@@ -866,3 +866,102 @@
   .screen-playerCard .podium-row { padding: 3px 6px; }
   .screen-playerCard .podium-meter { display: none; }
 }
+
+/* The leaderboard has no natural ceiling — twenty rows on a busy venue — so
+   it scrolls inside itself rather than growing the page, the same way the
+   door roster and host player list already do. Without this the Record tab
+   ran 233px past the fold on a phone and 723px on a big screen. */
+.lb { max-height: min(38vh, 300px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* And the record panel itself is capped so the two panels together always fit. */
+.screen-lobby .app-panel { max-height: calc(100vh - 120px); }
+.screen-lobby .app-panel-body { min-height: 0; overflow-y: auto; }
+@media (max-height: 460px) and (min-width: 560px) {
+  /* Landscape has ~300px of usable height for two panels, so Record puts the
+     card and the board SIDE BY SIDE rather than stacking them, and every part
+     of it gets tighter. */
+  .screen-lobby .staff-dash.mode-record { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+  .screen-lobby .mode-record .staff-hub-tabs { grid-column: 1 / -1; }
+  .screen-lobby .mode-record .app-panel { max-height: calc(100vh - 96px); min-height: 0; }
+  .screen-lobby .app-panel > header { padding: 6px 10px; }
+  .screen-lobby .app-panel h2 { font-size: 15px; }
+  .screen-lobby .rec-grid { grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .screen-lobby .rec-cell { padding: 4px 3px; }
+  .screen-lobby .rec-cell strong { font-size: 15px; }
+  .screen-lobby .rec-title { padding: 6px; }
+  .screen-lobby .rec-title-name { font-size: 16px; }
+  .screen-lobby .rec-streak { padding: 5px 8px; }
+  .screen-lobby .rec-streak strong { font-size: 12px; }
+  .screen-lobby .lb { max-height: calc(100vh - 190px); }
+  .screen-lobby .lb-row { padding: 4px 7px; }
+}
+
+
+/* ── Landscape phone: the screens that still ran past the fold ────────────
+   Measured at 844x390 with a live round on: Booking 94px, Host Control 97px,
+   Game Menu 153px, TV Display 27px. All four are stacked single-column
+   layouts with room to spare on the sides, so they go two-up and tighten. */
+@media (max-height: 460px) and (min-width: 560px) {
+  .screen-booking .staff-dash,
+  .screen-bingoStyle .staff-dash,
+  .screen-host .host-console { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: start; }
+  .screen-host .host-console > .battle-alert,
+  .screen-host .host-console > .host-tabs,
+  .screen-host .host-console > .podium { grid-column: 1 / -1; }
+  .screen-booking .app-panel,
+  .screen-bingoStyle .app-panel { max-height: calc(100vh - 84px); min-height: 0; }
+  /* Host Control carries more chrome above its panel than the others — the
+     battle alert and the tab row both sit full width — so its budget is
+     measurably smaller: ~28px header + 38px alert + 30px tabs + padding. */
+  .screen-host .app-panel { max-height: calc(100vh - 164px); min-height: 0; }
+  .screen-booking .app-panel-body,
+  .screen-bingoStyle .app-panel-body,
+  .screen-host .app-panel-body { min-height: 0; overflow-y: auto; }
+  .screen-booking .app-panel > header,
+  .screen-bingoStyle .app-panel > header,
+  .screen-host .app-panel > header { padding: 6px 10px; }
+  .screen-booking .app-panel h2,
+  .screen-bingoStyle .app-panel h2,
+  .screen-host .app-panel h2 { font-size: 15px; }
+  /* The TV Display screen is a call log that only grows. */
+  .screen-tv .staff-dash { max-height: calc(100vh - 66px); }
+  .screen-tv .app-panel-body { min-height: 0; overflow-y: auto; }
+}
+
+/* ── Short and wide: laptops, projectors, a 720p TV ──────────────────────
+   The member screens are a phone-width column centred in the page, so on a
+   1280x720 screen they have width to spare and no height at all — the same
+   shape as a landscape phone, an octave up. The landscape rules above are
+   keyed to (max-height: 460px) and never fire here, which left My Pass 285px,
+   the card 427px and Record 420px past the fold.
+
+   Deliberately gated at min-width 900px so it can never catch a phone in
+   either orientation, and at max-height 820px so a portrait tablet (820x1180)
+   is untouched. */
+@media (min-width: 900px) and (max-height: 820px) {
+  .screen { padding-top: 10px; padding-bottom: 10px; }
+  /* The screen header is 87px here with its paragraph already hidden — a
+     third of what the card needs. It comes down to match. */
+  .screen-header { margin-bottom: 8px; margin-top: 0; padding-top: 0; }
+  .screen-header p { display: none; }
+  .screen-header h1 { font-size: 24px; line-height: 1.1; }
+  .screen-membership .app-panel,
+  .screen-lobby .app-panel,
+  .screen-host .app-panel,
+  .screen-bingoStyle .app-panel { max-height: calc(100vh - 130px); min-height: 0; }
+  .screen-membership .app-panel-body,
+  .screen-lobby .app-panel-body,
+  .screen-host .app-panel-body,
+  .screen-bingoStyle .app-panel-body { min-height: 0; overflow-y: auto; }
+  .screen-membership .mem-screen { max-height: calc(100vh - 120px); overflow-y: auto; }
+  /* The card is square, so here — as in landscape — it is sized off HEIGHT.
+     Sized off the column width it renders 720px tall in a 720px window. */
+  .screen-playerCard .k-grid { width: min(calc(100vh - 344px), 100%); }
+  .screen-playerCard .app-panel { max-height: calc(100vh - 96px); min-height: 0; }
+  /* Record stacks two tall panels. There is 1280px of width going spare on a
+     screen this shape, so they go side by side — the same answer landscape
+     reached, for the same reason. */
+  .screen-lobby .mode-record { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  .screen-lobby .mode-record .staff-hub-tabs { grid-column: 1 / -1; }
+  .screen-lobby .mode-record .app-panel { max-height: calc(100vh - 168px); }
+  .lb { max-height: calc(100vh - 348px); }
+}

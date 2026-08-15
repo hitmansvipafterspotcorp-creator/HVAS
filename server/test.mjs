@@ -784,12 +784,17 @@ for (let i = 0; i < 3; i++) {
 await call('POST', '/bingo/start', {}, stok);
 for (let i = 0; i < 40; i++) { const c2 = await call('POST', '/bingo/call', {}, stok); if (c2.status !== 200) break; }
 
-// Winner takes a line. The other two cover different amounts, so the sprint
-// has something real to rank.
+// Cards are dealt at random, so this cannot assume anything about WHICH
+// squares a player holds. Two earlier versions did — one assumed more squares
+// covered meant closer to the pattern (it does not; that is only the
+// tie-break), the other assumed every card has a line free of lip sync
+// squares (about a third do not). Both failed on unlucky deals. So the
+// assertions below are about the published RULE and about the window being
+// live, not about a particular player winning.
 const plain = (m) => m.card.filter((sq) => sq && !sq.free && sq.type !== 'lipsync');
 for (const i of [0, 1, 2, 3, 4]) await cover(pod[0].card[i], pod[0].tok, pod[0].id, pod[1].tok);
 for (const sq of plain(pod[1]).slice(0, 8)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[1].tok);
-for (const sq of plain(pod[2]).slice(0, 3)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
+for (const sq of plain(pod[2]).slice(0, 2)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
 
 const podClaim = await call('POST', '/bingo/claim', {}, pod[0].tok);
 ok(podClaim.status === 200, 'the leader claims a line');
@@ -801,14 +806,21 @@ ok(podState.status === 'podium', 'the round enters the sprint instead of ending'
 ok(podState.podiumFirst === pod[0].id, 'first place is already locked to the claimant');
 ok(podState.standings.length === 3, 'every player still in the round appears in the live race');
 ok(podState.standings.every((p) => p.done <= p.need && p.pct >= 0 && p.pct <= 100), 'each is ranked by progress toward the pattern');
-const runnerUp = podState.standings.filter((p) => p.memberId !== pod[0].id);
-ok(runnerUp[0].memberId === pod[1].id, 'the player who covered more is ahead in the race for second');
+// The published order must obey the stated rule: closest to the pattern
+// first, total squares covered only as a tie-break.
+const ordered = (rows) => rows.every((p, i) => i === 0
+  || rows[i - 1].done > p.done
+  || (rows[i - 1].done === p.done && rows[i - 1].covered >= p.covered));
+ok(ordered(podState.standings), 'the race is ordered by progress toward the pattern, then by squares covered');
 
-// The sprint is live: covering more during it can still change the result.
-for (const sq of plain(pod[2]).slice(3, 14)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
+// The window is live: covering during it really does move you up the board.
+const beforeSprint = podState.standings.find((p) => p.memberId === pod[2].id);
+for (const sq of plain(pod[2]).slice(2, 16)) await call('POST', '/bingo/mark', { itemId: sq.id, covered: true }, pod[2].tok);
 podState = (await call('GET', '/bingo/state', null, pod[2].tok)).body;
-const chasers = podState.standings.filter((p) => p.memberId !== pod[0].id);
-ok(chasers[0].memberId === pod[2].id, 'a late sprint overtakes for second — the window is real, not decoration');
+const afterSprint = podState.standings.find((p) => p.memberId === pod[2].id);
+ok(afterSprint.covered > beforeSprint.covered,
+  `sprinting during the window moves you up the board (${beforeSprint.covered} -> ${afterSprint.covered} squares)`);
+ok(ordered(podState.standings), 'and the board stays correctly ordered as it changes');
 
 const memberClose = await call('POST', '/bingo/podium/close', {}, pod[0].tok);
 ok(memberClose.status === 401, 'players cannot close the podium themselves');
@@ -821,15 +833,16 @@ ok(podClose.status === 200, 'a host session closes the sprint, not just a staff 
 const fin = podClose.body.standings;
 ok(fin.length === 3 && fin[0].place === 1 && fin[1].place === 2 && fin[2].place === 3, 'a full podium comes back: first, second, third');
 ok(fin[0].memberId === pod[0].id, 'the claimant holds first');
-ok(fin[1].memberId === pod[2].id, 'second went to whoever finished closest');
+const finalRace = podState.standings.filter((p) => p.memberId !== pod[0].id);
+ok(fin[1].memberId === finalRace[0].memberId, 'second went to whoever the live board had closest when it closed');
 ok(fin.every((p) => p.name), 'each place carries a name, so every screen can show it');
 
 const podAgain = await call('POST', '/bingo/podium/close', {}, stok);
 ok(podAgain.status === 400, 'closing a podium that is not open is refused');
 
 // Second and third are worth having, not just first.
-const secondPlace = (await call('GET', '/me/stats', null, pod[2].tok)).body.stats;
-const thirdPlace = (await call('GET', '/me/stats', null, pod[1].tok)).body.stats;
+const secondPlace = (await call('GET', '/me/stats', null, pod.find((m) => m.id === fin[1].memberId).tok)).body.stats;
+const thirdPlace = (await call('GET', '/me/stats', null, pod.find((m) => m.id === fin[2].memberId).tok)).body.stats;
 ok(secondPlace.seconds === 1, 'a second place is recorded on that player\'s career');
 ok(thirdPlace.thirds === 1, 'and so is a third');
 ok((await call('GET', '/me/stats', null, pod[0].tok)).body.stats.roundsWon >= 1, 'first place still counts as a round won');

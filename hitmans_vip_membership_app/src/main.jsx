@@ -4573,7 +4573,10 @@ function LobbyScreen({ navigate }) {
   // so the mode switch lives ABOVE the connection check, not behind it.
   const [mode, setMode] = useState('venue');
   return (
-    <div className="staff-dash">
+    // The mode is on the wrapper so layout rules can target one tab. Record
+    // wants two columns in landscape; Solo, which shares this screen, does
+    // not — scoping it to .staff-dash alone knocked Solo past the fold.
+    <div className={`staff-dash mode-${mode}`}>
       <div className="staff-hub-tabs bingo-mode-tabs">
         <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
         <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
