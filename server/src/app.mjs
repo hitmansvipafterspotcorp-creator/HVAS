@@ -389,6 +389,49 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // A called LIP SYNC square opens a battle between everyone holding it. Two
   // or more is a real battle; a single holder still has to perform it solo
   // before the square counts.
+  // Titles are earned, not bought. Thresholds are deliberately reachable in a
+  // few nights at the bottom and genuinely hard at the top, so there is always
+  // a next one visible.
+  const PLAYER_TITLES = [
+    { at: 0,  title: 'First Timer' },
+    { at: 2,  title: 'Regular' },
+    { at: 5,  title: 'Card Shark' },
+    { at: 10, title: 'Mic Holder' },
+    { at: 18, title: 'Crowd Favorite' },
+    { at: 30, title: 'Headliner' },
+    { at: 50, title: 'After Spot Legend' },
+  ];
+  // One number behind every title: rounds are worth most, battles next, and
+  // simply turning up still counts for something.
+  const playerScore = (s) => (s.roundsWon || 0) * 3 + (s.battlesWon || 0) * 2 + (s.nights || 0);
+  const playerTitle = (s) => {
+    const score = playerScore(s);
+    let t = PLAYER_TITLES[0].title;
+    for (const step of PLAYER_TITLES) if (score >= step.at) t = step.title;
+    return t;
+  };
+  const nextTitle = (s) => {
+    const score = playerScore(s);
+    const step = PLAYER_TITLES.find((x) => x.at > score);
+    return step ? { title: step.title, need: step.at - score } : null;
+  };
+  const playerStats = (memberId) => {
+    const row = db.prepare(`SELECT nights, rounds_won AS roundsWon, battles_won AS battlesWon,
+      battles_lost AS battlesLost, forfeits, squares, performances, streak, best_streak AS bestStreak, last_night AS lastNight
+      FROM player_stats WHERE member_id=?`).get(memberId)
+      || { nights: 0, roundsWon: 0, battlesWon: 0, battlesLost: 0, forfeits: 0, squares: 0, performances: 0, streak: 0, bestStreak: 0, lastNight: null };
+    const fought = (row.battlesWon || 0) + (row.battlesLost || 0);
+    return {
+      ...row,
+      score: playerScore(row),
+      title: playerTitle(row),
+      next: nextTitle(row),
+      // Only meaningful once they have actually been in one.
+      battleWinRate: fought ? Math.round((row.battlesWon / fought) * 100) : null,
+      playedTonight: row.lastNight === nightKey(),
+    };
+  };
+
   const openBattleFor = (item) => {
     if (item?.type !== 'lipsync') return null;
     const existing = db.prepare(`SELECT id FROM lipsync_battles WHERE item_id=? AND status NOT IN ('done','void')`).get(item.id);
@@ -590,6 +633,33 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const m = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
       if (!m) return json(res, 404, { error: 'not found' });
       json(res, 200, { events: memberTimeline(m) });
+    },
+    // A member's career. The round resets every night; this does not, which
+    // is the point — it is the thing you come back to grow.
+    'GET /me/stats': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, { stats: playerStats(c.sub) });
+    },
+    // Who is actually good at this. Public on purpose: the TV shows it between
+    // rounds, and being on it is most of the reason to try for it.
+    'GET /bingo/leaderboard': (req, res) => {
+      const c = auth(req);
+      const rows = db.prepare(`
+        SELECT s.member_id AS memberId, m.name, m.number,
+               s.rounds_won AS roundsWon, s.battles_won AS battlesWon, s.battles_lost AS battlesLost,
+               s.nights, s.streak, s.best_streak AS bestStreak, s.squares, s.performances
+        FROM player_stats s JOIN members m ON m.id=s.member_id
+        WHERE s.nights > 0
+        ORDER BY (s.rounds_won * 3 + s.battles_won * 2 + s.nights) DESC, s.battles_won DESC, m.name ASC
+        LIMIT 20`).all();
+      json(res, 200, {
+        top: rows.map((r, i) => ({ ...r, place: i + 1, title: playerTitle(r), isMe: r.memberId === c?.sub })),
+        // Longest current run in the venue — a streak is worth chasing only if
+        // somebody can see it.
+        streaks: db.prepare(`
+          SELECT m.name, s.streak FROM player_stats s JOIN members m ON m.id=s.member_id
+          WHERE s.streak > 1 ORDER BY s.streak DESC, m.name ASC LIMIT 5`).all(),
+      });
     },
     // HitKoin: a member's own wallet + reward history. No wallet exists
     // until their first mint (their first real, confirmed payment).
@@ -899,7 +969,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (existing) return json(res, 200, { card: JSON.parse(existing.card), ready: !!existing.ready, covered: JSON.parse(existing.covered) });
       const r = getBingoRound();
       const card = bingoDealCard(deckById(r.deckId).items);
-      commit('bingo.join', { member_id: c.sub, card, at: Date.now() });
+      commit('bingo.join', { night: nightKey(), member_id: c.sub, card, at: Date.now() });
       json(res, 200, { card, ready: false, covered: [] });
     },
     'POST /bingo/ready': async (req, res) => {

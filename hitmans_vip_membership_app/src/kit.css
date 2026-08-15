@@ -714,3 +714,83 @@
   border: 1px solid var(--k-edge); background: var(--k-void); color: var(--k-text);
   font: 900 15px/1 var(--k-font); letter-spacing: .08em;
 }
+
+/* ── Host console ─────────────────────────────────────────────────────── */
+.host-tabs { margin-bottom: 6px; }
+/* A pending claim is the only thing here that cannot wait. */
+.staff-hub-tab.alert {
+  border-color: var(--k-gold); color: var(--k-gold);
+  box-shadow: var(--k-glow-gold); animation: k-pulse 1.4s ease-in-out infinite;
+}
+/* The player list is the one panel with no natural ceiling — a busy night is
+   forty names — so it scrolls inside itself rather than growing the page. */
+.host-scroll { max-height: min(46vh, 340px); overflow-y: auto; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .staff-hub-tab.alert { animation: none; } }
+
+/* ── Player record ────────────────────────────────────────────────────────
+   The round resets; this does not. It is the reason to come back, so it gets
+   the gold treatment the prize panel gets and nothing else does. */
+.rec-title {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 10px; border-radius: var(--k-r); text-align: center;
+}
+.rec-title-name {
+  font: 900 clamp(18px, 5.5vw, 26px)/1.05 var(--k-font);
+  color: var(--k-gold); text-shadow: 0 0 16px rgba(255, 207, 71, .45);
+  text-transform: uppercase; letter-spacing: .02em;
+}
+.rec-next { font: 700 11px/1.3 var(--k-font); color: var(--k-text-dim); }
+.rec-next b { color: var(--k-violet-lt); }
+
+/* The streak line. Cold when there is nothing to lose, lit once there is. */
+.rec-streak {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 11px;
+  border-radius: var(--k-r); border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.rec-streak strong { font: 900 14px/1.15 var(--k-font); color: var(--k-text); }
+.rec-streak span { font: 700 11px/1.25 var(--k-font); color: var(--k-text-dim); }
+.rec-streak.hot {
+  border-color: var(--k-neon); background: rgba(255, 61, 240, .1); box-shadow: var(--k-glow-neon);
+}
+.rec-streak.hot strong { color: var(--k-neon-lt); }
+
+.rec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.rec-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 8px 4px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.rec-cell strong { font: 900 19px/1 var(--k-font); color: var(--k-violet-lt); }
+.rec-cell span {
+  font: 900 8px/1.2 var(--k-font); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--k-text-faint); text-align: center;
+}
+.rec-rate { display: flex; flex-direction: column; gap: 4px; }
+.rec-rate-num { font: 900 10px/1 var(--k-font); color: var(--k-text-dim); }
+
+/* ── Leaderboard ──────────────────────────────────────────────────────── */
+.lb { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lb-row {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  padding: 7px 9px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.lb-row.podium { border-color: var(--k-gold); }
+.lb-row.is-me { border-color: var(--k-cyan); box-shadow: var(--k-glow-cyan); }
+.lb-place {
+  flex: 0 0 auto; width: 22px; text-align: center;
+  font: 900 14px/1 var(--k-font); color: var(--k-text-faint);
+}
+.lb-row.podium .lb-place { color: var(--k-gold); }
+.lb-who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lb-who strong {
+  font: 900 12.5px/1.15 var(--k-font); text-transform: uppercase; color: var(--k-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lb-who small { font: 700 9.5px/1 var(--k-font); color: var(--k-violet-lt); }
+.lb-stat {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+  font: 900 14px/1 var(--k-font); color: var(--k-text);
+}
+.lb-stat i { font: 900 7px/1.4 var(--k-font); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--k-text-faint); }
+.lb-streak { flex: 0 0 auto; font: 900 11px/1 var(--k-font); color: var(--k-neon-lt); }

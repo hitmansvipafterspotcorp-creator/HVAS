@@ -235,6 +235,22 @@ export function openDb(path) {
       at INTEGER NOT NULL,
       PRIMARY KEY (battle_id, voter_id)
     );
+    -- A player's career across every night, kept apart from the live round so
+    -- a reset cannot wipe it. This is the reason to come back: the round ends,
+    -- the record does not.
+    CREATE TABLE IF NOT EXISTS player_stats (
+      member_id TEXT PRIMARY KEY REFERENCES members(id),
+      nights INTEGER NOT NULL DEFAULT 0,
+      rounds_won INTEGER NOT NULL DEFAULT 0,
+      battles_won INTEGER NOT NULL DEFAULT 0,
+      battles_lost INTEGER NOT NULL DEFAULT 0,
+      forfeits INTEGER NOT NULL DEFAULT 0,
+      squares INTEGER NOT NULL DEFAULT 0,
+      performances INTEGER NOT NULL DEFAULT 0,
+      last_night TEXT,                        -- the night key of their last round
+      streak INTEGER NOT NULL DEFAULT 0,      -- consecutive nights played
+      best_streak INTEGER NOT NULL DEFAULT 0
+    );
     -- When three or more players hold the same lip sync square, the room
     -- decides which two actually battle for it. One pick per member.
     CREATE TABLE IF NOT EXISTS lipsync_battle_picks (

@@ -743,6 +743,49 @@ if (dropped) {
 const relock = await call('POST', '/battle/lock', { battleId: battle.id }, stok);
 ok(relock.status === 400, 'locking an already-locked roster is refused');
 
+console.log('CAREER STATS & LEADERBOARD');
+// The round resets every night; a player's record does not. That is the whole
+// reason to come back, so it has to survive a reset.
+const myStats = await call('GET', '/me/stats', null, mtok);
+ok(myStats.status === 200, 'a member can read their own career');
+const st0 = myStats.body.stats;
+ok(st0.nights >= 1, `nights played is counted (${st0.nights})`);
+ok(st0.squares > 0, `squares covered accumulate (${st0.squares})`);
+ok(typeof st0.title === 'string' && st0.title.length > 0, `every player has a title (${st0.title})`);
+// `next` is null only at the top title, which the suite reaches because it
+// resolves dozens of rounds; below that it must always show what is left.
+ok(st0.next ? st0.next.need > 0 : st0.title === 'After Spot Legend',
+  `the next title is visible with what it takes, or they are already at the top (${st0.title} / ${st0.next?.title ?? 'maxed'})`);
+const rookieStart = await call('POST', '/auth/member/start', { contact: '850-555-9500' });
+const rookieV = await call('POST', '/auth/member/verify', { contact: '850-555-9500', code: rookieStart.body.devCode, name: 'Rookie' });
+const rookie = (await call('GET', '/me/stats', null, rookieV.body.token)).body.stats;
+ok(rookie.nights === 0 && rookie.title === 'First Timer', 'someone who has never played reads as a First Timer with a clean sheet');
+ok(rookie.next && rookie.next.need > 0, `and can see exactly what the next title costs (${rookie.next?.title} in ${rookie.next?.need})`);
+ok(rookie.battleWinRate === null, 'no win rate before a first battle, rather than a misleading 0%');
+ok(st0.streak >= 1, 'playing tonight starts a streak');
+ok(st0.playedTonight === true, 'the card knows they have already played tonight');
+ok(st0.battleWinRate === null || (st0.battleWinRate >= 0 && st0.battleWinRate <= 100), 'win rate is a percentage, or null before their first battle');
+
+const anon = await call('GET', '/me/stats', null, null);
+ok(anon.status === 401, 'career stats need a member session');
+
+const lb = await call('GET', '/bingo/leaderboard', null, mtok);
+ok(lb.status === 200 && Array.isArray(lb.body.top), 'the leaderboard is readable');
+ok(lb.body.top.length > 0, 'and has players on it once a round has been played');
+ok(lb.body.top.every((r, i) => r.place === i + 1), 'places are numbered from 1');
+ok(lb.body.top.every((r) => r.title), 'every entry carries its title');
+ok(lb.body.top.some((r) => r.isMe), 'a member can find themselves on it');
+const scores = lb.body.top.map((r) => r.roundsWon * 3 + r.battlesWon * 2 + r.nights);
+ok(scores.every((v, i) => i === 0 || scores[i - 1] >= v), 'sorted best first');
+ok(Array.isArray(lb.body.streaks), 'current streaks are published for the TV');
+
+// The record has to outlive the game it was set in.
+const before = (await call('GET', '/me/stats', null, mtok)).body.stats;
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter' }, stok);
+const after = (await call('GET', '/me/stats', null, mtok)).body.stats;
+ok(after.nights === before.nights && after.squares === before.squares && after.roundsWon === before.roundsWon,
+  'a game reset wipes the round but never the career behind it');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 
 server.close();

@@ -78,6 +78,10 @@ export function apiSignalLeave() { return call('POST', '/signal/leave', {}, apiT
 
 // HitKoin — a member's own wallet + reward history. No wallet exists until
 // their first real, confirmed payment mints one.
+// A member's career across every night, and the venue leaderboard. These
+// outlive the round on purpose — they are the reason to come back.
+export function apiMyStats() { return call('GET', '/me/stats', null, apiToken()); }
+export function apiLeaderboard() { return call('GET', '/bingo/leaderboard', null, apiToken() || apiStaffToken()); }
 export function apiWallet() { return call('GET', '/wallet', null, apiToken()); }
 
 // Staff / host: venue-code login, then everything below reads from the ONE

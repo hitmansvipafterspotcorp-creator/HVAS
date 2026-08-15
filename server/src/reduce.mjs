@@ -11,6 +11,32 @@
 //   entry.admit                       → insert-once (member+night unique)
 //   entry.checkout                    → set-once (only while left_at is still null)
 //   decision                          → append (deduped by op id upstream)
+// Career stats live outside the round so a reset cannot erase them. Every
+// update goes through here so the row is created on first sight rather than
+// needing a seed step at signup.
+function bumpStat(db, memberId, field, by = 1) {
+  if (!memberId) return;
+  db.prepare('INSERT OR IGNORE INTO player_stats(member_id) VALUES(?)').run(memberId);
+  db.prepare(`UPDATE player_stats SET ${field} = ${field} + ? WHERE member_id=?`).run(by, memberId);
+}
+
+// A night counts the first time you take a card that night. Playing on
+// consecutive nights extends a streak; missing one resets it to this night
+// alone. Nights are keyed on a 3am boundary, so a 2am round still belongs to
+// the night it started.
+function markNight(db, memberId, night) {
+  if (!memberId || !night) return;
+  db.prepare('INSERT OR IGNORE INTO player_stats(member_id) VALUES(?)').run(memberId);
+  const row = db.prepare('SELECT last_night, streak, best_streak FROM player_stats WHERE member_id=?').get(memberId);
+  if (row.last_night === night) return;                 // already counted tonight
+  const prev = new Date(`${night}T00:00:00Z`);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  const consecutive = row.last_night === prev.toISOString().slice(0, 10);
+  const streak = consecutive ? (row.streak || 0) + 1 : 1;
+  db.prepare(`UPDATE player_stats SET nights = nights + 1, last_night = ?, streak = ?,
+    best_streak = MAX(best_streak, ?) WHERE member_id=?`).run(night, streak, streak, memberId);
+}
+
 export function applyOp(db, op) {
   const ts = op.ts;
   const d = op.data;
@@ -141,6 +167,7 @@ export function applyOp(db, op) {
     case 'bingo.join':
       db.prepare(`INSERT OR IGNORE INTO bingo_cards(member_id,card,ready,joined_at) VALUES(?,?,0,?)`)
         .run(d.member_id, JSON.stringify(d.card), d.at ?? ts);
+      markNight(db, d.member_id, d.night);
       break;
     case 'bingo.ready':
       db.prepare(`UPDATE bingo_cards SET ready=? WHERE member_id=?`).run(d.ready ? 1 : 0, d.member_id);
@@ -157,6 +184,7 @@ export function applyOp(db, op) {
       db.prepare(`UPDATE bingo_claims SET status=?, resolved_by=?, resolved_at=? WHERE id=?`)
         .run(d.approve ? 'approved' : 'rejected', d.by ?? null, d.at ?? ts, d.claim_id);
       if (!d.approve) break;
+      bumpStat(db, d.member_id, 'rounds_won');
       const r = db.prepare('SELECT round_no, custom_pattern, round_wins FROM bingo_round WHERE id=1').get();
       const wins = JSON.parse(r?.round_wins || '[]');
       wins.push({ round: r?.round_no ?? 1, memberId: d.member_id, at: d.at ?? ts });
@@ -193,8 +221,12 @@ export function applyOp(db, op) {
       const row = db.prepare('SELECT covered FROM bingo_cards WHERE member_id=?').get(d.member_id);
       if (!row) break;
       const covered = new Set(JSON.parse(row.covered));
+      const had = covered.has(d.item_id);
       if (d.covered) covered.add(d.item_id); else covered.delete(d.item_id);
       db.prepare('UPDATE bingo_cards SET covered=? WHERE member_id=?').run(JSON.stringify([...covered]), d.member_id);
+      // Career count only moves forward, and only on a square they did not
+      // already hold — un-covering and re-covering is not two squares.
+      if (d.covered && !had) bumpStat(db, d.member_id, 'squares');
       break;
     }
     // TV auto-media: host picks (or clears) the video playing on the room's
@@ -247,6 +279,7 @@ export function applyOp(db, op) {
         .run(d.accept ? 'accepted' : 'declined', d.battle_id, d.member_id);
       // Declining forfeits the square for good — that's the whole deterrent.
       if (!d.accept) {
+        bumpStat(db, d.member_id, 'forfeits');
         const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
         if (b) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'declined',?)`)
           .run(d.member_id, b.item_id, d.at ?? ts);
@@ -263,6 +296,7 @@ export function applyOp(db, op) {
     case 'battle.performed':
       db.prepare(`UPDATE lipsync_battle_players SET state='performed', performed_at=? WHERE battle_id=? AND member_id=?`)
         .run(d.at ?? ts, d.battle_id, d.member_id);
+      bumpStat(db, d.member_id, 'performances');
       db.prepare(`UPDATE lipsync_battles SET performing_member_id=NULL, performance_ends_at=NULL WHERE id=?`).run(d.battle_id);
       break;
     case 'battle.voting':
@@ -278,9 +312,11 @@ export function applyOp(db, op) {
         .run(d.winner_id ?? null, d.at ?? ts, d.battle_id);
       const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
       if (!b) break;
+      bumpStat(db, d.winner_id, 'battles_won');
       // Everyone in the battle except the winner is locked out of the square.
       for (const row of db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(d.battle_id)) {
         if (row.member_id === d.winner_id) continue;
+        bumpStat(db, row.member_id, 'battles_lost');
         db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'lost',?)`)
           .run(row.member_id, b.item_id, d.at ?? ts);
       }

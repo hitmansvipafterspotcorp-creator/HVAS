@@ -11,7 +11,7 @@ import {
   bingoProgress, bingoHasPattern, oneAwayIds,
 } from './bingoRules';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
-  apiSetOtw, apiSignalLeave,
+  apiSetOtw, apiSignalLeave, apiMyStats, apiLeaderboard,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
@@ -4508,10 +4508,12 @@ function LobbyScreen({ navigate }) {
       <div className="staff-hub-tabs bingo-mode-tabs">
         <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
         <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
+        <button type="button" className={`staff-hub-tab${mode === 'record' ? ' on' : ''}`} onClick={() => setMode('record')}>Record</button>
         <button type="button" className={`staff-hub-tab${mode === 'host' ? ' on' : ''}`} onClick={() => setMode('host')}>Host</button>
         <SfxToggle />
       </div>
       {mode === 'solo' ? <SoloBingoGame />
+        : mode === 'record' ? <PlayerRecord />
         : mode === 'host' ? <HostMode navigate={navigate} />
         : <VenueLobby navigate={navigate} />}
     </div>
@@ -4577,6 +4579,87 @@ function HostMode({ navigate }) {
         Stop hosting
       </button>
     </AppPanel>
+  );
+}
+
+// A member's career, and where they sit in the venue. The round resets every
+// night; this does not, which is the point. Shown as a tab in Lip Sync Bingo
+// so it is one tap from the game rather than buried in a profile.
+function PlayerRecord() {
+  const [stats, setStats] = useState(null);
+  const [board, setBoard] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const [s, b] = await Promise.all([apiMyStats(), apiLeaderboard()]);
+        if (live) { setStats(s.stats); setBoard(b); }
+      } catch { if (live) setErr('Could not reach the venue.'); }
+    })();
+    return () => { live = false; };
+  }, []);
+  if (!apiEnabled()) return <AppPanel title="Your record" subtitle="Not connected"><p className="mem-fineprint">Connect to the venue to see your record and the leaderboard.</p></AppPanel>;
+  if (err) return <AppPanel title="Your record" subtitle="Offline"><p className="dash-empty">{err}</p></AppPanel>;
+  if (!stats) return <AppPanel title="Your record" subtitle="Loading…"><p className="dash-empty">Reading your card…</p></AppPanel>;
+  const cells = [
+    ['Nights', stats.nights],
+    ['Rounds won', stats.roundsWon],
+    ['Battles won', stats.battlesWon],
+    ['Squares', stats.squares],
+    ['Performances', stats.performances],
+    ['Best streak', stats.bestStreak],
+  ];
+  return (
+    <>
+      <AppPanel title="Your record" subtitle={stats.playedTonight ? 'You have played tonight' : 'Not played yet tonight'}>
+        <div className="rec-title k-frame k-frame--gold">
+          <span className="k-label">Your title</span>
+          <strong className="rec-title-name">{stats.title}</strong>
+          {stats.next
+            ? <span className="rec-next">{stats.next.need} more to <b>{stats.next.title}</b></span>
+            : <span className="rec-next">Top title — nothing above this one</span>}
+        </div>
+        {/* A streak is the single strongest reason to come back tomorrow, so
+            it gets its own line rather than being one stat among six. */}
+        <div className={`rec-streak${stats.streak > 1 ? ' hot' : ''}`}>
+          <strong>{stats.streak > 0 ? `${stats.streak} night${stats.streak === 1 ? '' : 's'} in a row` : 'No streak yet'}</strong>
+          <span>{stats.playedTonight
+            ? (stats.streak > 1 ? 'Come back tomorrow to keep it alive.' : 'Play again tomorrow to start a run.')
+            : 'Take a card tonight to keep your streak.'}</span>
+        </div>
+        <div className="rec-grid">
+          {cells.map(([label, value]) => (
+            <div key={label} className="rec-cell">
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+        {stats.battleWinRate != null && (
+          <div className="rec-rate">
+            <span className="k-label">Battle win rate</span>
+            <div className="k-progress"><i style={{ width: `${stats.battleWinRate}%` }} /></div>
+            <span className="rec-rate-num">{stats.battleWinRate}% · {stats.battlesWon}W {stats.battlesLost}L</span>
+          </div>
+        )}
+      </AppPanel>
+      <AppPanel title="Leaderboard" subtitle="Everyone who has played here">
+        {board?.top?.length ? (
+          <ol className="lb">
+            {board.top.map((r) => (
+              <li key={r.memberId} className={`lb-row${r.isMe ? ' is-me' : ''}${r.place <= 3 ? ' podium' : ''}`}>
+                <span className="lb-place">{r.place}</span>
+                <span className="lb-who"><strong>{r.name}{r.isMe ? ' (you)' : ''}</strong><small>{r.title}</small></span>
+                <span className="lb-stat">{r.roundsWon}<i>rounds</i></span>
+                <span className="lb-stat">{r.battlesWon}<i>battles</i></span>
+                {r.streak > 1 && <span className="lb-streak">{r.streak}🔥</span>}
+              </li>
+            ))}
+          </ol>
+        ) : <p className="dash-empty">Nobody has played a round here yet. Be first.</p>}
+      </AppPanel>
+    </>
   );
 }
 
@@ -4870,6 +4953,7 @@ function PlayerCardScreen({ navigate }) {
 // can run the floor without hunting for it.
 function HostBattleControl() {
   const [battle, setBattle] = useState(null);
+  const [open, setOpen] = useState(false);
   const load = async () => { try { setBattle((await apiBattleCurrent()).battle); } catch { /* ignore */ } };
   useEffect(() => {
     if (!apiEnabled() || !apiStaffToken()) return undefined;
@@ -4877,15 +4961,44 @@ function HostBattleControl() {
     const id = setInterval(load, 2500);
     return () => clearInterval(id);
   }, []);
+  // The moment a battle needs the host — someone is up, or the vote is in —
+  // it opens itself rather than waiting to be found.
+  useEffect(() => {
+    if (battle?.status === 'performing' || battle?.status === 'voting') setOpen(true);
+  }, [battle?.status]);
   if (!battle || battle.status === 'done' || battle.status === 'void') return null;
-  // While the room is choosing, the host sees the same roster everyone else
-  // does — plus the button to close it early.
-  if (battle.status === 'picking') return <BattleRoster battle={battle} meId={null} pickable={false} isHost onChanged={load} />;
-  return <LipSyncBattlePanel battle={battle} meId={null} onChanged={load} isHost />;
+  // Same shape as the player's card: a slim always-visible alert, and the
+  // battle takes over the screen when the host opens it. Rendered inline it
+  // was a tall panel sitting on top of the controls the host needs between
+  // songs, and it pushed the console past the fold on a phone.
+  const PHASE = { picking: 'ROOM IS PICKING', pending: 'WAITING ON THEM', performing: 'PERFORMING', voting: 'VOTING' };
+  return (
+    <>
+      <button type="button" className="battle-alert" onClick={() => setOpen(true)}>
+        <span className="battle-alert-dot" aria-hidden="true" />
+        <span className="battle-alert-text">
+          <strong>🎤 {PHASE[battle.status] || 'LIVE BATTLE'}</strong>
+          <small>{battle.artist} — {battle.song}</small>
+        </span>
+        <span className="battle-alert-go">OPEN</span>
+      </button>
+      {open && (
+        <div className="battle-fullscreen">
+          <button type="button" className="battle-close" onClick={() => setOpen(false)} aria-label="Back to host controls">✕ Controls</button>
+          <div className="battle-fullscreen-body">
+            {battle.status === 'picking'
+              ? <BattleRoster battle={battle} meId={null} pickable={false} isHost onChanged={load} />
+              : <LipSyncBattlePanel battle={battle} meId={null} onChanged={load} isHost />}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function HostScreen() {
   const [board, setBoard] = useState(null);
+  const [tab, setTab] = useState('run');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const liveRef = useRef(true);
@@ -4899,53 +5012,91 @@ function HostScreen() {
     const id = setInterval(poll, 3000);
     return () => { liveRef.current = false; clearInterval(id); };
   }, []);
+  // A claim is the one thing on this screen that cannot wait, so it pulls the
+  // host to it rather than sitting behind a tab they might not be looking at.
+  const claimCount = board?.claims.length || 0;
+  const seenClaims = useRef(0);
+  useEffect(() => {
+    if (claimCount > seenClaims.current) setTab('claims');
+    seenClaims.current = claimCount;
+  }, [claimCount]);
   if (err === 'not-connected') return <NotConnectedBingo title="Host Control" />;
   // Re-poll right after an action instead of waiting up to 3s for the next
   // tick — a host tapping "Call Next Phrase" should see it change instantly.
   const act = async (fn) => { setBusy(true); try { await fn(); await poll(); } catch { /* ignore */ } setBusy(false); };
   const resolve = async (claimId, approve) => { setBusy(true); try { await apiBingoResolve(claimId, approve); await poll(); } catch { /* ignore */ } setBusy(false); };
   return (
-    <div className="staff-dash">
+    <div className="staff-dash host-console">
+      {/* A live battle always shows, whichever tab you are on — it is the one
+          thing on this screen that is time-critical. */}
       <HostBattleControl />
-      <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
-        <div className="bingo-status-row">
-          <span>{board ? `${board.players.length} players` : ''}</span>
-          <span>{board ? `${board.calls.length} called` : ''}</span>
-        </div>
-        {board?.calls.length > 0 && (
-          <div className="bingo-current-call">
-            {board.calls[board.calls.length - 1].type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
-            <strong>{board.calls[board.calls.length - 1].artist}</strong>
-            <span>{board.calls[board.calls.length - 1].song}</span>
+      {/* The rest is tabbed. Stacked, these five panels ran ~730px past the
+          fold on a phone, and a host hunting for "Approve" mid-round while
+          scrolling is how a claim gets missed. */}
+      <div className="staff-hub-tabs host-tabs">
+        {[
+          ['run', 'Run'],
+          ['claims', `Claims${board?.claims.length ? ` (${board.claims.length})` : ''}`],
+          ['players', `Players${board?.players.length ? ` (${board.players.length})` : ''}`],
+          ['media', 'TV'],
+        ].map(([id, label]) => (
+          <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}${id === 'claims' && board?.claims.length ? ' alert' : ''}`}
+                  onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'run' && (
+        <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
+          <div className="bingo-status-row">
+            <span>{board ? `${board.players.length} players` : ''}</span>
+            <span>{board ? `${board.calls.length} called` : ''}</span>
           </div>
-        )}
-        <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
-        <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
-        <DeckPatternPicker currentDeckId={board?.deckId} currentPattern={board?.pattern} busy={busy} onReset={(deckId, pattern) => act(() => apiBingoReset(deckId, pattern))} />
-      </AppPanel>
-      <AppPanel title="Pending claims" subtitle="Approve to end the round">
-        {board && board.claims.length === 0 && <p className="dash-empty">No claims yet.</p>}
-        {board?.claims.map((c) => (
-          <div key={c.id} className="bingo-claim-row">
-            <div className="dash-info"><strong>{c.name}</strong><span className="dash-num">{c.number}</span></div>
-            <div className="bingo-claim-actions">
-              <button type="button" className="pay-confirm" disabled={busy} onClick={() => resolve(c.id, true)}>✓ Approve</button>
-              <button type="button" className="pay-void" disabled={busy} onClick={() => resolve(c.id, false)}>Reject</button>
+          {board?.calls.length > 0 && (
+            <div className="bingo-current-call">
+              {board.calls[board.calls.length - 1].type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
+              <strong>{board.calls[board.calls.length - 1].artist}</strong>
+              <span>{board.calls[board.calls.length - 1].song}</span>
             </div>
+          )}
+          <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
+          <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
+          {/* Deck and pattern live in Game Menu, which is one tap away. They
+              were on both screens, and the copy here was the last thing
+              pushing this console past the fold. */}
+        </AppPanel>
+      )}
+
+      {tab === 'claims' && (
+        <AppPanel title="Pending claims" subtitle="Approve to end the round">
+          {board && board.claims.length === 0 && <p className="dash-empty">No claims yet.</p>}
+          {board?.claims.map((c) => (
+            <div key={c.id} className="bingo-claim-row">
+              <div className="dash-info"><strong>{c.name}</strong><span className="dash-num">{c.number}</span></div>
+              <div className="bingo-claim-actions">
+                <button type="button" className="pay-confirm" disabled={busy} onClick={() => resolve(c.id, true)}>✓ Approve</button>
+                <button type="button" className="pay-void" disabled={busy} onClick={() => resolve(c.id, false)}>Reject</button>
+              </div>
+            </div>
+          ))}
+        </AppPanel>
+      )}
+
+      {tab === 'players' && (
+        <AppPanel title="Players" subtitle="Joined tonight's round">
+          {board && board.players.length === 0 && <p className="dash-empty">Nobody has joined yet.</p>}
+          <div className="host-scroll">
+            {board?.players.map((p) => (
+              <div key={p.member_id} className="dash-row">
+                <span className={`dash-dot ${p.ready ? 'green' : 'amber'}`} />
+                <div className="dash-info"><strong>{p.name}</strong><span className="dash-num">{p.number}</span></div>
+                <span className="dash-when">{p.ready ? 'ready' : 'not ready'}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </AppPanel>
-      <AppPanel title="Players" subtitle="Joined tonight's round">
-        {board && board.players.length === 0 && <p className="dash-empty">Nobody has joined yet.</p>}
-        {board?.players.map((p) => (
-          <div key={p.member_id} className="dash-row">
-            <span className={`dash-dot ${p.ready ? 'green' : 'amber'}`} />
-            <div className="dash-info"><strong>{p.name}</strong><span className="dash-num">{p.number}</span></div>
-            <span className="dash-when">{p.ready ? 'ready' : 'not ready'}</span>
-          </div>
-        ))}
-      </AppPanel>
-      <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />
+        </AppPanel>
+      )}
+
+      {tab === 'media' && <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />}
     </div>
   );
 }
