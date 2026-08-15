@@ -670,6 +670,79 @@ ok(gCb.status === 200, 'a cancelled Google sign-in lands on a friendly page rath
 const gDisconnect = await call('POST', '/auth/google/disconnect', {}, stok);
 ok(gDisconnect.status === 200 && gDisconnect.body.connected === false, 'host can disconnect their Google account');
 
+console.log('BATTLE ROSTER — the room picks who performs');
+// Two contenders battle each other directly. Three or more and the square
+// would otherwise go to whoever taps "accept" fastest, so the room votes on
+// the matchup it wants to see first.
+await call('POST', '/bingo/reset', { deckId: 'after-spot-starter' }, stok);
+const crowd = [];
+for (let i = 0; i < 4; i++) {
+  const st1 = await call('POST', '/auth/member/start', { contact: `850-555-90${i}` });
+  const v1 = await call('POST', '/auth/member/verify', { contact: `850-555-90${i}`, code: st1.body.devCode, name: `Battler${i}` });
+  const j = await call('POST', '/bingo/join', {}, v1.body.token);
+  crowd.push({ tok: v1.body.token, id: v1.body.member.id, name: `Battler${i}`, card: j.body.card });
+}
+await call('POST', '/bingo/start', {}, stok);
+
+// Find a lip sync square that at least three of them hold, then call it.
+const contested = crowd[0].card.find((sq) => sq.type === 'lipsync'
+  && crowd.filter((m) => m.card.some((c) => c.id === sq.id)).length >= 3);
+ok(!!contested, 'at least one lip sync square is held by three or more players');
+let battle = null;
+for (let i = 0; i < 60 && !battle; i++) {
+  const called = await call('POST', '/bingo/call', {}, stok);
+  if (called.status !== 200) break;
+  const b = await call('GET', `/battle/current?itemId=${encodeURIComponent(contested.id)}`, null, crowd[0].tok);
+  if (b.body.battle) battle = b.body.battle;
+}
+ok(!!battle, 'calling the contested square opens a battle');
+ok(battle.status === 'picking', 'with three or more contenders the battle opens in PICKING, not straight to the mic');
+ok(battle.contenders.length >= 3, `every holder is listed as a contender (${battle.contenders?.length})`);
+ok(battle.contenders.every((c) => c.name && c.number), 'each contender carries a name and member number for their profile card');
+ok(typeof battle.pickEndsAt === 'number', 'the picking window has a deadline every screen can count down to');
+
+const [c1, c2, c3] = battle.contenders;
+const outsider = crowd.find((m) => !battle.contenders.some((c) => c.memberId === m.id));
+const selfPick = await call('POST', '/battle/pick', { battleId: battle.id, memberId: c1.memberId },
+  crowd.find((m) => m.id === c1.memberId).tok);
+ok(selfPick.status === 400, 'a contender cannot pick themselves');
+const notUp = await call('POST', '/battle/pick', { battleId: battle.id, memberId: 'nobody' }, crowd[0].tok);
+ok(notUp.status === 400, 'you cannot pick someone who is not up for the square');
+
+// Everyone who is not that contender votes for c1; one votes c2.
+for (const m of crowd) {
+  if (m.id === c1.memberId) continue;
+  await call('POST', '/battle/pick', { battleId: battle.id, memberId: c1.memberId }, m.tok);
+}
+await call('POST', '/battle/pick', { battleId: battle.id, memberId: c2.memberId },
+  crowd.find((m) => m.id === c1.memberId).tok);
+let roster = (await call('GET', `/battle/current?itemId=${encodeURIComponent(contested.id)}`, null, crowd[0].tok)).body.battle;
+ok(roster.contenders[0].memberId === c1.memberId && roster.contenders[0].picks >= 2, 'picks tally and the leader sorts to the top');
+ok(roster.contenders[0].share > 0 && roster.contenders.slice(0, 2).every((c) => c.leading), 'the meter shows each share and flags the two currently winning');
+ok(roster.totalPicks >= 3, 'the room total is published so every screen shows the same meter');
+const changed = await call('POST', '/battle/pick', { battleId: battle.id, memberId: c2.memberId }, crowd.find((m) => m.id !== c1.memberId && m.id !== c2.memberId).tok);
+ok(changed.status === 200, 'a member can change their pick while the window is open');
+
+const memberLock = await call('POST', '/battle/lock', { battleId: battle.id }, crowd[0].tok);
+ok(memberLock.status === 401, 'members cannot lock the roster themselves');
+const locked = await call('POST', '/battle/lock', { battleId: battle.id }, stok);
+ok(locked.status === 200 && locked.body.chosen.length === 2, 'the host closes picking and exactly two are chosen');
+roster = (await call('GET', `/battle/current?itemId=${encodeURIComponent(contested.id)}`, null, crowd[0].tok)).body.battle;
+ok(roster.status === 'pending', 'the battle moves on to perform-or-forfeit');
+ok(roster.players.length === 2, 'only the chosen two are in the battle');
+ok(roster.players.every((p) => p.state === 'invited'), 'and both are invited to perform or forfeit');
+
+// Anyone the room did not pick cannot quietly cover the square instead.
+const dropped = crowd.find((m) => battle.contenders.some((c) => c.memberId === m.id)
+  && !locked.body.chosen.includes(m.id));
+if (dropped) {
+  const sneak = await call('POST', '/bingo/mark', { itemId: contested.id, covered: true }, dropped.tok);
+  ok(sneak.status === 403 && /picked someone else/.test(sneak.body.error || ''),
+    'a contender the room passed over cannot cover the square anyway');
+}
+const relock = await call('POST', '/battle/lock', { battleId: battle.id }, stok);
+ok(relock.status === 400, 'locking an already-locked roster is refused');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 
 server.close();

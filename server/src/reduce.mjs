@@ -178,6 +178,7 @@ export function applyOp(db, op) {
       // reset deals brand new cards, so carrying locks over would bar someone
       // from a square they've never even been offered in this game.
       db.prepare(`DELETE FROM lipsync_battle_votes`).run();
+      db.prepare(`DELETE FROM lipsync_battle_picks`).run();
       db.prepare(`DELETE FROM lipsync_battle_players`).run();
       db.prepare(`DELETE FROM lipsync_battles`).run();
       db.prepare(`DELETE FROM lipsync_locks`).run();
@@ -205,12 +206,42 @@ export function applyOp(db, op) {
 
     // ── Lip Sync Battles ──
     case 'battle.open':
-      db.prepare(`INSERT OR IGNORE INTO lipsync_battles(id,item_id,artist,song,status,stage,started_at)
-        VALUES(?,?,?,?,'pending',?,?)`).run(d.id, d.item_id, d.artist ?? null, d.song ?? null, d.stage || 'phones', d.at ?? ts);
+      // Two contenders battle straight away. Three or more and the room picks
+      // which two first, so the square is not decided by whoever taps fastest.
+      db.prepare(`INSERT OR IGNORE INTO lipsync_battles(id,item_id,artist,song,status,stage,started_at,pick_ends_at)
+        VALUES(?,?,?,?,?,?,?,?)`).run(d.id, d.item_id, d.artist ?? null, d.song ?? null,
+          d.status || 'pending', d.stage || 'phones', d.at ?? ts, d.pick_ends_at ?? null);
       for (const m of d.members || []) {
-        db.prepare(`INSERT OR IGNORE INTO lipsync_battle_players(battle_id,member_id,state) VALUES(?,?,'invited')`).run(d.id, m);
+        db.prepare(`INSERT OR IGNORE INTO lipsync_battle_players(battle_id,member_id,state) VALUES(?,?,?)`)
+          .run(d.id, m, d.status === 'picking' ? 'contender' : 'invited');
       }
       break;
+    // One pick per member, changeable until the roster locks.
+    case 'battle.pick':
+      db.prepare(`INSERT INTO lipsync_battle_picks(battle_id,voter_id,member_id,at) VALUES(?,?,?,?)
+        ON CONFLICT(battle_id,voter_id) DO UPDATE SET member_id=excluded.member_id, at=excluded.at`)
+        .run(d.battle_id, d.voter_id, d.member_id, d.at ?? ts);
+      break;
+    // The room has chosen. The picked two are invited to perform or forfeit;
+    // everyone else drops out of the battle and cannot cover the square,
+    // because they never performed for it.
+    case 'battle.lock': {
+      const chosen = new Set(d.chosen || []);
+      const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+      for (const row of db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(d.battle_id)) {
+        if (chosen.has(row.member_id)) {
+          db.prepare(`UPDATE lipsync_battle_players SET state='invited' WHERE battle_id=? AND member_id=?`)
+            .run(d.battle_id, row.member_id);
+        } else {
+          db.prepare('DELETE FROM lipsync_battle_players WHERE battle_id=? AND member_id=?')
+            .run(d.battle_id, row.member_id);
+          if (b) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'not_picked',?)`)
+            .run(row.member_id, b.item_id, d.at ?? ts);
+        }
+      }
+      db.prepare(`UPDATE lipsync_battles SET status='pending', pick_ends_at=NULL WHERE id=?`).run(d.battle_id);
+      break;
+    }
     case 'battle.respond': {
       db.prepare(`UPDATE lipsync_battle_players SET state=? WHERE battle_id=? AND member_id=? AND state='invited'`)
         .run(d.accept ? 'accepted' : 'declined', d.battle_id, d.member_id);

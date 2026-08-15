@@ -15,7 +15,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
-  apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
+  apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePick, apiBattleLock, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
   apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
@@ -4252,6 +4252,71 @@ function useCallClock(state) {
   return { left, pct: Math.max(0, Math.min(1, left / window)), text };
 }
 
+// The roster call-out. When three or more players hold the same lip sync
+// square, the whole room — not just the contenders — decides which two
+// perform for it. This renders identically on a player's phone, the host
+// screen and the TV, because everybody is looking at the same decision.
+//
+// `pickable` is false on the TV and the host screen: they display the vote,
+// they do not cast one.
+function BattleRoster({ battle, meId, pickable = true, isHost = false, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const left = useCountdown(battle?.pickEndsAt);   // { ms, text } | null
+  if (!battle || battle.status !== 'picking') return null;
+  const pick = async (memberId) => {
+    if (!pickable || busy) return;
+    setBusy(true); setErr('');
+    try { await apiBattlePick(battle.id, memberId); await onChanged?.(); }
+    catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+  return (
+    <div className="roster">
+      <div className="roster-head">
+        <span className="k-chip k-chip--neon k-chip--live">Who battles?</span>
+        <strong className="roster-song">{battle.artist} — {battle.song}</strong>
+        {left && <span className="roster-clock">{Math.ceil(left.ms / 1000)}s</span>}
+      </div>
+      <p className="roster-hint">
+        {pickable
+          ? 'Tap the two you want to see go head to head.'
+          : 'The room is choosing the matchup.'}
+      </p>
+      <div className="roster-cards">
+        {battle.contenders.map((c) => {
+          const mine = battle.myPick === c.memberId;
+          const isMe = c.memberId === meId;
+          return (
+            <button
+              type="button"
+              key={c.memberId}
+              className={`roster-card${c.leading ? ' is-leading' : ''}${mine ? ' is-mine' : ''}${isMe ? ' is-you' : ''}`}
+              onClick={() => pick(c.memberId)}
+              disabled={!pickable || isMe || busy}
+            >
+              <span className="roster-tier" data-tier={(c.tier || 'Member').toLowerCase()}>{c.vip ? 'VIP' : (c.tier || 'Member')}</span>
+              <span className="roster-name">{c.name}{isMe ? ' (you)' : ''}</span>
+              <span className="roster-num">#{c.number}</span>
+              {c.battleWins > 0 && <span className="roster-wins">{c.battleWins}W</span>}
+              {c.leading && <span className="roster-lead">IN</span>}
+              <span className="roster-meter"><i style={{ width: `${c.share}%` }} /></span>
+              <span className="roster-share">{c.picks} {c.picks === 1 ? 'pick' : 'picks'} · {c.share}%</span>
+            </button>
+          );
+        })}
+      </div>
+      {err && <p className="roster-err">{err}</p>}
+      {isHost && (
+        <button type="button" className="k-btn k-btn--go" disabled={busy}
+                onClick={async () => { setBusy(true); try { await apiBattleLock(battle.id); await onChanged?.(); } catch (e) { setErr(e.message); } setBusy(false); }}>
+          Lock the matchup now
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Host-facing deck + win-pattern picker for the NEXT game — shared by Game
 // Menu and Host Control. Deliberately only takes effect on reset (not
 // start), so nobody's already-dealt card can be pulled out from under them
@@ -4367,6 +4432,16 @@ function TvDisplayScreen() {
   if (err === 'not-connected') return <NotConnectedBingo title="TV Display" />;
   const calls = state?.calls || [];
   const onTv = battle && battle.stage === 'tv' && battle.status !== 'done' && battle.status !== 'void';
+  // Picking takes the TV regardless of stage: the whole room is voting on it,
+  // so the whole room has to be able to see the running count.
+  if (battle && battle.status === 'picking') {
+    return (
+      <div className="staff-dash tv-battle">
+        <BattleRoster battle={battle} meId={null} pickable={false} />
+        <p className="tv-roster-cta">Pick on your phone — the top two battle for the square.</p>
+      </div>
+    );
+  }
   if (onTv) {
     return (
       <div className="staff-dash tv-battle">
@@ -4529,7 +4604,19 @@ function PlayerCardScreen({ navigate }) {
   // Any battle this member is personally in takes over the screen — being
   // called out is time-critical and must not be buried under the card.
   const [myBattles, setMyBattles] = useState([]);
-  const loadBattles = async () => { try { setMyBattles((await apiBattleMine()).battles || []); } catch { /* ignore */ } };
+  // Battles you are personally in, PLUS any battle currently choosing its
+  // roster. Picking is the whole room's decision — someone who does not hold
+  // the square still votes on who performs for it — so /battle/mine alone is
+  // not enough to put it on every phone.
+  const loadBattles = async () => {
+    try {
+      const [mine, current] = await Promise.all([apiBattleMine(), apiBattleCurrent().catch(() => ({}))]);
+      const list = mine.battles || [];
+      const cur = current?.battle;
+      if (cur && cur.status === 'picking' && !list.some((b) => b.id === cur.id)) list.unshift(cur);
+      setMyBattles(list);
+    } catch { /* ignore */ }
+  };
   useEffect(() => {
     if (!apiEnabled() || !apiToken()) return undefined;
     loadBattles();
@@ -4622,7 +4709,9 @@ function PlayerCardScreen({ navigate }) {
             <small>{activeBattle.artist} — {activeBattle.song}</small>
           </span>
           <span className="battle-alert-go">
-            {activeBattle.me?.state === 'invited' ? 'RESPOND' : activeBattle.status === 'voting' ? 'VOTE' : 'ENTER'}
+            {activeBattle.status === 'picking' ? 'PICK'
+              : activeBattle.me?.state === 'invited' ? 'RESPOND'
+              : activeBattle.status === 'voting' ? 'VOTE' : 'ENTER'}
           </span>
         </button>
       )}
@@ -4630,7 +4719,9 @@ function PlayerCardScreen({ navigate }) {
         <div className="battle-fullscreen">
           <button type="button" className="battle-close" onClick={() => setBattleOpen(false)} aria-label="Back to card">✕ Card</button>
           <div className="battle-fullscreen-body">
-            <LipSyncBattlePanel battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} isHost={false} />
+            {activeBattle.status === 'picking'
+              ? <BattleRoster battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} />
+              : <LipSyncBattlePanel battle={activeBattle} meId={apiMemberId()} onChanged={loadBattles} isHost={false} />}
           </div>
           <BattleChat battle={activeBattle} onChanged={loadBattles} />
         </div>
@@ -4734,6 +4825,9 @@ function HostBattleControl() {
     return () => clearInterval(id);
   }, []);
   if (!battle || battle.status === 'done' || battle.status === 'void') return null;
+  // While the room is choosing, the host sees the same roster everyone else
+  // does — plus the button to close it early.
+  if (battle.status === 'picking') return <BattleRoster battle={battle} meId={null} pickable={false} isHost onChanged={load} />;
   return <LipSyncBattlePanel battle={battle} meId={null} onChanged={load} isHost />;
 }
 

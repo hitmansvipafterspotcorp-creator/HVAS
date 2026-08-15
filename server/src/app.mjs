@@ -45,6 +45,10 @@ const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/youtube.readonly';
 // actual performance on the floor, so it gets two. Overridable per venue, and
 // kept short in tests.
 const BINGO_SONG_MS = Math.max(3, Number(process.env.BINGO_SONG_SECONDS) || 60) * 1000;
+// How long the room gets to choose which two of three-or-more contenders
+// actually battle. Short on purpose: it happens while the song is still
+// playing, so it cannot outlast the square it is deciding.
+const BATTLE_PICK_MS = Math.max(5, Number(process.env.BATTLE_PICK_SECONDS) || 25) * 1000;
 const BINGO_LIPSYNC_MS = Math.max(3, Number(process.env.BINGO_LIPSYNC_SECONDS) || 120) * 1000;
 const bingoWindowFor = (item) => (item?.type === 'lipsync' ? BINGO_LIPSYNC_MS : BINGO_SONG_MS);
 
@@ -319,9 +323,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   const battleFrames = new Map();
 
   const battleTally = (battleId) => db.prepare(`
-    SELECT p.member_id AS memberId, m.name, m.number, p.state,
+    SELECT p.member_id AS memberId, m.name, m.number, p.state, ms.tier, ms.vip,
+           (SELECT COUNT(*) FROM lipsync_battles w WHERE w.winner_member_id=p.member_id) AS battleWins,
            (SELECT COUNT(*) FROM lipsync_battle_votes v WHERE v.battle_id=p.battle_id AND v.member_id=p.member_id) AS votes
-    FROM lipsync_battle_players p JOIN members m ON m.id=p.member_id
+    FROM lipsync_battle_players p
+    JOIN members m ON m.id=p.member_id
+    LEFT JOIN memberships ms ON ms.member_id=p.member_id
     WHERE p.battle_id=? ORDER BY votes DESC, m.name ASC`).all(battleId);
 
   const battlePublic = (b, viewerId) => {
@@ -335,6 +342,23 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       totalVotes: total,
       // share of the vote — the on-screen meter during voting
       players: players.map((p) => ({ ...p, share: total ? Math.round((p.votes / total) * 100) : 0 })),
+      // Contender roster for the picking phase: who holds this square, and
+      // how much of the room wants to see each of them do it. Every screen
+      // renders this, so it carries enough to draw a profile card.
+      pickEndsAt: b.pick_ends_at,
+      contenders: (() => {
+        if (b.status !== 'picking') return [];
+        const rows = battlePicks(b.id);
+        const cast = rows.reduce((n, r) => n + r.picks, 0);
+        return rows.map((r, i) => ({
+          ...r,
+          share: cast ? Math.round((r.picks / cast) * 100) : 0,
+          // Who would be chosen if the window closed right now.
+          leading: i < 2,
+        }));
+      })(),
+      totalPicks: b.status === 'picking' ? battlePicks(b.id).reduce((n, r) => n + r.picks, 0) : 0,
+      myPick: db.prepare('SELECT member_id FROM lipsync_battle_picks WHERE battle_id=? AND voter_id=?').get(b.id, viewerId)?.member_id || null,
       // Live IG-Live layer: the last stretch of chat, plus running emoji totals.
       comments: db.prepare(`SELECT c.id, c.member_id AS memberId, m.name, c.body, c.at
         FROM lipsync_battle_comments c JOIN members m ON m.id=c.member_id
@@ -351,7 +375,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   const lipSyncGate = (memberId, itemId) => {
     const locked = db.prepare('SELECT reason FROM lipsync_locks WHERE member_id=? AND item_id=?').get(memberId, itemId);
     if (locked) {
-      return { ok: false, error: locked.reason === 'declined' ? 'you declined this battle' : 'you lost this battle' };
+      return { ok: false, error: locked.reason === 'declined' ? 'you declined this battle'
+        : locked.reason === 'not_picked' ? 'the room picked someone else for this one'
+        : 'you lost this battle' };
     }
     const battle = db.prepare(`SELECT * FROM lipsync_battles WHERE item_id=? ORDER BY id DESC LIMIT 1`).get(itemId);
     if (!battle) return { ok: false, error: 'lip sync squares must be performed' };
@@ -374,8 +400,39 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       .filter((m) => !db.prepare('SELECT 1 FROM lipsync_locks WHERE member_id=? AND item_id=?').get(m, item.id));
     if (holders.length === 0) return null;
     const id = Date.now();
-    commit('battle.open', { id, item_id: item.id, artist: item.artist, song: item.song, members: holders, at: Date.now() });
+    // Two contenders just battle. Three or more and the room chooses which two
+    // — otherwise a square with five holders is decided by whoever taps
+    // "accept" fastest, which is not a battle, it is a reflex test.
+    const picking = holders.length > 2;
+    commit('battle.open', {
+      id, item_id: item.id, artist: item.artist, song: item.song, members: holders,
+      status: picking ? 'picking' : 'pending',
+      pick_ends_at: picking ? Date.now() + BATTLE_PICK_MS : null,
+      at: Date.now(),
+    });
     return id;
+  };
+
+  // Who the room voted to see battle, highest first. Ties break on name so the
+  // order is stable between polls rather than jittering on every render.
+  const battlePicks = (battleId) => db.prepare(`
+    SELECT p.member_id AS memberId, m.name, m.number, p.state,
+           ms.tier, ms.vip,
+           (SELECT COUNT(*) FROM lipsync_battle_picks k WHERE k.battle_id=p.battle_id AND k.member_id=p.member_id) AS picks,
+           (SELECT COUNT(*) FROM lipsync_battles w WHERE w.winner_member_id=p.member_id) AS battleWins
+    FROM lipsync_battle_players p
+    JOIN members m ON m.id=p.member_id
+    LEFT JOIN memberships ms ON ms.member_id=p.member_id
+    WHERE p.battle_id=? ORDER BY picks DESC, m.name ASC`).all(battleId);
+
+  // Lock the roster to the top two. With no picks at all it still has to
+  // choose somebody, or a square nobody voted on would hang forever.
+  const lockBattleRoster = (battleId) => {
+    const b = db.prepare('SELECT * FROM lipsync_battles WHERE id=?').get(battleId);
+    if (!b || b.status !== 'picking') return null;
+    const chosen = battlePicks(battleId).slice(0, 2).map((p) => p.memberId);
+    commit('battle.lock', { battle_id: battleId, chosen, at: Date.now() });
+    return chosen;
   };
 
   const bingoCallNext = async () => {
@@ -397,6 +454,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ticker only advances once that window is up. A host pressing "Call Song"
   // still overrides immediately (that goes through bingoCallNext directly).
   setInterval(() => {
+    // Close any picking window whose time is up. This runs regardless of round
+    // status: a battle stuck in 'picking' would block its square forever.
+    for (const b of db.prepare(`SELECT id FROM lipsync_battles WHERE status='picking' AND pick_ends_at IS NOT NULL AND pick_ends_at <= ?`).all(Date.now())) {
+      try { lockBattleRoster(b.id); } catch { /* one stuck battle must not kill the ticker */ }
+    }
     const r = getBingoRound();
     if (r.status !== 'live') return;
     const last = r.calls[r.calls.length - 1];
@@ -898,6 +960,31 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         JOIN lipsync_battle_players p ON p.battle_id=b.id AND p.member_id=?
         WHERE b.status NOT IN ('done','void') ORDER BY b.id ASC`).all(c.sub);
       json(res, 200, { battles: rows.map((b) => battlePublic(b, c.sub)) });
+    },
+    // Anyone in the room votes on which contenders should battle — including
+    // people who do not hold the square. That is the point: the crowd picks
+    // the matchup it wants to watch.
+    'POST /battle/pick': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, memberId } = await readBody(req);
+      const b = db.prepare('SELECT * FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      if (b.status !== 'picking') return json(res, 400, { error: 'the roster is already set' });
+      const isContender = db.prepare('SELECT 1 FROM lipsync_battle_players WHERE battle_id=? AND member_id=?').get(battleId, memberId);
+      if (!isContender) return json(res, 400, { error: 'that member is not up for this square' });
+      // A contender voting themselves in would make the pick meaningless.
+      if (memberId === c.sub) return json(res, 400, { error: 'you cannot pick yourself' });
+      commit('battle.pick', { battle_id: battleId, voter_id: c.sub, member_id: memberId, at: Date.now() });
+      json(res, 200, { ok: true, battle: battlePublic(db.prepare('SELECT * FROM lipsync_battles WHERE id=?').get(battleId), c.sub) });
+    },
+    // The host can close the picking window early — the room is usually ready
+    // long before the timer is.
+    'POST /battle/lock': async (req, res) => {
+      const c = auth(req, 'staff'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { battleId } = await readBody(req);
+      const chosen = lockBattleRoster(battleId);
+      if (!chosen) return json(res, 400, { error: 'that battle is not picking' });
+      json(res, 200, { ok: true, chosen });
     },
     'POST /battle/respond': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });

@@ -125,6 +125,9 @@ export function apiBattleCurrent(itemId) {
   return call('GET', `/battle/current${q}`, null, apiToken() || apiStaffToken());
 }
 export function apiBattleMine() { return call('GET', '/battle/mine', null, apiToken()); }
+// The room picks which contenders battle when three or more hold the square.
+export function apiBattlePick(battleId, memberId) { return call('POST', '/battle/pick', { battleId, memberId }, apiToken()); }
+export function apiBattleLock(battleId) { return call('POST', '/battle/lock', { battleId }, apiStaffToken()); }
 export function apiBattleRespond(battleId, accept) { return call('POST', '/battle/respond', { battleId, accept }, apiToken()); }
 export function apiBattlePerformed(battleId) { return call('POST', '/battle/performed', { battleId }, apiToken()); }
 export function apiBattleFrame(battleId, frame) { return call('POST', '/battle/frame', { battleId, frame }, apiToken()); }

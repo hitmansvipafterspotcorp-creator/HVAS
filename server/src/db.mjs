@@ -235,6 +235,15 @@ export function openDb(path) {
       at INTEGER NOT NULL,
       PRIMARY KEY (battle_id, voter_id)
     );
+    -- When three or more players hold the same lip sync square, the room
+    -- decides which two actually battle for it. One pick per member.
+    CREATE TABLE IF NOT EXISTS lipsync_battle_picks (
+      battle_id INTEGER NOT NULL REFERENCES lipsync_battles(id),
+      voter_id TEXT NOT NULL,
+      member_id TEXT NOT NULL,                -- the contender they want to see
+      at INTEGER NOT NULL,
+      PRIMARY KEY (battle_id, voter_id)
+    );
     -- A member who declined (or lost) is barred from covering that square.
     CREATE TABLE IF NOT EXISTS lipsync_locks (
       member_id TEXT NOT NULL,
@@ -262,6 +271,13 @@ export function openDb(path) {
       updated_at INTEGER NOT NULL
     );
   `);
+
+  const bcols = db.prepare(`PRAGMA table_info(lipsync_battles)`).all().map((c) => c.name);
+  if (!bcols.includes('pick_ends_at')) {
+    // How long the room gets to choose the two battlers, when there are more
+    // than two contenders for one square.
+    db.exec(`ALTER TABLE lipsync_battles ADD COLUMN pick_ends_at INTEGER`);
+  }
 
   const entryCols = db.prepare(`PRAGMA table_info(entries)`).all().map((c) => c.name);
   if (!entryCols.includes('left_at')) {
