@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
+import './kit.css';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
   apiSetOtw, apiSignalLeave,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
@@ -4111,13 +4112,143 @@ function SoloBingoGame({ onExit }) {
   );
 }
 
+// The only art the card screen loads. Everything else on it — frames, chips,
+// buttons, bars, the timer dial — is drawn in kit.css, so it stays sharp at
+// any size and restyles from one place.
+const KIT = (n) => `${import.meta.env.BASE_URL}assets/ui/kit/${n}.png`;
+const TILE_ART = {
+  covered: KIT('mark_covered'),   // magenta star  — icon_star_accent
+  called:  KIT('mark_called'),    // violet diamond — icon_diamond_accent
+  bonus:   KIT('mark_bonus'),     // crown          — icon_membership
+  lipsync: KIT('mark_lipsync'),   // mic            — lsb sheet 03
+};
+const KIT_LOGO = KIT('logo_lipsync_bingo');
+const KIT_BADGE = KIT('logo_badge');
+
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
 const BINGO_PATTERN_LABEL = {
-  line: 'complete a line', four_corners: 'cover all four corners', x: 'cover an X',
+  line: 'complete a line', two_lines: 'complete two lines', four_corners: 'cover all four corners', x: 'cover an X',
   around_the_world: 'cover the outer ring', blackout: 'cover the whole card',
 };
-const BINGO_PATTERN_NAME = { line: 'Line', four_corners: 'Four Corners', x: 'X', around_the_world: 'Around The World', blackout: 'Blackout' };
-const BINGO_PATTERN_IDS = ['line', 'four_corners', 'x', 'around_the_world', 'blackout'];
+const BINGO_PATTERN_NAME = { line: 'Line', two_lines: 'Two Lines', four_corners: 'Four Corners', x: 'X', around_the_world: 'Around The World', blackout: 'Blackout' };
+const BINGO_PATTERN_IDS = ['line', 'two_lines', 'four_corners', 'x', 'around_the_world', 'blackout'];
+// Short goal text for the round chip — the long sentence above does not fit
+// in a 90px panel, and on the card the player only needs the target.
+const BINGO_PATTERN_GOAL = {
+  line: '1 LINE', two_lines: '2 LINES', four_corners: '4 CORNERS', x: 'THE X',
+  around_the_world: 'OUTER RING', blackout: 'FULL CARD',
+};
+// What each round is worth. The art sheet prints these on the round chips, so
+// the numbers live here rather than being invented per screen.
+const BINGO_ROUND_PRIZE = { 1: 5, 2: 10, 3: 20 };
+
+// The 12 winning lines of a 5x5 card, as flat indexes. Used only to show a
+// player how close they are — the server still decides every real claim.
+const BINGO_LINES = (() => {
+  const L = [];
+  for (let r = 0; r < 5; r++) L.push([0, 1, 2, 3, 4].map((c) => r * 5 + c));
+  for (let c = 0; c < 5; c++) L.push([0, 1, 2, 3, 4].map((r) => r * 5 + c));
+  L.push([0, 6, 12, 18, 24]);
+  L.push([4, 8, 12, 16, 20]);
+  return L;
+})();
+
+// How far along the current pattern this card is, as done//needed. Centre
+// square (12) is always free, so it counts as covered everywhere.
+function bingoProgress(card, coveredIds, pattern) {
+  if (!card?.length) return { done: 0, need: 1 };
+  const on = card.map((it, i) => i === 12 || coveredIds.has(it.id));
+  const lines = BINGO_LINES.filter((l) => l.every((i) => on[i])).length;
+  switch (pattern) {
+    case 'two_lines': return { done: Math.min(lines, 2), need: 2 };
+    case 'four_corners': return { done: [0, 4, 20, 24].filter((i) => on[i]).length, need: 4 };
+    case 'x': return { done: [0, 6, 18, 24, 4, 8, 16, 20].filter((i) => on[i]).length, need: 8 };
+    case 'around_the_world': {
+      const ring = [...Array(25).keys()].filter((i) => i < 5 || i > 19 || i % 5 === 0 || i % 5 === 4);
+      return { done: ring.filter((i) => on[i]).length, need: ring.length };
+    }
+    case 'blackout': return { done: on.filter(Boolean).length, need: 25 };
+    default: {
+      // Closest line, so "4 / 5" means one square from a bingo.
+      const best = Math.max(0, ...BINGO_LINES.map((l) => l.filter((i) => on[i]).length));
+      return { done: lines >= 1 ? 5 : best, need: 5 };
+    }
+  }
+}
+
+// How many rows of a list fit in the box flex actually handed us. The
+// already-called list shares the landscape rail with a HUD whose height moves
+// (a lip sync call adds a chip), so any fixed row count is wrong half the
+// time — it either clipped a row through the middle or left a heading with
+// nothing under it. This measures instead of guessing, and returns 0 when
+// there is no room, so the whole block can disappear cleanly.
+function useFitRows(active, max = 6, rowPx = 22, headingPx = 15) {
+  const [rows, setRows] = useState(max);
+  // A callback ref, not useRef: the list only mounts once the round's calls
+  // arrive, which is several renders after this component first mounts. With
+  // a plain ref the effect ran once against a null node, gave up, and never
+  // re-ran — so the row count stayed at the default and the list clipped.
+  const [node, setNode] = useState(null);
+  useEffect(() => {
+    // Only the landscape rail is height-constrained. Everywhere else the list
+    // sits in a column that grows, so measuring there would read back its own
+    // content height and settle at zero forever.
+    if (!active || !node || typeof ResizeObserver === 'undefined') { setRows(max); return undefined; }
+    const measure = () => {
+      const ol = node.querySelector('ol');
+      const row = node.querySelector('li')?.getBoundingClientRect().height || rowPx;
+      if (!ol) return;
+      // Measure the gap between where the list actually starts and where the
+      // box actually ends. Modelling it instead — heading height plus margin —
+      // was a couple of pixels optimistic, which is enough to slice the last
+      // row in half, and an inline heading's line box is taller than its
+      // bounding rect anyway.
+      const gap = parseFloat(getComputedStyle(ol).rowGap) || 2;
+      const avail = (node.getBoundingClientRect().top + node.clientHeight) - ol.getBoundingClientRect().top;
+      setRows(Math.max(0, Math.min(max, Math.floor((avail + gap) / (row + gap)))));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, [active, node, max, rowPx, headingPx]);
+  return [rows, setNode];
+}
+
+// Live match for a media query, so layout-dependent logic and the stylesheet
+// can never disagree about which layout is on screen.
+function useMediaQuery(query) {
+  const [on, setOn] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof matchMedia === 'undefined') return undefined;
+    const mq = matchMedia(query);
+    const fn = (e) => setOn(e.matches);
+    setOn(mq.matches);
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, [query]);
+  return on;
+}
+
+// Countdown for the square currently on screen. The server stamps every call
+// with `at` and publishes the window it gets (lip sync squares run longer),
+// so the clock is derived, never pushed — a late poll cannot desync it.
+function useCallClock(state) {
+  const [, tick] = useState(0);
+  const running = state?.status === 'live' && !!state?.calls?.[state.calls.length - 1]?.at;
+  useEffect(() => {
+    if (!running) return undefined; // don't re-render 4x/second all night in the lobby
+    const id = setInterval(() => tick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [running]);
+  const last = state?.calls?.[state.calls.length - 1];
+  if (!running) return null;
+  const window = state.currentWindowMs || 60000;
+  const left = Math.max(0, last.at + window - Date.now());
+  const secs = Math.ceil(left / 1000);
+  const text = secs >= 60 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : `${secs}s`;
+  return { left, pct: Math.max(0, Math.min(1, left / window)), text };
+}
 
 // Host-facing deck + win-pattern picker for the NEXT game — shared by Game
 // Menu and Host Control. Deliberately only takes effect on reset (not
@@ -4359,12 +4490,25 @@ function PlayerCardScreen({ navigate }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [localCovered, setLocalCovered] = useState(null); // optimistic override until the next poll lands
-  if (err === 'not-connected') return <NotConnectedBingo title="Your Card" />;
+  // Every hook in this component has to run before any early return. `err`
+  // starts empty and only becomes 'not-connected' once a poll fails, so
+  // returning above the hooks below would change the hook count between two
+  // renders of the same component and blow up with "rendered fewer hooks
+  // than expected" the first time the backend goes away mid-round.
   const me = state?.me;
   const calls = state?.calls || [];
   const calledIds = new Set(calls.map((c) => c.id));
   const nowCalling = calls[calls.length - 1] || null;
   const covered = new Set(localCovered ?? me?.covered ?? []);
+  // The server has run a 3-round ladder since the backend work, but nothing
+  // on the player's screen ever said so. These drive the round chip.
+  const roundNo = state?.roundNo || 1;
+  const finalRound = state?.finalRound || 3;
+  const pattern = state?.pattern || 'line';
+  const progress = bingoProgress(me?.card, covered, pattern);
+  const clock = useCallClock(state);
+  const railLayout = useMediaQuery('(max-height: 460px) and (min-width: 560px)');
+  const [recentRows, recentRef] = useFitRows(railLayout);
   // Ring the call sting when a genuinely new song lands (poll-driven, so guard
   // against re-firing on every 2.5s refresh of the same call).
   const lastHeard = useRef(null);
@@ -4400,6 +4544,7 @@ function PlayerCardScreen({ navigate }) {
   useEffect(() => {
     if (activeBattle?.performingMemberId && activeBattle.performingMemberId === apiMemberId()) setBattleOpen(true);
   }, [activeBattle?.performingMemberId]);
+  if (err === 'not-connected') return <NotConnectedBingo title="Your Card" />;
   const claim = async () => {
     setBusy(true); setMsg('');
     try { await apiBingoClaim(); await refresh(); setMsg('Bingo claimed! Waiting on the host to confirm…'); }
@@ -4458,52 +4603,97 @@ function PlayerCardScreen({ navigate }) {
         </div>
       )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
-        {/* What was just called, on the player's own screen. Without this you
-            had to watch the TV to know what to look for — which defeats the
-            point of holding your card on your phone. */}
-        {/* Everything that isn't the card lives in one column so landscape can
-            put it BESIDE the card instead of above it — a 5x5 card is square,
-            so in landscape it has to be sized off height, and that leaves a
-            wide empty gutter that this fills. */}
+        {/* Layout follows lsb_sheet_03's assembled card screen: a status strip
+            across the top (what's playing, how long is left, what this round
+            pays and what it takes to win), the grid, then progress. In
+            landscape the strip becomes the right-hand rail beside the grid —
+            a 5x5 card is square, so it is sized off height and leaves a wide
+            gutter that this exactly fills. */}
         <div className="bingo-side">
-        {nowCalling && (
-          <div className="bingo-now-calling">
-            <span className="bingo-now-label">NOW CALLING</span>
-            {nowCalling.type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
-            <strong>{nowCalling.artist}</strong>
-            <span className="bingo-now-song">{nowCalling.song}</span>
+          <div className="k-hud">
+            <div className="k-hud-now k-frame k-frame--flat">
+              <span className="k-label">{nowCalling ? 'Now calling' : 'Standing by'}</span>
+              {nowCalling ? (
+                <>
+                  <strong className="k-value">{nowCalling.artist}</strong>
+                  <span className="k-hud-song k-dim">{nowCalling.song}</span>
+                  {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                </>
+              ) : <span className="k-hud-song k-dim">Waiting on the host…</span>}
+            </div>
+            {clock && (
+              <div className={`k-timer${clock.left < 10000 ? ' k-timer--low' : ''}`} style={{ '--k-pct': clock.pct }}
+                   role="timer" aria-label={`${Math.floor(clock.left / 1000)} seconds left`}>
+                <span>{clock.text}</span>
+              </div>
+            )}
+            {/* Round + goal. Until now the round ladder existed only on the
+                server, so a player had no way to know that round 2 needs two
+                lines and round 3 needs the whole card. */}
+            <div className="k-hud-round k-frame k-frame--gold">
+              <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {roundNo} of {finalRound}</span>
+              <strong className="k-money">${BINGO_ROUND_PRIZE[roundNo] ?? 5}</strong>
+              <span className="k-hud-goal">{BINGO_PATTERN_GOAL[pattern] || '1 LINE'}</span>
+            </div>
           </div>
-        )}
-        {waiting > 0 && (
-          <p className="bingo-waiting">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
-        )}
-        <p className="mem-fineprint">Tap a square once the host calls it — {BINGO_PATTERN_LABEL[state?.pattern] || 'complete a line'} to win.</p>
+          {waiting > 0 && (
+            <p className="k-nudge">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
+          )}
+          {/* Already-called songs. If you looked away for one song you had no
+              way to catch up without asking the host; this is also what fills
+              the rail in landscape, which was otherwise dead space. */}
+          {calls.length > 1 && (
+            <div className="k-recent" ref={recentRef} data-rows={recentRows}>
+              {/* When not even one row fits, the heading carries the count
+                  instead, so the block still says something useful rather
+                  than heading an empty list. */}
+              <span className="k-label">Already called{recentRows === 0 ? ` · ${calls.length - 1}` : ''}</span>
+              <ol>
+                {calls.slice(0, -1).reverse().slice(0, recentRows).map((c) => (
+                  <li key={c.id} className={covered.has(c.id) ? 'is-mine' : ''}>
+                    <b>{c.artist}</b> <span>{c.song}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
-        <div className="bingo-grid">
+        <div className="k-grid">
           {me.card.map((item, i) => {
             const isFree = i === 12;
             const isCalled = calledIds.has(item.id);
             const isCovered = isFree || covered.has(item.id);
-            const cls = ['bingo-cell', isFree ? 'free' : '', isCovered ? 'marked' : '', !isFree && isCalled && !isCovered ? 'tappable' : ''].filter(Boolean).join(' ');
+            const isLip = item.type === 'lipsync';
+            // One state class per square: free > covered > called > idle. A
+            // square can never render as two things at once, which is what
+            // made the old grid hard to read at a glance.
+            const state3 = isFree ? 'free' : isCovered ? 'covered' : isCalled ? 'called' : '';
+            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync'].filter(Boolean).join(' ');
+            const mark = isCovered && !isFree ? TILE_ART.covered : isCalled ? TILE_ART.called : isLip ? TILE_ART.lipsync : null;
             return (
               <button type="button" key={`${i}-${item.id}`} className={cls} onClick={() => tap(item)} disabled={isFree || !isCalled}>
-                {isFree ? 'FREE SPACE' : (
+                {isFree ? 'Free space' : (
                   <>
-                    {item.type === 'lipsync' && <span className="bingo-cell-tag" title="Lip sync square" aria-label="Lip sync square">🎤</span>}
-                    <span className="bingo-cell-artist">{item.artist}</span>
-                    <span className="bingo-cell-song">{item.song}</span>
+                    <span className="k-tile-artist">{item.artist}</span>
+                    <span className="k-tile-song">{item.song}</span>
                   </>
                 )}
-                {isCovered && !isFree && <span className="bingo-cell-check" aria-hidden="true">✓</span>}
+                {mark && <img className="k-tile-mark" src={mark} alt="" aria-hidden="true" />}
               </button>
             );
           })}
         </div>
-        {!state.winner && (
-          <button type="button" className="bingo-btn gold" disabled={busy || me.hasPendingClaim || state.status !== 'live'} onClick={claim}>
-            {me.hasPendingClaim ? 'Claim pending…' : 'Claim Bingo!'}
-          </button>
-        )}
+        <div className="k-cardfoot">
+          <div className="k-progressrow">
+            <span className="k-label">{progress.done} / {progress.need} to bingo</span>
+            <div className="k-progress"><i style={{ width: `${Math.round((progress.done / progress.need) * 100)}%` }} /></div>
+          </div>
+          {!state.winner && (
+            <button type="button" className="k-btn k-btn--gold" disabled={busy || me.hasPendingClaim || state.status !== 'live'} onClick={claim}>
+              {me.hasPendingClaim ? 'Claim pending…' : 'Claim Bingo!'}
+            </button>
+          )}
+        </div>
         {msg && <p className="mem-fineprint">{msg}</p>}
       </AppPanel>
     </div>
@@ -4802,7 +4992,7 @@ function PartyScreen({ isHost }) {
         </AppPanel>
       )}
       {isHost && (
-        <AppPanel title="Host Controls" subtitle={`Minimum ${party?.minPlayers ?? 5} players to start`}>
+        <AppPanel title="Host Controls" subtitle={`Minimum ${party?.minPlayers ?? 2} players to start`}>
           <p className="dash-num">{party ? `${party.playerCount} in the room` : ''}</p>
           {err && <p className="dash-empty">{err}</p>}
           <button type="button" className="bingo-btn" disabled={busy || party?.status === 'battling'} onClick={() => act(apiPartyStart)}>Start Battle</button>

@@ -4537,70 +4537,7 @@ button {
 .battle-watch-live { position: absolute; top: 7px; left: 7px; padding: 3px 9px; border-radius: 999px; background: rgba(220,20,60,.9); color: #fff; font-size: 10px; font-weight: 900; letter-spacing: .08em; }
 .tv-battle .battle-watch { width: min(92%, 520px); margin: 0 auto 16px; }
 
-/* ── Lip Sync Bingo in LANDSCAPE ────────────────────────────────────────────
-   A 5x5 card is square, so in portrait it's sized off WIDTH. Turn the phone
-   and width is no longer the constraint — height is. Measured on a real
-   844x390 landscape viewport the card was still being sized off width and
-   rendering 618x618 in a 390px-tall window: 674px of overflow, i.e. the card
-   ran three-quarters of a screen past the bottom.
-
-   So in landscape the card is sized off HEIGHT instead, and the wide gutter
-   that frees up (~844 - 340 = 500px) carries everything else beside it.
-   Budget for the 390px height: ~44px trimmed header + 2x8px padding leaves
-   ~330px for the card => ~62px cells, which is within a couple of px of the
-   67px cells portrait already ships, so squares stay just as readable. */
-@media (max-height: 460px) and (min-width: 560px) {
-  .screen-bingo .screen-header, .screen-playerCard .screen-header { margin-bottom: 4px; }
-  .screen-playerCard .screen-header h1 { font-size: 20px; }
-  .screen-playerCard .screen-header p { display: none; }
-  .screen-playerCard .screen-header { margin-top: 0; padding-top: 0; }
-  /* the page's own top/bottom padding is a big slice of a 390px window */
-  .screen-playerCard.screen { padding-top: 6px; padding-bottom: 6px; }
-  .screen-playerCard .home-dashboard, .screen-playerCard .staff-dash { gap: 4px; }
-  .screen-playerCard .app-panel { padding: 6px 8px; }
-  /* NOT overflow:hidden — that just clipped the bottom row of the card off
-     the screen, which is worse than scrolling. Everything is sized to fit
-     instead: the panel's own title bar goes (the screen header already says
-     Bingo Card), and Claim moves into the side column so it stops costing a
-     full row of height under the card. */
-  .screen-playerCard .app-panel > header { display: none; }
-  /* the battle alert is the last thing competing for height in landscape */
-  .battle-alert { padding: 5px 10px; margin-bottom: 4px; }
-  .battle-alert-text strong { font-size: 12px; }
-  .battle-alert-text small { font-size: 10.5px; }
-  .screen-playerCard .app-panel-body { display: flex; }
-  .screen-playerCard .bingo-btn.gold { order: 9; width: 100%; }
-  .screen-playerCard .app-panel > header { margin-bottom: 4px; }
-  .screen-playerCard .app-panel h2 { font-size: 15px; }
-  .screen-playerCard .bingo-btn.gold { padding: 8px; font-size: 13px; }
-
-  .screen-playerCard .app-panel-body {
-    display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 12px;
-  }
-  /* square, driven by the viewport height rather than the column width */
-  .screen-playerCard .bingo-grid {
-    flex: 0 0 auto; width: min(66vh, 44vw); height: min(66vh, 44vw);
-    margin: 0; gap: 3px;
-  }
-  .bingo-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .screen-playerCard .app-panel-body > .bingo-btn.gold { align-self: flex-end; max-width: 200px; }
-  .bingo-side .bingo-now-calling { margin: 0; padding: 8px 10px; }
-  .bingo-side .bingo-now-calling strong { font-size: 15px; }
-  .bingo-side .bingo-waiting { margin: 0; padding: 5px 8px; font-size: 11.5px; }
-  .bingo-side .mem-fineprint { margin: 0; font-size: 11px; }
-  .screen-playerCard .bingo-btn.gold { margin-top: 6px; }
-  /* squares get tighter type at this size, but never clipped */
-  .screen-playerCard .bingo-cell { padding: 3px 2px; gap: 1px; }
-  .screen-playerCard .bingo-cell-artist { font-size: 9.5px; }
-  .screen-playerCard .bingo-cell-song { font-size: 7.5px; }
-  .screen-playerCard .bingo-cell:has(.bingo-cell-tag) { padding-top: 11px; }
-  .screen-playerCard .bingo-cell-tag { width: 12px; height: 12px; }
-}
-
-/* Portrait card: same guarantee, different budget. The card is sized off
-   width here, so the cap only has to absorb the surrounding chrome. */
-@media (max-width: 720px) and (min-height: 461px) {
-  .screen-playerCard .app-panel { max-height: calc(100vh - 150px); overflow: hidden; }
-  .screen-playerCard .app-panel-body { max-height: calc(100vh - 190px); }
-  .screen-playerCard.screen { padding-bottom: 6px; }
-}
+/* Lip Sync Bingo's card screen sizes itself in kit.css — see the
+   "Card screen layout" and "Card screen fit" sections there. It lives with
+   the rest of the kit rather than here so the whole screen is described in
+   one place. */

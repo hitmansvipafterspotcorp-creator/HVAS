@@ -515,18 +515,19 @@ ok(badSetMedia.status === 401, 'members cannot set now-playing media');
 
 console.log('PARTY MODE / BATTLERZ');
 const notEnough = await call('POST', '/party/start', {}, stok);
-ok(notEnough.status === 400, 'refuses to start with fewer than 5 players in the room');
+ok(notEnough.status === 400, 'refuses to start with an empty room');
+ok((await call('GET', '/party/state')).body.minPlayers === 2, 'the floor is published as 2, so the UI states the real number');
 
-// bring the room to 5 players (bingo_cards was cleared by the last reset)
+// One player is still not a battle — Battlerz needs two sides.
 await call('POST', '/bingo/join', {}, mtok);
+const onlyOne = await call('POST', '/party/start', {}, stok);
+ok(onlyOne.status === 400, 'one player alone still cannot start a battle');
+
+// Two is enough now. A slow night should not lock the mode out entirely,
+// which a floor of 5 did.
 await call('POST', '/bingo/join', {}, mtok2);
-for (let i = 0; i < 3; i++) {
-  const s = await call('POST', '/auth/member/start', { contact: `850-555-70${i}` });
-  const v = await call('POST', '/auth/member/verify', { contact: `850-555-70${i}`, code: s.body.devCode, name: `Guest${i}` });
-  await call('POST', '/bingo/join', {}, v.body.token);
-}
 const partyStart = await call('POST', '/party/start', {}, stok);
-ok(partyStart.status === 200, 'host starts Battlerz once 5+ players are in the room');
+ok(partyStart.status === 200, 'host starts Battlerz with just two players in the room');
 let party = await call('GET', '/party/state');
 ok(party.body.status === 'battling' && party.body.teamA === 'Team Purple' && party.body.teamB === 'Team Pink', 'battle is live with both teams named');
 

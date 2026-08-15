@@ -56,6 +56,9 @@ const BINGO_PATTERN_IDS = ['line', 'two_lines', 'four_corners', 'x', 'around_the
 // comes from here unless the host has explicitly picked a one-off pattern.
 const BINGO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
 const BINGO_FINAL_ROUND = 3;
+// Party Mode floor. Was 5, which made the mode untestable and unusable on a
+// slow night — two people in the room should be able to run a Battlerz round.
+const PARTY_MIN_PLAYERS = Math.max(2, Number(process.env.PARTY_MIN_PLAYERS) || 2);
 // 5x5 card, index 12 is the free center square.
 const BINGO_LINES = [
   [0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [15, 16, 17, 18, 19], [20, 21, 22, 23, 24],
@@ -1179,12 +1182,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       let myVote = null;
       const c = auth(req, 'member');
       if (c) myVote = db.prepare('SELECT team, reaction FROM party_votes WHERE round=? AND member_id=?').get(b.round, c.sub) || null;
-      json(res, 200, { status: b.status, teamA: b.team_a, teamB: b.team_b, votesA, votesB, hype: votesA + votesB, winner: b.winner, playerCount, minPlayers: 5, myVote });
+      json(res, 200, { status: b.status, teamA: b.team_a, teamB: b.team_b, votesA, votesB, hype: votesA + votesB, winner: b.winner, playerCount, minPlayers: PARTY_MIN_PLAYERS, myVote });
     },
     'POST /party/start': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       const playerCount = db.prepare('SELECT COUNT(*) c FROM bingo_cards').get().c;
-      if (playerCount < 5) return json(res, 400, { error: 'Not enough players — gather your crew and try again.' });
+      if (playerCount < PARTY_MIN_PLAYERS) return json(res, 400, { error: `Not enough players — ${PARTY_MIN_PLAYERS} needed to start.` });
       commit('party.start', { at: Date.now() });
       json(res, 200, { ok: true });
     },

@@ -1,0 +1,456 @@
+:root {
+  /* Ground — a true cool near-black, not the warm violet-brown it was. The
+     newer sheets (ui_04 member entry, ui_17 loading) sit their neon on almost
+     pure black, which is what makes the colour read as light rather than as
+     paint. */
+  --k-void:        #050509;
+  --k-ink:         #0b0b14;
+  --k-ink-2:       #12121f;
+  --k-ink-3:       #1b1b2e;
+
+  /* Electric violet → magenta is the primary ramp. */
+  --k-violet-lt:   #d4a3ff;
+  --k-violet:      #a935ff;
+  --k-violet-mid:  #7c14d6;
+  --k-violet-dk:   #43077a;
+  --k-neon:        #ff3df0;
+  --k-neon-lt:     #ff9df7;
+
+  /* Cyan carries anything informational — scanning, waiting, counts. */
+  --k-cyan:        #22d3ee;
+  --k-cyan-lt:     #8beaf7;
+
+  /* Gold is BRAND, not chrome. It belongs on the logo, the prize figure and a
+     won state, and nowhere else. Bordering every panel in gold bevel is what
+     made the first pass read as an old slot-machine skin. */
+  --k-gold-lt:     #ffe9a8;
+  --k-gold:        #ffcf47;
+  --k-gold-mid:    #d99a24;
+  --k-gold-dk:     #8a5a10;
+
+  --k-go:          #39ff88;
+  --k-danger:      #ff3355;
+
+  --k-text:        #f2f0ff;
+  --k-text-dim:    #a9a3c9;
+  --k-text-faint:  #6c6690;
+
+  /* Hairline edges. The newer sheets outline in a 1px bright stroke and let
+     the GLOW do the work; thick metal borders eat space on a phone and read
+     as dated. */
+  --k-edge:        rgba(169, 53, 255, .55);
+  --k-edge-soft:   rgba(140, 130, 190, .22);
+
+  --k-r-sm: 7px;
+  --k-r:    12px;
+  --k-r-lg: 18px;
+
+  --k-glow-violet: 0 0 20px rgba(169, 53, 255, .40);
+  --k-glow-gold:   0 0 18px rgba(255, 207, 71, .35);
+  --k-glow-neon:   0 0 22px rgba(255, 61, 240, .45);
+  --k-glow-cyan:   0 0 18px rgba(34, 211, 238, .38);
+
+  --k-font: 'Arial Black', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Frames ───────────────────────────────────────────────────────────────
+   A hairline edge over a near-black fill, lifted by an outer glow and a
+   single top highlight. One rule, any radius, any size. */
+.k-frame {
+  border: 1px solid var(--k-edge);
+  border-radius: var(--k-r);
+  background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), var(--k-glow-violet);
+}
+.k-frame--neon { border-color: var(--k-neon); box-shadow: inset 0 1px 0 rgba(255, 157, 247, .12), var(--k-glow-neon); }
+.k-frame--cyan { border-color: var(--k-cyan); box-shadow: inset 0 1px 0 rgba(139, 234, 247, .12), var(--k-glow-cyan); }
+/* Gold appears here only for the prize panel and a won state. */
+.k-frame--gold { border-color: var(--k-gold); box-shadow: inset 0 1px 0 rgba(255, 233, 168, .14), var(--k-glow-gold); }
+.k-frame--flat { border-color: var(--k-edge-soft); box-shadow: none; }
+
+/* ── Type ─────────────────────────────────────────────────────────────── */
+.k-label {                     /* the sheets' small-caps captions */
+  font: 900 9px/1 var(--k-font);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--k-violet-lt);
+}
+.k-value  { font: 900 clamp(15px, 4.4vw, 22px)/1.05 var(--k-font); color: var(--k-text); }
+.k-money  { font: 900 clamp(18px, 5vw, 26px)/1 var(--k-font); color: var(--k-gold); text-shadow: 0 0 12px rgba(255, 190, 70, .5); }
+.k-dim    { color: var(--k-text-dim); }
+
+/* ── Chips ────────────────────────────────────────────────────────────── */
+.k-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--k-violet); background: rgba(169, 53, 255, .12);
+  font: 900 10px/1 var(--k-font); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--k-violet-lt); white-space: nowrap;
+}
+.k-chip--neon { border-color: var(--k-neon); background: rgba(255, 61, 240, .13); color: var(--k-neon-lt); box-shadow: var(--k-glow-neon); }
+.k-chip--cyan { border-color: var(--k-cyan); background: rgba(34, 211, 238, .12); color: var(--k-cyan-lt); }
+.k-chip--gold { border-color: var(--k-gold); background: rgba(255, 207, 71, .12); color: var(--k-gold); }
+.k-chip--live::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; box-shadow: 0 0 8px currentColor;
+  animation: k-pulse 1.2s ease-in-out infinite;
+}
+@keyframes k-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+/* ── Buttons ───────────────────────────────────────────────────────────
+   Flat neon fills with a hairline edge, not metal bevels. 44px minimum
+   because this is used one-handed in a dark room. */
+.k-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 44px; padding: 10px 16px;
+  border: 1px solid var(--k-violet-lt); border-radius: var(--k-r);
+  font: 900 13px/1 var(--k-font); letter-spacing: .06em; text-transform: uppercase;
+  color: #fff; cursor: pointer; width: 100%;
+  background: linear-gradient(180deg, var(--k-violet), var(--k-violet-mid));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), var(--k-glow-violet);
+  transition: filter .12s ease, transform .08s ease;
+}
+.k-btn:hover:not(:disabled)  { filter: brightness(1.16); }
+.k-btn:active:not(:disabled) { transform: translateY(1px); }
+.k-btn:disabled { opacity: .38; cursor: default; box-shadow: none; }
+.k-btn--secondary {
+  background: rgba(169, 53, 255, .1); border-color: var(--k-violet);
+  color: var(--k-violet-lt); box-shadow: none;
+}
+.k-btn--tertiary {
+  background: transparent; border-color: var(--k-edge-soft);
+  color: var(--k-text-dim); box-shadow: none;
+}
+.k-btn--go {
+  background: linear-gradient(180deg, #3affa0, #0e9b52);
+  border-color: #9dffcd; color: #04240f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 20px rgba(57, 255, 136, .38);
+}
+.k-btn--gold {
+  background: linear-gradient(180deg, var(--k-gold), var(--k-gold-mid));
+  border-color: var(--k-gold-lt); color: #241500;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), var(--k-glow-gold);
+}
+.k-btn--danger {
+  background: linear-gradient(180deg, #ff4d6b, #a30d25);
+  border-color: #ffa8b8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 0 20px rgba(255, 51, 85, .38);
+}
+
+/* ── Progress ─────────────────────────────────────────────────────────── */
+.k-progress {
+  position: relative; height: 16px; border-radius: 999px; overflow: hidden;
+  border: 1px solid var(--k-edge-soft);
+  background: var(--k-void);
+}
+.k-progress > i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--k-violet), var(--k-neon));
+  box-shadow: 0 0 14px rgba(255, 61, 240, .6);
+  transition: width .35s cubic-bezier(.2, .8, .3, 1);
+}
+.k-progress--gold > i { background: linear-gradient(180deg, var(--k-gold-lt), var(--k-gold-mid)); box-shadow: var(--k-glow-gold); }
+
+/* ── Tiles — the 5x5 card ────────────────────────────────────────────────
+   State is carried by ONE class so a square can never be two things at once,
+   which is what made the old grid hard to read at a glance. Idle squares are
+   nearly bare: only the states that need attention carry colour. */
+.k-tile {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+  padding: 3px 2px; overflow: hidden; text-align: center; cursor: default;
+  border: 1px solid var(--k-edge-soft); border-radius: var(--k-r-sm);
+  background: var(--k-ink);
+  color: var(--k-text-dim); min-width: 0; min-height: 0;
+}
+.k-tile-artist {
+  font: 900 clamp(7px, 1.9vmin, 11px)/1.08 var(--k-font);
+  color: var(--k-text); text-transform: uppercase;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.k-tile-song {
+  font: 700 clamp(6px, 1.6vmin, 9.5px)/1.05 var(--k-font);
+  color: var(--k-text-faint);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+/* CALLED — said by the host, not yet yours. The only state that has to carry
+   across a dark room, so the only one that animates. */
+.k-tile--called {
+  border-color: var(--k-cyan); cursor: pointer;
+  background: linear-gradient(180deg, rgba(34, 211, 238, .18), rgba(34, 211, 238, .05));
+  animation: k-callout 1.5s ease-in-out infinite;
+}
+.k-tile--called .k-tile-artist { color: #fff; }
+.k-tile--called .k-tile-song { color: var(--k-cyan-lt); }
+@keyframes k-callout {
+  0%, 100% { box-shadow: 0 0 8px rgba(34, 211, 238, .28); }
+  50%      { box-shadow: 0 0 20px rgba(34, 211, 238, .8); }
+}
+/* COVERED — banked. */
+.k-tile--covered {
+  border-color: var(--k-violet);
+  background: linear-gradient(180deg, var(--k-violet-mid), var(--k-violet-dk));
+  box-shadow: var(--k-glow-violet), inset 0 1px 0 rgba(255, 255, 255, .16);
+}
+.k-tile--covered .k-tile-artist { color: #fff; }
+.k-tile--covered .k-tile-song   { color: #e9d6ff; }
+/* LIP SYNC — you have to perform to take it. */
+.k-tile--lipsync { border-color: var(--k-neon); box-shadow: 0 0 10px rgba(255, 61, 240, .28); }
+.k-tile--free {
+  border-color: var(--k-gold);
+  background: linear-gradient(180deg, rgba(255, 207, 71, .22), rgba(255, 207, 71, .06));
+  color: var(--k-gold); font: 900 clamp(7px, 1.9vmin, 10px)/1.1 var(--k-font);
+  text-transform: uppercase; box-shadow: var(--k-glow-gold);
+}
+/* The state icon rides in the corner, small, so it never eats the words —
+   the point of a square is still reading the artist and the song. */
+.k-tile-mark {
+  position: absolute; top: 1px; right: 1px;
+  width: clamp(11px, 3vmin, 17px); height: clamp(11px, 3vmin, 17px);
+  object-fit: contain; pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .85));
+}
+
+/* ── Timer dial ───────────────────────────────────────────────────────── */
+.k-timer {
+  position: relative; display: grid; place-items: center;
+  width: clamp(52px, 13vmin, 78px); aspect-ratio: 1; border-radius: 50%;
+  background: conic-gradient(var(--k-violet) calc(var(--k-pct, 1) * 360deg), #16162a 0);
+  padding: 3px; flex: 0 0 auto;
+}
+.k-timer::before {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%;
+  background: var(--k-void);
+  border: 1px solid var(--k-edge-soft);
+}
+.k-timer > span {
+  position: relative; font: 900 clamp(13px, 3.6vmin, 19px)/1 var(--k-font);
+  color: var(--k-text); font-variant-numeric: tabular-nums;
+}
+.k-timer--low { background: conic-gradient(var(--k-neon) calc(var(--k-pct, 1) * 360deg), #2a0a24 0); }
+.k-timer--low > span { color: var(--k-neon-lt); }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-tile--called, .k-chip--live::before { animation: none; }
+  .k-progress > i, .k-btn { transition: none; }
+}
+
+/* ── Card screen layout ───────────────────────────────────────────────────
+   Portrait: status strip on top, grid, footer.
+   Landscape: the same strip becomes the rail beside the grid.
+   Neither ever scrolls — the grid is sized off whichever axis is scarce. */
+.k-hud { display: flex; align-items: stretch; gap: 6px; margin-bottom: 6px; }
+.k-hud-now {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 5px 9px; border-radius: var(--k-r);
+}
+.k-hud-now .k-value,
+.k-hud-song { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-hud-song { font: 700 11.5px/1.2 var(--k-font); }
+.k-hud-now .k-chip { align-self: flex-start; margin-top: 2px; }
+.k-hud-round {
+  flex: 0 0 auto; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+  padding: 5px 10px; border-radius: var(--k-r); text-align: center;
+}
+.k-hud-goal {
+  font: 900 8.5px/1 var(--k-font); letter-spacing: .1em;
+  color: var(--k-violet-lt); text-transform: uppercase; white-space: nowrap;
+}
+.k-nudge {
+  margin: 0 0 6px; padding: 5px 9px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-cyan);
+  background: rgba(34, 211, 238, .12);
+  font: 900 11px/1.25 var(--k-font); color: var(--k-cyan-lt);
+}
+.k-cardfoot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.k-progressrow { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.k-cardfoot .k-btn { flex: 0 0 auto; width: auto; min-width: 132px; }
+
+/* Landscape phone. The generic (max-width) breakpoints never fire here —
+   a phone on its side is WIDE — so this needs its own height-based query. */
+@media (max-height: 460px) and (min-width: 560px) {
+  /* The rail beside the card is ~570px wide, so the HUD stays a row here —
+     stacking it made the rail taller than the card it sits next to. */
+  .k-hud { gap: 5px; margin-bottom: 0; }
+  .k-nudge { font-size: 10px; padding: 4px 7px; margin: 0; }
+}
+
+/* ── The 5x5 grid ─────────────────────────────────────────────────────────
+   Its own class, not `.bingo-grid`. That name was already taken by three
+   unrelated two-column layouts elsewhere in styles.css, one of which set
+   `.bingo-grid img { width: 100% }` and blew every square's state icon up to
+   fill the tile. Namespacing it ends that whole class of collision. */
+.k-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 4px;
+  width: 100%;
+  aspect-ratio: 1;
+  margin: 0;
+}
+.k-grid > .k-tile { width: auto; height: auto; }
+
+/* ── Card screen fit ──────────────────────────────────────────────────────
+   The card must never scroll: a player holding a phone in a dark club is not
+   going to discover a row hidden below the fold. Both orientations size the
+   grid off whichever axis is actually scarce.
+
+   PORTRAIT — width is scarce, so the grid takes the column width and the
+   surrounding chrome is capped.
+   LANDSCAPE — a phone on its side is WIDE; height is scarce. The grid is
+   sized off height and the freed gutter (~844 - 340 = 500px) carries the
+   HUD beside it. Note (max-width: 720px) never matches in landscape, which
+   is why this needs its own height-based query. */
+@media (max-width: 720px) and (min-height: 461px) {
+  .screen-playerCard .app-panel { max-height: calc(100vh - 150px); overflow: hidden; }
+  .screen-playerCard .app-panel-body { max-height: calc(100vh - 190px); }
+  .screen-playerCard.screen { padding-bottom: 6px; }
+}
+
+@media (max-height: 460px) and (min-width: 560px) {
+  .screen-bingo .screen-header,
+  .screen-playerCard .screen-header { margin-bottom: 4px; margin-top: 0; padding-top: 0; }
+  .screen-playerCard .screen-header h1 { font-size: 20px; }
+  .screen-playerCard .screen-header p { display: none; }
+  .screen-playerCard.screen { padding-top: 6px; padding-bottom: 6px; }
+  .screen-playerCard .home-dashboard,
+  .screen-playerCard .staff-dash { gap: 4px; }
+  .screen-playerCard .app-panel { padding: 6px 8px; }
+  /* NOT overflow:hidden — that only clipped the bottom row off the screen,
+     which is worse than scrolling. Everything is sized to fit instead, and
+     the panel's own title bar goes since the screen header already says
+     Bingo Card. */
+  .screen-playerCard .app-panel > header { display: none; }
+  .battle-alert { padding: 5px 10px; margin-bottom: 4px; }
+  .battle-alert-text strong { font-size: 12px; }
+  .battle-alert-text small { font-size: 10.5px; }
+
+  /* Two columns, not three. Flex + order put the grid in the middle with the
+     HUD on one side and Claim stranded on the other; a grid with an explicit
+     span keeps the card on the left and everything else in ONE rail beside
+     it, which is what the sheet's assembled landscape example shows. */
+  .screen-playerCard .app-panel-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch; gap: 8px 10px;
+    /* Bound the body to the card's own height, or the rail's contents (the
+       already-called list) grow the row and push the page past the fold. */
+    height: min(calc(100vh - 152px), 46vw);
+  }
+  /* Sized off what is actually left, not a guessed fraction of the viewport.
+     Measured on a 390px-tall landscape window: 43px screen header + 38px
+     battle alert + 12px screen padding + 14px panel padding + ~12px of
+     margins = ~132px of chrome. 152px is the measured budget that lands the
+     page at exactly zero overflow with a battle alert on screen. Capped at
+     46vw so it cannot crowd out the rail. */
+  .screen-playerCard .k-grid {
+    grid-column: 1; grid-row: 1 / span 2;
+    width: min(calc(100vh - 152px), 46vw); gap: 3px;
+  }
+  .screen-playerCard .bingo-side {
+    grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  /* The list is the one thing here that can be any length, so it is the one
+     thing that gives up space — it shows as many as fit and no more. */
+  .screen-playerCard .k-recent { display: block; flex: 1 1 0; min-height: 0; }
+  .screen-playerCard .k-cardfoot {
+    grid-column: 2; grid-row: 2; margin-top: 0;
+    flex-direction: column; align-items: stretch; gap: 5px;
+  }
+  .screen-playerCard .k-cardfoot .k-btn { width: 100%; min-height: 38px; }
+}
+
+/* Portrait phone: the screen's own intro paragraph is a luxury on a 390px
+   card — the panel below already says what this is, and the paragraph was
+   costing roughly a full row of squares. */
+@media (max-width: 720px) and (min-height: 461px) {
+  .screen-playerCard .screen-header p { display: none; }
+  .screen-playerCard .screen-header { margin-bottom: 6px; }
+  .screen-playerCard .app-panel > header { margin-bottom: 6px; }
+  .screen-playerCard .app-panel h2 { font-size: 19px; }
+}
+/* The now-calling title gets two lines before it truncates — artist names
+   like "Luther Vandross" are common enough that one line ellipsised most of
+   them away. */
+.k-hud-now .k-value {
+  white-space: normal;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+
+/* ── Already-called list ──────────────────────────────────────────────── */
+.k-recent { min-width: 0; overflow: hidden; }
+.k-recent ol {
+  list-style: none; margin: 3px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.k-recent li {
+  display: flex; align-items: baseline; gap: 5px;
+  padding: 2px 7px; border-radius: var(--k-r-sm);
+  border: 1px solid var(--k-edge-soft); background: rgba(18, 18, 31, .8);
+  font: 700 10.5px/1.3 var(--k-font); color: var(--k-text-dim);
+  white-space: nowrap; overflow: hidden;
+}
+.k-recent li b { color: var(--k-text); text-transform: uppercase; }
+.k-recent li span { overflow: hidden; text-overflow: ellipsis; color: var(--k-text-faint); }
+/* Ones you already covered read as done, so the list doubles as a checklist. */
+.k-recent li.is-mine { border-color: var(--k-violet); color: var(--k-violet-lt); }
+.k-recent li.is-mine::after { content: '✓'; margin-left: auto; color: var(--k-violet-lt); font-weight: 900; }
+
+/* This list exists to fill the gutter that landscape opens up beside a square
+   card. In every other layout the card already fills the screen, so it is off
+   by default and switched on only in the rail. */
+.k-recent { display: none; }
+
+/* Square type: break inside a word only when a word genuinely cannot fit,
+   and go a little tighter in landscape where cells are ~44px wide. */
+.k-tile-artist, .k-tile-song { word-break: normal; overflow-wrap: break-word; }
+@media (max-height: 460px) and (min-width: 560px) {
+  .k-tile-artist { font-size: 8.5px; letter-spacing: -.02em; }
+  .k-tile-song { font-size: 7px; }
+  .k-tile { padding: 2px 1px; }
+}
+
+/* Row COUNT is measured in JS (useFitRows) rather than capped here, because
+   the rail shares its height with a HUD that grows a chip on lip sync calls.
+
+   Nothing in this block may be hidden based on that measurement. Hiding the
+   box collapsed it to zero height, hiding its children moved the list's top —
+   either way the next measurement read back a number that the previous
+   measurement had caused, and the count latched permanently at whatever it
+   hit first. The heading and the (possibly empty) list are always rendered so
+   the geometry the measurement depends on never moves. */
+@media (max-height: 460px) and (min-width: 560px) {
+  .k-recent li { padding: 1px 6px; font-size: 9.5px; }
+}
+
+/* A crown on the round label. Tried the full brand badge as a watermark
+   behind this panel first; at 62px inside a 90px box it just read as a
+   cropped image sitting in the corner by mistake. */
+.k-hud-round { position: relative; }
+.k-label { display: inline-flex; align-items: center; gap: 4px; }
+.k-hud-crown { width: 13px; height: 13px; object-fit: contain; }
+
+
+/* ── Shared shell, restyled ───────────────────────────────────────────────
+   These are not kit classes, but the app's panels are what everything else
+   sits inside, and they carried the old look: a gold 1px border over a warm
+   purple wash. Leaving them would have meant a modern card inside a dated
+   frame on every screen. Same structure, new palette — near-black ground,
+   hairline violet edge, glow instead of metal. */
+.app-panel {
+  border: 1px solid var(--k-edge);
+  border-radius: var(--k-r);
+  background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 0 26px rgba(169, 53, 255, .16);
+}
+.app-panel header {
+  border-bottom: 1px solid var(--k-edge-soft);
+  background: linear-gradient(90deg, rgba(169, 53, 255, .14), transparent 70%);
+}
+.app-panel header span { color: var(--k-neon); }
+.app-panel h2 { color: var(--k-text); }
