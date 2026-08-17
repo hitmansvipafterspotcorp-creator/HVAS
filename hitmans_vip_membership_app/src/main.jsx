@@ -769,6 +769,13 @@ const screens = [
     detail: 'Member access, staff check-in, Lip Sync Bingo, and host controls.',
   },
   {
+    id: 'lipsyncBattle',
+    label: 'Lip Sync Battle',
+    eyebrow: 'Live Floor',
+    title: 'Lip Sync Battle',
+    detail: 'Bracket, king of the hill or open floor — battles with no bingo card involved.',
+  },
+  {
     id: 'payVerify',
     label: 'Pay & Verify',
     eyebrow: 'Front Door',
@@ -985,7 +992,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle'],
   },
   {
     id: 'staff',
