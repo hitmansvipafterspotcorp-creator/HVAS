@@ -769,6 +769,43 @@ if (dropped) {
 const relock = await call('POST', '/battle/lock', { battleId: battle.id }, stok);
 ok(relock.status === 400, 'locking an already-locked roster is refused');
 
+{ // scoped: this file is one flat module, and bare consts collide across sections
+  console.log('MEDIA SETUP — the reason songs were not playing');
+  // Nothing plays until the venue has EITHER a YouTube key or a signed-in Google
+  // account, and until now there was no way to set either from the app: the
+  // endpoints existed and nothing called them, so a host with silent songs had
+  // no way to find out why.
+  const mediaOff = await call('GET', '/bingo/board', null, stok);
+  ok(mediaOff.body.youtubeEnabled === false, 'the host board says plainly that media is off');
+  ok((await call('GET', '/bingo/state')).body.youtubeEnabled === false, 'and so does the state every screen reads');
+
+  const keyStatus = await call('GET', '/bingo/youtube-key', null, stok);
+  ok(keyStatus.status === 200 && keyStatus.body.usingHostKey === false, 'the host can read whether a venue key is set');
+  ok(!('key' in keyStatus.body) && !('value' in keyStatus.body), 'and the key itself is never echoed back');
+
+  const ytSave = await call('POST', '/bingo/youtube-key', { key: 'AIzaTESTKEY1234' }, stok);
+  ok(ytSave.status === 200 && ytSave.body.youtubeEnabled === true, 'saving a key turns media on');
+  ok((await call('GET', '/bingo/board', null, stok)).body.youtubeEnabled === true, 'the host board reflects it immediately');
+  const hinted = await call('GET', '/bingo/youtube-key', null, stok);
+  ok(hinted.body.hint === '••••1234', 'the saved key is shown only as a last-four hint');
+
+  const memberKey = await call('POST', '/bingo/youtube-key', { key: 'nope' }, mtok);
+  ok(memberKey.status === 401, 'a member cannot set the venue media key');
+  const ytHostTok = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
+  ok((await call('POST', '/bingo/youtube-key', { key: 'AIzaHOSTSET' }, ytHostTok)).status === 200,
+    'a host session can set it, not just staff');
+
+  const ytClear = await call('POST', '/bingo/youtube-key', { key: '' }, stok);
+  ok(ytClear.status === 200 && ytClear.body.youtubeEnabled === false, 'clearing the key turns media back off');
+
+  // The Google route is a browser redirect, so it has to accept the session in
+  // the URL — a redirect cannot carry an Authorization header.
+  const noAuthStart = await call('GET', '/auth/google/start', null, null);
+  ok(noAuthStart.status === 401, 'the Google sign-in redirect still needs a session');
+  const qsStart = await call('GET', `/auth/google/start?token=${encodeURIComponent(ytHostTok)}`, null, null);
+  ok(qsStart.status === 503, 'with a session in the URL it gets past auth and fails only on this venue having no Google app');
+}
+
 console.log('PODIUM — first, second and third every round');
 // A round used to stop dead on one winner and everyone else simply lost at
 // once. Now the claim settles first place and opens a sprint, and second and

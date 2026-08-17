@@ -144,6 +144,17 @@ export function apiBattlePerform(battleId, memberId, seconds) { return call('POS
 export function apiBattleVoting(battleId, seconds) { return call('POST', '/battle/voting', { battleId, seconds }, apiStaffToken()); }
 export function apiBattleResolve(battleId, winnerId) { return call('POST', '/battle/resolve', { battleId, winnerId }, apiStaffToken()); }
 export function apiBingoDecks() { return call('GET', '/bingo/decks', null, apiStaffToken()); }
+// Venue media credentials. Songs only play once one of these two is set up —
+// either the venue's own YouTube API key, or the host signing in with Google
+// so searches run on their account (and playback ads follow their Premium).
+export function apiYoutubeKeyStatus() { return call('GET', '/bingo/youtube-key', null, apiStaffToken()); }
+export function apiSetYoutubeKey(key) { return call('POST', '/bingo/youtube-key', { key }, apiStaffToken()); }
+export function apiGoogleStatus() { return call('GET', '/auth/google/status', null, apiStaffToken()); }
+export function apiGoogleDisconnect() { return call('POST', '/auth/google/disconnect', {}, apiStaffToken()); }
+// The sign-in itself is a full-page redirect to Google, so it needs the URL
+// rather than a fetch — the token rides as a query param because a redirect
+// cannot carry an Authorization header.
+export const googleSignInUrl = () => `${apiBase()}/auth/google/start?token=${encodeURIComponent(apiStaffToken())}`;
 export function apiYoutubeSearch(q) { return call('GET', `/media/youtube-search?q=${encodeURIComponent(q)}`, null, apiStaffToken()); }
 export function apiBingoPlayMedia(videoId, title) { return call('POST', '/bingo/media', { videoId, title }, apiStaffToken()); }
 export function apiBingoStopMedia() { return call('POST', '/bingo/media/stop', {}, apiStaffToken()); }

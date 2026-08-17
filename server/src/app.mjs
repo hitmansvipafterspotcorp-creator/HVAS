@@ -313,6 +313,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return (row?.value || '').trim() || YOUTUBE_ENV_KEY;
   };
 
+  // Can this venue actually play a song? Either route counts. Checked as the
+  // PRESENCE of a Google refresh token rather than by minting an access token,
+  // so it stays synchronous and cheap enough to publish on every poll.
+  const mediaReady = () => !!youtubeKey() || !!setting('google_refresh_token');
+
   const getBingoRound = () => {
     const r = db.prepare('SELECT * FROM bingo_round WHERE id=1').get();
     const roundNo = r.round_no || 1;
@@ -379,9 +384,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       // Signed-in host → the search runs on THEIR account and quota.
       const r = await fetch(url, ytToken ? { headers: { Authorization: `Bearer ${ytToken}` } } : undefined);
       const data = await r.json();
+      // Remember WHY nothing played. A rejected key or an exhausted quota used
+      // to be swallowed here, which put the host back where they started —
+      // songs silent, no reason given. The round still never blocks on it.
+      if (data.error) {
+        putSetting('media_last_error', String(data.error.message || 'YouTube rejected the request'));
+        return;
+      }
       const it = data.items?.[0];
-      if (it) commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
-    } catch { /* media is a bonus, never a blocker */ }
+      if (it) {
+        putSetting('media_last_error', '');
+        commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
+      } else {
+        putSetting('media_last_error', `No YouTube result for "${q}"`);
+      }
+    } catch (e) {
+      putSetting('media_last_error', `Could not reach YouTube: ${String(e.message || e).slice(0, 120)}`);
+      /* media is a bonus, never a blocker */
+    }
   };
   // Votes per performer, highest first — drives both the live meter and the
   // automatic winner when the host closes voting.
@@ -1032,7 +1052,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         // for second and third. Every screen shows the same board.
         podium: r.podium, podiumEndsAt: r.podiumEndsAt, podiumFirst: r.podiumFirst,
         standings: (r.status === 'podium' || r.status === 'ended') ? bingoStandings().slice(0, 8) : [],
-        songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: !!youtubeKey(),
+        songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: mediaReady(),
         // window for the square currently on screen (lip sync squares run longer)
         currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
@@ -1188,7 +1208,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // Step 1: hand the host the consent URL. `redirect` is this backend's own
     // callback, which must be registered in the Google Cloud OAuth client.
     'GET /auth/google/start': (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      // This one is entered by NAVIGATING the browser to it, not by fetch, so
+      // it cannot carry an Authorization header — the session rides in the
+      // query string instead. Same session check either way.
+      const qs = new URL(req.url, 'http://x').searchParams;
+      const c = auth(req) || (qs.get('token') ? readSession(secret, qs.get('token')) : null);
+      if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       if (!GOOGLE_CLIENT_ID) return json(res, 503, { error: 'Google sign-in is not configured for this venue yet (set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).' });
       const origin = `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
       const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
@@ -1266,15 +1291,18 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       } else {
         db.prepare(`DELETE FROM settings WHERE key='youtube_api_key'`).run();
       }
+      putSetting('media_last_error', '');   // a new key gets a clean slate
       // Never echo the key back — it's a credential.
-      json(res, 200, { ok: true, usingHostKey: !!clean, youtubeEnabled: !!youtubeKey() });
+      json(res, 200, { ok: true, usingHostKey: !!clean, youtubeEnabled: mediaReady() });
     },
     'GET /bingo/youtube-key': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       const row = db.prepare(`SELECT value, updated_at FROM settings WHERE key='youtube_api_key'`).get();
       json(res, 200, {
         usingHostKey: !!row,
-        youtubeEnabled: !!youtubeKey(),
+        youtubeEnabled: mediaReady(),
+        // The last reason a called song did not play, if there was one.
+        lastError: setting('media_last_error') || null,
         // enough to confirm which key is live without exposing it
         hint: row ? `••••${String(row.value).slice(-4)}` : null,
         updatedAt: row?.updated_at || null,
@@ -1426,7 +1454,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const claims = db.prepare(`SELECT bc.*, m.name, m.number FROM bingo_claims bc
         JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
       const r = getBingoRound();
-      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying, deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern });
+      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying,
+        deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
+        // So Host Control can say plainly that calling a song will play nothing.
+        youtubeEnabled: mediaReady(),
+        mediaError: setting('media_last_error') || null,
+        podium: r.podium, podiumEndsAt: r.podiumEndsAt, podiumFirst: r.podiumFirst,
+        standings: (r.status === 'podium' || r.status === 'ended') ? bingoStandings().slice(0, 8) : [] });
     },
 
     // ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──

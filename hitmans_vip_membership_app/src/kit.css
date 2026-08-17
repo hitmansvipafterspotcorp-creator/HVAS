@@ -965,3 +965,18 @@
   .screen-lobby .mode-record .app-panel { max-height: calc(100vh - 168px); }
   .lb { max-height: calc(100vh - 348px); }
 }
+
+/* ── Media setup ──────────────────────────────────────────────────────────
+   Two routes to getting the music on, each stated plainly with what it does
+   and does not fix. */
+.media-route {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border-radius: var(--k-r);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.media-route-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.media-route-head strong { font: 900 13px/1.15 var(--k-font); text-transform: uppercase; color: var(--k-text); }
+.media-route-head .k-chip { margin-left: auto; }
+.media-google { text-decoration: none; }
+/* The warning on the Run tab is a button — tapping it opens the setup. */
+.media-warn { display: block; width: 100%; text-align: left; cursor: pointer; border-width: 1px; }

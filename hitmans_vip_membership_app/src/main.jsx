@@ -19,6 +19,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
+  apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
   apiBookingRequest, apiBookingMine, apiBookingCancel, apiBookingBoard, apiBookingDecide } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
@@ -5179,6 +5180,19 @@ function HostScreen() {
       )}
       {tab === 'run' && (
         <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
+          {/* Said here, where the round gets started, rather than only on the
+              TV tab a host might never open. Calling songs with no YouTube
+              access looks like the app is broken; it is just not set up. */}
+          {board && board.youtubeEnabled === false && (
+            <button type="button" className="k-nudge k-nudge--no media-warn" onClick={() => setTab('media')}>
+              🔇 No YouTube access — calling a song will play nothing. Tap to set it up.
+            </button>
+          )}
+          {board?.youtubeEnabled && board.mediaError && (
+            <button type="button" className="k-nudge k-nudge--no media-warn" onClick={() => setTab('media')}>
+              🔇 {board.mediaError} — tap to check the setup.
+            </button>
+          )}
           <div className="bingo-status-row">
             <span>{board ? `${board.players.length} players` : ''}</span>
             <span>{board ? `${board.calls.length} called` : ''}</span>
@@ -5228,7 +5242,12 @@ function HostScreen() {
         </AppPanel>
       )}
 
-      {tab === 'media' && <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />}
+      {tab === 'media' && (
+        <>
+          <MediaSetupPanel onChange={poll} />
+          <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />
+        </>
+      )}
     </div>
   );
 }
@@ -5237,6 +5256,108 @@ function HostScreen() {
 // login needed, since search runs on the venue's own key and playback embeds
 // a public video. If the venue hasn't added a YOUTUBE_API_KEY yet, search
 // fails with a clear "not connected" message instead of silently doing nothing.
+// Turning the music on. Nothing plays until the venue has one of these, and
+// until now there was no way to set either from inside the app — the endpoints
+// existed but nothing called them, so a host whose songs were silent had no
+// way to find out why, let alone fix it.
+//
+// Two routes on purpose. A YouTube API key is the quick one and belongs to the
+// venue. Signing in with Google is the one that matters for ads: search then
+// runs on the host's own account, and playback on a screen signed into their
+// Premium account is ad-free. Neither removes ads on a screen signed into
+// nobody — that is a property of the account watching, not of this app.
+function MediaSetupPanel({ onChange }) {
+  const [ytStatus, setYtStatus] = useState(null);
+  const [google, setGoogle] = useState(null);
+  const [key, setKey] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = async () => {
+    try {
+      const [y, g] = await Promise.all([apiYoutubeKeyStatus(), apiGoogleStatus().catch(() => null)]);
+      setYtStatus(y); setGoogle(g);
+    } catch { setMsg('Could not read the venue media settings.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const saveKey = async () => {
+    setBusy(true); setMsg('');
+    try {
+      const r = await apiSetYoutubeKey(key.trim());
+      setKey('');
+      setMsg(r.youtubeEnabled ? 'Saved — songs will play from the next call.' : 'Key cleared.');
+      await load(); await onChange?.();
+    } catch (e) { setMsg(e.message || 'Could not save that key.'); }
+    setBusy(false);
+  };
+  const on = !!ytStatus?.youtubeEnabled || !!google?.connected;
+  return (
+    <AppPanel title="Music &amp; TV" subtitle={on ? 'Songs will play when you call them' : 'Not set up — songs will NOT play'}>
+      {!on && (
+        <p className="k-nudge k-nudge--no">
+          No YouTube access yet, so calling a song plays nothing. Set up either option below — one is enough.
+        </p>
+      )}
+      {/* Set up but still not playing is a different problem, and the reason
+          comes straight from YouTube — a rejected key, an exhausted quota, a
+          song with no embeddable result. */}
+      {on && ytStatus?.lastError && (
+        <p className="k-nudge k-nudge--no">Last song didn&apos;t play: {ytStatus.lastError}</p>
+      )}
+      <div className="media-route">
+        <div className="media-route-head">
+          <strong>Host&apos;s Google account</strong>
+          <span className={`k-chip${google?.connected ? ' k-chip--cyan' : ''}`}>
+            {google?.connected ? 'Connected' : google?.configured ? 'Not connected' : 'Unavailable'}
+          </span>
+        </div>
+        <p className="mem-fineprint">
+          Searches run on your account and its quota. If the screen you play on is signed into your
+          YouTube Premium, playback has no ads — that comes from the account watching, not from here.
+        </p>
+        {google?.configured ? (
+          google.connected
+            ? <button type="button" className="k-btn k-btn--tertiary" disabled={busy}
+                      onClick={async () => { setBusy(true); try { await apiGoogleDisconnect(); await load(); } catch { /* ignore */ } setBusy(false); }}>
+                Disconnect Google
+              </button>
+            : <a className="k-btn k-btn--go media-google" href={googleSignInUrl()}>Sign in with Google</a>
+        ) : (
+          <p className="mem-fineprint">
+            This venue has no Google app set up yet, so this route is off. It needs GOOGLE_CLIENT_ID and
+            GOOGLE_CLIENT_SECRET in the venue&apos;s .env — see SELF_HOST.md. The API key below works without it.
+          </p>
+        )}
+      </div>
+      <div className="media-route">
+        <div className="media-route-head">
+          <strong>Venue YouTube API key</strong>
+          <span className={`k-chip${ytStatus?.youtubeEnabled ? ' k-chip--cyan' : ''}`}>
+            {ytStatus?.usingHostKey ? `Set ${ytStatus.hint || ''}` : ytStatus?.youtubeEnabled ? 'From .env' : 'Not set'}
+          </span>
+        </div>
+        <p className="mem-fineprint">
+          A key from the Google Cloud console with the YouTube Data API enabled. Quickest route — it does
+          nothing about ads, but it does make the songs play.
+        </p>
+        <label className="host-code-label">Paste a key
+          <input type="password" value={key} autoComplete="off" placeholder="AIza…"
+                 onChange={(e) => { setKey(e.target.value); setMsg(''); }} />
+        </label>
+        <button type="button" className="k-btn k-btn--secondary" disabled={busy || !key.trim()} onClick={saveKey}>
+          {busy ? 'Saving…' : 'Save key'}
+        </button>
+        {ytStatus?.usingHostKey && (
+          <button type="button" className="k-btn k-btn--tertiary" disabled={busy}
+                  onClick={async () => { setKey(''); setBusy(true); try { await apiSetYoutubeKey(''); await load(); await onChange?.(); } catch { /* ignore */ } setBusy(false); }}>
+            Remove the saved key
+          </button>
+        )}
+      </div>
+      {msg && <p className="mem-fineprint">{msg}</p>}
+    </AppPanel>
+  );
+}
+
 function TvAutoMediaPanel({ nowPlaying, onChange }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
