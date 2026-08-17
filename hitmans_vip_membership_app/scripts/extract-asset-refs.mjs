@@ -38,6 +38,24 @@ for (const f of sources) {
   }
 }
 
+// A path built from a variable — `assets/ui/kit/${name}.png` — compiles to a
+// concatenation, and nothing below can see it. That has now shipped a broken
+// live site twice: once for the loyalty rank badges, once for the square
+// marks. So fail the deploy instead of quietly leaving files behind.
+const dynamic = new Set();
+for (const f of sources) {
+  const text = readFileSync(f, 'utf8');
+  for (const m of text.matchAll(/assets\/[A-Za-z0-9_\-./]*(?:\$\{|"\s*\+|'\s*\+)/g)) {
+    dynamic.add(m[0].replace(/(\$\{|"\s*\+|'\s*\+)$/, ''));
+  }
+}
+if (dynamic.size) {
+  console.error('\nDYNAMIC ASSET PATHS — these cannot be resolved, so they would deploy missing:');
+  for (const d of dynamic) console.error(`  ${d}\${...}  <- write the full filename out instead`);
+  console.error('');
+  process.exit(1);
+}
+
 const sorted = [...refs].sort();
 console.log(`${sorted.length} referenced asset paths found`);
 process.stdout.write(sorted.join('\n') + '\n');

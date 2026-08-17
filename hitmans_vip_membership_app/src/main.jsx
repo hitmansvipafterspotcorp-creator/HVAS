@@ -4233,15 +4233,19 @@ function SoloBingoGame({ onExit }) {
 // The only art the card screen loads. Everything else on it — frames, chips,
 // buttons, bars, the timer dial — is drawn in kit.css, so it stays sharp at
 // any size and restyles from one place.
-const KIT = (n) => `${import.meta.env.BASE_URL}assets/ui/kit/${n}.png`;
+// Every one of these is written out in full, deliberately. Building the path
+// from a variable — `${BASE_URL}assets/ui/kit/${name}.png` — compiles to a
+// concatenation, and the deploy step that works out which public/ files the
+// bundle actually needs can only see complete literal paths. A helper function
+// here shipped a live site with every one of these missing. Same failure as
+// the loyalty badges earlier: if it is not a whole string, the deploy cannot
+// find it.
 const TILE_ART = {
-  covered: KIT('mark_covered'),   // magenta star  — icon_star_accent
-  called:  KIT('mark_called'),    // violet diamond — icon_diamond_accent
-  bonus:   KIT('mark_bonus'),     // crown          — icon_membership
-  lipsync: KIT('mark_lipsync'),   // mic            — lsb sheet 03
+  covered: `${import.meta.env.BASE_URL}assets/ui/kit/mark_covered.png`,   // magenta star  — icon_star_accent
+  called:  `${import.meta.env.BASE_URL}assets/ui/kit/mark_called.png`,    // violet diamond — icon_diamond_accent
+  bonus:   `${import.meta.env.BASE_URL}assets/ui/kit/mark_bonus.png`,     // crown          — icon_membership
+  lipsync: `${import.meta.env.BASE_URL}assets/ui/kit/mark_lipsync.png`,   // mic            — lsb sheet 03
 };
-const KIT_LOGO = KIT('logo_lipsync_bingo');
-const KIT_BADGE = KIT('logo_badge');
 
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
 // One-shot animation flags, driven by state rather than by touching
