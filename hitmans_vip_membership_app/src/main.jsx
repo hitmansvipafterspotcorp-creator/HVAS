@@ -1039,26 +1039,41 @@ function ConnectingScreen() {
 // entirely rather than quietly landing in local demo mode: someone who
 // "joins" there gets a real-looking pass and QR that no door scan will ever
 // recognize, with nothing telling them it wasn't real until it's too late.
-function ConnectFailedScreen({ url, onRetry, onDemo }) {
+function ConnectFailedScreen({ url, onRetry, onDemo, onForget, stale }) {
   let host = url;
   try { host = new URL(url).host; } catch { /* show the raw string */ }
   return (
     <section className="screen screen-door">
       <div className="door-wrap">
-        <span className="door-eyebrow">CONNECTION FAILED</span>
+        <span className="door-eyebrow">{stale ? 'VENUE MOVED' : 'CONNECTION FAILED'}</span>
         <h1 className="door-title">Can’t reach<span>{host}</span></h1>
+        {/* Two genuinely different situations, so two different explanations.
+            A fresh link that fails is usually a network problem. A SAVED
+            address that fails is almost always last night's — the venue's
+            public address changes every time it restarts. Telling someone to
+            check their wifi in that case sends them hunting for a fault that
+            is not theirs. */}
         <p className="door-tag">
-          This usually means you're not on the same network as the venue —
-          switch to the venue's wifi (not cellular data) and try again, or
-          ask staff for the current link.
+          {stale
+            ? "This is the address you joined with last time, and the venue isn't answering on it any more. Venue addresses change whenever the venue restarts — scan tonight's join QR to get the current one."
+            : "This usually means you're not on the same network as the venue — switch to the venue's wifi (not cellular data) and try again, or ask staff for the current link."}
         </p>
         <div className="door-actions">
           <button type="button" className="door-primary" onClick={onRetry}>Try again →</button>
+          {stale && onForget && (
+            <button type="button" className="door-secondary" onClick={onForget}>Forget this venue — I'll scan tonight's QR</button>
+          )}
           <button type="button" className="door-secondary" onClick={onDemo}>Continue without connecting (demo only — won't work at the door)</button>
         </div>
       </div>
     </section>
   );
+}
+
+// Compare venue addresses the way a human would: trailing slashes and case in
+// the host should not make two links look like different venues.
+function normalizeBase(u) {
+  return String(u || '').trim().replace(/\/+$/, '').toLowerCase();
 }
 
 function App() {
@@ -1074,7 +1089,9 @@ function App() {
   // worse, silent hub/demo mode) would flash up in the meantime.
   const [connecting, setConnecting] = useState(() => {
     const p = new URLSearchParams(window.location.search).get('connect');
-    return !!(p && !apiEnabled());
+    // Same test as the effect below: a link to a DIFFERENT venue blocks boot
+    // while it re-points, whether or not one was already saved.
+    return !!(p && normalizeBase(p) !== normalizeBase(apiBase()));
   });
   const [activeScreen, setActiveScreen] = useState('home');
   const [targetScreen, setTargetScreen] = useState('home');
@@ -1105,7 +1122,15 @@ function App() {
     // in-app scanner) opens this page with ?connect=<backend url> — connect
     // to it immediately so a plain camera scan works, not just the in-app one.
     const toConnect = new URLSearchParams(window.location.search).get('connect');
-    if (toConnect && !apiEnabled()) {
+    // A join link RE-POINTS the app, even when it is already connected to
+    // something. This used to bail out whenever a venue address was already
+    // saved, which is the single worst thing it could do: the venue's public
+    // tunnel address is different every time the venue restarts, so everyone
+    // who joined on a previous night had a dead address saved, and the host
+    // sending them a fresh QR did absolutely nothing — the app read the link
+    // and threw it away. Scanning a join QR now always means "use THIS venue".
+    const already = apiBase();
+    if (toConnect && normalizeBase(toConnect) !== normalizeBase(already)) {
       connectVenue(toConnect)
         .then(() => {
           const clean = window.location.pathname;
@@ -1115,12 +1140,29 @@ function App() {
         .catch(() => { setConnecting(false); setConnectError({ url: toConnect }); }); // loud, not swallowed
       return;
     }
+    // Already pointed at exactly this venue — just tidy the URL.
+    if (toConnect) {
+      window.history.replaceState(null, '', window.location.pathname);
+      setConnecting(false);
+    }
+    // A saved venue address gets checked once on boot. The venue's public
+    // address changes every time it restarts, so a phone that joined on a
+    // previous night is holding a dead one — and with nothing checking, every
+    // screen just quietly failed to load. Now it says so, and offers the way
+    // out (scan tonight's QR, or carry on in demo).
+    if (apiEnabled()) {
+      const saved = apiBase();
+      fetch(`${saved}/config`, { signal: AbortSignal.timeout(9000) })
+        .then((r) => { if (!r.ok) throw new Error('bad'); })
+        .catch(() => setConnectError({ url: saved, stale: true }));
+      return;
+    }
     // The app IS the backend by default: it runs its own in-browser hub in
     // the background so the social layer has something to attach to even
     // with no server connected. Skipped if the user explicitly stopped
     // hosting (e.g. to connect to a real venue backend instead) — otherwise
     // that choice gets silently reverted on the very next boot.
-    if (!apiEnabled() && !hubDeclined()) startHub();
+    if (!hubDeclined()) startHub();
   }, []);
 
   // Signing out (from anywhere — the door or the profile) clears the member
@@ -1228,6 +1270,8 @@ function App() {
     return (
       <ConnectFailedScreen
         url={connectError.url}
+        stale={connectError.stale}
+        onForget={() => { disconnectVenue(); window.location.reload(); }}
         onRetry={() => {
           const url = connectError.url;
           setConnectError(null);
