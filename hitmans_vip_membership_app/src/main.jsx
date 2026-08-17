@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
@@ -17,6 +17,8 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
   apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePick, apiBattleLock, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
   apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
+  apiEventState, apiEventCreate, apiEventJoin, apiEventLeave, apiEventStart, apiEventNext,
+  apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
@@ -974,6 +976,7 @@ const ROLES = [
     menu: [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
+      { title: 'Lip Sync Battle', detail: 'Bracket, king of the hill or open floor — no card needed', chip: ui.chips.active, target: 'lipsyncBattle' },
       { title: 'Party Mode', detail: 'Vote for your favorite team during Battlerz', chip: ui.chips.active, target: 'party' },
       { title: 'Book a VIP Table', detail: 'Request a night + party size, staff confirms', chip: ui.chips.vip, target: 'booking' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
@@ -1543,6 +1546,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'checkout') return <CheckoutScreen />;
   if (activeScreen === 'booking') return <TableBookingScreen />;
   if (activeScreen === 'bookingBoard') return <TableBookingBoardScreen />;
+  if (activeScreen === 'lipsyncBattle') return <LipSyncBattleScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
   return <PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
 }
 
@@ -4681,6 +4685,7 @@ function HostMode({ navigate }) {
   }
   const tools = [
     { target: 'host', title: 'Host Control', detail: 'Call songs, approve claims, run battles' },
+    { target: 'lipsyncBattle', title: 'Lip Sync Battle', detail: 'Run a bracket, king of the hill or open floor' },
     { target: 'bingoStyle', title: 'Game Menu', detail: 'Pick the deck and win pattern, start or reset' },
     { target: 'tv', title: 'TV Display', detail: 'Throw the round on the big screen' },
     { target: 'songQueue', title: 'Song Queue', detail: 'Everything called so far' },
@@ -5506,6 +5511,247 @@ const PARTY_REACTIONS = ['🔥', '😍', '😂', '👏', '💯', '⭐'];
 // Host starts/ends the battle and needs 5+ players in the room; members
 // vote for a team and can react once they've picked one. Same shared state
 // for everyone, same as the rest of Lip Sync Bingo.
+// ── Standalone Lip Sync Battle ───────────────────────────────────────────
+// Bingo battles happen because a square got called. This is the night that is
+// only battles, in the three shapes a room actually asks for:
+//   bracket — a seeded knockout down to one champion
+//   king    — whoever wins holds the floor until somebody takes it
+//   open    — anyone calls anyone out, and the crowd's votes are the table
+// The bout itself is an ordinary battle, so LipSyncBattlePanel and BattleChat
+// below are the same components the bingo flow uses — nothing is duplicated.
+const EVENT_FORMATS = [
+  { id: 'bracket', name: 'Bracket', blurb: 'Seeded knockout. Lose once and you are out.' },
+  { id: 'king', name: 'King of the Hill', blurb: 'Winner holds the floor. Challengers line up.' },
+  { id: 'open', name: 'Open Floor', blurb: 'Anyone calls anyone out. Crowd votes rank it.' },
+];
+const EVENT_FORMAT_NAME = { bracket: 'Bracket', king: 'King of the Hill', open: 'Open Floor' };
+
+// What the format is doing right now, in one line, for the header.
+function eventSubtitle(ev) {
+  if (!ev) return 'Lip Sync Battle';
+  if (ev.status === 'lobby') return `${EVENT_FORMAT_NAME[ev.format]} · lobby open`;
+  if (ev.status === 'done') return `${EVENT_FORMAT_NAME[ev.format]} · finished`;
+  if (ev.format === 'bracket') return `Bracket · round ${ev.round} · ${ev.remaining} left`;
+  if (ev.format === 'king') return ev.king ? `${ev.king.name} holds the floor · ${ev.king.reign} straight` : 'King of the Hill · no king yet';
+  return `Open Floor · ${ev.roster.length} on the list`;
+}
+
+function EventStandings({ ev, meId, onChallenge, busy }) {
+  const knockout = ev.format === 'bracket';
+  return (
+    <div className="ev-standings">
+      <div className="ev-standings-head">
+        <span>{knockout ? 'Field' : 'Standings'}</span>
+        <span>{knockout ? 'Seed · W–L' : 'W–L · votes'}</span>
+      </div>
+      {ev.roster.map((p, i) => {
+        const out = p.state === 'out';
+        const isKing = ev.king?.memberId === p.memberId;
+        return (
+          <div key={p.memberId} className={`ev-row${out ? ' is-out' : ''}${isKing ? ' is-king' : ''}`}>
+            <span className="ev-rank">{knockout ? (p.seed ? `#${p.seed}` : '—') : i + 1}</span>
+            <span className="ev-name">
+              {isKing && <span className="ev-crown" aria-label="king">👑</span>}
+              {p.name}{p.memberId === meId ? ' (you)' : ''}
+              {out && <small> · out R{p.outRound}</small>}
+            </span>
+            <span className="ev-record">{p.wins}–{p.losses}{!knockout && <small> · {p.votes}</small>}</span>
+            {onChallenge && !out && p.memberId !== meId && (
+              <button type="button" className="ev-challenge" disabled={busy} onClick={() => onChallenge(p.memberId)}>
+                Call out
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {ev.roster.length === 0 && <p className="dash-empty">Nobody has joined yet.</p>}
+    </div>
+  );
+}
+
+// The bracket as it actually played out, grouped by round. Rendered from the
+// bouts the backend recorded rather than a predicted tree, so a bye or a
+// declined bout shows the truth instead of a diagram that no longer matches.
+function EventBracket({ ev }) {
+  if (!ev.bouts.length) return null;
+  const rounds = [...new Set(ev.bouts.map((b) => b.round))].sort((a, b) => a - b);
+  return (
+    <div className="ev-bracket">
+      {rounds.map((r) => (
+        <div key={r} className="ev-round">
+          <span className="ev-round-label">{ev.format === 'bracket' ? `Round ${r}` : `Bout ${r}`}</span>
+          {ev.bouts.filter((b) => b.round === r).map((b) => (
+            <div key={b.id} className={`ev-bout is-${b.status}`}>
+              <span className="ev-bout-names">{b.names || '—'}</span>
+              <span className="ev-bout-song">{b.artist ? `${b.artist} — ${b.song}` : ''}</span>
+              <span className="ev-bout-state">
+                {b.status === 'done' ? '✓' : b.status === 'void' ? '—' : '● live'}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LipSyncBattleScreen({ isHost }) {
+  const [ev, setEv] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [format, setFormat] = useState('bracket');
+  const [size, setSize] = useState(8);
+  const [title, setTitle] = useState('');
+  const meId = apiMemberId();
+
+  const load = useCallback(async () => {
+    try { const r = await apiEventState(); setEv(r.event); setErr(''); }
+    catch (e) { setErr(e.message); }
+    setLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!apiEnabled()) { setLoaded(true); return undefined; }
+    load();
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message); }
+    setBusy(false);
+  };
+
+  if (!apiEnabled()) return <NotConnectedBingo title="Lip Sync Battle" />;
+  if (!loaded) {
+    return (
+      <div className="staff-dash">
+        <AppPanel title="Lip Sync Battle" subtitle="Loading…"><p className="dash-empty">One second…</p></AppPanel>
+      </div>
+    );
+  }
+
+  const live = ev && ev.status === 'live';
+  const canChallenge = live && ev.format !== 'bracket' && !ev.bout && ev.joined;
+
+  return (
+    <div className="staff-dash">
+      {ev?.champion && ev.status === 'done' && (
+        <div className="bingo-winner-banner"><strong>🏆 {ev.champion.name} takes it!</strong></div>
+      )}
+
+      {/* The bout takes the screen while one is on the floor — same components
+          the bingo battle uses, so it behaves identically to what the room
+          already knows. */}
+      {ev?.bout && (
+        <>
+          <LipSyncBattlePanel battle={ev.bout} meId={meId} onChanged={load} isHost={isHost} />
+          <BattleChat battle={ev.bout} onChanged={load} />
+        </>
+      )}
+
+      <AppPanel title={ev?.title || 'Lip Sync Battle'} subtitle={eventSubtitle(ev)}>
+        {err && <p className="roster-err">{err}</p>}
+
+        {/* No event: the host opens one, everyone else waits. */}
+        {!ev || ev.status === 'done' ? (
+          isHost ? (
+            <div className="ev-create">
+              <div className="ev-formats">
+                {EVENT_FORMATS.map((f) => (
+                  <button type="button" key={f.id}
+                          className={`ev-format${format === f.id ? ' is-on' : ''}`}
+                          onClick={() => setFormat(f.id)}>
+                    <strong>{f.name}</strong><small>{f.blurb}</small>
+                  </button>
+                ))}
+              </div>
+              <label className="bingo-picker-label">Name it (optional)
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Friday Night Bracket" />
+              </label>
+              {format === 'bracket' && (
+                <label className="bingo-picker-label">Field size
+                  <select value={size} onChange={(e) => setSize(Number(e.target.value))}>
+                    {[4, 8, 16].map((n) => <option key={n} value={n}>{n} players</option>)}
+                  </select>
+                </label>
+              )}
+              <button type="button" className="k-btn k-btn--go" disabled={busy}
+                      onClick={() => act(() => apiEventCreate(format, title.trim() || null, size))}>
+                Open the lobby
+              </button>
+            </div>
+          ) : <p className="dash-empty">No battle running right now. The host opens the next one.</p>
+        ) : null}
+
+        {/* Lobby: sign up, then the host starts it. */}
+        {ev?.status === 'lobby' && (
+          <>
+            <p className="ev-hint">
+              {EVENT_FORMATS.find((f) => f.id === ev.format)?.blurb}
+              {ev.size ? ` Room for ${ev.size}.` : ''}
+            </p>
+            <EventStandings ev={ev} meId={meId} />
+            {!isHost && (
+              <button type="button" className={`k-btn ${ev.joined ? '' : 'k-btn--go'}`} disabled={busy}
+                      onClick={() => act(() => (ev.joined ? apiEventLeave() : apiEventJoin()))}>
+                {ev.joined ? 'Leave the lobby' : "I'm in — sign me up"}
+              </button>
+            )}
+            {isHost && (
+              <>
+                <button type="button" className="k-btn k-btn--go" disabled={busy || ev.roster.length < 2}
+                        onClick={() => act(apiEventStart)}>
+                  {ev.roster.length < 2 ? 'Need 2 signed up' : `Start with ${ev.roster.length}`}
+                </button>
+                <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiEventEnd)}>
+                  Cancel this event
+                </button>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Live, between bouts. */}
+        {live && (
+          <>
+            {ev.format === 'king' && ev.king && (
+              <p className="ev-hint">👑 <strong>{ev.king.name}</strong> holds the floor — {ev.king.reign} in a row.</p>
+            )}
+            <EventStandings ev={ev} meId={meId}
+                            onChallenge={canChallenge ? ((id) => act(() => apiEventChallenge(id))) : null}
+                            busy={busy} />
+            {canChallenge && (
+              <p className="ev-hint">
+                {ev.format === 'king' ? 'Tap the king to challenge for the floor.' : 'Tap anyone to call them out.'}
+              </p>
+            )}
+            {isHost && !ev.bout && (
+              <button type="button" className="k-btn k-btn--go" disabled={busy} onClick={() => act(() => apiEventNext())}>
+                Put the next bout on the floor
+              </button>
+            )}
+            {isHost && (
+              <button type="button" className="bingo-btn ghost" disabled={busy} onClick={() => act(apiEventEnd)}>
+                End the event
+              </button>
+            )}
+            <EventBracket ev={ev} />
+          </>
+        )}
+
+        {ev?.status === 'done' && (
+          <>
+            <EventStandings ev={ev} meId={meId} />
+            <EventBracket ev={ev} />
+          </>
+        )}
+      </AppPanel>
+    </div>
+  );
+}
+
 function PartyScreen({ isHost }) {
   const [party, setParty] = useState(null);
   const [err, setErr] = useState('');

@@ -39,7 +39,9 @@ const CMD = process.env.KEEPER_CMD || 'node host.mjs';
 // command exit non-zero before the real suite ever runs, so every deploy
 // gets falsely rejected as "tests failed" even when the code is fine.
 // Calling node directly skips npm entirely — no shell, no policy to trip.
-const TEST_CMD = process.env.KEEPER_TEST_CMD || 'node test.mjs';
+// test-gate.mjs runs every suite in turn — see the note in that file for why
+// this is one command and not a chained 'a && b'.
+const TEST_CMD = process.env.KEEPER_TEST_CMD || 'node test-gate.mjs';
 const POLL_MS = Number(process.env.KEEPER_POLL_SECONDS || 120) * 1000;
 const STATUS_FILE = process.env.KEEPER_STATUS_FILE || resolve(CWD, 'data', 'keeper-status.json');
 const WEBHOOK = process.env.KEEPER_NOTIFY_WEBHOOK || '';

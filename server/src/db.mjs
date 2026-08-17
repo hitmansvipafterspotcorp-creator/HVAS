@@ -288,6 +288,37 @@ export function openDb(path) {
       value TEXT NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    -- ── Standalone Lip Sync Battle events ──
+    -- Bingo battles are owned by a called square. These are the opposite: a
+    -- night (or a slot in the night) that is only battles, with its own lobby
+    -- and its own standings. The bouts themselves are ordinary rows in
+    -- lipsync_battles carrying an event_id, so performing, streaming, crowd
+    -- voting and chat are the exact same code paths — only matchmaking differs.
+    CREATE TABLE IF NOT EXISTS lipsync_events (
+      id INTEGER PRIMARY KEY,
+      format TEXT NOT NULL,                   -- bracket | king | open
+      title TEXT,
+      size INTEGER,                           -- bracket only: 4 | 8 | 16
+      status TEXT NOT NULL DEFAULT 'lobby',   -- lobby | live | done
+      round INTEGER NOT NULL DEFAULT 0,       -- bracket round, or bout number
+      king_member_id TEXT,                    -- king of the hill: who holds the floor
+      reign INTEGER NOT NULL DEFAULT 0,       -- how many defences the king has won
+      champion_member_id TEXT,
+      created_at INTEGER NOT NULL,
+      started_at INTEGER, ended_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS lipsync_event_players (
+      event_id INTEGER NOT NULL REFERENCES lipsync_events(id),
+      member_id TEXT NOT NULL REFERENCES members(id),
+      seed INTEGER,                           -- bracket position, set at start
+      wins INTEGER NOT NULL DEFAULT 0,
+      losses INTEGER NOT NULL DEFAULT 0,
+      votes_for INTEGER NOT NULL DEFAULT 0,   -- crowd votes across the event
+      state TEXT NOT NULL DEFAULT 'in',       -- in | out (knocked out of a bracket)
+      out_round INTEGER,
+      joined_at INTEGER NOT NULL,
+      PRIMARY KEY (event_id, member_id)
+    );
   `);
 
   // player_stats shipped before podium places existed, so any venue already
@@ -316,6 +347,16 @@ export function openDb(path) {
     // than two contenders for one square.
     db.exec(`ALTER TABLE lipsync_battles ADD COLUMN pick_ends_at INTEGER`);
   }
+  // A bout in a standalone event is still a battle row; these say which event
+  // and where in it. Null event_id keeps every existing bingo battle unchanged.
+  if (!bcols.includes('event_id')) {
+    db.exec(`ALTER TABLE lipsync_battles ADD COLUMN event_id INTEGER`);
+    db.exec(`ALTER TABLE lipsync_battles ADD COLUMN round INTEGER`);
+    db.exec(`ALTER TABLE lipsync_battles ADD COLUMN slot INTEGER`);
+  }
+  // Indexed after the ALTER, not with the other tables: on a fresh database
+  // those columns do not exist until the migration above has run.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_event_bouts ON lipsync_battles(event_id, round)`);
 
   const entryCols = db.prepare(`PRAGMA table_info(entries)`).all().map((c) => c.name);
   if (!entryCols.includes('left_at')) {

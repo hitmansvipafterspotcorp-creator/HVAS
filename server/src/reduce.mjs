@@ -37,6 +37,49 @@ function markNight(db, memberId, night) {
     best_streak = MAX(best_streak, ?) WHERE member_id=?`).run(night, streak, streak, memberId);
 }
 
+// ── Standalone Lip Sync Battle events ──
+// Called when a bout carrying an event_id resolves. Everything here is derived
+// from the bout row and the winner, so a replay of the op log rebuilds the same
+// standings — no wall-clock or random input.
+function advanceEvent(db, bout, winnerId, ts) {
+  const ev = db.prepare('SELECT * FROM lipsync_events WHERE id=?').get(bout.event_id);
+  if (!ev || ev.status === 'done') return;
+  const players = db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(bout.id)
+    .map((r) => r.member_id);
+
+  // Standings first: win/loss for the pair, plus the crowd votes each drew,
+  // which is how the open floor is ranked.
+  for (const m of players) {
+    const votes = db.prepare('SELECT COUNT(*) n FROM lipsync_battle_votes WHERE battle_id=? AND member_id=?').get(bout.id, m).n;
+    db.prepare(`UPDATE lipsync_event_players SET wins=wins+?, losses=losses+?, votes_for=votes_for+?
+      WHERE event_id=? AND member_id=?`)
+      .run(m === winnerId ? 1 : 0, m === winnerId ? 0 : 1, votes, ev.id, m);
+  }
+
+  if (ev.format === 'bracket') {
+    // Knockout: the loser is out at this round. When one player is left
+    // standing across the whole bracket, they are the champion.
+    for (const m of players) {
+      if (m === winnerId) continue;
+      db.prepare(`UPDATE lipsync_event_players SET state='out', out_round=? WHERE event_id=? AND member_id=?`)
+        .run(bout.round, ev.id, m);
+    }
+    const left = db.prepare(`SELECT member_id FROM lipsync_event_players WHERE event_id=? AND state='in'`).all(ev.id);
+    if (left.length === 1) {
+      db.prepare(`UPDATE lipsync_events SET status='done', champion_member_id=?, ended_at=? WHERE id=?`)
+        .run(left[0].member_id, ts, ev.id);
+    }
+  } else if (ev.format === 'king') {
+    // Whoever wins holds the floor. Holding it through another bout extends the
+    // reign; taking it from someone starts a fresh one.
+    const held = ev.king_member_id === winnerId;
+    db.prepare(`UPDATE lipsync_events SET king_member_id=?, reign=? WHERE id=?`)
+      .run(winnerId, held ? ev.reign + 1 : 1, ev.id);
+  }
+  // Open floor keeps no throne and eliminates nobody — the standings are the
+  // whole game, so the rows updated above are all it needs.
+}
+
 export function applyOp(db, op) {
   const ts = op.ts;
   const d = op.data;
@@ -258,9 +301,10 @@ export function applyOp(db, op) {
     case 'battle.open':
       // Two contenders battle straight away. Three or more and the room picks
       // which two first, so the square is not decided by whoever taps fastest.
-      db.prepare(`INSERT OR IGNORE INTO lipsync_battles(id,item_id,artist,song,status,stage,started_at,pick_ends_at)
-        VALUES(?,?,?,?,?,?,?,?)`).run(d.id, d.item_id, d.artist ?? null, d.song ?? null,
-          d.status || 'pending', d.stage || 'phones', d.at ?? ts, d.pick_ends_at ?? null);
+      db.prepare(`INSERT OR IGNORE INTO lipsync_battles(id,item_id,artist,song,status,stage,started_at,pick_ends_at,event_id,round,slot)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(d.id, d.item_id, d.artist ?? null, d.song ?? null,
+          d.status || 'pending', d.stage || 'phones', d.at ?? ts, d.pick_ends_at ?? null,
+          d.event_id ?? null, d.round ?? null, d.slot ?? null);
       for (const m of d.members || []) {
         db.prepare(`INSERT OR IGNORE INTO lipsync_battle_players(battle_id,member_id,state) VALUES(?,?,?)`)
           .run(d.id, m, d.status === 'picking' ? 'contender' : 'invited');
@@ -277,7 +321,7 @@ export function applyOp(db, op) {
     // because they never performed for it.
     case 'battle.lock': {
       const chosen = new Set(d.chosen || []);
-      const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+      const b = db.prepare('SELECT item_id, event_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
       for (const row of db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(d.battle_id)) {
         if (chosen.has(row.member_id)) {
           db.prepare(`UPDATE lipsync_battle_players SET state='invited' WHERE battle_id=? AND member_id=?`)
@@ -285,7 +329,9 @@ export function applyOp(db, op) {
         } else {
           db.prepare('DELETE FROM lipsync_battle_players WHERE battle_id=? AND member_id=?')
             .run(d.battle_id, row.member_id);
-          if (b) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'not_picked',?)`)
+          // A standalone bout has no square behind it, so there is nothing to
+          // lock anyone out of — only bingo battles bar a member from an item.
+          if (b && !b.event_id) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'not_picked',?)`)
             .run(row.member_id, b.item_id, d.at ?? ts);
         }
       }
@@ -298,8 +344,8 @@ export function applyOp(db, op) {
       // Declining forfeits the square for good — that's the whole deterrent.
       if (!d.accept) {
         bumpStat(db, d.member_id, 'forfeits');
-        const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
-        if (b) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'declined',?)`)
+        const b = db.prepare('SELECT item_id, event_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+        if (b && !b.event_id) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'declined',?)`)
           .run(d.member_id, b.item_id, d.at ?? ts);
       }
       break;
@@ -328,16 +374,18 @@ export function applyOp(db, op) {
     case 'battle.resolve': {
       db.prepare(`UPDATE lipsync_battles SET status='done', winner_member_id=?, resolved_at=? WHERE id=?`)
         .run(d.winner_id ?? null, d.at ?? ts, d.battle_id);
-      const b = db.prepare('SELECT item_id FROM lipsync_battles WHERE id=?').get(d.battle_id);
+      const b = db.prepare('SELECT * FROM lipsync_battles WHERE id=?').get(d.battle_id);
       if (!b) break;
       bumpStat(db, d.winner_id, 'battles_won');
       // Everyone in the battle except the winner is locked out of the square.
       for (const row of db.prepare('SELECT member_id FROM lipsync_battle_players WHERE battle_id=?').all(d.battle_id)) {
         if (row.member_id === d.winner_id) continue;
         bumpStat(db, row.member_id, 'battles_lost');
-        db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'lost',?)`)
+        if (!b.event_id) db.prepare(`INSERT OR IGNORE INTO lipsync_locks(member_id,item_id,reason,at) VALUES(?,?,'lost',?)`)
           .run(row.member_id, b.item_id, d.at ?? ts);
       }
+      // A bout inside a standalone event also moves that event's standings on.
+      if (b.event_id) advanceEvent(db, b, d.winner_id, d.at ?? ts);
       break;
     }
     case 'battle.say':                                    // live comment or emoji burst
@@ -346,6 +394,38 @@ export function applyOp(db, op) {
       break;
     case 'battle.void':                                 // nobody accepted — square dies with it
       db.prepare(`UPDATE lipsync_battles SET status='void', resolved_at=? WHERE id=?`).run(d.at ?? ts, d.battle_id);
+      break;
+
+    // ── Standalone Lip Sync Battle events ──
+    case 'event.create':
+      db.prepare(`INSERT OR IGNORE INTO lipsync_events(id,format,title,size,status,created_at) VALUES(?,?,?,?,'lobby',?)`)
+        .run(d.id, d.format, d.title ?? null, d.size ?? null, d.at ?? ts);
+      break;
+    case 'event.join':
+      db.prepare(`INSERT OR IGNORE INTO lipsync_event_players(event_id,member_id,joined_at) VALUES(?,?,?)`)
+        .run(d.event_id, d.member_id, d.at ?? ts);
+      break;
+    case 'event.leave':
+      // Only while the lobby is open — once it is live, dropping out is a
+      // forfeit handled by the bout, not a quiet exit from the roster.
+      db.prepare(`DELETE FROM lipsync_event_players WHERE event_id=? AND member_id=?
+        AND EXISTS(SELECT 1 FROM lipsync_events e WHERE e.id=? AND e.status='lobby')`)
+        .run(d.event_id, d.member_id, d.event_id);
+      break;
+    case 'event.start':
+      db.prepare(`UPDATE lipsync_events SET status='live', round=1, started_at=? WHERE id=? AND status='lobby'`)
+        .run(d.at ?? ts, d.id);
+      for (const s of d.seeds || []) {
+        db.prepare(`UPDATE lipsync_event_players SET seed=? WHERE event_id=? AND member_id=?`)
+          .run(s.seed, d.id, s.member_id);
+      }
+      break;
+    case 'event.round':
+      db.prepare(`UPDATE lipsync_events SET round=? WHERE id=?`).run(d.round, d.event_id);
+      break;
+    case 'event.end':
+      db.prepare(`UPDATE lipsync_events SET status='done', champion_member_id=COALESCE(?,champion_member_id), ended_at=? WHERE id=?`)
+        .run(d.champion_id ?? null, d.at ?? ts, d.event_id);
       break;
 
     // ── Party Mode / Battlerz: Team Purple vs Team Pink, audience votes ──

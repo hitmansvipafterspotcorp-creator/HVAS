@@ -544,6 +544,137 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return id;
   };
 
+  // ── Standalone Lip Sync Battle events ──
+  // Bingo battles belong to a called square. An event is the standalone version:
+  // its own lobby, its own matchmaking, its own standings. The bouts are plain
+  // rows in lipsync_battles tagged with event_id, so perform / stream / vote /
+  // chat all run on the code above unchanged.
+  const activeEvent = () => db.prepare(`SELECT * FROM lipsync_events WHERE status!='done' ORDER BY id DESC LIMIT 1`).get();
+
+  // Standings order IS the leaderboard for the open floor: wins, then how much
+  // of the room voted for you, then name so the order never jitters mid-poll.
+  const eventRoster = (eventId) => db.prepare(`
+    SELECT p.member_id AS memberId, m.name, m.number, p.seed, p.wins, p.losses,
+           p.votes_for AS votes, p.state, p.out_round AS outRound, ms.tier, ms.vip
+    FROM lipsync_event_players p
+    JOIN members m ON m.id=p.member_id
+    LEFT JOIN memberships ms ON ms.member_id=p.member_id
+    WHERE p.event_id=? ORDER BY p.wins DESC, p.votes_for DESC, m.name ASC`).all(eventId);
+
+  const eventBouts = (eventId) => db.prepare(`
+    SELECT b.id, b.round, b.slot, b.status, b.artist, b.song, b.winner_member_id AS winnerId,
+           (SELECT GROUP_CONCAT(m.name, ' vs ') FROM lipsync_battle_players bp
+              JOIN members m ON m.id=bp.member_id WHERE bp.battle_id=b.id) AS names
+    FROM lipsync_battles b WHERE b.event_id=? ORDER BY b.round, b.slot`).all(eventId);
+
+  const nameOf = (id) => db.prepare('SELECT name FROM members WHERE id=?').get(id)?.name || null;
+
+  const eventPublic = (ev, viewerId) => {
+    const roster = eventRoster(ev.id);
+    const live = db.prepare(`SELECT * FROM lipsync_battles WHERE event_id=? AND status NOT IN ('done','void')
+      ORDER BY id DESC LIMIT 1`).get(ev.id);
+    return {
+      id: ev.id, format: ev.format, title: ev.title, size: ev.size, status: ev.status, round: ev.round,
+      king: ev.king_member_id ? { memberId: ev.king_member_id, name: nameOf(ev.king_member_id), reign: ev.reign } : null,
+      champion: ev.champion_member_id ? { memberId: ev.champion_member_id, name: nameOf(ev.champion_member_id) } : null,
+      roster, bouts: eventBouts(ev.id),
+      remaining: roster.filter((r) => r.state === 'in').length,
+      joined: roster.some((r) => r.memberId === viewerId),
+      bout: live ? battlePublic(live, viewerId) : null,
+    };
+  };
+
+  // A standalone bout still needs a song to perform. Host can name one; other-
+  // wise take a lip-sync entry from whichever deck the venue is running.
+  const boutSong = (artist, song) => {
+    if (artist && song) return { artist, song };
+    const r = getBingoRound();
+    const items = deckById(r?.deckId || DEFAULT_DECK_ID).items.filter((i) => i.type === 'lipsync');
+    const pick = items[Math.floor(Math.random() * items.length)];
+    return pick ? { artist: pick.artist, song: pick.song } : { artist: null, song: null };
+  };
+
+  // How many bouts a member has already been in, this event.
+  const boutsFought = (eventId, memberId) => db.prepare(`SELECT COUNT(*) n FROM lipsync_battles b
+    JOIN lipsync_battle_players p ON p.battle_id=b.id AND p.member_id=?
+    WHERE b.event_id=?`).get(memberId, eventId).n;
+
+  // Who is still waiting to fight in the current bracket round.
+  const awaitingThisRound = (ev) => {
+    const fought = new Set(db.prepare(`SELECT p.member_id FROM lipsync_battles b
+      JOIN lipsync_battle_players p ON p.battle_id=b.id
+      WHERE b.event_id=? AND b.round=?`).all(ev.id, ev.round).map((r) => r.member_id));
+    return eventRoster(ev.id).filter((r) => r.state === 'in' && !fought.has(r.memberId));
+  };
+
+  // Open one bout of an event. Both names go in as 'invited' exactly like a
+  // bingo battle, so a contender can still decline on their own phone.
+  const openBout = (ev, pair, artist, song) => {
+    const slot = db.prepare('SELECT COUNT(*) n FROM lipsync_battles WHERE event_id=? AND round=?').get(ev.id, ev.round).n;
+    const id = Date.now();
+    const s = boutSong(artist, song);
+    commit('battle.open', {
+      id, item_id: `event:${ev.id}:r${ev.round}:s${slot}`, artist: s.artist, song: s.song,
+      members: pair, status: 'pending', event_id: ev.id, round: ev.round, slot, at: Date.now(),
+    });
+    return id;
+  };
+
+  // Pick the next matchup for an event. Each format answers one question —
+  // bracket: who is left in this round; king: who takes on the throne; open
+  // floor: who has performed least, so nobody sits out all night.
+  const openNextBout = (ev, opts = {}) => {
+    const { a, b, artist, song } = opts;
+    const isIn = (m) => db.prepare(`SELECT state FROM lipsync_event_players WHERE event_id=? AND member_id=?`).get(ev.id, m);
+    if (a && b) {                                        // host named the pair
+      if (a === b) return { error: 'that is one person' };
+      for (const m of [a, b]) {
+        const row = isIn(m);
+        if (!row) return { error: 'both battlers must be in the event' };
+        if (row.state !== 'in') return { error: 'that member is already knocked out' };
+      }
+      return { boutId: openBout(ev, [a, b], artist, song) };
+    }
+    // Fewest bouts first keeps the floor moving through everybody; name breaks
+    // ties so two polls never disagree about who is up.
+    const byFewest = (x, y) => (boutsFought(ev.id, x.memberId) - boutsFought(ev.id, y.memberId))
+      || String(x.name).localeCompare(String(y.name));
+
+    if (ev.format === 'bracket') {
+      let cur = ev;
+      // Advance through rounds until a pair falls out. A lone survivor in a
+      // round has nobody to fight, so they take a bye into the next one.
+      for (let guard = 0; guard < 8; guard++) {
+        const waiting = awaitingThisRound(cur).slice().sort((x, y) => (x.seed || 0) - (y.seed || 0));
+        if (waiting.length >= 2) {
+          // Top seed against bottom seed, the standard bracket draw.
+          return { boutId: openBout(cur, [waiting[0].memberId, waiting[waiting.length - 1].memberId], artist, song) };
+        }
+        const stillIn = eventRoster(cur.id).filter((r) => r.state === 'in');
+        if (stillIn.length <= 1) return { note: 'the bracket is finished' };
+        commit('event.round', { event_id: cur.id, round: cur.round + 1 });
+        cur = db.prepare('SELECT * FROM lipsync_events WHERE id=?').get(cur.id);
+      }
+      return { error: 'could not work out the next matchup' };
+    }
+
+    if (ev.format === 'king') {
+      const roster = eventRoster(ev.id);
+      if (!ev.king_member_id) {                          // first bout crowns one
+        const two = roster.slice().sort(byFewest).slice(0, 2);
+        if (two.length < 2) return { error: 'need 2 to open the floor' };
+        return { boutId: openBout(ev, [two[0].memberId, two[1].memberId], artist, song) };
+      }
+      const challenger = roster.filter((r) => r.memberId !== ev.king_member_id).sort(byFewest)[0];
+      if (!challenger) return { error: 'nobody left to challenge the king' };
+      return { boutId: openBout(ev, [ev.king_member_id, challenger.memberId], artist, song) };
+    }
+
+    const roster = eventRoster(ev.id).slice().sort(byFewest);
+    if (roster.length < 2) return { error: 'need at least 2 in the event' };
+    return { boutId: openBout(ev, [roster[0].memberId, roster[1].memberId], artist, song) };
+  };
+
   // Who the room voted to see battle, highest first. Ties break on name so the
   // order is stable between polls rather than jittering on every render.
   const battlePicks = (battleId) => db.prepare(`
@@ -1384,6 +1515,112 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       commit('battle.resolve', { battle_id: battleId, winner_id: winner, at: Date.now() });
       battleFrames.delete(String(battleId));
       json(res, 200, { ok: true, winnerId: winner, tally });
+    },
+
+    // ── Standalone Lip Sync Battle events ──
+    // The whole event in one shape: roster, standings, bracket so far, and the
+    // live bout (already in /battle/current form, so the TV reuses that view).
+    'GET /lipsync/state': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent()
+        || db.prepare(`SELECT * FROM lipsync_events ORDER BY id DESC LIMIT 1`).get();
+      json(res, 200, { event: ev ? eventPublic(ev, c.sub) : null });
+    },
+    // Host opens a lobby. One event at a time — two live brackets on one TV is
+    // not a feature, it is a support call.
+    'POST /lipsync/create': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { format, title, size } = await readBody(req);
+      if (!['bracket', 'king', 'open'].includes(format)) return json(res, 400, { error: 'format must be bracket, king or open' });
+      const running = activeEvent();
+      if (running) return json(res, 409, { error: 'an event is already running — end it first', eventId: running.id });
+      const id = Date.now();
+      const validSize = [4, 8, 16].includes(Number(size)) ? Number(size) : (format === 'bracket' ? 8 : null);
+      commit('event.create', { id, format, title: title || null, size: validSize, at: Date.now() });
+      json(res, 201, { ok: true, event: eventPublic(db.prepare('SELECT * FROM lipsync_events WHERE id=?').get(id), c.sub) });
+    },
+    'POST /lipsync/join': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      if (ev.status !== 'lobby') return json(res, 400, { error: 'this event has already started' });
+      const n = db.prepare('SELECT COUNT(*) n FROM lipsync_event_players WHERE event_id=?').get(ev.id).n;
+      if (ev.size && n >= ev.size) return json(res, 400, { error: `this bracket is full (${ev.size})` });
+      commit('event.join', { event_id: ev.id, member_id: c.sub, at: Date.now() });
+      json(res, 200, { ok: true, event: eventPublic(activeEvent(), c.sub) });
+    },
+    'POST /lipsync/leave': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      if (ev.status !== 'lobby') return json(res, 400, { error: 'too late to leave — you are in the running' });
+      commit('event.leave', { event_id: ev.id, member_id: c.sub });
+      json(res, 200, { ok: true, event: eventPublic(activeEvent(), c.sub) });
+    },
+    // Seed and open the first bout. Bracket seeds on career battle wins so the
+    // two strongest performers do not meet in round one.
+    'POST /lipsync/start': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      if (ev.status !== 'lobby') return json(res, 400, { error: 'already started' });
+      const roster = db.prepare(`SELECT p.member_id AS memberId,
+          COALESCE(ps.battles_won,0) AS won, m.name
+        FROM lipsync_event_players p JOIN members m ON m.id=p.member_id
+        LEFT JOIN player_stats ps ON ps.member_id=p.member_id
+        WHERE p.event_id=? ORDER BY won DESC, m.name ASC`).all(ev.id);
+      if (roster.length < 2) return json(res, 400, { error: 'need at least 2 in the lobby' });
+      const seeds = roster.map((r, i) => ({ member_id: r.memberId, seed: i + 1 }));
+      commit('event.start', { id: ev.id, seeds, at: Date.now() });
+      const fresh = activeEvent();
+      const bout = openNextBout(fresh);
+      json(res, 200, { ok: true, seeded: seeds.length, boutId: bout.boutId || null, note: bout.note || null,
+        event: eventPublic(activeEvent(), c.sub) });
+    },
+    // Open the next bout. Host-paced on purpose: one battle on the TV at a time.
+    'POST /lipsync/next': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      if (ev.status !== 'live') return json(res, 400, { error: 'event is not live' });
+      const open = db.prepare(`SELECT id FROM lipsync_battles WHERE event_id=? AND status NOT IN ('done','void')`).get(ev.id);
+      if (open) return json(res, 409, { error: 'finish the bout on the floor first', boutId: open.id });
+      const { artist, song, a, b } = await readBody(req);
+      const out = openNextBout(ev, { a, b, artist, song });
+      if (out.error) return json(res, 400, { error: out.error });
+      json(res, 200, { ok: true, boutId: out.boutId || null, note: out.note || null,
+        event: eventPublic(activeEvent(), c.sub) });
+    },
+    // Open floor and king of the hill: a member calls somebody out themselves.
+    // The host still opens the bout, but this is how the queue gets its names.
+    'POST /lipsync/challenge': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      if (ev.format === 'bracket') return json(res, 400, { error: 'a bracket decides its own matchups' });
+      if (ev.status !== 'live') return json(res, 400, { error: 'event is not live' });
+      const { memberId } = await readBody(req);
+      if (memberId === c.sub) return json(res, 400, { error: 'you cannot challenge yourself' });
+      const inEvent = (m) => db.prepare('SELECT 1 FROM lipsync_event_players WHERE event_id=? AND member_id=?').get(ev.id, m);
+      if (!inEvent(c.sub)) return json(res, 400, { error: 'join the event first' });
+      if (!inEvent(memberId)) return json(res, 400, { error: 'they are not in this event' });
+      // King of the hill has exactly one target: whoever holds the floor.
+      if (ev.format === 'king' && ev.king_member_id && memberId !== ev.king_member_id) {
+        return json(res, 400, { error: 'in king of the hill you challenge the king' });
+      }
+      const open = db.prepare(`SELECT id FROM lipsync_battles WHERE event_id=? AND status NOT IN ('done','void')`).get(ev.id);
+      if (open) return json(res, 409, { error: 'a bout is already on the floor', boutId: open.id });
+      const id = openBout(ev, [c.sub, memberId]);
+      json(res, 200, { ok: true, boutId: id, event: eventPublic(activeEvent(), c.sub) });
+    },
+    'POST /lipsync/end': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const ev = activeEvent();
+      if (!ev) return json(res, 404, { error: 'no event open' });
+      // Whoever is top of the standings takes it when a host stops early.
+      const top = eventRoster(ev.id).filter((r) => r.state === 'in')[0];
+      commit('event.end', { event_id: ev.id, champion_id: ev.champion_member_id || top?.memberId || null, at: Date.now() });
+      json(res, 200, { ok: true, event: eventPublic(db.prepare('SELECT * FROM lipsync_events WHERE id=?').get(ev.id), c.sub) });
     },
 
     'POST /bingo/claim': async (req, res) => {

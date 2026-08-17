@@ -143,6 +143,19 @@ export function apiBattleStage(battleId, stage) { return call('POST', '/battle/s
 export function apiBattlePerform(battleId, memberId, seconds) { return call('POST', '/battle/perform', { battleId, memberId, seconds }, apiStaffToken()); }
 export function apiBattleVoting(battleId, seconds) { return call('POST', '/battle/voting', { battleId, seconds }, apiStaffToken()); }
 export function apiBattleResolve(battleId, winnerId) { return call('POST', '/battle/resolve', { battleId, winnerId }, apiStaffToken()); }
+
+// ── Standalone Lip Sync Battle events ──
+// A whole night of battles with no bingo card involved: its own lobby, its own
+// standings. The bout inside an event is an ordinary battle, so every apiBattle*
+// call above drives it — only these set the event up and pick the next matchup.
+export function apiEventState() { return call('GET', '/lipsync/state', null, apiToken() || apiStaffToken()); }
+export function apiEventCreate(format, title, size) { return call('POST', '/lipsync/create', { format, title, size }, apiStaffToken()); }
+export function apiEventJoin() { return call('POST', '/lipsync/join', {}, apiToken()); }
+export function apiEventLeave() { return call('POST', '/lipsync/leave', {}, apiToken()); }
+export function apiEventStart() { return call('POST', '/lipsync/start', {}, apiStaffToken()); }
+export function apiEventNext(opts = {}) { return call('POST', '/lipsync/next', opts, apiStaffToken()); }
+export function apiEventChallenge(memberId) { return call('POST', '/lipsync/challenge', { memberId }, apiToken()); }
+export function apiEventEnd() { return call('POST', '/lipsync/end', {}, apiStaffToken()); }
 export function apiBingoDecks() { return call('GET', '/bingo/decks', null, apiStaffToken()); }
 // Venue media credentials. Songs only play once one of these two is set up —
 // either the venue's own YouTube API key, or the host signing in with Google

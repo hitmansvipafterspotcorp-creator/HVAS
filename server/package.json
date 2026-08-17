@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "HVAS custom backend — rolling Ed25519 door passes, member/staff auth, live door board. Zero dependencies (Node 22 built-ins) except ethers, used only for HitKoin (signing real blockchain transactions by hand is a real-money security risk not worth taking).",
-  "engines": { "node": ">=22.5.0" },
+  "description": "HVAS custom backend \u2014 rolling Ed25519 door passes, member/staff auth, live door board. Zero dependencies (Node 22 built-ins) except ethers, used only for HitKoin (signing real blockchain transactions by hand is a real-money security risk not worth taking).",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "dependencies": {
     "ethers": "^6.13.0"
   },
@@ -22,6 +24,8 @@
     "test:pay": "node pay-test.mjs",
     "test:ble": "node ../native/ble-test.mjs",
     "test:hitkoin": "node hitkoin-test.mjs",
-    "test:all": "node test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node network-test.mjs && node pay-test.mjs && node ../native/ble-test.mjs"
+    "test:all": "node test.mjs && node lipsync-test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node network-test.mjs && node pay-test.mjs && node ../native/ble-test.mjs",
+    "test:lipsync": "node lipsync-test.mjs",
+    "test:gate": "node test-gate.mjs"
   }
 }

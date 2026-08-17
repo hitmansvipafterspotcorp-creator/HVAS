@@ -980,3 +980,71 @@
 .media-google { text-decoration: none; }
 /* The warning on the Run tab is a button — tapping it opens the setup. */
 .media-warn { display: block; width: 100%; text-align: left; cursor: pointer; border-width: 1px; }
+
+/* ── Standalone Lip Sync Battle ──────────────────────────────────────────
+   The bout itself reuses .battle-* / .roster-* above. What is new here is the
+   frame around it: the lobby, the standings table that doubles as the open
+   floor's leaderboard, and the round-by-round record of what happened. */
+.ev-create { display: grid; gap: 10px; }
+.ev-formats { display: grid; gap: 7px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ev-format {
+  display: flex; flex-direction: column; gap: 3px; padding: 10px; text-align: left; cursor: pointer;
+  border-radius: var(--k-r); border: 1px solid var(--k-edge-soft); color: var(--k-text);
+  background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ev-format strong { font: 900 12.5px/1.15 var(--k-font); text-transform: uppercase; }
+.ev-format small { font: 700 10px/1.35 var(--k-font); color: var(--k-text-dim); }
+.ev-format.is-on { border-color: var(--k-violet); box-shadow: var(--k-glow-violet); }
+.ev-hint { margin: 6px 0; font: 700 11.5px/1.4 var(--k-font); color: var(--k-text-dim); }
+
+.ev-standings { display: grid; gap: 4px; margin: 8px 0; }
+.ev-standings-head {
+  display: flex; justify-content: space-between;
+  font: 900 8.5px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase; color: var(--k-text-faint);
+}
+.ev-row {
+  display: grid; grid-template-columns: 34px 1fr auto auto; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: var(--k-r);
+  border: 1px solid var(--k-edge-soft); background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+}
+/* Knocked out stays on the list — seeing who you beat is half the fun — but
+   reads as history rather than as somebody still in the running. */
+.ev-row.is-out { opacity: .45; }
+.ev-row.is-king { border-color: var(--k-gold); box-shadow: 0 0 0 1px rgba(255, 207, 71, .18); }
+.ev-rank { font: 900 11px/1 var(--k-font); color: var(--k-text-faint); font-variant-numeric: tabular-nums; }
+.ev-name {
+  font: 900 12.5px/1.15 var(--k-font); text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ev-name small { font: 700 9px/1 var(--k-font); color: var(--k-text-faint); text-transform: none; }
+.ev-crown { margin-right: 4px; }
+.ev-record { font: 900 12px/1 var(--k-font); color: var(--k-neon-lt); font-variant-numeric: tabular-nums; }
+.ev-record small { font: 700 9.5px/1 var(--k-font); color: var(--k-text-faint); }
+.ev-challenge {
+  padding: 5px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--k-neon); background: rgba(255, 61, 240, .12);
+  font: 900 8.5px/1 var(--k-font); letter-spacing: .08em; text-transform: uppercase; color: var(--k-neon-lt);
+}
+.ev-challenge:disabled { opacity: .5; cursor: default; }
+
+.ev-bracket { display: grid; gap: 10px; margin-top: 12px; }
+.ev-round { display: grid; gap: 5px; }
+.ev-round-label {
+  font: 900 8.5px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase; color: var(--k-violet-lt);
+}
+.ev-bout {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px;
+  padding: 7px 9px; border-radius: var(--k-r);
+  border: 1px solid var(--k-edge-soft); background: var(--k-ink);
+}
+.ev-bout-names { font: 900 11.5px/1.2 var(--k-font); text-transform: uppercase; }
+.ev-bout-song {
+  grid-column: 1 / -1; font: 700 9.5px/1.2 var(--k-font); color: var(--k-text-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ev-bout-state { font: 900 10px/1 var(--k-font); color: var(--k-text-dim); }
+.ev-bout.is-done .ev-bout-state { color: var(--k-gold); }
+.ev-bout.is-performing .ev-bout-state,
+.ev-bout.is-voting .ev-bout-state,
+.ev-bout.is-pending .ev-bout-state { color: var(--k-neon); }
