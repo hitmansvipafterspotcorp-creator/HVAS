@@ -7,3 +7,10 @@ session.key
 
 # your real Cloudflare Tunnel config (tunnel id + hostname) — keep the .example only
 cloudflared/config.yml
+
+# your real venue codes / API keys — the .example is the only one that ships.
+# This was NOT ignored, which put HVAS_STAFF_CODE, HVAS_HOST_CODE and any
+# YOUTUBE_API_KEY one `git add -A` away from a public repo. Never committed as
+# it turns out, but that was luck rather than design.
+.env
+.env.local
