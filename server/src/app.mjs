@@ -74,6 +74,53 @@ const ytSeconds = (iso) => {
   if (!m) return 0;
   return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + Math.round(+m[4] || 0);
 };
+// The replay heatmap YouTube renders under the scrubber: an array of equal
+// slices, each scored 0..1 by how much people rewind into it. On a music video
+// the top slice is the hook, near enough every time — it is the room voting
+// with its thumbs. Parsed straight out of the watch page, which is where the
+// player itself gets it.
+const hookFromHeatmap = (html) => {
+  const markers = [];
+  const re = /"heatMarkerRenderer":\{"timeRangeStartMillis":(\d+),"markerDurationMillis":(\d+),"heatMarkerIntensityScoreNormalized":([0-9.]+)\}/g;
+  let m;
+  while ((m = re.exec(html))) markers.push({ start: +m[1] / 1000, dur: +m[2] / 1000, score: +m[3] });
+  if (markers.length < 4) return null;
+  // The opening seconds always score high — that is people restarting the
+  // video, not the hook. Ignore the first tenth before picking the peak.
+  const floor = markers[markers.length - 1].start * 0.1;
+  const body = markers.filter((k) => k.start >= floor);
+  const peak = (body.length ? body : markers).reduce((a, b) => (b.score > a.score ? b : a));
+  const spread = peak.score - (markers.reduce((n, k) => n + k.score, 0) / markers.length);
+  return {
+    hookAt: Math.round(peak.start),
+    // A pronounced peak is a real hook; a flat heatmap means the video is
+    // watched evenly and the read is worth less.
+    confidence: Math.max(35, Math.min(95, Math.round(spread * 220))),
+  };
+};
+
+// Some music videos are chaptered, and the chorus is often labelled outright.
+// Free and exact when it is there.
+const hookFromChapters = (html) => {
+  const re = /"chapterRenderer":\{"title":\{"simpleText":"([^"]{1,80})"\},"timeRangeStartMillis":(\d+)/g;
+  let m;
+  while ((m = re.exec(html))) {
+    if (/\b(chorus|hook|refrain)\b/i.test(m[1])) return { hookAt: Math.round(+m[2] / 1000), confidence: 90 };
+  }
+  return null;
+};
+
+// Turn "the hook lands at 1:07" into the window to play: back up into the tail
+// of the verse so the performer gets a run-up, then carry through the hook.
+const windowAroundHook = (hookAt, durationSec) => {
+  const d = Number(durationSec) || 0;
+  const runUp = 18;                                  // enough verse to get set
+  const start = Math.max(0, Math.round(hookAt) - runUp);
+  let seconds = Math.min(75, Math.max(40, Math.round((d || 210) * 0.4)));
+  if (d) seconds = Math.min(seconds, Math.max(20, d - start - 2));
+  return { start, seconds };
+};
+
 const clipWindowFor = (durationSec) => {
   const d = Number(durationSec) || 0;
   // Unknown length: fall back to the shipped performance window, from the top.
@@ -408,6 +455,62 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // YouTube for it and send the top result straight to the TV. Best-effort
   // — if it fails or no key is configured, the call itself already landed
   // and gameplay keeps going regardless.
+  // Where this song's hook is. Worked out once, written down, and reused for
+  // every night after — so the second time a song comes up there is no lookup
+  // at all. Best source wins:
+  //   replayed — YouTube's own replay heatmap, the crowd showing you the hook
+  //   chapter  — the uploader labelled the chorus
+  //   estimate — nothing to read, so cut it from the track's proportions
+  const resolveClip = async (songId, videoId, ytKey, ytToken) => {
+    const known = db.prepare('SELECT * FROM song_clips WHERE song_id=?').get(songId);
+    // A stored read is reused unless it was a weak guess and the video changed.
+    if (known && (known.video_id === videoId || known.confidence >= 60)) {
+      return { start: known.start, seconds: known.seconds, hookAt: known.hook_at,
+               source: known.source, confidence: known.confidence };
+    }
+
+    let duration = 0;
+    try {
+      const durUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${encodeURIComponent(videoId)}${ytToken ? '' : `&key=${ytKey}`}`;
+      const dr = await fetch(durUrl, ytToken ? { headers: { Authorization: `Bearer ${ytToken}` } } : undefined);
+      duration = ytSeconds((await dr.json()).items?.[0]?.contentDetails?.duration);
+    } catch { /* fall through to the estimate */ }
+
+    let found = null;
+    try {
+      // The watch page carries the heatmap and any chapters. This is the same
+      // public page the embedded player loads; it is read once per song.
+      const wr = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+                   'Accept-Language': 'en-US,en;q=0.9' },
+      });
+      if (wr.ok) {
+        const html = await wr.text();
+        const chap = hookFromChapters(html);
+        const heat = hookFromHeatmap(html);
+        // A labelled chorus beats a read of the heatmap; a strong heatmap beats
+        // a weak one. Either beats guessing.
+        found = (chap && heat) ? (chap.confidence >= heat.confidence ? { ...chap, source: 'chapter' } : { ...heat, source: 'replayed' })
+              : chap ? { ...chap, source: 'chapter' }
+              : heat ? { ...heat, source: 'replayed' } : null;
+      }
+    } catch { /* the round never waits on this */ }
+
+    const clip = found
+      ? { ...windowAroundHook(found.hookAt, duration), hookAt: found.hookAt, source: found.source, confidence: found.confidence }
+      : { ...clipWindowFor(duration), hookAt: null, source: 'estimate', confidence: duration ? 30 : 10 };
+
+    try {
+      db.prepare(`INSERT INTO song_clips(song_id,video_id,start,seconds,hook_at,source,confidence,updated_at)
+        VALUES(?,?,?,?,?,?,?,?)
+        ON CONFLICT(song_id) DO UPDATE SET video_id=excluded.video_id, start=excluded.start,
+          seconds=excluded.seconds, hook_at=excluded.hook_at, source=excluded.source,
+          confidence=excluded.confidence, updated_at=excluded.updated_at`)
+        .run(songId, videoId, clip.start, clip.seconds, clip.hookAt, clip.source, clip.confidence, Date.now());
+    } catch { /* a failed write just means we look it up again next time */ }
+    return clip;
+  };
+
   const autoResolveMedia = async (item) => {
     const ytKey = youtubeKey();
     const ytToken = await googleAccessToken();
@@ -428,17 +531,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const it = data.items?.[0];
       if (it) {
         putSetting('media_last_error', '');
-        // Second call for the real running time, so the verse-and-hook window
-        // is cut from this track's actual length rather than an assumption.
-        // If it fails the song still plays — just from the top, full length.
-        let clip = clipWindowFor(0);
-        try {
-          const durUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${encodeURIComponent(it.id.videoId)}${ytToken ? '' : `&key=${ytKey}`}`;
-          const dr = await fetch(durUrl, ytToken ? { headers: { Authorization: `Bearer ${ytToken}` } } : undefined);
-          const dd = await dr.json();
-          const secs = ytSeconds(dd.items?.[0]?.contentDetails?.duration);
-          if (secs) clip = clipWindowFor(secs);
-        } catch { /* keep the fallback window */ }
+        const clip = await resolveClip(item.id, it.id.videoId, ytKey, ytToken);
         commit('bingo.media', {
           video: { videoId: it.id.videoId, title: it.snippet.title, clip },
           at: Date.now(),

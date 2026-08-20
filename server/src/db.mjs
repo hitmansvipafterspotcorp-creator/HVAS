@@ -283,6 +283,21 @@ export function openDb(path) {
     CREATE INDEX IF NOT EXISTS idx_battle_comments ON lipsync_battle_comments(battle_id, at);
     -- Runtime venue settings the host can change without a redeploy or a
     -- restart (e.g. their own YouTube API key).
+    -- Where the hook actually is, per song, learned once and kept.
+    -- YouTube publishes a replay heatmap on the watch page: the part of a video
+    -- people rewind to. On a music video that peak IS the hook — it is the
+    -- crowd telling you which 30 seconds matter. We read it once per song,
+    -- store the window, and never look it up again.
+    CREATE TABLE IF NOT EXISTS song_clips (
+      song_id TEXT PRIMARY KEY,               -- the deck item id
+      video_id TEXT NOT NULL,                 -- which video the window was measured on
+      start INTEGER NOT NULL,                 -- seconds into the video
+      seconds INTEGER NOT NULL,               -- how long to play
+      hook_at INTEGER,                        -- where the hook itself lands
+      source TEXT NOT NULL,                   -- replayed | chapter | estimate | manual
+      confidence INTEGER NOT NULL DEFAULT 0,  -- 0-100, so a weak read can be re-tried
+      updated_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,

@@ -5249,6 +5249,21 @@ function HostScreen() {
               {board.calls[board.calls.length - 1].type === 'lipsync' && <span className="bingo-cell-tag">LIP SYNC</span>}
               <strong>{board.calls[board.calls.length - 1].artist}</strong>
               <span>{board.calls[board.calls.length - 1].song}</span>
+              {/* Which part of the track is playing, and how we know. The host
+                  should be able to see when a window was guessed rather than
+                  read off the crowd's own replays. */}
+              {board.nowPlaying?.clip?.seconds && (
+                <span className={`clip-src clip-src--${board.nowPlaying.clip.source || 'estimate'}`}>
+                  {(() => {
+                    const c = board.nowPlaying.clip;
+                    const mm = (x) => `${Math.floor(x / 60)}:${String(Math.round(x % 60)).padStart(2, '0')}`;
+                    const span = `${mm(c.start)}–${mm(c.start + c.seconds)}`;
+                    return c.source === 'replayed' ? `▶ ${span} · hook from replays`
+                      : c.source === 'chapter' ? `▶ ${span} · chorus chapter`
+                      : `▶ ${span} · estimated`;
+                  })()}
+                </span>
+              )}
             </div>
           )}
           <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
