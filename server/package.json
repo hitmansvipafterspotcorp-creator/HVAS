@@ -24,9 +24,10 @@
     "test:pay": "node pay-test.mjs",
     "test:ble": "node ../native/ble-test.mjs",
     "test:hitkoin": "node hitkoin-test.mjs",
-    "test:all": "node test.mjs && node lipsync-test.mjs && node bingo-modes-test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node network-test.mjs && node pay-test.mjs && node ../native/ble-test.mjs",
+    "test:all": "node test.mjs && node lipsync-test.mjs && node bingo-modes-test.mjs && node clip-timer-test.mjs && node mesh-test.mjs && node mesh-tcp-test.mjs && node mesh-encrypted-test.mjs && node cluster-test.mjs && node network-test.mjs && node pay-test.mjs && node ../native/ble-test.mjs",
     "test:lipsync": "node lipsync-test.mjs",
     "test:gate": "node test-gate.mjs",
-    "test:modes": "node bingo-modes-test.mjs"
+    "test:modes": "node bingo-modes-test.mjs",
+    "test:clip": "node clip-timer-test.mjs"
   }
 }

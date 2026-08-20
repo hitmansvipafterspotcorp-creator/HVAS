@@ -16,7 +16,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
   apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePick, apiBattleLock, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
-  apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve,
+  apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve, apiBattleTimer,
   apiEventState, apiEventCreate, apiEventJoin, apiEventLeave, apiEventStart, apiEventNext,
   apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
@@ -3348,7 +3348,7 @@ function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
               </button>
             )}
             {isHost && battle.status === 'pending' && p.state === 'accepted' && (
-              <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattlePerform(battle.id, p.memberId, 120))}>Put {p.name} up</button>
+              <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattlePerform(battle.id, p.memberId))}>Put {p.name} up</button>
             )}
           </div>
         ))}
@@ -3361,7 +3361,17 @@ function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
             {battle.stage === 'tv' ? '📺 On TV — send back to phones' : '📺 Project to TV'}
           </button>
           {battle.status === 'performing' && (
-            <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattleVoting(battle.id, 30))}>Open voting</button>
+            <>
+              {/* Hold the clock, don't set it. The room goes off, a mic dies —
+                  the performer gets back exactly what they had left. */}
+              <button type="button" className={`bingo-btn ghost${battle.timerHeldMs != null ? ' ready' : ''}`} disabled={busy}
+                      onClick={() => act(() => apiBattleTimer(battle.id, battle.timerHeldMs != null ? 'resume' : 'pause'))}>
+                {battle.timerHeldMs != null
+                  ? `▶ Clock held at ${Math.ceil(battle.timerHeldMs / 1000)}s — release`
+                  : '⏸ Hold the clock'}
+              </button>
+              <button type="button" className="bingo-btn" disabled={busy} onClick={() => act(() => apiBattleVoting(battle.id, 30))}>Open voting</button>
+            </>
           )}
           {battle.status === 'voting' && (
             <button type="button" className="bingo-btn gold" disabled={busy} onClick={() => act(() => apiBattleResolve(battle.id))}>Close voting &amp; crown</button>
@@ -4519,9 +4529,19 @@ function YouTubeStage({ video }) {
   useEffect(() => {
     const p = playerRef.current;
     if (!playerReady || !p) return;
-    if (video?.videoId) p.loadVideoById(video.videoId);
-    else p.stopVideo?.();
-  }, [playerReady, video?.videoId]);
+    if (!video?.videoId) { p.stopVideo?.(); return; }
+    // Play the verse-and-hook cut, not the whole track: the backend works the
+    // window out from the song's real length and sends it with the video, so
+    // the music ends exactly when the performance timer does. No window (an
+    // older call, or a video whose length never resolved) plays from the top.
+    const clip = video.clip;
+    if (clip?.seconds) {
+      p.loadVideoById({ videoId: video.videoId, startSeconds: clip.start || 0,
+                        endSeconds: (clip.start || 0) + clip.seconds });
+    } else {
+      p.loadVideoById(video.videoId);
+    }
+  }, [playerReady, video?.videoId, video?.clip?.start, video?.clip?.seconds]);
   if (!video?.videoId) return null;
   return <div className="bingo-tv-media"><div ref={hostRef} /></div>;
 }

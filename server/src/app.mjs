@@ -59,7 +59,38 @@ const BINGO_SONG_MS = Math.max(3, Number(process.env.BINGO_SONG_SECONDS) || 60) 
 const bingoPodiumMs = () => Math.max(5, Number(process.env.BINGO_PODIUM_SECONDS) || 30) * 1000;
 const BATTLE_PICK_MS = Math.max(5, Number(process.env.BATTLE_PICK_SECONDS) || 25) * 1000;
 const BINGO_LIPSYNC_MS = Math.max(3, Number(process.env.BINGO_LIPSYNC_SECONDS) || 120) * 1000;
-const bingoWindowFor = (item) => (item?.type === 'lipsync' ? BINGO_LIPSYNC_MS : BINGO_SONG_MS);
+// ── Verse-and-hook clip window ──
+// Nobody lip syncs to an intro, and nobody should have to sit through a third
+// verse. A performance plays one segment: the back half of verse one straight
+// into the first hook, which is the part a room actually knows.
+//
+// There is no song-structure data in any API, so this is derived from the
+// track's own length rather than guessed at a flat number — a 2:30 cut and a
+// 5:00 album version get proportionally different windows. Roughly: skip the
+// intro, start inside verse one, and run long enough to carry the hook.
+const YT_DURATION = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/;
+const ytSeconds = (iso) => {
+  const m = YT_DURATION.exec(String(iso || ''));
+  if (!m) return 0;
+  return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + Math.round(+m[4] || 0);
+};
+const clipWindowFor = (durationSec) => {
+  const d = Number(durationSec) || 0;
+  // Unknown length: fall back to the shipped performance window, from the top.
+  if (d < 30) return { start: 0, seconds: Math.round(BINGO_LIPSYNC_MS / 1000), estimated: true };
+  const start = Math.max(12, Math.round(d * 0.12));            // clear the intro
+  const seconds = Math.min(75, Math.max(40, Math.round(d * 0.40)));  // verse tail + hook
+  // Never run past the end of the track.
+  const capped = Math.min(seconds, Math.max(20, d - start - 2));
+  return { start, seconds: capped, estimated: false };
+};
+
+const bingoWindowFor = (item, clip) => {
+  // The performance runs as long as the clip does — that is the whole point of
+  // cutting to the verse and hook, and it means nobody sets a duration by hand.
+  if (item?.type === 'lipsync') return clip?.seconds ? clip.seconds * 1000 : BINGO_LIPSYNC_MS;
+  return clip?.seconds ? clip.seconds * 1000 : BINGO_SONG_MS;
+};
 
 // ── Lip Sync Bingo ──
 const FREE_ITEM = { id: 'FREE', free: true, artist: '', song: '', type: 'free' };
@@ -397,7 +428,21 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const it = data.items?.[0];
       if (it) {
         putSetting('media_last_error', '');
-        commit('bingo.media', { video: { videoId: it.id.videoId, title: it.snippet.title }, at: Date.now() });
+        // Second call for the real running time, so the verse-and-hook window
+        // is cut from this track's actual length rather than an assumption.
+        // If it fails the song still plays — just from the top, full length.
+        let clip = clipWindowFor(0);
+        try {
+          const durUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${encodeURIComponent(it.id.videoId)}${ytToken ? '' : `&key=${ytKey}`}`;
+          const dr = await fetch(durUrl, ytToken ? { headers: { Authorization: `Bearer ${ytToken}` } } : undefined);
+          const dd = await dr.json();
+          const secs = ytSeconds(dd.items?.[0]?.contentDetails?.duration);
+          if (secs) clip = clipWindowFor(secs);
+        } catch { /* keep the fallback window */ }
+        commit('bingo.media', {
+          video: { videoId: it.id.videoId, title: it.snippet.title, clip },
+          at: Date.now(),
+        });
       } else {
         putSetting('media_last_error', `No YouTube result for "${q}"`);
       }
@@ -428,6 +473,8 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       id: b.id, itemId: b.item_id, artist: b.artist, song: b.song,
       status: b.status, stage: b.stage,
       performingMemberId: b.performing_member_id, performanceEndsAt: b.performance_ends_at,
+      // Set while the host is holding the clock; the number is what was left on it.
+      timerHeldMs: b.paused_ms ?? null,
       votingEndsAt: b.voting_ends_at, winnerMemberId: b.winner_member_id,
       totalVotes: total,
       // share of the vote — the on-screen meter during voting
@@ -764,7 +811,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // Auto is a switch they can flip when they want the night to run itself.
     if (!r.autoCall) return;
     const last = r.calls[r.calls.length - 1];
-    if (last?.at && Date.now() - last.at < bingoWindowFor(last)) return;   // current song still playing
+    if (last?.at && Date.now() - last.at < bingoWindowFor(last, r.nowPlaying?.clip)) return;  // clip still running
     bingoCallNext().catch(() => {});
   }, 2000).unref?.();
 
@@ -1221,7 +1268,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         // Whether the night is advancing itself, so the host screen can say so.
         autoCall: r.autoCall,
         // window for the square currently on screen (lip sync squares run longer)
-        currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
+        currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1], r.nowPlaying?.clip) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
         pendingClaims, winner, me, nowPlaying: r.nowPlaying,
       });
@@ -1350,11 +1397,30 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const p = db.prepare('SELECT state FROM lipsync_battle_players WHERE battle_id=? AND member_id=?').get(battleId, memberId);
       if (!p) return json(res, 404, { error: 'not in this battle' });
       if (p.state !== 'accepted') return json(res, 400, { error: 'that member has not accepted' });
-      const ms = Math.max(5, Number(seconds) || BINGO_LIPSYNC_MS / 1000) * 1000;
+      // The performance window is the clip's own length: verse into hook, so
+      // the music and the timer run out together. `seconds` stays available
+      // for tests and for a bout with no video behind it.
+      const clip = getBingoRound().nowPlaying?.clip;
+      const auto = clip?.seconds || BINGO_LIPSYNC_MS / 1000;
+      const ms = Math.max(5, Number(seconds) || auto) * 1000;
       commit('battle.perform', { battle_id: battleId, member_id: memberId, ends_at: Date.now() + ms });
-      json(res, 200, { ok: true, endsAt: Date.now() + ms });
+      json(res, 200, { ok: true, endsAt: Date.now() + ms, seconds: Math.round(ms / 1000), fromClip: !seconds && !!clip?.seconds });
     },
     // The performer's own device reports the take is finished.
+    // Host controls the timer, never its length: hold it, let it go again.
+    'POST /battle/timer': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { battleId, action } = await readBody(req);
+      if (!['pause', 'resume'].includes(action)) return json(res, 400, { error: 'action must be pause or resume' });
+      const b = db.prepare('SELECT status, performance_ends_at, paused_ms FROM lipsync_battles WHERE id=?').get(battleId);
+      if (!b) return json(res, 404, { error: 'no such battle' });
+      if (b.status !== 'performing') return json(res, 400, { error: 'nobody is performing' });
+      if (action === 'pause' && !b.performance_ends_at) return json(res, 400, { error: 'the clock is already held' });
+      if (action === 'resume' && b.paused_ms == null) return json(res, 400, { error: 'the clock is not held' });
+      commit('battle.timer', { battle_id: battleId, action, at: Date.now() });
+      const after = db.prepare('SELECT performance_ends_at, paused_ms FROM lipsync_battles WHERE id=?').get(battleId);
+      json(res, 200, { ok: true, paused: after.paused_ms != null, endsAt: after.performance_ends_at, leftMs: after.paused_ms });
+    },
     'POST /battle/performed': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const { battleId } = await readBody(req);

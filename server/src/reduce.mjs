@@ -364,6 +364,20 @@ export function applyOp(db, op) {
       db.prepare(`UPDATE lipsync_battles SET status='performing', performing_member_id=?, performance_ends_at=? WHERE id=?`)
         .run(d.member_id, d.ends_at ?? null, d.battle_id);
       break;
+    // Hold and release the running clock. The remaining time is carried over
+    // exactly, so pausing never lengthens or shortens a performance.
+    case 'battle.timer': {
+      const b = db.prepare('SELECT performance_ends_at, paused_ms FROM lipsync_battles WHERE id=?').get(d.battle_id);
+      if (!b) break;
+      if (d.action === 'pause' && b.performance_ends_at) {
+        const left = Math.max(0, b.performance_ends_at - (d.at ?? ts));
+        db.prepare('UPDATE lipsync_battles SET paused_ms=?, performance_ends_at=NULL WHERE id=?').run(left, d.battle_id);
+      } else if (d.action === 'resume' && b.paused_ms != null) {
+        db.prepare('UPDATE lipsync_battles SET performance_ends_at=?, paused_ms=NULL WHERE id=?')
+          .run((d.at ?? ts) + b.paused_ms, d.battle_id);
+      }
+      break;
+    }
     case 'battle.performed':
       db.prepare(`UPDATE lipsync_battle_players SET state='performed', performed_at=? WHERE battle_id=? AND member_id=?`)
         .run(d.at ?? ts, d.battle_id, d.member_id);

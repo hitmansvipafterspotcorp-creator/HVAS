@@ -365,6 +365,12 @@ export function openDb(path) {
     db.exec(`ALTER TABLE lipsync_battles ADD COLUMN round INTEGER`);
     db.exec(`ALTER TABLE lipsync_battles ADD COLUMN slot INTEGER`);
   }
+  // A host can hold a running performance — the crowd is loud, someone's mic
+  // died — and pick it up where it stopped. Stores what was left on the clock,
+  // never a duration the host chose.
+  if (!bcols.includes('paused_ms')) {
+    db.exec(`ALTER TABLE lipsync_battles ADD COLUMN paused_ms INTEGER`);
+  }
   // Indexed after the ALTER, not with the other tables: on a fresh database
   // those columns do not exist until the migration above has run.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_event_bouts ON lipsync_battles(event_id, round)`);

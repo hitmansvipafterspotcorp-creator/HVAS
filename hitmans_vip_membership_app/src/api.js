@@ -144,6 +144,7 @@ export function apiBattleVote(battleId, memberId) { return call('POST', '/battle
 export function apiBattleStage(battleId, stage) { return call('POST', '/battle/stage', { battleId, stage }, apiStaffToken()); }
 export function apiBattlePerform(battleId, memberId, seconds) { return call('POST', '/battle/perform', { battleId, memberId, seconds }, apiStaffToken()); }
 export function apiBattleVoting(battleId, seconds) { return call('POST', '/battle/voting', { battleId, seconds }, apiStaffToken()); }
+export function apiBattleTimer(battleId, action) { return call('POST', '/battle/timer', { battleId, action }, apiStaffToken()); }
 export function apiBattleResolve(battleId, winnerId) { return call('POST', '/battle/resolve', { battleId, winnerId }, apiStaffToken()); }
 
 // ── Standalone Lip Sync Battle events ──
