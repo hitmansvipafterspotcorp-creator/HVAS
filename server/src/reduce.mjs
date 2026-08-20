@@ -278,6 +278,13 @@ export function applyOp(db, op) {
     // Player taps a square to mark it covered — only actually called items
     // count toward a win (checked at claim time), but tapping itself is
     // always allowed so the UI can't desync from a slightly-stale poll.
+    // Both opt-in and both default off — see the note in db.mjs.
+    case 'bingo.auto':
+      db.prepare('UPDATE bingo_round SET auto_call=? WHERE id=1').run(d.on ? 1 : 0);
+      break;
+    case 'bingo.autofill':
+      db.prepare('UPDATE bingo_cards SET autofill=? WHERE member_id=?').run(d.on ? 1 : 0, d.member_id);
+      break;
     case 'bingo.mark': {
       const row = db.prepare('SELECT covered FROM bingo_cards WHERE member_id=?').get(d.member_id);
       if (!row) break;

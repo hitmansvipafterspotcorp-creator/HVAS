@@ -333,6 +333,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       podium: JSON.parse(r.podium || '[]'),
       podiumEndsAt: r.podium_ends_at,
       podiumFirst: r.podium_first,
+      autoCall: !!r.auto_call,
+      songSeconds: Math.round(BINGO_SONG_MS / 1000),
+      lipsyncSeconds: Math.round(BINGO_LIPSYNC_MS / 1000),
     };
   };
 
@@ -720,7 +723,22 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     commit('bingo.call', { calls: [...r.calls, item] });
     autoResolveMedia(item);
     openBattleFor(item);            // LIP SYNC squares must be performed for
+    autofillCall(item);             // players who asked not to tap
     return item;
+  };
+
+  // Players who switched their card to auto-fill get the called square covered
+  // for them. A LIP SYNC square is never auto-filled: those are earned by
+  // performing, and handing one over for free would delete the battle.
+  const autofillCall = (item) => {
+    if (!item || item.type === 'lipsync') return;
+    for (const row of db.prepare('SELECT member_id, card, covered FROM bingo_cards WHERE autofill=1').all()) {
+      try {
+        if (!JSON.parse(row.card).some((sq) => sq && sq.id === item.id)) continue;
+        if (JSON.parse(row.covered).includes(item.id)) continue;
+        commit('bingo.mark', { member_id: row.member_id, item_id: item.id, covered: true, at: Date.now() });
+      } catch { /* one bad card must not stop the call */ }
+    }
   };
   // Each call swaps the YouTube video on the TV, so the gap between calls IS
   // how long a song gets to play. At the old flat 6s the video was replaced
@@ -742,6 +760,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       return;
     }
     if (r.status !== 'live') return;
+    // Manual is the default: the host decides when the next song goes on.
+    // Auto is a switch they can flip when they want the night to run itself.
+    if (!r.autoCall) return;
     const last = r.calls[r.calls.length - 1];
     if (last?.at && Date.now() - last.at < bingoWindowFor(last)) return;   // current song still playing
     bingoCallNext().catch(() => {});
@@ -1186,7 +1207,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (c) {
         const mine = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
         const myClaim = db.prepare(`SELECT 1 FROM bingo_claims WHERE member_id=? AND status='pending'`).get(c.sub);
-        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, covered: JSON.parse(mine.covered), hasPendingClaim: !!myClaim } : null;
+        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, covered: JSON.parse(mine.covered), autofill: !!mine.autofill, hasPendingClaim: !!myClaim } : null;
       }
       json(res, 200, {
         status: r.status, calls: r.calls, startedAt: r.started_at,
@@ -1197,6 +1218,8 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         podium: r.podium, podiumEndsAt: r.podiumEndsAt, podiumFirst: r.podiumFirst,
         standings: (r.status === 'podium' || r.status === 'ended') ? bingoStandings().slice(0, 8) : [],
         songMs: BINGO_SONG_MS, lipSyncMs: BINGO_LIPSYNC_MS, youtubeEnabled: mediaReady(),
+        // Whether the night is advancing itself, so the host screen can say so.
+        autoCall: r.autoCall,
         // window for the square currently on screen (lip sync squares run longer)
         currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1]) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
@@ -1636,6 +1659,37 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { ok: true, event: eventPublic(db.prepare('SELECT * FROM lipsync_events WHERE id=?').get(ev.id), c.sub) });
     },
 
+    // Manual by default: the host calls each song. Flipping this on lets the
+    // play timer advance the night by itself — same songs, nobody tapping.
+    'POST /bingo/auto': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { on } = await readBody(req);
+      commit('bingo.auto', { on: !!on });
+      json(res, 200, { ok: true, autoCall: !!on, songSeconds: Math.round(BINGO_SONG_MS / 1000) });
+    },
+    // A player's own choice, per card: tap what you hear (default), or have
+    // the called squares covered for you. Lip sync squares are never filled
+    // in — those are still earned by performing.
+    'POST /bingo/autofill': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { on } = await readBody(req);
+      const mine = db.prepare('SELECT member_id FROM bingo_cards WHERE member_id=?').get(c.sub);
+      if (!mine) return json(res, 400, { error: 'join first' });
+      commit('bingo.autofill', { member_id: c.sub, on: !!on, at: Date.now() });
+      // Turning it on mid-round catches up on everything already played, or it
+      // would look broken until the next song lands.
+      if (on) {
+        const row = db.prepare('SELECT card, covered FROM bingo_cards WHERE member_id=?').get(c.sub);
+        const held = new Set(JSON.parse(row.card).filter((sq) => sq && sq.type !== 'lipsync' && !sq.free).map((sq) => sq.id));
+        const already = new Set(JSON.parse(row.covered));
+        for (const call of getBingoRound().calls) {
+          if (held.has(call.id) && !already.has(call.id)) {
+            commit('bingo.mark', { member_id: c.sub, item_id: call.id, covered: true, at: Date.now() });
+          }
+        }
+      }
+      json(res, 200, { ok: true, autofill: !!on });
+    },
     'POST /bingo/claim': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const r = getBingoRound();

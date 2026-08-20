@@ -330,6 +330,17 @@ export function openDb(path) {
   if (!pcols.includes('thirds')) db.exec(`ALTER TABLE player_stats ADD COLUMN thirds INTEGER NOT NULL DEFAULT 0`);
 
   const rcols = db.prepare(`PRAGMA table_info(bingo_round)`).all().map((c) => c.name);
+  // Both of these are opt-in, and both default to OFF, because the night runs
+  // manually by default: the host calls each song, and a player covers a
+  // square by tapping what they hear. Auto is a convenience the host and each
+  // player can switch on for themselves, not the house style.
+  if (!rcols.includes('auto_call')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN auto_call INTEGER NOT NULL DEFAULT 0`);
+  }
+  const ccols = db.prepare(`PRAGMA table_info(bingo_cards)`).all().map((c) => c.name);
+  if (!ccols.includes('autofill')) {
+    db.exec(`ALTER TABLE bingo_cards ADD COLUMN autofill INTEGER NOT NULL DEFAULT 0`);
+  }
   if (!rcols.includes('podium_ends_at')) {
     // A round no longer stops dead on one winner: the room gets a short sprint
     // to settle second and third.

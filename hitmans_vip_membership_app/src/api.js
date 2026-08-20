@@ -113,6 +113,8 @@ export function apiMemberFlags() { return call('GET', '/members/flags', null, ap
 // State is public (the TV Display runs unattended with no login) but carries
 // `me` when a member token is sent, so the player-facing screens can reuse it.
 export function apiBingoState() { return call('GET', '/bingo/state', null, apiToken() || apiStaffToken()); }
+export function apiBingoAuto(on) { return call('POST', '/bingo/auto', { on }, apiStaffToken()); }
+export function apiBingoAutofill(on) { return call('POST', '/bingo/autofill', { on }, apiToken()); }
 export function apiBingoJoin() { return call('POST', '/bingo/join', {}, apiToken()); }
 export function apiBingoReady(ready) { return call('POST', '/bingo/ready', { ready }, apiToken()); }
 export function apiBingoClaim() { return call('POST', '/bingo/claim', {}, apiToken()); }

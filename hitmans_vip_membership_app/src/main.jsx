@@ -20,6 +20,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiEventState, apiEventCreate, apiEventJoin, apiEventLeave, apiEventStart, apiEventNext,
   apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
+  apiBingoAuto, apiBingoAutofill,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -5084,6 +5085,20 @@ function PlayerCardScreen({ navigate }) {
               {me.hasPendingClaim ? 'Claim pending…' : 'Claim Bingo!'}
             </button>
           )}
+          {/* Tapping what you hear is the game, so it stays the default. This
+              is here for anyone who would rather watch the room than their
+              phone — it never fills a LIP SYNC square, because those are won
+              by performing. */}
+          <button type="button" className={`k-autofill${me.autofill ? ' is-on' : ''}`} disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try { await apiBingoAutofill(!me.autofill); setLocalCovered(null); await refresh(); }
+                    catch (e) { setMsg(e.message || 'Could not change that — try again.'); }
+                    setBusy(false);
+                  }}>
+            <span className="k-autofill-box" aria-hidden="true">{me.autofill ? '✓' : ''}</span>
+            {me.autofill ? 'Filling my card for me' : 'Fill my card for me'}
+          </button>
         </div>
       </AppPanel>
     </div>
@@ -5218,6 +5233,13 @@ function HostScreen() {
           )}
           <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
           <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
+          {/* The night is manual by default — the host decides when the next
+              song goes on. Auto hands that to the play timer for hosts who
+              would rather work the room than the phone. */}
+          <button type="button" className={`bingo-btn ghost${board?.autoCall ? ' ready' : ''}`} disabled={busy}
+                  onClick={() => act(() => apiBingoAuto(!board?.autoCall))}>
+            {board?.autoCall ? `✓ Auto-play is ON · every ${Math.round((board?.songMs || 60000) / 1000)}s` : 'Songs are manual · switch to auto'}
+          </button>
           {/* Deck and pattern live in Game Menu, which is one tap away. They
               were on both screens, and the copy here was the last thing
               pushing this console past the fold. */}
