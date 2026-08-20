@@ -585,12 +585,20 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   };
 
   // A standalone bout still needs a song to perform. Host can name one; other-
-  // wise take a lip-sync entry from whichever deck the venue is running.
-  const boutSong = (artist, song) => {
+  // wise take a lip-sync entry from whichever deck the venue is running —
+  // skipping anything already performed this event, because back-to-back bouts
+  // on the same song is the fastest way to make a bracket feel cheap.
+  const boutSong = (eventId, artist, song) => {
     if (artist && song) return { artist, song };
     const r = getBingoRound();
     const items = deckById(r?.deckId || DEFAULT_DECK_ID).items.filter((i) => i.type === 'lipsync');
-    const pick = items[Math.floor(Math.random() * items.length)];
+    const used = new Set(db.prepare('SELECT artist, song FROM lipsync_battles WHERE event_id=?').all(eventId)
+      .map((b) => `${b.artist}|${b.song}`));
+    const fresh = items.filter((i) => !used.has(`${i.artist}|${i.song}`));
+    // Once the deck is exhausted the night can keep going — repeats beat
+    // stopping — so fall back to the full list rather than to nothing.
+    const pool = fresh.length ? fresh : items;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     return pick ? { artist: pick.artist, song: pick.song } : { artist: null, song: null };
   };
 
@@ -610,12 +618,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // Open one bout of an event. Both names go in as 'invited' exactly like a
   // bingo battle, so a contender can still decline on their own phone.
   const openBout = (ev, pair, artist, song) => {
-    const slot = db.prepare('SELECT COUNT(*) n FROM lipsync_battles WHERE event_id=? AND round=?').get(ev.id, ev.round).n;
+    // A bracket groups several bouts into one round; king of the hill and the
+    // open floor are a single running sequence, so there each bout IS the
+    // round — otherwise every bout files under "Bout 1" forever.
+    const total = db.prepare('SELECT COUNT(*) n FROM lipsync_battles WHERE event_id=?').get(ev.id).n;
+    const round = ev.format === 'bracket' ? ev.round : total + 1;
+    const slot = db.prepare('SELECT COUNT(*) n FROM lipsync_battles WHERE event_id=? AND round=?').get(ev.id, round).n;
     const id = Date.now();
-    const s = boutSong(artist, song);
+    const s = boutSong(ev.id, artist, song);
     commit('battle.open', {
-      id, item_id: `event:${ev.id}:r${ev.round}:s${slot}`, artist: s.artist, song: s.song,
-      members: pair, status: 'pending', event_id: ev.id, round: ev.round, slot, at: Date.now(),
+      id, item_id: `event:${ev.id}:r${round}:s${slot}`, artist: s.artist, song: s.song,
+      members: pair, status: 'pending', event_id: ev.id, round, slot, at: Date.now(),
     });
     return id;
   };

@@ -5563,9 +5563,10 @@ function EventStandings({ ev, meId, onChallenge, busy }) {
               {out && <small> · out R{p.outRound}</small>}
             </span>
             <span className="ev-record">{p.wins}–{p.losses}{!knockout && <small> · {p.votes}</small>}</span>
-            {onChallenge && !out && p.memberId !== meId && (
+            {onChallenge && !out && p.memberId !== meId
+              && (ev.format !== 'king' || isKing) && (
               <button type="button" className="ev-challenge" disabled={busy} onClick={() => onChallenge(p.memberId)}>
-                Call out
+                {ev.format === 'king' ? 'Challenge' : 'Call out'}
               </button>
             )}
           </div>
@@ -5689,7 +5690,13 @@ function LipSyncBattleScreen({ isHost }) {
                 Open the lobby
               </button>
             </div>
-          ) : <p className="dash-empty">No battle running right now. The host opens the next one.</p>
+          ) : (
+            <p className="dash-empty">
+              {ev?.status === 'done'
+                ? 'That one is a wrap. The host opens the next battle when the floor is ready.'
+                : 'No battle running right now. The host opens the next one.'}
+            </p>
+          )
         ) : null}
 
         {/* Lobby: sign up, then the host starts it. */}

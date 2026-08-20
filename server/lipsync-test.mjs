@@ -87,6 +87,9 @@ ok(ev.roster.filter((p) => p.state === 'in').length === 1, 'exactly one player w
 ok(ev.roster.filter((p) => p.state === 'out').length === 3, 'the other three were knocked out');
 ok(ev.bouts.length === 3, 'a 4-player knockout took 3 bouts');
 ok(ev.roster.find((p) => p.memberId === ev.champion.memberId).wins === 2, 'champion won 2 bouts');
+// Two bouts on the same song in one bracket makes the night feel cheap.
+ok(new Set(ev.bouts.map((b) => `${b.artist}|${b.song}`)).size === ev.bouts.length,
+   'every bout drew a different song');
 
 console.log('\nBRACKET — odd field, so somebody takes a bye');
 await call('POST', '/lipsync/end', {}, host);
@@ -129,6 +132,8 @@ const challenger = byId[ids.find((i) => i !== king.id)];
 await runBout(ev.bout.id, king, [challenger]);
 ev = await state();
 ok(ev.king.memberId === king.id && ev.king.reign === 2, 'a successful defence extends the reign to 2');
+ok(new Set(ev.bouts.map((b) => b.round)).size === ev.bouts.length,
+   'king of the hill numbers each bout separately, not all as bout 1');
 
 await call('POST', '/lipsync/next', {}, host);
 ev = await state();
