@@ -5613,7 +5613,12 @@ function EventStandings({ ev, meId, onChallenge, busy }) {
         const isKing = ev.king?.memberId === p.memberId;
         return (
           <div key={p.memberId} className={`ev-row${out ? ' is-out' : ''}${isKing ? ' is-king' : ''}`}>
-            <span className="ev-rank">{knockout ? (p.seed ? `#${p.seed}` : '—') : i + 1}</span>
+            {/* The venue's placement plates are 259x93 — legible on the
+                champion banner, mush at rank-column size. So the leader is
+                marked in gold instead, and the plates stay where they read. */}
+            <span className={`ev-rank${!knockout && i === 0 && p.wins > 0 ? ' is-lead' : ''}`}>
+              {knockout ? (p.seed ? `#${p.seed}` : '—') : i + 1}
+            </span>
             <span className="ev-name">
               {isKing && <span className="ev-crown" aria-label="king">👑</span>}
               {p.name}{p.memberId === meId ? ' (you)' : ''}
@@ -5703,7 +5708,10 @@ function LipSyncBattleScreen({ isHost }) {
   return (
     <div className="staff-dash">
       {ev?.champion && ev.status === 'done' && (
-        <div className="bingo-winner-banner"><strong>🏆 {ev.champion.name} takes it!</strong></div>
+        <div className="ev-champion">
+          <img className="ev-champion-plate" src={ui.winner.first} alt="1st place" />
+          <strong>{ev.champion.name} takes it</strong>
+        </div>
       )}
 
       {/* The bout takes the screen while one is on the floor — same components
@@ -5711,12 +5719,19 @@ function LipSyncBattleScreen({ isHost }) {
           already knows. */}
       {ev?.bout && (
         <>
+          <div className="ev-onfloor">
+            <img src={ui.party.battleCard} alt="" aria-hidden="true" />
+            <span>{(ev.bout.players || []).map((p) => p.name).join('  vs  ')}</span>
+          </div>
           <LipSyncBattlePanel battle={ev.bout} meId={meId} onChanged={load} isHost={isHost} />
           <BattleChat battle={ev.bout} onChanged={load} />
         </>
       )}
 
       <AppPanel title={ev?.title || 'Lip Sync Battle'} subtitle={eventSubtitle(ev)}>
+        {/* The venue's own plate, not a typed heading — this screen is the one
+            the room looks at on the big screen. */}
+        <img className="ev-banner" src={ui.party.hypeMeter} alt="Battlerz Mode — lipsync, battle, dominate" />
         {err && <p className="roster-err">{err}</p>}
 
         {/* No event: the host opens one, everyone else waits. */}
@@ -5742,9 +5757,10 @@ function LipSyncBattleScreen({ isHost }) {
                   </select>
                 </label>
               )}
-              <button type="button" className="k-btn k-btn--go" disabled={busy}
+              <button type="button" className="ev-start" disabled={busy}
                       onClick={() => act(() => apiEventCreate(format, title.trim() || null, size))}>
-                Open the lobby
+                <img src={ui.party.startBattle} alt="Start battle — let the lip sync war begin!" />
+                <span className="ev-start-sub">{busy ? 'Opening…' : `Open the ${EVENT_FORMAT_NAME[format]} lobby`}</span>
               </button>
             </div>
           ) : (
