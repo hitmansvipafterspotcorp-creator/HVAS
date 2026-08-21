@@ -1082,7 +1082,7 @@ function useVenueHealing(failed) {
   return healing;
 }
 
-function ConnectFailedScreen({ url, onRetry, onDemo, onForget, stale }) {
+function ConnectFailedScreen({ url, onRetry, onForget, stale }) {
   let host = url;
   try { host = new URL(url).host; } catch { /* show the raw string */ }
   // Before telling anyone anything went wrong, try to find the venue again by
@@ -1118,10 +1118,21 @@ function ConnectFailedScreen({ url, onRetry, onDemo, onForget, stale }) {
         </p>
         <div className="door-actions">
           <button type="button" className="door-primary" onClick={onRetry}>Try again →</button>
-          {stale && onForget && (
-            <button type="button" className="door-secondary" onClick={onForget}>Forget this venue — I'll scan tonight's QR</button>
+          {/* There used to be a third button here: "Continue without connecting
+              (demo only)". It made this phone its own server — a private game
+              with nobody else in it — which is not what anybody standing at a
+              door that will not open is asking for. It read as a way in and was
+              a way out of the venue entirely.
+
+              Forgetting the venue is the honest version of the same escape: it
+              drops back to the door, where the room list, the QR and Solo vs CPU
+              all are. It is offered in both cases now, not only a stale one —
+              a venue that cannot be reached is a venue that cannot be reached. */}
+          {onForget && (
+            <button type="button" className="door-secondary" onClick={onForget}>
+              {stale ? "Forget this venue — I'll scan tonight's QR" : 'Back to the door'}
+            </button>
           )}
-          <button type="button" className="door-secondary" onClick={onDemo}>Continue without connecting (demo only — won't work at the door)</button>
         </div>
       </div>
     </section>
@@ -1342,13 +1353,6 @@ function App() {
           connectVenue(url)
             .then(() => window.location.reload())
             .catch(() => { setConnecting(false); setConnectError({ url }); });
-        }}
-        onDemo={() => {
-          window.history.replaceState(null, '', window.location.pathname);
-          // startHub() is async (awaits WebMesh init before flipping the
-          // localStorage flag hubOn() reads) — leave this screen only once
-          // it's actually done, so the very next render already sees it.
-          startHub().then(() => setConnectError(null));
         }}
       />
     );
@@ -1971,9 +1975,6 @@ function ConnectVenue() {
             </>
           )}
           {err && <p className="gate-err">{err}</p>}
-          <button type="button" className="venue-hub-btn" onClick={async () => { await startHub(); window.location.reload(); }}>
-            ✦ Be the venue hub (no server, this device)
-          </button>
         </div>
       ))}
     </div>

@@ -70,6 +70,11 @@ console.log('   [panel]',panel);
 ok(/hitmans vip after spot/i.test(panel),'the room is listed by name');
 ok(/join/i.test(panel),'with one tap to join it');
 ok(await addrBoxes()===0,'and no address box asking to be typed into');
+// "Be the venue hub" turned the phone into its own server — a private game with
+// nobody in it. On a member's door, next to the real room, it read as another
+// way in. It is not: it is a way out of the venue. The code still exists for a
+// future offline mode; it must not sit on the door.
+ok(!/venue hub|be the venue/i.test(panel),'and no offer to become a server instead of joining one');
 
 console.log('\nSCAN VENUE QR');
 ok(await tap('Scan venue QR'),'the scanner opens');
