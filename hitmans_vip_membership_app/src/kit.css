@@ -1168,3 +1168,31 @@
 @media (prefers-reduced-motion: reduce) {
   .rotate-gate-art { animation: none; transform: rotate(-90deg); }
 }
+
+/* ── Solo lip sync battles ───────────────────────────────────────────────
+   Solo runs the venue's rules: a LIP SYNC square is performed for, and passing
+   on it loses it for the round. A dead square has to read as dead or the
+   player keeps tapping it. */
+.k-tile--lost {
+  opacity: .34; filter: grayscale(.7);
+  border-style: dashed; cursor: default;
+}
+.k-tile--lost::after {
+  content: 'PASSED'; position: absolute; inset: auto 0 6px;
+  font: 900 7px/1 var(--k-font); letter-spacing: .12em; color: var(--k-danger);
+  text-align: center;
+}
+.solo-battle-line { margin: 0 0 8px; font: 700 12.5px/1.45 var(--k-font); color: var(--k-text); }
+.solo-battle-line b { color: var(--k-neon-lt); }
+
+/* Three dots while the room decides — a beat, so a verdict does not appear the
+   instant the recording stops. */
+.solo-judging { display: flex; gap: 7px; justify-content: center; padding: 14px 0; }
+.solo-judging i {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--k-violet);
+  animation: solo-judge 1.1s ease-in-out infinite;
+}
+.solo-judging i:nth-child(2) { animation-delay: .16s; }
+.solo-judging i:nth-child(3) { animation-delay: .32s; }
+@keyframes solo-judge { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .solo-judging i { animation: none; opacity: .7; } }

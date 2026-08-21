@@ -3236,7 +3236,7 @@ function SharePerformance({ blob, artist, song }) {
       <video className="share-preview" src={URL.createObjectURL(blob)} controls playsInline />
       <p className="share-title">🎬 Your take is ready</p>
       {canShareFile
-        ? <button type="button" className="bingo-btn gold" onClick={share}>Share to IG · TikTok · Snapchat · Shorts</button>
+        ? <button type="button" className="bingo-btn gold" onClick={share}>Share to TikTok · IG · FB · X · Snapchat</button>
         : <p className="mem-fineprint">Direct sharing isn't available on this browser — save it and post from your camera roll.</p>}
       <button type="button" className="bingo-btn ghost" onClick={save}>Save video</button>
       {msg && <p className="mem-fineprint">{msg}</p>}
@@ -3316,8 +3316,10 @@ function BattleStage({ battle, onDone, onTake }) {
       const cx = cv.getContext('2d');
       cx.translate(w, 0); cx.scale(-1, 1);          // un-mirror for viewers
       cx.drawImage(v, 0, 0, w, h);
+      if (battle.solo) return;      // nobody to cast to — solo plays on this phone alone
       try { await apiBattleFrame(battle.id, cv.toDataURL('image/jpeg', 0.5)); } catch { /* a dropped frame costs nothing */ }
     };
+    if (battle.solo) return;
     castRef.current = setInterval(send, 165);
   };
   const stopBroadcast = () => { clearInterval(castRef.current); castRef.current = null; };
@@ -3337,7 +3339,7 @@ function BattleStage({ battle, onDone, onTake }) {
       onTake?.(new Blob(chunksRef.current, { type: chunksRef.current[0]?.type || 'video/webm' }));
     }
     setRecording(false);
-    try { await apiBattlePerformed(battle.id); } catch { /* ignore */ }
+    if (!battle.solo) { try { await apiBattlePerformed(battle.id); } catch { /* ignore */ } }
     onDone?.();
   };
 
@@ -4053,9 +4055,11 @@ const SOLO_DECK = (() => {
 })();
 
 const CPU_PLAYERS = [
-  { name: 'Rell',  avatar: 'R', delay: [900, 2600] },
-  { name: 'Tasha', avatar: 'T', delay: [700, 2100] },
-  { name: 'Marcus', avatar: 'M', delay: [1100, 3000] },
+  // `skill` is how hard they are to beat in a lip sync battle, matched to how
+  // fast they are on the card — the regular who marks quickest also performs.
+  { name: 'Rell',  avatar: 'R', delay: [900, 2600], skill: 0.55 },
+  { name: 'Tasha', avatar: 'T', delay: [700, 2100], skill: 0.65 },
+  { name: 'Marcus', avatar: 'M', delay: [1100, 3000], skill: 0.45 },
 ];
 
 const shuffled = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -4092,6 +4096,102 @@ const soloHasPattern = (card, covered, pattern) => bingoHasPattern(soloCard(card
 // performance between calls, so the same pacing just reads as dead air on a
 // phone. ~2.2s keeps a round in the 60–90s arcade range.
 const SOLO_CALL_MS = 2200;
+// ── Solo lip sync battles ────────────────────────────────────────────────
+// Solo plays by the venue's rules, not an easier version of them: a LIP SYNC
+// square is never covered by tapping it. You perform it, or you pass and lose
+// it for the round — the same deterrent that makes the square mean something
+// in a real room.
+//
+// The differences are only the ones the format forces. There is no crowd, so
+// the vote is simulated. And you never watch the CPU perform — there is
+// nothing to watch — so their take is reported, not shown. What you get back
+// instead is your own recording, ready to post.
+const SOLO_JUDGE_MS = 2200;
+
+// Who takes it. Performing is most of the battle; the rest is the CPU's own
+// standard, so the regulars who are hard to beat on the card are hard to beat
+// on the floor too.
+function soloJudge(performed, cpu) {
+  if (!performed) return { you: 0, them: 1, won: false };
+  const you = 0.45 + Math.random() * 0.55;
+  const them = 0.30 + Math.random() * (cpu?.skill ?? 0.55);
+  return { you, them, won: you >= them };
+}
+
+function SoloBattle({ battle, cpu, onSettled }) {
+  const [stage, setStage] = useState('offer');     // offer | performing | judging | result
+  const [take, setTake] = useState(null);
+  const [verdict, setVerdict] = useState(null);
+
+  // The judging beat exists so a result does not appear the instant the
+  // recording stops — it should feel like the room deciding.
+  useEffect(() => {
+    if (stage !== 'judging') return undefined;
+    const t = setTimeout(() => {
+      const v = soloJudge(true, cpu);
+      setVerdict(v);
+      setStage('result');
+      playSfx(v.won ? 'win' : 'buzz');
+    }, SOLO_JUDGE_MS);
+    return () => clearTimeout(t);
+  }, [stage, cpu]);
+
+  const pass = () => {
+    playSfx('buzz');
+    onSettled({ performed: false, won: false, take: null });
+  };
+
+  if (stage === 'offer') {
+    return (
+      <AppPanel className="battle-panel" title="Lip Sync Battle" subtitle={`${battle.artist} — ${battle.song}`}>
+        <p className="solo-battle-line">
+          {cpu
+            ? <><b>{cpu.avatar} {cpu.name}</b> holds this square too. Perform it to take it.</>
+            : <>This one is a LIP SYNC square. Perform it to cover it.</>}
+        </p>
+        <p className="mem-fineprint">Pass and the square is gone for this round — same as the venue.</p>
+        <button type="button" className="k-btn k-btn--go" onClick={() => setStage('performing')}>🎤 Perform it</button>
+        <button type="button" className="bingo-btn ghost" onClick={pass}>Pass — give up the square</button>
+      </AppPanel>
+    );
+  }
+  if (stage === 'performing') {
+    return (
+      <BattleStage
+        battle={{ ...battle, solo: true }}
+        onTake={(blob) => setTake(blob)}
+        onDone={() => setStage('judging')}
+      />
+    );
+  }
+  if (stage === 'judging') {
+    return (
+      <AppPanel className="battle-panel" title="The room is deciding" subtitle={`${battle.artist} — ${battle.song}`}>
+        <p className="solo-battle-line">{cpu ? <>{cpu.avatar} {cpu.name} took their turn.</> : <>Scoring your take…</>}</p>
+        <div className="solo-judging" aria-hidden="true"><i /><i /><i /></div>
+      </AppPanel>
+    );
+  }
+  return (
+    <AppPanel className="battle-panel"
+              title={verdict?.won ? 'You took it' : 'They took it'}
+              subtitle={`${battle.artist} — ${battle.song}`}>
+      <p className="solo-battle-line">
+        {verdict?.won
+          ? <>The square is yours.{cpu ? <> {cpu.name} is locked out of it.</> : null}</>
+          : <>{cpu ? `${cpu.name} edged it.` : 'Not this time.'} The square stays uncovered.</>}
+      </p>
+      {/* The take is yours either way — losing a square in a game against a
+          phone is no reason to lose the video. */}
+      {take && <SharePerformance blob={take} artist={battle.artist} song={battle.song} />}
+      <button type="button" className="k-btn k-btn--go"
+              onClick={() => onSettled({ performed: true, won: !!verdict?.won, take })}>
+        Back to my card
+      </button>
+    </AppPanel>
+  );
+}
+
 function SoloBingoGame({ onExit }) {
   const [game, setGame] = useState(null);
   const timerRef = useRef(null);
@@ -4116,10 +4216,14 @@ function SoloBingoGame({ onExit }) {
     calledCount: 0,
     card: dealCard(SOLO_DECK),
     covered: new Set(),
+    // Squares passed on or lost in a battle. Locked for the round, exactly as
+    // a forfeited square is locked in the venue round.
+    lost: new Set(),
     cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(SOLO_DECK), covered: new Set() })),
     status: 'playing',
     winner: null,
   });
+  const [battle, setBattle] = useState(null);   // { item, cpu } while one is on
   const start = () => { clearTimers(); setGame(deal(1, 0)); };
   // Won the round but not the match — deal the next one at the harder pattern.
   const nextRound = () => {
@@ -4170,6 +4274,14 @@ function SoloBingoGame({ onExit }) {
     if (!game || game.status !== 'playing' || !item) return;
     const called = new Set(game.order.slice(0, game.calledCount).map((c) => c.id));
     if (!called.has(item.id)) return;                  // can only cover what's been called
+    if (game.lost?.has(item.id)) return;               // passed on, or lost on the floor
+    // A LIP SYNC square is performed for, never tapped — the same rule the
+    // venue round runs. Whoever else holds it contests it.
+    if (item.type === 'lipsync' && !game.covered.has(item.id)) {
+      const rival = game.cpus.find((c) => c.card.some((sq) => sq && sq.id === item.id) && !c.covered.has(item.id));
+      setBattle({ item, cpu: rival || null });
+      return;
+    }
     const covered = new Set(game.covered);
     const wasCovered = covered.has(item.id);
     wasCovered ? covered.delete(item.id) : covered.add(item.id);
@@ -4194,10 +4306,34 @@ function SoloBingoGame({ onExit }) {
   };
 
 
+  // A battle takes the whole screen, the way it does in the venue round.
+  if (battle) {
+    return (
+      <SoloBattle
+        battle={{ id: `solo-${battle.item.id}`, artist: battle.item.artist, song: battle.item.song }}
+        cpu={battle.cpu}
+        onSettled={({ won }) => {
+          const item = battle.item;
+          setBattle(null);
+          setGame((g) => {
+            if (!g || g.status !== 'playing') return g;
+            if (!won) return { ...g, lost: new Set([...(g.lost || []), item.id]) };
+            const covered = new Set([...g.covered, item.id]);
+            const takesIt = soloHasPattern(g.card, covered, g.pattern);
+            const done = g.round >= BINGO_FINAL_ROUND_CLIENT;
+            return takesIt
+              ? { ...g, covered, wins: g.wins + 1, status: done ? 'won' : 'roundWon', winner: 'you' }
+              : { ...g, covered };
+          });
+        }}
+      />
+    );
+  }
+
   if (!game) {
     return (
       <AppPanel title="Solo vs CPU" subtitle="Play a round on your own — no host, no wifi needed">
-        <p className="mem-fineprint">You against three regulars, over three rounds — a line, then two lines, then the whole card. Tap your squares as they're called, before they get there first.</p>
+        <p className="mem-fineprint">You against three regulars, over three rounds — a line, then two lines, then the whole card. Tap your squares as they're called, before they get there first. LIP SYNC squares you perform for, same as the venue — and the take is yours to post.</p>
         <div className="k-ladder">
           {[1, 2, 3].map((r) => (
             <span key={r} className="k-ladder-step">
@@ -4280,11 +4416,15 @@ function SoloBingoGame({ onExit }) {
             const isLip = !isFree && item.type === 'lipsync';
             const state3 = isFree ? 'free' : isCovered ? 'covered'
               : !over && soloOneAway.has(item.id) ? 'oneaway' : isCalled && !over ? 'called' : '';
-            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && 'k-tile--lipsync',
+            // A square passed on, or lost on the floor, is gone for the round.
+            // It has to look gone, or the player keeps tapping a dead tile.
+            const isLost = !isFree && game.lost?.has(item.id);
+            const cls = ['k-tile', state3 && `k-tile--${state3}`, isLip && !isCovered && !isLost && 'k-tile--lipsync',
+              isLost && 'k-tile--lost',
               !isFree && soloPop.id === item.id && 'k-tile--pop'].filter(Boolean).join(' ');
             const mark = isCovered && !isFree ? TILE_ART.covered : isCalled && !over ? TILE_ART.called : isLip ? TILE_ART.lipsync : null;
             return (
-              <button type="button" key={`${isFree ? 'free' : item.id}-${!isFree && soloPop.id === item.id ? soloPop.token : 0}`} className={cls} onClick={(e) => tap(item, e.currentTarget)} disabled={isFree || !isCalled || over}>
+              <button type="button" key={`${isFree ? 'free' : item.id}-${!isFree && soloPop.id === item.id ? soloPop.token : 0}`} className={cls} onClick={(e) => tap(item, e.currentTarget)} disabled={isFree || !isCalled || over || isLost}>
                 {isFree ? 'Free space' : (
                   <>
                     <span className="k-tile-artist">{item.artist}</span>
