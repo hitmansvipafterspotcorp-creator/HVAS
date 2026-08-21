@@ -1755,17 +1755,35 @@ function TeamAccessScreen({ onPick, onBack }) {
 function QrScan({ onDecode, onCancel }) {
   const videoRef = useRef(null); const rafRef = useRef(0); const streamRef = useRef(null);
   const [err, setErr] = useState('');
+  // The camera used to be mounted in `.qr-framed.lg`, which draws its size from
+  // a frame image this scanner never rendered — so the box collapsed to no
+  // height, and the video inside it was styled `opacity: 0` until a `.live`
+  // class that nothing here ever added. The stream really did open; there was
+  // simply nothing on screen, and no way to aim a phone at a QR you cannot see.
+  //
+  // This now uses the same square frame the door scanner uses, which works:
+  // the video fills it, `ready` flips it visible on the first real frame, and
+  // until then it says so instead of showing a black hole.
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     let live = true;
     (async () => {
-      if (!navigator.mediaDevices?.getUserMedia) { setErr('No camera — paste the address instead.'); return; }
+      if (!navigator.mediaDevices?.getUserMedia) { setErr('No camera on this device.'); return; }
+      // getUserMedia is blocked outright on an insecure origin, and the browser
+      // does not explain why. Over plain http on someone's phone that reads as
+      // "the camera is broken", so say what it actually is.
+      if (!window.isSecureContext) { setErr('The camera only works on a secure (https) connection.'); return; }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         if (!live) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream; const video = videoRef.current; video.srcObject = stream; await video.play();
+        streamRef.current = stream; const video = videoRef.current; video.srcObject = stream;
+        try { await video.play(); } catch { /* autoPlay covers the browsers that refuse a bare play() */ }
         const canvas = document.createElement('canvas');
         const tick = () => {
-          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          // videoWidth stays 0 until the first frame decodes; drawing before
+          // that gives jsQR a blank canvas forever.
+          if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth) {
+            if (live) setReady(true);
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
@@ -1774,13 +1792,32 @@ function QrScan({ onDecode, onCancel }) {
           rafRef.current = requestAnimationFrame(tick);
         };
         rafRef.current = requestAnimationFrame(tick);
-      } catch { setErr('Camera blocked — paste the address instead.'); }
+      } catch (e) {
+        setErr(e?.name === 'NotAllowedError'
+          ? 'Camera blocked — allow camera for this site in your browser settings, then try again.'
+          : 'Could not start the camera.');
+      }
     })();
     return () => { live = false; cancelAnimationFrame(rafRef.current); streamRef.current?.getTracks().forEach((t) => t.stop()); };
   }, []);
   return (
     <div className="qr-scan">
-      <div className="qr-framed lg"><video className="qr-code cam" ref={videoRef} playsInline muted /></div>
+      <div className="qr-scanframe sq">
+        <video className={`qr-cam${ready ? ' live' : ''}`} ref={videoRef} playsInline muted autoPlay />
+        {ready && (
+          <>
+            <div className="qr-scanline2" aria-hidden="true" />
+            <img className="qr-scan-logo-img" src={ui.fullLogoClear} alt="" aria-hidden="true" />
+          </>
+        )}
+        <span className="qr-br tl" aria-hidden="true" />
+        <span className="qr-br tr" aria-hidden="true" />
+        <span className="qr-br bl" aria-hidden="true" />
+        <span className="qr-br br" aria-hidden="true" />
+        {!ready && !err && <div className="qr-cam-off starting">Starting camera…</div>}
+        {err && <div className="qr-cam-off">Camera off</div>}
+      </div>
+      <span className="qr-align">★ ALIGN QR CODE HERE ★</span>
       {err ? <p className="gate-err">{err}</p> : <p className="venue-connect-note">Point at the venue's Join QR</p>}
       <button type="button" className="auth-back" onClick={onCancel}>← Back</button>
     </div>
@@ -1806,12 +1843,20 @@ function JoinQR({ url, label, onClose }) {
 // Rooms running right now, read from the directory the app serves from its own
 // permanent address. This is the part that replaces a domain: a member never
 // holds a link, they hold a room.
-function RoomList({ onJoin, busy }) {
+function RoomList({ onJoin, busy, onCount }) {
   const [rooms, setRooms] = useState(null);
-  useEffect(() => { let live = true; fetchRooms().then((r) => live && setRooms(r)); return () => { live = false; }; }, []);
+  // The door needs to know whether this found anything, so it can drop the
+  // manual address field on a normal night and bring it back on the one night
+  // the directory is unreachable.
+  useEffect(() => {
+    let live = true;
+    fetchRooms().then((r) => { if (!live) return; setRooms(r); onCount?.(r.length); })
+      .catch(() => { if (live) { setRooms([]); onCount?.(0); } });
+    return () => { live = false; };
+  }, [onCount]);
   if (rooms === null) return <p className="mem-fineprint">Looking for rooms…</p>;
   if (!rooms.length) {
-    return <p className="mem-fineprint">No rooms listed yet. Paste a venue address above, or scan the QR at the door.</p>;
+    return <p className="mem-fineprint">No rooms listed yet — scan the QR at the door, or enter the address below.</p>;
   }
   return (
     <div className="room-list">
@@ -1837,6 +1882,7 @@ function ConnectVenue() {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [roomCount, setRoomCount] = useState(null);   // null = still looking
   const connectTo = async (u) => {
     setBusy(true); setErr('');
     try { await connectVenue(u); window.location.reload(); }
@@ -1898,12 +1944,23 @@ function ConnectVenue() {
           {/* Rooms first, address second. Nobody should have to hold a URL to
               get into a room they have been to before. */}
           <p className="venue-connect-note">rooms playing now</p>
-          <RoomList onJoin={join} busy={busy} />
-          <p className="venue-connect-note">or enter the address</p>
-          <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setErr(''); }}
-            placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && connectTo(url)} />
+          <RoomList onJoin={join} busy={busy} onCount={setRoomCount} />
+          {/* Nobody should have to hold a URL. Tapping the room, or scanning the
+              QR at the door, covers every normal night — so the address box is
+              not sitting there asking to be typed into.
+
+              It stays for exactly one case: the directory came back with no
+              rooms in it. That is when a hand-typed address is the only way in,
+              and taking it away would strand somebody at the door. */}
+          {roomCount === 0 && (
+            <>
+              <p className="venue-connect-note">or enter the address</p>
+              <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setErr(''); }}
+                placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && connectTo(url)} />
+              <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={() => connectTo(url)}>{busy ? 'Connecting…' : 'Connect'}</button>
+            </>
+          )}
           {err && <p className="gate-err">{err}</p>}
-          <button type="button" className="venue-connect-go" disabled={!url.trim() || busy} onClick={() => connectTo(url)}>{busy ? 'Connecting…' : 'Connect'}</button>
           <button type="button" className="venue-hub-btn" onClick={async () => { await startHub(); window.location.reload(); }}>
             ✦ Be the venue hub (no server, this device)
           </button>

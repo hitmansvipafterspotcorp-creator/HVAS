@@ -9,6 +9,7 @@ app promises cannot be asserted from the server:
 | `lipsync-battle.mjs` | Standalone Lip Sync Battle: sign in, open the screen, join a lobby, watch a bout arrive. |
 | `offline.mjs` | The venue loses its internet: the laptop in the room keeps serving, and a member can still load the app from their phone's cache and reach the live round. |
 | `rooms.mjs` | The venue's permanent id, the room directory, and the one that matters: move a venue to a completely different address and the member's app reconnects itself with no failure screen and nothing to type. |
+| `door.mjs` | Getting into a room: a listed room is one tap and the address box stays out of the way, an empty directory brings it back, and "Scan venue QR" opens a camera you can actually see and aim. |
 | `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; sideways-play-only in both orientations; and play-along keeping the video frame sealed so its title cannot be read. |
 
 They are **not** in the deploy gate (`server/test-gate.mjs`) and must not be:
@@ -26,5 +27,12 @@ machine. On a box with Playwright installed that is usually somewhere under
 
 Why they earned their place: between them these caught a menu tile that
 navigated nowhere, a champion banner colliding with the venue crest, placement
-plates rendered as unreadable mush, and a service worker serving a stale bundle
-— none of which failed a build or a server test.
+plates rendered as unreadable mush, a service worker serving a stale bundle, a
+QR scanner whose camera was mounted invisible at zero height, and a hook
+declared below an early return that white-screened the entire app the moment a
+member opened Lip Sync Bingo without a venue — none of which failed a build or
+a server test.
+
+That last one now also has a source-level guard in the deploy gate
+(`server/render-safety-test.mjs`), because a white screen is too expensive to
+rely on someone remembering to run a browser suite.
