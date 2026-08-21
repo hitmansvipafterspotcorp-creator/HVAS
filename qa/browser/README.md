@@ -11,6 +11,7 @@ app promises cannot be asserted from the server:
 | `rooms.mjs` | The venue's permanent id, the room directory, and the one that matters: move a venue to a completely different address and the member's app reconnects itself with no failure screen and nothing to type. |
 | `door.mjs` | Getting into a room: a listed room is one tap and the address box stays out of the way, an empty directory brings it back, and "Scan venue QR" opens a camera you can actually see and aim. |
 | `solo-round.mjs` | A solo round end to end: the theme you pick is the deck you play, the card is sideways-only, the clock and the meters are live venue art, the round holds while you perform, the clip is cut to the venue's window and its length IS the performance length — and with no song, nothing gets called. |
+| `sweep.mjs` | Wide rather than deep: signs in with **no venue**, walks every screen and tab a member can reach by tapping, and after every tap asks the same two questions — is the app still mounted, and is any control on screen invisible or zero-sized? This is the net for the two shapes that keep reaching the venue. |
 | `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; sideways-play-only in both orientations; and play-along keeping the video frame sealed so its title cannot be read. |
 
 `fake-youtube.js` is not a suite — it is a stand-in for the YouTube IFrame API,
