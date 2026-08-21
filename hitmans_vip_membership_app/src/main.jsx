@@ -5212,8 +5212,22 @@ function VenueLobby({ navigate }) {
     );
   }
   const me = state?.me;
-  const join = async () => { setBusy(true); try { await apiBingoJoin(); await refresh(); } catch { /* ignore */ } setBusy(false); };
-  const toggleReady = async () => { setBusy(true); try { await apiBingoReady(!me?.ready); await refresh(); } catch { /* ignore */ } setBusy(false); };
+  // These used to swallow every error. A member tapped Join, nothing happened,
+  // and there was nothing on screen to explain why — in a loud room that reads
+  // as "the app is broken" and ends with them asking staff.
+  const [msg, setMsg] = useState('');
+  const join = async () => {
+    setBusy(true); setMsg('');
+    try { await apiBingoJoin(); await refresh(); }
+    catch (e) { setMsg(e.message === 'Failed to fetch' ? "Couldn't reach the venue — check you're on the venue wifi." : (e.message || 'Could not join — try again.')); }
+    setBusy(false);
+  };
+  const toggleReady = async () => {
+    setBusy(true); setMsg('');
+    try { await apiBingoReady(!me?.ready); await refresh(); }
+    catch (e) { setMsg(e.message === 'Failed to fetch' ? "Couldn't reach the venue — check you're on the venue wifi." : (e.message || 'Could not change that — try again.')); }
+    setBusy(false);
+  };
   return (
     <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
       <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
@@ -5225,6 +5239,7 @@ function VenueLobby({ navigate }) {
           <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>Go to My Card →</button>
         </>
       )}
+      {msg && <p className="gate-err">{msg}</p>}
       {state?.status === 'live' && <p className="mem-fineprint">The round is live — head to your card to play!</p>}
     </AppPanel>
   );
