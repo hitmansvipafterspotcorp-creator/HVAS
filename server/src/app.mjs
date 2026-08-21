@@ -369,6 +369,25 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return db.prepare(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`).run(k, v, Date.now());
   };
+  // ── The venue's permanent name on the network ──
+  // A tunnel address is disposable — quick tunnels mint a new one every run,
+  // and even a paid domain is one unpaid renewal from dead. What has to be
+  // permanent is the VENUE, not the URL it happens to be behind tonight.
+  //
+  // This id is generated once, lives in the venue's own database, and never
+  // changes. Members hold onto it instead of a link: when the address moves,
+  // the app looks the venue up again by id and reconnects itself. A saved
+  // room cannot rot the way a saved link does.
+  const venueId = () => {
+    let id = setting('venue_id');
+    if (!id) {
+      // Short, unambiguous, and readable down a phone line if it ever has to be.
+      id = 'v' + randomBytes(6).toString('hex');
+      putSetting('venue_id', id);
+    }
+    return id;
+  };
+
   // Swap the stored refresh token for a live access token. Google access
   // tokens last ~1h, so this runs per burst of calls rather than being cached
   // to disk where it would go stale mid-night.
@@ -983,6 +1002,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // (the backend) and every device picks it up — no per-device rebuild.
     'GET /config': (req, res) => json(res, 200, {
       venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
+      venueId: venueId(),   // permanent; the address is not
       paypalMe: process.env.PAYPAL_ME || process.env.VITE_PAYPAL_ME || '',
       zelle: process.env.HVAS_ZELLE || process.env.VITE_ZELLE_HANDLE || '',
       features: { social: true, pay: true, mesh: !!meshPort, youtube: !!youtubeKey(), hitkoin: hitkoinEnabled() },
@@ -1337,6 +1357,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // No auth required to read state — the TV Display screen runs unattended
     // at the venue with no login. When a member token IS present, `me` carries
     // their own card/ready/claim status so PlayerCard can use the same call.
+    // What this venue is, for the directory that lets people find it. Public
+    // and deliberately thin — a name, whether a round is on, how busy it is.
+    // No member data, because anyone on the internet can read this.
+    'GET /beacon': (req, res) => {
+      const r = getBingoRound();
+      const players = db.prepare('SELECT COUNT(*) n FROM bingo_cards').get().n;
+      const ev = db.prepare(`SELECT format, status FROM lipsync_events WHERE status!='done' ORDER BY id DESC LIMIT 1`).get();
+      json(res, 200, {
+        venueId: venueId(),
+        name: process.env.HVAS_VENUE_NAME || 'HITMANS VIP After Spot',
+        live: r.status === 'live' || r.status === 'podium',
+        round: r.status === 'live' ? r.roundNo : null,
+        players,
+        battle: ev ? { format: ev.format, status: ev.status } : null,
+        youtube: mediaReady(),
+        at: Date.now(),
+      });
+    },
     'GET /bingo/state': (req, res) => {
       const r = getBingoRound();
       const players = db.prepare('SELECT member_id, ready FROM bingo_cards').all();

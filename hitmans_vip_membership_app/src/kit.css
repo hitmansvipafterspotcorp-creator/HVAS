@@ -1274,3 +1274,23 @@
   border: 1px solid var(--k-edge-soft); background: none;
   font: 900 9px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase; color: var(--k-text-dim);
 }
+
+/* Rooms playing now, from the directory. A member picks a room, not a URL. */
+.room-list { display: grid; gap: 6px; margin: 6px 0 10px; }
+.room-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 9px 11px; border-radius: var(--k-r); cursor: pointer; text-align: left;
+  border: 1px solid var(--k-edge-soft); background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+  color: var(--k-text);
+}
+.room-row:disabled { opacity: .55; cursor: default; }
+.room-name { display: grid; min-width: 0; }
+.room-name strong {
+  font: 900 12px/1.2 var(--k-font); text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.room-name small { font: 700 9.5px/1.2 var(--k-font); color: var(--k-text-faint); }
+.room-go {
+  flex: 0 0 auto;
+  font: 900 9px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; color: var(--k-cyan-lt);
+}

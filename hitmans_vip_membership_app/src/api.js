@@ -33,11 +33,65 @@ export async function connectVenue(url) {
   }
   localStorage.setItem('hvas_api_base', base);
   localStorage.setItem('hvas_cfg', JSON.stringify(cfg));
+  // The id outlives the address — this is what makes a dead link recoverable.
+  if (cfg.venueId) localStorage.setItem('hvas_venue_id', cfg.venueId);
   return cfg;
 }
+
+// ── The room directory ───────────────────────────────────────────────────
+// A domain points a name at a machine, and dies the day it is not renewed or
+// the tunnel restarts. This is the stronger version of the same job: the venue
+// has a permanent id, the directory says where that id is reachable right now,
+// and the directory itself is served from the app's own address — which is
+// already permanent and costs nothing.
+//
+// The practical difference: a member who joined once never needs a link again.
+// When the address moves, the app looks the venue up by id and reconnects
+// itself. A saved room cannot rot the way a saved link does.
+const DIRECTORY_URL = (import.meta.env.BASE_URL || '/') + 'venues.json';
+
+export async function fetchRooms() {
+  try {
+    // Cache-busted: the whole point is that this file changes when a venue
+    // moves, and a stale copy would send everyone to a dead address.
+    const r = await fetch(`${DIRECTORY_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return Array.isArray(d?.venues) ? d.venues : [];
+  } catch { return []; }
+}
+
+/** Where this venue is reachable now, by its permanent id. */
+export async function findRoom(venueId) {
+  if (!venueId) return null;
+  return (await fetchRooms()).find((v) => v.venueId === venueId) || null;
+}
+
+export const savedVenueId = () => ls('hvas_venue_id');
+
+/** Reconnect a member whose saved address has gone stale, without asking them
+ *  for anything. Returns the new base if it worked. */
+export async function healVenue() {
+  const id = savedVenueId();
+  if (!id) return null;
+  const room = await findRoom(id);
+  if (!room?.url) return null;
+  const base = String(room.url).replace(/\/+$/, '');
+  if (base === apiBase()) return null;              // already there; something else is wrong
+  try {
+    const r = await fetch(base + '/config', { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const cfg = await r.json();
+    if (cfg.venueId && cfg.venueId !== id) return null;   // moved on to a different venue
+    localStorage.setItem('hvas_api_base', base);
+    localStorage.setItem('hvas_cfg', JSON.stringify(cfg));
+    return base;
+  } catch { return null; }
+}
+
 export const venueConfig = () => { try { return JSON.parse(ls('hvas_cfg') || '{}'); } catch { return {}; } };
 export function disconnectVenue() {
-  ['hvas_api_base', 'hvas_cfg', 'hvas_api_token', 'hvas_api_member_id'].forEach((k) => localStorage.removeItem(k));
+  ['hvas_api_base', 'hvas_cfg', 'hvas_api_token', 'hvas_api_member_id', 'hvas_venue_id'].forEach((k) => localStorage.removeItem(k));
 }
 
 async function call(method, path, body, token) {

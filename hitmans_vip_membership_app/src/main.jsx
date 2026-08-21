@@ -15,6 +15,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiSetOtw, apiSignalLeave, apiMyStats, apiLeaderboard,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
+  fetchRooms, healVenue, savedVenueId,
   apiMemberTimeline, apiMemberManage, apiMemberFlags,
   apiBattleCurrent, apiBattleMine, apiBattleRespond, apiBattlePick, apiBattleLock, apiBattlePerformed, apiBattleVote, apiBattleSay, apiBattleFrame, apiBattleWatch,
   apiBattleStage, apiBattlePerform, apiBattleVoting, apiBattleResolve, apiBattleTimer,
@@ -1052,9 +1053,43 @@ function ConnectingScreen() {
 // entirely rather than quietly landing in local demo mode: someone who
 // "joins" there gets a real-looking pass and QR that no door scan will ever
 // recognize, with nothing telling them it wasn't real until it's too late.
+// A saved address that stops answering is not a dead end any more: the venue
+// has a permanent id, so the app can look up where it moved to and reconnect
+// without asking the member for anything.
+function useVenueHealing(failed) {
+  const [healing, setHealing] = useState(false);
+  useEffect(() => {
+    if (!failed || !savedVenueId()) return undefined;
+    let live = true;
+    setHealing(true);
+    healVenue().then((base) => {
+      if (!live) return;
+      if (base) window.location.reload();          // found it — come back up on the new address
+      else setHealing(false);
+    });
+    return () => { live = false; };
+  }, [failed]);
+  return healing;
+}
+
 function ConnectFailedScreen({ url, onRetry, onDemo, onForget, stale }) {
   let host = url;
   try { host = new URL(url).host; } catch { /* show the raw string */ }
+  // Before telling anyone anything went wrong, try to find the venue again by
+  // its permanent id. Most of the time this reconnects and they never see this
+  // screen at all.
+  const healing = useVenueHealing(true);
+  if (healing) {
+    return (
+      <section className="screen screen-door">
+        <div className="door-wrap">
+          <span className="door-eyebrow">FINDING THE ROOM</span>
+          <h1 className="door-title">One second<span>looking for the venue</span></h1>
+          <p className="door-tag">The address moved. Checking where it went — you should not have to do anything.</p>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="screen screen-door">
       <div className="door-wrap">
@@ -1068,7 +1103,7 @@ function ConnectFailedScreen({ url, onRetry, onDemo, onForget, stale }) {
             is not theirs. */}
         <p className="door-tag">
           {stale
-            ? "This is the address you joined with last time, and the venue isn't answering on it any more. Venue addresses change whenever the venue restarts — scan tonight's join QR to get the current one."
+            ? "This is the address you joined with last time, and the venue isn't answering on it any more. We looked the venue up by name and it isn't listed as running right now either — try again when the room opens, or scan tonight's join QR."
             : "This usually means you're not on the same network as the venue — switch to the venue's wifi (not cellular data) and try again, or ask staff for the current link."}
         </p>
         <div className="door-actions">
@@ -1765,6 +1800,31 @@ function JoinQR({ url, label, onClose }) {
 // Connect this device to a venue backend at RUNTIME — scan its QR or paste the
 // URL. No rebuild. The venue's own device is the server (LAN, no cloud); this
 // just points the app at it and pulls its config (name, PayPal.me, Zelle).
+// Rooms running right now, read from the directory the app serves from its own
+// permanent address. This is the part that replaces a domain: a member never
+// holds a link, they hold a room.
+function RoomList({ onJoin, busy }) {
+  const [rooms, setRooms] = useState(null);
+  useEffect(() => { let live = true; fetchRooms().then((r) => live && setRooms(r)); return () => { live = false; }; }, []);
+  if (rooms === null) return <p className="mem-fineprint">Looking for rooms…</p>;
+  if (!rooms.length) {
+    return <p className="mem-fineprint">No rooms listed yet. Paste a venue address above, or scan the QR at the door.</p>;
+  }
+  return (
+    <div className="room-list">
+      {rooms.map((r) => (
+        <button type="button" key={r.venueId} className="room-row" disabled={busy} onClick={() => onJoin(r.url)}>
+          <span className="room-name">
+            <strong>{r.name}</strong>
+            {r.city && <small>{r.city}</small>}
+          </span>
+          <span className="room-go">Join →</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ConnectVenue() {
   const cfg = venueConfig();
   const connected = apiEnabled();
@@ -1780,6 +1840,7 @@ function ConnectVenue() {
     catch (e) { setErr(e.message || 'Could not connect'); setScan(false); } finally { setBusy(false); }
   };
   const base = apiBase();
+  const join = (u) => connectTo(u);
   if (hubOn()) {
     return (
       <div className="venue-connected">
@@ -1814,6 +1875,10 @@ function ConnectVenue() {
       ) : (
         <div className="venue-connect-form">
           <button type="button" className="venue-scan-btn" onClick={() => setScan(true)}>📷 Scan venue QR</button>
+          {/* Rooms first, address second. Nobody should have to hold a URL to
+              get into a room they have been to before. */}
+          <p className="venue-connect-note">rooms playing now</p>
+          <RoomList onJoin={join} busy={busy} />
           <p className="venue-connect-note">or enter the address</p>
           <input type="url" inputMode="url" value={url} onChange={(e) => { setUrl(e.target.value); setErr(''); }}
             placeholder="http://192.168.1.20:8787" onKeyDown={(e) => e.key === 'Enter' && connectTo(url)} />
