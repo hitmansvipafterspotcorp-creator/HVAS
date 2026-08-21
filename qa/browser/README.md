@@ -7,7 +7,7 @@ app promises cannot be asserted from the server:
 |---|---|
 | `solo.mjs` | Solo vs CPU: lip sync squares are performed for, passing forfeits them, a take comes back ready to post — and is kept on the phone, surviving a reload, listed in the Record tab with no venue at all. Runs with no backend. |
 | `lipsync-battle.mjs` | Standalone Lip Sync Battle: sign in, open the screen, join a lobby, watch a bout arrive. |
-| `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; and sideways-play-only in both orientations. |
+| `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; sideways-play-only in both orientations; and play-along keeping the video frame sealed so its title cannot be read. |
 
 They are **not** in the deploy gate (`server/test-gate.mjs`) and must not be:
 they need a Chromium binary at a path this venue's laptop does not have, so

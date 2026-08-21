@@ -5151,6 +5151,80 @@ function VenueLobby({ navigate }) {
 // actually taps it. Tapping is optimistic (instant local feedback) and
 // reconciled by the next poll, but the server is the one that ultimately
 // decides whether a claim is real — see bingoHasWin() on the backend.
+// ── Playing along from somewhere else ────────────────────────────────────
+// In the room you hear the song off the venue's speakers. From another city
+// there is nothing — the video only ever played on the TV, which made a round
+// unplayable for anyone not standing in the building.
+//
+// So the same clip can play on the member's own phone. Two rules make it the
+// same game rather than an easier one:
+//
+//  * You hear it, you never see it. The YouTube frame is covered — the title
+//    sits in that frame, and reading it would hand over the answer that the
+//    whole card is built on working out by ear.
+//  * It is off until asked for. A phone in the venue playing the song a
+//    half-second behind the room is worse than useless, and browsers block
+//    audio without a tap anyway.
+function PlayAlong({ nowPlaying }) {
+  const hostRef = useRef(null);
+  const playerRef = useRef(null);
+  const [on, setOn] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!on) return undefined;
+    let live = true;
+    loadYoutubeApi().then(() => {
+      if (!live || !hostRef.current || playerRef.current) return;
+      playerRef.current = new window.YT.Player(hostRef.current, {
+        width: '100%', height: '100%',
+        playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1 },
+        events: {
+          onReady: (e) => { if (live) { e.target.unMute?.(); e.target.setVolume?.(100); setReady(true); } },
+          onError: () => live && setErr('That one would not play here — the room still has it.'),
+        },
+      });
+    }).catch(() => live && setErr('Could not load the player.'));
+    return () => { live = false; };
+  }, [on]);
+
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!on || !ready || !p) return;
+    if (!nowPlaying?.videoId) { p.stopVideo?.(); return; }
+    const clip = nowPlaying.clip;
+    setErr('');
+    if (clip?.seconds) {
+      p.loadVideoById({ videoId: nowPlaying.videoId, startSeconds: clip.start || 0,
+                        endSeconds: (clip.start || 0) + clip.seconds });
+    } else {
+      p.loadVideoById(nowPlaying.videoId);
+    }
+  }, [on, ready, nowPlaying?.videoId, nowPlaying?.clip?.start, nowPlaying?.clip?.seconds]);
+
+  if (!on) {
+    return (
+      <button type="button" className="playalong-start" onClick={() => setOn(true)}>
+        🎧 Playing from somewhere else? Hear the song here
+      </button>
+    );
+  }
+  return (
+    <div className="playalong">
+      {/* The frame is deliberately covered rather than merely small: the title
+          is drawn inside it, and that is the answer. */}
+      <div className="playalong-frame" aria-hidden="true"><div ref={hostRef} /></div>
+      <div className="playalong-face">
+        <span className="playalong-eq" aria-hidden="true"><i /><i /><i /><i /></span>
+        <strong>{err ? 'Nothing playing' : nowPlaying?.videoId ? 'Playing in your ear' : 'Waiting for the next song'}</strong>
+        <small>{err || 'Do not look it up — find it on your card.'}</small>
+      </div>
+      <button type="button" className="playalong-off" onClick={() => setOn(false)}>Stop</button>
+    </div>
+  );
+}
+
 function PlayerCardScreen({ navigate }) {
   const { state, err, refresh } = useBingoState(2500);
   const [msg, setMsg] = useState('');
@@ -5404,6 +5478,8 @@ function PlayerCardScreen({ navigate }) {
               {me.hasPendingClaim ? 'Claim pending…' : 'Claim Bingo!'}
             </button>
           )}
+          {/* For anyone not in the room: the song, in their ear. */}
+          {state.status === 'live' && <PlayAlong nowPlaying={state.nowPlaying} />}
           {/* Tapping what you hear is the game, so it stays the default. This
               is here for anyone who would rather watch the room than their
               phone — it never fills a LIP SYNC square, because those are won

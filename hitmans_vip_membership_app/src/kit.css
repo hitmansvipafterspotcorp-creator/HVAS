@@ -1233,3 +1233,44 @@
 .take-tag--solo { border-color: var(--k-violet); color: var(--k-violet-lt); }
 .take-size { font: 700 9.5px/1 var(--k-font); color: var(--k-text-faint); font-variant-numeric: tabular-nums; }
 .take-body { padding: 0 10px 10px; display: grid; gap: 8px; }
+
+/* ── Play along from anywhere ────────────────────────────────────────────
+   The YouTube frame is present and playing but visually sealed: its title is
+   the answer to the square the player is meant to be working out by ear, so it
+   is covered rather than merely shrunk. Audio is unaffected. */
+.playalong-start {
+  display: block; width: 100%; margin-top: 8px; padding: 9px 10px;
+  border-radius: var(--k-r); cursor: pointer; text-align: left;
+  border: 1px solid var(--k-cyan); background: rgba(34, 211, 238, .08);
+  font: 700 11px/1.3 var(--k-font); letter-spacing: .04em; text-transform: uppercase; color: var(--k-cyan-lt);
+}
+.playalong {
+  position: relative; margin-top: 8px; padding: 10px; overflow: hidden;
+  border-radius: var(--k-r); border: 1px solid var(--k-cyan);
+  background: linear-gradient(180deg, var(--k-ink-2), var(--k-void));
+}
+.playalong-frame {
+  position: absolute; width: 2px; height: 2px; top: 0; left: 0;
+  opacity: .01; pointer-events: none; overflow: hidden;
+}
+.playalong-face { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.playalong-face strong {
+  font: 900 12px/1.2 var(--k-font); text-transform: uppercase; color: var(--k-cyan-lt);
+}
+.playalong-face small { font: 700 10px/1.35 var(--k-font); color: var(--k-text-dim); }
+.playalong-eq { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+.playalong-eq i {
+  width: 4px; border-radius: 2px; background: var(--k-cyan);
+  animation: playalong-bars .9s ease-in-out infinite;
+}
+.playalong-eq i:nth-child(1) { height: 40%; animation-delay: 0s; }
+.playalong-eq i:nth-child(2) { height: 90%; animation-delay: .12s; }
+.playalong-eq i:nth-child(3) { height: 60%; animation-delay: .24s; }
+.playalong-eq i:nth-child(4) { height: 100%; animation-delay: .36s; }
+@keyframes playalong-bars { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .playalong-eq i { animation: none; } }
+.playalong-off {
+  width: 100%; margin-top: 8px; padding: 6px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--k-edge-soft); background: none;
+  font: 900 9px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase; color: var(--k-text-dim);
+}

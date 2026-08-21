@@ -83,6 +83,27 @@ await rotate(430,932);                     // and back
 await settle(1600);
 ok(/turn your phone sideways/i.test(await text()), 'turning back upright asks again rather than half-rendering');
 
+console.log('\nPLAY ALONG FROM ANYWHERE');
+await rotate(932,430);                     // play is sideways
+await settle(1600);
+const t2 = await text();
+ok(/hear the song here|playing from somewhere else/i.test(t2), 'the card offers to play the song on your own phone');
+await tap('Hear the song here'); await settle(2000);
+const sealed = await js(`
+  const f = document.querySelector('.playalong-frame');
+  if (!f) return 'no frame';
+  const cs = getComputedStyle(f); const r = f.getBoundingClientRect();
+  return { opacity: Number(cs.opacity), w: Math.round(r.width), h: Math.round(r.height), events: cs.pointerEvents };`);
+ok(sealed && sealed !== 'no frame', 'switching it on mounts a player');
+if (sealed && sealed !== 'no frame') {
+  ok(sealed.opacity <= 0.05 && sealed.w <= 4 && sealed.h <= 4,
+     `the video frame is sealed so its title cannot be read (${sealed.w}x${sealed.h}px, opacity ${sealed.opacity})`);
+  ok(sealed.events === 'none', 'and cannot be tapped open to reveal it');
+}
+const face = await text();
+ok(/in your ear|waiting for the next song/i.test(face), 'it says plainly that it is playing');
+ok(/find it on your card/i.test(face), 'and reminds you the point is still to work it out by ear');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 ws.close();chrome.kill();server.close();web.close();
 process.exit(fail?1:0);
