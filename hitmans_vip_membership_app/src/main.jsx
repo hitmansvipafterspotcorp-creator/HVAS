@@ -1351,13 +1351,11 @@ function App() {
         <span className="dynamic-bg-layer dynamic-bg-vip" />
       </div>
       <TransitionOverlay transition={transition} destination={targetScreen} />
-      {hubOn() && (
-        <div className="demo-mode-banner">
-          🧪 DEMO MODE — not connected to a real venue. Anything you do here (join, pay, get a QR)
-          stays on this device only and won't work at a real door. Connect to venue at the bottom
-          of the sign-in screen to go live.
-        </div>
-      )}
+      {/* There was a full-width DEMO MODE banner here. It said the same thing
+          the door's own hub line already says — "this device is the venue hub,
+          Stop hosting" — only louder, in warning yellow, above everything else
+          on the screen. Hosting locally is a real feature somebody chose, not a
+          fault to be warned about, and the quiet indicator is enough. */}
       {!role ? (
         gate === 'member' ? (
           <MemberAuthScreen onBack={() => setGate(null)} onDone={() => enterMember()} />
