@@ -1936,7 +1936,7 @@ function MemberAuthScreen({ onBack, onDone }) {
     setBusy(true); setErr('');
     try {
       const r = await memberOtpStart(contact.trim());
-      setDevCode(r.devCode || '');               // demo backends echo the code
+      setDevCode(r.devCode || '');               // set when the venue echoes the code instead of sending it
       setStage('code');
     } catch (e) { setErr('Could not send a code — check the connection.'); }
     finally { setBusy(false); }
@@ -1966,12 +1966,15 @@ function MemberAuthScreen({ onBack, onDone }) {
               </button>
               <p className="auth-fine">{backend
                 ? 'We’ll send a one-time code to confirm it’s you, then create your member account.'
-                : 'New here? This creates your member account. Demo mode — no code is sent.'}</p>
+                : 'New here? This creates your member account on this phone — no code needed.'}</p>
             </>
           ) : (
             <>
               <label>6-digit code<input type="text" inputMode="numeric" value={code} onChange={(e) => { setCode(e.target.value); setErr(''); }} placeholder="000000" autoComplete="one-time-code" onKeyDown={(e) => e.key === 'Enter' && verify()} /></label>
-              {devCode && <p className="auth-fine">Demo code: <code>{devCode}</code> (a real build sends this by SMS/email).</p>}
+              {/* The venue can be configured to echo the code back instead of paying
+                  for SMS. When it does, show it plainly — a member staring at an
+                  empty code box with nothing arriving is stuck at the door. */}
+              {devCode && <p className="auth-fine">Your code: <code>{devCode}</code></p>}
               {err && <p className="gate-err">{err}</p>}
               <button type="button" className="auth-continue" disabled={code.trim().length < 4 || busy} onClick={verify}>
                 {busy ? 'Verifying…' : 'Verify →'}
@@ -5223,6 +5226,19 @@ function PlayerRecord() {
 function VenueLobby({ navigate }) {
   const { state, err, refresh } = useBingoState(3000);
   const [busy, setBusy] = useState(false);
+  // These used to swallow every error. A member tapped Join, nothing happened,
+  // and there was nothing on screen to explain why — in a loud room that reads
+  // as "the app is broken" and ends with them asking staff.
+  //
+  // It has to be declared HERE, above the not-connected return. Every hook this
+  // component calls must run on every render: the first render happens before
+  // the venue poll has answered, so err is null and all three run; the moment
+  // the poll comes back 'not-connected' the early return below fires and this
+  // one does not. React counts hooks, sees three become two, and throws — which
+  // white-screens the whole app, taking the tab bar and Solo down with it. The
+  // one screen a member opens when the venue is unreachable was the one screen
+  // that could not survive the venue being unreachable.
+  const [msg, setMsg] = useState('');
   if (err === 'not-connected') {
     return (
       <AppPanel title="Venue Round" subtitle="Not connected to a venue">
@@ -5232,10 +5248,6 @@ function VenueLobby({ navigate }) {
     );
   }
   const me = state?.me;
-  // These used to swallow every error. A member tapped Join, nothing happened,
-  // and there was nothing on screen to explain why — in a loud room that reads
-  // as "the app is broken" and ends with them asking staff.
-  const [msg, setMsg] = useState('');
   const join = async () => {
     setBusy(true); setMsg('');
     try { await apiBingoJoin(); await refresh(); }
