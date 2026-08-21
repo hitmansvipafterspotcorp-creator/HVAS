@@ -74,16 +74,27 @@ function openBrowser(url) {
 // says so: "it may take some time to be reachable") — opening the browser
 // immediately raced that gap and landed on the app's "can't reach" screen.
 // Poll the real URL until it actually answers before opening anything.
-async function waitUntilReachable(url, timeoutMs = 25000) {
+// Two completely different things can leave the public link silent, and they
+// need opposite responses: the backend is not running (open the server window),
+// or the tunnel has not finished routing yet (wait). Check both so the message
+// at the end can say which — the old one just said the network was unsettled,
+// which sends somebody to fiddle with their wifi when their server is down.
+async function waitUntilReachable(url, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
+  let local = false, lastPublic = '';
   while (Date.now() < deadline) {
     try {
-      const r = await fetch(`${url}/config`, { signal: AbortSignal.timeout(3000) });
-      if (r.ok) return true;
-    } catch { /* not ready yet — keep trying */ }
-    await new Promise((res) => setTimeout(res, 1000));
+      const r = await fetch(`http://localhost:${PORT}/config`, { signal: AbortSignal.timeout(2500) });
+      local = r.ok;
+    } catch { local = false; }
+    try {
+      const r = await fetch(`${url}/config`, { signal: AbortSignal.timeout(4000) });
+      if (r.ok) return { ok: true };
+      lastPublic = `answered ${r.status}`;          // 502 = tunnel up, nothing behind it yet
+    } catch (e) { lastPublic = e.name === 'TimeoutError' ? 'timed out' : 'no answer'; }
+    await new Promise((res) => setTimeout(res, 1500));
   }
-  return false;
+  return { ok: false, local, lastPublic };
 }
 
 let found = false;
@@ -101,10 +112,21 @@ const announce = (url, permanent) => {
   console.log('==================================================\n');
   console.log('Confirming the tunnel is actually reachable before opening the app...');
   waitUntilReachable(url).then((ready) => {
-    if (!ready) {
-      console.log('\nStill not answering after 25s. The link above is real and may just need');
-      console.log('more time — open it manually, or run this again once the venue wifi/network');
-      console.log('settles down.\n');
+    if (!ready.ok) {
+      console.log('\n--------------------------------------------------');
+      if (!ready.local) {
+        console.log('  THE SERVER IS NOT ANSWERING');
+        console.log(`  Nothing is running on http://localhost:${PORT}, so the tunnel has`);
+        console.log('  nothing to point at. Check the OTHER window (HVAS Server) —');
+        console.log('  it may have closed or failed to start. Start it, then run this again.');
+      } else {
+        console.log('  THE SERVER IS FINE — THE LINK IS STILL ROUTING');
+        console.log(`  http://localhost:${PORT} is answering, so the venue itself is up.`);
+        console.log(`  The public link ${ready.lastPublic} for the last minute; quick tunnels`);
+        console.log('  sometimes take a while to propagate. The link above is real —');
+        console.log('  try opening it in a browser. If it works, you are live.');
+      }
+      console.log('--------------------------------------------------\n');
       return;
     }
     console.log('Confirmed reachable. Opening the app now, already connected to this venue...');
