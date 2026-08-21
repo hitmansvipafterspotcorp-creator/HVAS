@@ -6,7 +6,13 @@
 // QR / pasted URL) wins, else the build-time env. This lets the same deployed
 // static site connect to any backend with no rebuild.
 const ls = (k) => (typeof localStorage !== 'undefined' && localStorage.getItem(k)) || '';
-export const apiBase = () => (ls('hvas_api_base') || import.meta.env.VITE_HVAS_API || '').replace(/\/+$/, '');
+// When the venue itself is serving this app (a phone on the venue wifi opening
+// http://192.168.1.20:8787), that venue IS the backend — the server injects a
+// marker saying so. Nobody should have to type an address to play in the room
+// they are standing in. A venue the member chose explicitly still wins, so
+// connecting to somewhere else from a venue-served page keeps working.
+const servedByVenue = () => (typeof window !== 'undefined' && window.__HVAS_VENUE__) || '';
+export const apiBase = () => (ls('hvas_api_base') || servedByVenue() || import.meta.env.VITE_HVAS_API || '').replace(/\/+$/, '');
 export const apiEnabled = () => !!apiBase();
 
 export const apiToken = () => ls('hvas_api_token');

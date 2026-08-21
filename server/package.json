@@ -30,6 +30,7 @@
     "test:modes": "node bingo-modes-test.mjs",
     "test:clip": "node clip-timer-test.mjs",
     "test:hook": "node hook-test.mjs",
-    "test:stream": "node stream-test.mjs"
+    "test:stream": "node stream-test.mjs",
+    "test:localapp": "node local-app-test.mjs"
   }
 }

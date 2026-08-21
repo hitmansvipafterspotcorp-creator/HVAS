@@ -7,6 +7,9 @@
 // The door verifies rolling Ed25519 passes (see crypto.mjs) and logs one
 // admission per 3AM night. A live board streams over SSE.
 import { createServer } from 'node:http';
+import { readFileSync, existsSync, statSync } from 'node:fs';
+import { resolve as pathResolve, join as pathJoin, normalize as pathNormalize, extname, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
 import {
@@ -261,6 +264,60 @@ const readRaw = (req) => new Promise((resolve) => {
   let d = ''; req.on('data', (c) => { d += c; if (d.length > 1e6) req.destroy(); });
   req.on('end', () => resolve(d));
 });
+
+// ── Serving the app itself ───────────────────────────────────────────────
+// A phone on the venue wifi can talk to this laptop directly — no tunnel, no
+// Cloudflare, no internet. What stopped that was where the app came from: a
+// page served over HTTPS from the public web is not allowed to call an
+// insecure http://192.168.x.x address, so the browser blocked every request
+// and a tunnel became mandatory just to stand in the room.
+//
+// Serving the app from here removes the mismatch. Phone opens
+// http://192.168.1.20:8787, gets the app AND the backend from one origin, and
+// the whole night runs on a laptop and a router.
+//
+// Nothing is required: with no app folder present this does nothing at all and
+// the venue behaves exactly as before, serving only its API.
+const APP_DIR = process.env.HVAS_APP_DIR
+  || pathResolve(dirname(fileURLToPath(import.meta.url)), '..', 'app');
+const APP_BASE = '/HVAS/';                    // the built app references this path
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff',
+  '.mp4': 'video/mp4', '.webm': 'video/webm',
+};
+const appAvailable = () => existsSync(pathJoin(APP_DIR, 'index.html'));
+
+// Tell the app it is being served BY a venue, so it connects to that venue
+// without anyone typing an address or scanning anything. Injected rather than
+// built in, because the same built files are also served from the public web
+// where this must not apply.
+const markVenue = (html) => html.replace('<head>',
+  '<head><script>window.__HVAS_VENUE__=location.origin;</script>');
+
+const serveApp = (req, res, pathname) => {
+  let rel = pathname.slice(APP_BASE.length);
+  if (!rel || rel.endsWith('/')) rel = 'index.html';
+  // Contain it: a request may not climb out of the app folder.
+  const full = pathJoin(APP_DIR, pathNormalize(rel).replace(/^([.][.][/\\])+/, ''));
+  if (!full.startsWith(APP_DIR)) { res.writeHead(403).end('no'); return true; }
+  let file = full;
+  if (!existsSync(file) || !statSync(file).isFile()) file = pathJoin(APP_DIR, 'index.html');  // SPA routes
+  try {
+    const isHtml = extname(file) === '.html';
+    const body = isHtml ? markVenue(readFileSync(file, 'utf8')) : readFileSync(file);
+    res.writeHead(200, {
+      'Content-Type': MIME[extname(file)] || 'application/octet-stream',
+      // The venue is the source of truth for its own copy; never let a phone
+      // hold a stale build of a room it is standing in.
+      'Cache-Control': isHtml ? 'no-cache' : 'public, max-age=86400',
+    });
+    res.end(body);
+  } catch { res.writeHead(500).end('app read failed'); }
+  return true;
+};
 
 export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('hex')}`, meshPort = null, peers = [] } = {}) {
   const db = openDb(`${dataDir}/hvas.db`);
@@ -2131,7 +2188,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     if (req.method === 'OPTIONS') return json(res, 204, {});
     const url = new URL(req.url, 'http://x');
     const handler = routes[`${req.method} ${url.pathname}`];
-    if (!handler) return json(res, 404, { error: 'not found' });
+    if (!handler) {
+      // Not an API route — it may be the app, if this venue is serving one.
+      if (req.method === 'GET' && appAvailable()) {
+        if (url.pathname === '/' || url.pathname === '/HVAS') {
+          res.writeHead(302, { Location: APP_BASE });
+          return res.end();
+        }
+        if (url.pathname.startsWith(APP_BASE)) return serveApp(req, res, url.pathname);
+      }
+      return json(res, 404, { error: 'not found' });
+    }
     try { await handler(req, res); } catch (e) { json(res, 500, { error: String(e.message || e) }); }
   });
 
