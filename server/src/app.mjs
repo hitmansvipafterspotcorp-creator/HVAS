@@ -565,6 +565,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   };
   // Votes per performer, highest first — drives both the live meter and the
   // automatic winner when the host closes voting.
+  // Who is currently looking at a battle's stream. A watcher counts for a few
+  // seconds after their last poll, so a phone that locks or a TV that closes
+  // stops being counted on its own without anything to clean up.
+  const battleWatchers = new Map();          // battleId -> Map(viewer -> lastSeen)
+  const WATCHER_TTL = 6000;
+  const noteWatcher = (battleId, viewer) => {
+    const key = String(battleId);
+    if (!battleWatchers.has(key)) battleWatchers.set(key, new Map());
+    battleWatchers.get(key).set(viewer, Date.now());
+  };
+  const watcherCount = (battleId) => {
+    const m = battleWatchers.get(String(battleId));
+    if (!m) return 0;
+    const cut = Date.now() - WATCHER_TTL;
+    for (const [v, t] of m) if (t < cut) m.delete(v);
+    return m.size;
+  };
+
   // Latest live frame per battle. In-memory and intentionally unbounded-free:
   // one small entry per battle, cleared when the battle resolves.
   const battleFrames = new Map();
@@ -1690,11 +1708,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (b.performing_member_id !== c.sub) return json(res, 403, { error: 'you are not performing' });
       if (typeof frame !== 'string' || frame.length > 400000) return json(res, 400, { error: 'bad frame' });
       battleFrames.set(String(battleId), { frame, at: Date.now(), by: c.sub });
-      json(res, 200, { ok: true });
+      // Tell the performer's phone how many screens are actually watching, so
+      // it can stop paying to cast into an empty room. Over a venue LAN that
+      // was free; over the internet every frame is somebody's mobile data and
+      // the venue's own upload.
+      json(res, 200, { ok: true, watchers: watcherCount(battleId) });
     },
     'GET /battle/frame': (req, res) => {
       const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
       const id = new URL(req.url, 'http://x').searchParams.get('battleId');
+      noteWatcher(id, c.sub || c.role || 'screen');
       const f = battleFrames.get(String(id));
       // Treat a stale frame as "no stream" so a frozen image never masquerades
       // as a live performance after the performer's phone drops off.

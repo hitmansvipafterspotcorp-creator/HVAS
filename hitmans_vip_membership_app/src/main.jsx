@@ -3207,7 +3207,7 @@ function BattleWatch({ battleId, label }) {
       catch { if (on) setLive(false); }
     };
     tick();
-    const id = setInterval(tick, 180);
+    const id = setInterval(tick, 450);
     return () => { on = false; clearInterval(id); };
   }, [battleId]);
   if (!live || !frame) return null;
@@ -3317,6 +3317,7 @@ function BattleStage({ battle, onDone, onTake }) {
   const recRef = useRef(null);
   const chunksRef = useRef([]);
   const castRef = useRef(null);
+  const watchersRef = useRef(1);           // assume someone is there until told otherwise
   const [stream, setStream] = useState(null);
   const [recording, setRecording] = useState(false);
   const [err, setErr] = useState('');
@@ -3377,18 +3378,36 @@ function BattleStage({ battle, onDone, onTake }) {
     const send = async () => {
       const v = videoRef.current;
       if (!v || !v.videoWidth) return;
-      const w = 320, h = Math.round((v.videoHeight / v.videoWidth) * w);
+      // 240px, not 320: this used to be a LAN-only feature where frames were
+      // free. Over the internet a 320px frame at 6fps is ~24MB of somebody's
+      // mobile data per performance and ~50Mbps of venue upload for a crowd of
+      // twenty. At 240 and a slower cadence that is roughly a fifth.
+      const w = 240, h = Math.round((v.videoHeight / v.videoWidth) * w);
       cv.width = w; cv.height = h;
       const cx = cv.getContext('2d');
       cx.translate(w, 0); cx.scale(-1, 1);          // un-mirror for viewers
       cx.drawImage(v, 0, 0, w, h);
       if (battle.solo) return;      // nobody to cast to — solo plays on this phone alone
-      try { await apiBattleFrame(battle.id, cv.toDataURL('image/jpeg', 0.5)); } catch { /* a dropped frame costs nothing */ }
+      try {
+        const r = await apiBattleFrame(battle.id, cv.toDataURL('image/jpeg', 0.4));
+        // Nobody watching means the TV is off and every phone is looking at
+        // something else — drop to a heartbeat rather than shouting into a
+        // room that left.
+        watchersRef.current = Number(r?.watchers ?? 1);
+      } catch { /* a dropped frame costs nothing */ }
     };
     if (battle.solo) return;
-    castRef.current = setInterval(send, 165);
+    // Self-pacing instead of a fixed interval: full rate while people are
+    // watching, a slow heartbeat when nobody is, so the stream can come back
+    // the moment a screen opens.
+    const tick = async () => {
+      await send();
+      const gap = watchersRef.current > 0 ? 400 : 2000;
+      castRef.current = setTimeout(tick, gap);
+    };
+    tick();
   };
-  const stopBroadcast = () => { clearInterval(castRef.current); castRef.current = null; };
+  const stopBroadcast = () => { clearTimeout(castRef.current); castRef.current = null; };
 
   const stop = async () => {
     stopBroadcast();
