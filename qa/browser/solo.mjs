@@ -29,6 +29,15 @@ const js=async e=>{const r=await cdp('Runtime.evaluate',{expression:`(()=>{${e}}
   if(r.result?.exceptionDetails)return{__err:String(r.result.exceptionDetails.text).slice(0,160)};return r.result?.result?.value;};
 const jsA=async e=>{const r=await cdp('Runtime.evaluate',{expression:`(async()=>{${e}})()`,returnByValue:true,awaitPromise:true});return r.result?.result?.value;};
 const settle=ms=>new Promise(r=>setTimeout(r,ms));
+// Solo will not call a square without a song playing — "no YouTube, no game" is
+// the rule, not a bug. So the suite supplies the player rather than reaching out
+// to youtube.com, which would make every run depend on a third party's uptime
+// and a search result that changes. See qa/browser/fake-youtube.js.
+await cdp('Page.enable');
+const FAKE_YT = await readFile(new URL('./fake-youtube.js', import.meta.url), 'utf8');
+const fakeYouTube = (cfg) => cdp('Page.addScriptToEvaluateOnNewDocument',
+  { source: `window.__FAKE_YT=${JSON.stringify(cfg||{})};\n${FAKE_YT}` });
+await fakeYouTube({ duration: 210 });
 const text=async()=>(await js('return document.body?document.body.innerText:""'))||'';
 const tap=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const el=[...document.querySelectorAll('button')].find(b=>(b.innerText||'').toLowerCase().includes(t)&&!b.disabled&&b.offsetParent);if(!el)return false;el.click();return true;`);
 const tapAny=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const hit=s=>[...document.querySelectorAll(s)].find(b=>(b.innerText||'').toLowerCase().includes(t)&&b.offsetParent&&(b.innerText||'').length<220);const el=hit('button')||hit('a,[role="button"]')||hit('li,article,div');if(!el)return false;el.click();return true;`);

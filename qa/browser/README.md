@@ -10,7 +10,14 @@ app promises cannot be asserted from the server:
 | `offline.mjs` | The venue loses its internet: the laptop in the room keeps serving, and a member can still load the app from their phone's cache and reach the live round. |
 | `rooms.mjs` | The venue's permanent id, the room directory, and the one that matters: move a venue to a completely different address and the member's app reconnects itself with no failure screen and nothing to type. |
 | `door.mjs` | Getting into a room: a listed room is one tap and the address box stays out of the way, an empty directory brings it back, and "Scan venue QR" opens a camera you can actually see and aim. |
+| `solo-round.mjs` | A solo round end to end: the theme you pick is the deck you play, the card is sideways-only, the clock and the meters are live venue art, the round holds while you perform, the clip is cut to the venue's window and its length IS the performance length — and with no song, nothing gets called. |
 | `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; sideways-play-only in both orientations; and play-along keeping the video frame sealed so its title cannot be read. |
+
+`fake-youtube.js` is not a suite — it is a stand-in for the YouTube IFrame API,
+injected before the app boots by the suites that need one. Solo will not call a
+square without a song playing, so those suites have to supply the player: going
+to youtube.com for real would make every run depend on a third party's uptime,
+on a search result that changes, and on a network the runner may not have.
 
 They are **not** in the deploy gate (`server/test-gate.mjs`) and must not be:
 they need a Chromium binary at a path this venue's laptop does not have, so

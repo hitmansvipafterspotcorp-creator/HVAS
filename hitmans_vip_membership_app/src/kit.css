@@ -1294,3 +1294,142 @@
   flex: 0 0 auto;
   font: 900 9px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; color: var(--k-cyan-lt);
 }
+
+/* ── Live meters ──────────────────────────────────────────────────────────
+   Built from the venue's rank art (loy_track / loy_fill / loy_marker) rather
+   than a flat CSS bar, so the game's instruments match the rest of the kit.
+   Three states worth looking at: idle, live (something is moving), and hot
+   (it is about to matter — a clock running out, or a rival one square away). */
+.ui-meter { width: 100%; display: block; }
+.ui-meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.ui-meter-label { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #c9b6e8; }
+.ui-meter-right { font-size: 13px; font-weight: 800; color: #ffd66b; font-variant-numeric: tabular-nums; }
+
+.ui-meter-track { position: relative; width: 100%; height: 14px; display: flex; align-items: center; }
+/* The track art is a thin rule; stretch it across and let the fill sit on top. */
+.ui-meter-track-art { position: absolute; inset: 50% 0 auto 0; transform: translateY(-50%);
+  width: 100%; height: 10px; display: block; pointer-events: none; }
+
+.ui-meter-fill { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  height: 10px; border-radius: 999px; overflow: hidden; min-width: 0;
+  transition: width .18s cubic-bezier(.4,0,.2,1); will-change: width; }
+/* loy_fill is a short gold segment — repeat it along the filled length so the
+   bar keeps the kit's texture at any width instead of smearing one copy. */
+.ui-meter-fill-art { position: absolute; inset: 0; display: block; border-radius: 999px;
+  background-repeat: repeat-x; background-size: auto 100%; }
+
+/* The travelling highlight. Only while something is actually moving — a sheen
+   sweeping a bar that is not changing is the kind of motion that reads as a
+   stuck loading spinner. */
+.ui-meter-sheen { position: absolute; inset: 0; display: block; opacity: 0; border-radius: 999px;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+  background-size: 220% 100%; }
+.ui-meter.is-live .ui-meter-sheen { opacity: 1; animation: ui-meter-sweep 1.5s linear infinite; }
+@keyframes ui-meter-sweep { from { background-position: 220% 0; } to { background-position: -120% 0; } }
+
+.ui-meter-head-art { position: absolute; top: 50%; height: 22px; width: auto;
+  transform: translate(-50%, -50%); pointer-events: none; filter: drop-shadow(0 0 5px rgba(176,107,255,.75));
+  transition: left .18s cubic-bezier(.4,0,.2,1); }
+.ui-meter.is-live .ui-meter-head-art { animation: ui-meter-bob 1.1s ease-in-out infinite; }
+@keyframes ui-meter-bob { 0%, 100% { transform: translate(-50%, -50%) scale(1); }
+                          50%      { transform: translate(-50%, -50%) scale(1.13); } }
+
+/* Hot: the last stretch of a clock, or a rival one square from taking it. */
+.ui-meter.is-hot .ui-meter-fill-art { filter: saturate(1.5) brightness(1.15); }
+.ui-meter.is-hot .ui-meter-head-art { filter: drop-shadow(0 0 9px #ff3cb4) saturate(1.4);
+  animation: ui-meter-flare .5s ease-in-out infinite; }
+.ui-meter.is-hot .ui-meter-right { color: #ff6bd0; }
+@keyframes ui-meter-flare { 0%, 100% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+                            50%      { transform: translate(-50%, -50%) scale(1.3);  opacity: .82; } }
+
+/* A countdown drains rather than fills, so its bar should read as spending
+   something. Same art, warmer as it empties. */
+.ui-meter.is-countdown .ui-meter-fill { transition: width .1s linear; }
+.ui-meter.is-countdown .ui-meter-head-art { transition: left .1s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-meter .ui-meter-sheen,
+  .ui-meter .ui-meter-head-art { animation: none !important; }
+}
+
+/* ── Theme picker ─────────────────────────────────────────────────────────
+   The deck is the night, so choosing it is a real choice and gets room to be
+   one: name loud, blurb underneath, the picked one lit. Scrolls rather than
+   wrapping into a wall — there are sixteen and there will be more. */
+.deck-picker { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr);
+  gap: 10px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch; }
+.deck-picker::-webkit-scrollbar { height: 6px; }
+.deck-picker::-webkit-scrollbar-thumb { background: rgba(176,107,255,.5); border-radius: 999px; }
+.deck-chip { scroll-snap-align: start; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px; padding: 11px 13px;
+  border-radius: 12px; border: 1px solid rgba(176,107,255,.34);
+  background: linear-gradient(160deg, rgba(38,20,64,.92), rgba(18,10,32,.94));
+  color: #efe6ff; transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease; }
+.deck-chip strong { font-size: 14px; letter-spacing: .02em; }
+.deck-chip small { font-size: 11px; line-height: 1.35; color: #b9a6d8; }
+.deck-chip:hover { transform: translateY(-1px); border-color: rgba(176,107,255,.7); }
+.deck-chip.on { border-color: #ffd66b; box-shadow: 0 0 0 1px #ffd66b inset, 0 6px 20px rgba(255,214,107,.22); }
+.deck-chip.on strong { color: #ffd66b; }
+
+/* The call clock sits under the HUD and is the thing you watch between songs. */
+.solo-callclock { margin: 10px 0 4px; }
+/* Rival progress rails are small and sit under each name. */
+.solo-cpu-meter { margin-top: 5px; }
+.solo-cpu-meter .ui-meter-track { height: 10px; }
+.solo-cpu-meter .ui-meter-track-art { height: 7px; }
+.solo-cpu-meter .ui-meter-fill { height: 7px; }
+.solo-cpu-meter .ui-meter-head-art { height: 15px; }
+
+/* A dealt solo round takes the screen. It is the game now, not a tab in a
+   panel — same as the venue card, which has always played this way. */
+.solo-stage { position: relative; width: 100%; }
+.solo-stage .k-grid { max-width: min(100%, 92vh); margin-inline: auto; }
+
+/* Host is one line under the tabs rather than a fourth tab: reachable in one
+   tap by the person running the night, invisible as a choice to everyone else. */
+.bingo-host-link { display: block; width: 100%; margin: 14px 0 2px; padding: 9px 12px;
+  background: none; border: 1px dashed rgba(176,107,255,.32); border-radius: 10px;
+  color: #9a8ab8; font-size: 12px; letter-spacing: .04em; cursor: pointer;
+  transition: color .15s ease, border-color .15s ease; }
+.bingo-host-link b { color: #c9a6ff; }
+.bingo-host-link:hover { color: #efe6ff; border-color: rgba(176,107,255,.62); }
+
+/* ── The host's night, in order ───────────────────────────────────────────
+   Four numbered steps rather than six equal tiles, because a night has an
+   order and a first-time host should be able to read it off the screen. The
+   step you are on is lit; the ones behind you dim rather than disappear, so
+   you can always go back and change the theme. */
+.host-flow { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.host-step { border: 1px solid rgba(176,107,255,.22); border-radius: 14px; padding: 12px 13px;
+  background: linear-gradient(160deg, rgba(30,16,52,.72), rgba(14,8,26,.82));
+  transition: border-color .2s ease, box-shadow .2s ease, opacity .2s ease; }
+.host-step > header { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
+  align-items: center; margin-bottom: 9px; }
+.host-step > header b { grid-row: 1 / span 2; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 13px; font-weight: 800;
+  background: rgba(176,107,255,.16); color: #c9a6ff; border: 1px solid rgba(176,107,255,.4); }
+.host-step > header strong { font-size: 14px; color: #efe6ff; }
+.host-step > header span { font-size: 11px; color: #9a8ab8; letter-spacing: .03em; }
+.host-step.now { border-color: #ffd66b; box-shadow: 0 0 0 1px rgba(255,214,107,.35) inset, 0 8px 26px rgba(255,214,107,.14); }
+.host-step.now > header b { background: #ffd66b; color: #1a0e2e; border-color: #ffd66b; }
+.host-step.done { opacity: .62; }
+.host-step.done > header b { background: rgba(82,255,168,.18); color: #52ffa8; border-color: rgba(82,255,168,.45); }
+.host-step .ui-meter { margin: 4px 0 10px; }
+
+/* Everything a host needs less than once a night, folded away. */
+.host-more { margin: 6px 0 12px; border-top: 1px solid rgba(176,107,255,.18); padding-top: 10px; }
+.host-more > summary { cursor: pointer; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  color: #9a8ab8; margin-bottom: 8px; }
+.host-more > summary:hover { color: #c9a6ff; }
+.host-more .k-btn { margin-bottom: 6px; }
+
+/* The round's player. Mounted for the whole round and never torn down, so the
+   song survives walking onto the battle stage — but sealed, because the video
+   title is the answer to the square. */
+.solo-player { position: fixed; left: -9999px; top: 0; width: 2px; height: 2px;
+  opacity: .01; pointer-events: none; overflow: hidden; }
+
+/* The clip draining on the battle stage. Full width under the camera, because
+   it is the only number that decides when the take ends. */
+.battle-clipmeter { margin: 10px 0 6px; }

@@ -135,18 +135,40 @@ ok(!!created.event, 'backend accepted the event the member screen will show');
 console.log('\nMEMBER — the Lip Sync Battle screen');
 await rotate(932, 430);   // turn the phone — play is sideways
 await settle(1200);
-const openTile = () => js(`
-  const b = document.querySelector('[data-target="lipsyncBattle"]');
+// Battle is no longer a tile on the member menu — the member menu is down to
+// My Pass, Lip Sync Bingo and History, and battles happen inside a round. The
+// standalone screen is now where the person running the night finds it: Lip
+// Sync Bingo -> Host controls (behind the venue's host code) -> Other tools.
+// That is the path a real host walks, so it is the path this walks.
+const openBingo = () => js(`
+  const b = document.querySelector('[data-target="lobby"]');
   if (!b) return false; b.click(); return true;`);
 // The app plays a ~9.5s boot transition, and navigate() refuses to move while
-// any transition is running — so tap the tile until it actually takes.
+// any transition is running — so tap until it actually takes.
+let inBingo = false;
+for (let i = 0; i < 18 && !inBingo; i++) {
+  await openBingo();
+  await settle(1500);
+  inBingo = /solo vs cpu/i.test(await text());
+}
+ok(inBingo, 'Lip Sync Bingo opens');
+await tap('Host controls'); await settle(1200);
+// The host code gate. Unlocking here is what a host does once a night.
+await js(`const el=[...document.querySelectorAll('input')].find(i=>(i.placeholder||'').toLowerCase().includes('host code'));
+  if(!el)return false;Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(el,'HOST850');
+  el.dispatchEvent(new Event('input',{bubbles:true}));return true;`);
+await settle(400);
+await tap('Unlock hosting'); await settle(2000);
+// "Other tools" is a <details>; open it before its buttons can be tapped.
+await js(`const d=document.querySelector('.host-more'); if(d) d.open = true; return !!d;`);
+await settle(400);
 let opened = false;
-for (let i = 0; i < 18 && !opened; i++) {
-  await openTile();
+for (let i = 0; i < 12 && !opened; i++) {
+  await tap('Lip Sync Battle —') || await tap('Lip Sync Battle');
   await settle(1500);
   opened = /lobby open|Seeded knockout|No battle running/i.test(await text());
 }
-ok(opened, 'the Lip Sync Battle tile opens the screen');
+ok(opened, 'Host controls reach the Lip Sync Battle screen');
 body = await text();
 ok(/Lip Sync Battle|Smoke Bracket/i.test(body), 'the Lip Sync Battle screen opens from the app');
 ok(/lobby open/i.test(body), 'it shows the live lobby the host opened');

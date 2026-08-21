@@ -30,6 +30,10 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
 import { hubOn, startHub, stopHub, hubNode } from './hub.js';
 import { playSfx, sfxMuted, setSfxMuted } from './sfx.js';
+// Generated from the venue backend's own deck list — see server/gen-client-decks.mjs.
+// Solo has no backend to ask, so it carries the same songs in the bundle.
+import { deckList as soloDeckList, deckById as soloDeckById, DEFAULT_DECK_ID as SOLO_DEFAULT_DECK,
+         clipWindowFor as soloClipWindow } from './decks.generated.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
 // A member is either NOT a member (no card) or has ONE active tier. Buying a
@@ -983,12 +987,18 @@ const ROLES = [
     tagline: 'Your night, your access',
     eyebrow: 'MEMBER APP',
     chip: 'vip',
+    // Three doors, not six. A member opens this in a dark room with a drink in
+    // one hand: every extra tile is one more thing to read before they find the
+    // game. Battles are not a separate destination — they happen inside a round,
+    // off a lip sync square — and table booking is not finished, so neither
+    // belongs on the menu pretending otherwise.
+    //
+    // The screens behind them still exist and stay in `allowed` below, so the
+    // paths that reach them from inside the game keep working and putting a
+    // tile back is one line, not a re-wiring.
     menu: [
       { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
       { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
-      { title: 'Lip Sync Battle', detail: 'Bracket, king of the hill or open floor — no card needed', chip: ui.chips.active, target: 'lipsyncBattle' },
-      { title: 'Party Mode', detail: 'Vote for your favorite team during Battlerz', chip: ui.chips.active, target: 'party' },
-      { title: 'Book a VIP Table', detail: 'Request a night + party size, staff confirms', chip: ui.chips.vip, target: 'booking' },
       { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
     ],
     // Hosting is a member capability, not a staff one — a member runs the
@@ -2332,7 +2342,10 @@ const STATUS_CHIP = { valid: ui.verify.valid, expired: ui.verify.expired, trespa
 // A dashboard stat widget (frame + icon art only) with all text and the bottom
 // bar rebuilt live: neon label + number (the logo's pink-neon look), and either
 // a live sparkline tracker (entries) or a dynamic capacity meter (event/venue).
-function Meter({ pct }) {
+// The little capacity bar inside a dashboard stat tile. Distinct from the
+// game's <Meter> below, which is the venue's rank art driven by live play —
+// this one is a 22px sliver sharing a slot with a sparkline.
+function StatMeter({ pct }) {
   return <div className="stat-meter"><span style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} /></div>;
 }
 function Sparkline({ data }) {
@@ -2366,7 +2379,7 @@ function StatWidget({ src, label, value, sub, cap, series }) {
       <span className="stat-w-num">{Math.max(0, Math.round(value || 0))}</span>
       <span className="stat-w-sub">{sub}</span>
       <div className="stat-w-track">
-        {series ? <Sparkline data={series} /> : <Meter pct={cap ? (value / cap) * 100 : 0} />}
+        {series ? <Sparkline data={series} /> : <StatMeter pct={cap ? (value / cap) * 100 : 0} />}
       </div>
     </div>
   );
@@ -3424,9 +3437,17 @@ function BattleStage({ battle, onDone, onTake }) {
   }, []);
 
   // Countdown against the server's window so every device agrees on time left.
+  // `total` is what the window was when this stage opened, so the meter below
+  // has something to be a fraction of.
+  const totalRef = useRef(0);
+  const [total, setTotal] = useState(0);
   useEffect(() => {
-    if (!battle?.performanceEndsAt) { setLeft(null); return undefined; }
-    const id = setInterval(() => setLeft(Math.max(0, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000))), 250);
+    if (!battle?.performanceEndsAt) { setLeft(null); setTotal(0); return undefined; }
+    totalRef.current = Math.max(1, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000));
+    setTotal(totalRef.current);
+    const tick = () => setLeft(Math.max(0, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 250);
     return () => clearInterval(id);
   }, [battle?.performanceEndsAt]);
 
@@ -3519,6 +3540,12 @@ function BattleStage({ battle, onDone, onTake }) {
         {left != null && <span className="battle-clock">{String(Math.floor(left / 60)).padStart(2, '0')}:{String(left % 60).padStart(2, '0')}</span>}
         <div className="battle-meter" aria-hidden="true"><span style={{ width: `${Math.round(level * 100)}%` }} /></div>
       </div>
+      {/* The clip draining away. This is the performance length — the take ends
+          when the clip does, and this is the performer watching it go. */}
+      {left != null && total > 0 && (
+        <Meter className="battle-clipmeter" countdown live={recording}
+               value={left / total} label="Clip left" right={`${left}s`} />
+      )}
       {err && <p className="gate-err">{err}</p>}
       <p className="battle-song"><b>{battle.artist}</b> — {battle.song}</p>
       {!recording
@@ -4125,6 +4152,10 @@ function useBingoState(pollMs = 3000) {
     if (!apiEnabled()) { setErr('not-connected'); return undefined; }
     liveRef.current = true;
     refresh();
+    // pollMs <= 0 means "read it once and stop" — for a screen that is behind a
+    // lock and has nothing to show yet. Without this guard setInterval(fn, 0)
+    // hammers the venue as fast as the event loop will go.
+    if (pollMs <= 0) return () => { liveRef.current = false; };
     const id = setInterval(refresh, pollMs);
     return () => { liveRef.current = false; clearInterval(id); };
   }, [pollMs]);
@@ -4133,99 +4164,11 @@ function useBingoState(pollMs = 3000) {
 // ── Solo Bingo vs CPU ────────────────────────────────────────────────────
 // Fully client-side on purpose: solo play must work with no venue backend,
 // no host, and no other players — on the couch, on the way over, anywhere.
-// Deck is generated from the real server decks (server/src/decks.mjs), all
-// four merged and de-duped BY ARTIST+SONG, so solo squares are the same songs
-// the venue actually calls. De-duping by the server's own id is not enough:
-// the same song can exist as both a plain and a lip-sync square in different
-// decks (different server ids, `-lip` suffix), which collapsed to one client
-// id here and dealt visible duplicate squares onto a single card.
-// Tuples keep the bundle small: [artist, song, isLipSync].
-const SOLO_DECK_RAW = [
-  ["Usher","Yeah!",1],
-  ["Mary J. Blige","Family Affair",1],
-  ["Outkast","Hey Ya!",0],
-  ["Drake","Nice For What",0],
-  ["T-Pain","Buy U A Drank",0],
-  ["Aaliyah","Rock The Boat",1],
-  ["Missy Elliott","Work It",0],
-  ["Bruno Mars","Uptown Funk",0],
-  ["Rihanna","Work",1],
-  ["Latto","Big Energy",0],
-  ["Beyoncé","Crazy in Love",0],
-  ["Lil Wayne","A Milli",1],
-  ["Chris Brown","No Guidance",1],
-  ["SZA","Kill Bill",0],
-  ["Cardi B","Up",1],
-  ["Ciara","1, 2 Step",0],
-  ["Migos","Bad and Boujee",1],
-  ["Whitney Houston","I Wanna Dance With Somebody",1],
-  ["TLC","No Scrubs",0],
-  ["Future","Mask Off",0],
-  ["Beyoncé","Cuff It",1],
-  ["Nicki Minaj","Super Bass",1],
-  ["Glorilla","Tomorrow 2",1],
-  ["Luther Vandross","Never Too Much",1],
-  ["Kodak Black","No Flockin",0],
-  ["Rick Ross","Aston Martin Music",1],
-  ["T-Pain","Bartender",0],
-  ["Plies","Bust It Baby Pt. 2",1],
-  ["Sexyy Red","SkeeYee",1],
-  ["Lil Wayne","Lollipop",1],
-  ["Travis Scott","SICKO MODE",0],
-  ["City Girls","Act Up",1],
-  ["Moneybagg Yo","Wockesha",0],
-  ["Lil Baby","Drip Too Hard",0],
-  ["21 Savage","A Lot",0],
-  ["Trina","Pull Over",1],
-  ["OutKast","So Fresh, So Clean",0],
-  ["Ludacris","Move Bitch",1],
-  ["Gucci Mane","Wasted",0],
-  ["2 Chainz","No Lie",0],
-  ["Young Dolph","Get Paid",1],
-  ["T-Pain","I'm Sprung",1],
-  ["Lil Jon","Get Low",1],
-  ["Ying Yang Twins","Salt Shaker",0],
-  ["Future","March Madness",1],
-  ["Trick Daddy","I'm a Thug",0],
-  ["City Girls","Twerk",1],
-  ["Flo Milli","Beef FloMix",0],
-  ["Young Jeezy","Soul Survivor",0],
-  ["Webbie","Independent",1],
-  ["Boosie Badazz","Wipe Me Down",0],
-  ["Pastor Troy","Vice Versa",0],
-  ["Ying Yang Twins","Wait (The Whisper Song)",0],
-  ["Boyz II Men","I'll Make Love to You",0],
-  ["Jodeci","Freek'n You",0],
-  ["Usher","Confessions Part II",0],
-  ["Ginuwine","So Anxious",1],
-  ["SZA","Snooze",0],
-  ["Jill Scott","A Long Walk",1],
-  ["Musiq Soulchild","Just Friends",0],
-  ["H.E.R.","Best Part",0],
-  ["Whitney Houston","I Will Always Love You",1],
-  ["Toni Braxton","Un-Break My Heart",0],
-  ["Brandy","Have You Ever?",1],
-  ["Monica","Angel of Mine",0],
-  ["Trey Songz","Can't Help But Wait",1],
-  ["Keith Sweat","Nobody",0],
-  ["Beyoncé","Dangerously in Love",1],
-  ["Ne-Yo","So Sick",0],
-  ["Mariah Carey","We Belong Together",1],
-  ["Anita Baker","Sweet Love",0],
-  ["Jagged Edge","Let's Get Married",1],
-  ["Silk","Freak Me",0],
-  ["Case","Happily Ever After",0],
-];
-const SOLO_DECK = (() => {
-  const byId = new Map();
-  for (const [artist, song, lip] of SOLO_DECK_RAW) {
-    const id = `${artist}-${song}`.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    // Belt and braces: `covered` is keyed by id, so a duplicate id would both
-    // show the same square twice on one card and cover both at once.
-    if (!byId.has(id)) byId.set(id, { id, artist, song, type: lip ? 'lipsync' : 'song' });
-  }
-  return [...byId.values()];
-})();
+// Decks come from the venue's own list (server/src/decks.mjs) via the
+// generated client copy, so a themed night the room plays is a themed night
+// solo can practise — same songs, same lip sync squares, same ids.
+const SOLO_DECK_OPTIONS = soloDeckList();
+const soloDeck = (id) => soloDeckById(id).items;
 
 const CPU_PLAYERS = [
   // `skill` is how hard they are to beat in a lip sync battle, matched to how
@@ -4368,6 +4311,160 @@ function SoloBattle({ battle, cpu, onSettled }) {
   );
 }
 
+// ── Meters ───────────────────────────────────────────────────────────────
+// The venue's own meter art, driven by real numbers.
+//
+// These were plain CSS bars sitting next to a brand kit that ships a track, a
+// fill and a slider head — so the numbers were live but the instrument looked
+// painted on. A meter that never moves is furniture; a meter you can watch
+// close on you is the game.
+//
+//   value 0..1        where the fill sits
+//   live              the value is actively moving (adds the travelling sheen)
+//   hot               close enough to matter (pulses, and the head flares)
+//   countdown         hot means LOW rather than HIGH — for clocks running out
+//
+// The head is deliberately clamped inside the track so it cannot hang off the
+// end at 0% or 100%, which is what made the loyalty one look broken at the
+// extremes.
+const RANK_ART = `${A_}assets/ui/rank/`;
+function Meter({ value, label, right, live = false, hot = false, countdown = false, className = '' }) {
+  const pct = Math.max(0, Math.min(100, Math.round((Number(value) || 0) * 100)));
+  const isHot = hot || (countdown ? pct <= 22 : pct >= 88);
+  const cls = ['ui-meter', live && 'is-live', isHot && 'is-hot', countdown && 'is-countdown', className]
+    .filter(Boolean).join(' ');
+  return (
+    <div className={cls}>
+      {(label || right) && (
+        <div className="ui-meter-head">
+          {label && <span className="ui-meter-label">{label}</span>}
+          {right && <span className="ui-meter-right">{right}</span>}
+        </div>
+      )}
+      <div className="ui-meter-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
+           aria-label={typeof label === 'string' ? label : undefined}>
+        <img className="ui-meter-track-art" src={`${RANK_ART}loy_track.png`} alt="" aria-hidden="true" />
+        <span className="ui-meter-fill" style={{ width: `${pct}%` }}>
+          <i className="ui-meter-fill-art" style={{ backgroundImage: `url(${RANK_ART}loy_fill.png)` }} />
+          <i className="ui-meter-sheen" aria-hidden="true" />
+        </span>
+        {/* clamped so the head stays on the rail at both ends */}
+        <img className="ui-meter-head-art" src={`${RANK_ART}loy_marker.png`} alt="" aria-hidden="true"
+             style={{ left: `${Math.max(2, Math.min(98, pct))}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// Solo's music, and solo's clock — they are the same thing.
+//
+// The rule the venue plays by: a performance runs exactly as long as the clip
+// that plays. Not a fixed timer somebody set. The clip is the tail of a verse
+// into the hook, which is the part of a record a room knows, and when it ends
+// the take ends. No YouTube, no game — a lip sync round with no song is not a
+// harder version of the game, it is a different game.
+//
+// The venue backend resolves each call to a real video with its own key and
+// hands every phone the window. Solo has no backend — that is the point of it —
+// so it does the same job here: the IFrame player takes a SEARCH instead of an
+// id (listType 'search'), which needs no key and no quota, and the duration
+// comes back off the player itself. clipWindowFor is the venue's own rule,
+// generated into the bundle, so both sides cut a song identically.
+//
+// One player for the whole round, mounted above the card/battle split, so
+// walking onto the battle stage does not restart the song you are performing to.
+function useSoloPlayer({ item, armed, paused }) {
+  const hostRef = useRef(null);
+  const playerRef = useRef(null);
+  const [status, setStatus] = useState('idle');   // idle | loading | playing | error
+  const [clip, setClip] = useState(null);         // { start, seconds } for the current song
+  const startedRef = useRef(null);                // item id we have already cued the window for
+
+  useEffect(() => {
+    if (!armed) return undefined;
+    let live = true;
+    setStatus('loading');
+    loadYoutubeApi().then(() => {
+      if (!live || !hostRef.current || playerRef.current) return;
+      playerRef.current = new window.YT.Player(hostRef.current, {
+        width: '100%', height: '100%',
+        playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1 },
+        events: {
+          onReady: (e) => { if (live) { e.target.unMute?.(); e.target.setVolume?.(100); } },
+          onError: () => live && setStatus('error'),
+          onStateChange: (e) => {
+            if (!live) return;
+            if (e.data === window.YT?.PlayerState?.PLAYING) {
+              setStatus('playing');
+              // The duration is only real once something is actually playing.
+              // Cut to the venue's window the first time we see this song.
+              const p = e.target;
+              const dur = Number(p.getDuration?.() || 0);
+              // startedRef is the song the load effect last cued. Comparing it
+              // against `item` here does not work and quietly disabled the cut
+              // for a while: this handler is created once, when the player is
+              // built, so it closes over the `item` of that moment — which is
+              // null, because nothing has been called yet. The ref is the whole
+              // point of the ref.
+              const key = startedRef.current;
+              if (key && !key.cued && dur > 0) {
+                const win = soloClipWindow(dur, SOLO_FALLBACK_CLIP_SECONDS);
+                key.cued = true;
+                key.clip = win;
+                setClip(win);
+                try { if (win.start > 1) p.seekTo(win.start, true); } catch { /* fine — play from the top */ }
+              }
+            }
+          },
+        },
+      });
+    }).catch(() => live && setStatus('error'));
+    return () => {
+      live = false;
+      try { playerRef.current?.destroy?.(); } catch { /* already gone */ }
+      playerRef.current = null;
+    };
+  }, [armed]);
+
+  // Each call is a new search.
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!armed || !p || !item) return;
+    startedRef.current = { id: item.id, cued: false, clip: null };
+    setClip(null);
+    setStatus('loading');
+    try { p.loadPlaylist({ list: `${item.artist} ${item.song}`, listType: 'search', index: 0 }); }
+    catch { setStatus('error'); }
+  }, [armed, item?.id]);
+
+  // The round holding for a performance does not hold the music — the whole
+  // point is that you perform TO the clip. Pausing here is only for when the
+  // round itself is over.
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!armed || !p) return;
+    try { paused ? p.pauseVideo?.() : p.playVideo?.(); } catch { /* mid-swap */ }
+  }, [armed, paused]);
+
+  /** How much of the current clip is left, in ms. This is the performance
+   *  length: the take ends when the clip does. */
+  const clipLeftMs = () => {
+    const p = playerRef.current;
+    const win = startedRef.current?.clip || clip;
+    if (!p || !win) return SOLO_FALLBACK_CLIP_SECONDS * 1000;
+    let at = 0;
+    try { at = Number(p.getCurrentTime?.() || 0); } catch { /* not ready */ }
+    const endsAt = (win.start || 0) + win.seconds;
+    return Math.max(4000, Math.round((endsAt - at) * 1000));
+  };
+
+  return { hostRef, status, clip, clipLeftMs };
+}
+
+// Used only when a track's real length is unknown — the same shipped window the
+// backend falls back to (BINGO_LIPSYNC_SECONDS).
+const SOLO_FALLBACK_CLIP_SECONDS = 120;
+
 function SoloBingoGame({ onExit }) {
   const [game, setGame] = useState(null);
   const timerRef = useRef(null);
@@ -4375,6 +4472,19 @@ function SoloBingoGame({ onExit }) {
   const soloGridRef = useRef(null);
   const [soloPop, fireSoloPop] = useOneShot(320);
   const [soloWin, fireSoloWin] = useOneShot(950);
+  // Which themed deck this round plays. Picked before the round starts and
+  // held across the three-round ladder — a night is one theme, not a shuffle
+  // of eleven.
+  const [deckId, setDeckId] = useState(SOLO_DEFAULT_DECK);
+  const [battle, setBattle] = useState(null);   // { item, cpu } while one is on
+  // Re-render often enough to move a clock. The call deadline lives in game
+  // state; this is just the heartbeat that redraws it.
+  const [, setNow] = useState(0);
+  // Armed by the first tap on Start — which is also the user gesture every
+  // mobile browser demands before it will play audio out loud.
+  const [armed, setArmed] = useState(false);
+  const nowCallingItem = game && game.calledCount > 0 ? game.order[game.calledCount - 1] : null;
+  const song = useSoloPlayer({ item: nowCallingItem, armed, paused: !!game && game.status !== 'playing' });
 
   const clearTimers = () => {
     clearInterval(timerRef.current);
@@ -4384,33 +4494,62 @@ function SoloBingoGame({ onExit }) {
   useEffect(() => clearTimers, []);
 
   // `round` carries across a deal; everything else is fresh each round.
-  const deal = (round, wins) => ({
+  const deal = (round, wins, deck) => ({
     round,
     wins,
+    deckId: deck,
     pattern: BINGO_ROUND_PATTERN[round] || 'line',
-    order: shuffled(SOLO_DECK),
+    order: shuffled(soloDeck(deck)),
     calledCount: 0,
-    card: dealCard(SOLO_DECK),
+    card: dealCard(soloDeck(deck)),
     covered: new Set(),
     // Squares passed on or lost in a battle. Locked for the round, exactly as
     // a forfeited square is locked in the venue round.
     lost: new Set(),
-    cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(SOLO_DECK), covered: new Set() })),
+    cpus: CPU_PLAYERS.map((c) => ({ ...c, card: dealCard(soloDeck(deck)), covered: new Set() })),
     status: 'playing',
     winner: null,
+    // When the next square gets called. Rendered as a countdown so the player
+    // can see the round moving instead of being surprised by it.
+    nextCallAt: Date.now() + SOLO_CALL_MS,
   });
-  const [battle, setBattle] = useState(null);   // { item, cpu } while one is on
-  const start = () => { clearTimers(); setGame(deal(1, 0)); };
-  // Won the round but not the match — deal the next one at the harder pattern.
+  const start = () => { setArmed(true); clearTimers(); setGame(deal(1, 0, deckId)); };
+  // Won the round but not the match — deal the next one at the harder pattern,
+  // from the same deck: the theme is the night, not the round.
   const nextRound = () => {
     clearTimers();
-    setGame((g) => deal(Math.min((g?.round || 1) + 1, BINGO_FINAL_ROUND_CLIENT), g?.wins || 0));
+    setGame((g) => deal(Math.min((g?.round || 1) + 1, BINGO_FINAL_ROUND_CLIENT), g?.wins || 0, g?.deckId || deckId));
   };
 
   // The call loop + CPU marking. Kept in one effect keyed on status so it
   // tears down cleanly the moment somebody wins.
+  //
+  // `performing` is in the condition, not just the render, and that is the
+  // whole fix for a real complaint: the player would open a lip sync battle,
+  // go and perform for thirty seconds, and come back to a round that had
+  // called a dozen more squares and possibly been won by a CPU while they were
+  // singing. The venue round holds for a performance. Solo now does too — the
+  // calls stop, the CPUs stop marking, and the clock below stops with them.
+  const performing = !!battle;
+  // No YouTube, no game. A lip sync round with no song is not a harder version
+  // of this game, it is a different one — you cannot work a square out by ear
+  // with nothing to hear.
+  //
+  // But "hold until the music plays" cannot be the whole rule, and the first
+  // draft of it deadlocked on exactly that: the round waited for a song, and
+  // the player had nothing to play until a square was called, so neither ever
+  // moved. The order is call, then song, then next call. So the FIRST call
+  // always goes out; after that, each new call waits for the one before it to
+  // actually be playing, and a player that has failed stops the round dead.
+  const musicOn = song.status === 'playing';
+  const musicFailed = song.status === 'error';
+  const awaitingSong = !!game && game.calledCount > 0 && !musicOn;
+  const held = performing || musicFailed || awaitingSong;
   useEffect(() => {
-    if (game?.status !== 'playing') return undefined;
+    if (game?.status !== 'playing' || held) return undefined;
+    // Coming back from a performance restarts the interval, so restart the
+    // countdown with it rather than showing a deadline that passed mid-song.
+    setGame((g) => (g && g.status === 'playing' ? { ...g, nextCallAt: Date.now() + SOLO_CALL_MS } : g));
     timerRef.current = setInterval(() => {
       setGame((g) => {
         if (!g || g.status !== 'playing') return g;
@@ -4436,11 +4575,19 @@ function SoloBingoGame({ onExit }) {
           }, lo + Math.random() * (hi - lo));
           cpuTimersRef.current.push(t);
         });
-        return { ...g, calledCount: g.calledCount + 1 };
+        return { ...g, calledCount: g.calledCount + 1, nextCallAt: Date.now() + SOLO_CALL_MS };
       });
     }, SOLO_CALL_MS);
     return () => clearTimers();
-  }, [game?.status]);
+  }, [game?.status, held]);
+
+  // The heartbeat behind the countdown. Only runs while a round is actually
+  // moving — no timer ticking behind a finished round, a battle, or a silence.
+  useEffect(() => {
+    if (game?.status !== 'playing' || held) return undefined;
+    const t = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(t);
+  }, [game?.status, held]);
 
   const tap = (item, el) => {
     // Everything that is not a state update happens OUT here. A setGame
@@ -4455,7 +4602,9 @@ function SoloBingoGame({ onExit }) {
     // venue round runs. Whoever else holds it contests it.
     if (item.type === 'lipsync' && !game.covered.has(item.id)) {
       const rival = game.cpus.find((c) => c.card.some((sq) => sq && sq.id === item.id) && !c.covered.has(item.id));
-      setBattle({ item, cpu: rival || null });
+      // Read the clock off the clip that is playing right now, at the moment
+      // the square is tapped — that is the performance length.
+      setBattle({ item, cpu: rival || null, endsAt: Date.now() + song.clipLeftMs() });
       return;
     }
     const covered = new Set(game.covered);
@@ -4482,11 +4631,22 @@ function SoloBingoGame({ onExit }) {
   };
 
 
-  // A battle takes the whole screen, the way it does in the venue round.
+  // The player lives here, above everything, and is never unmounted while a
+  // round is on. Walking onto the battle stage used to tear the iframe down
+  // and take the song with it — which, under a rule that says the clip IS the
+  // performance, would mean performing to silence against a clock that had
+  // nothing to measure.
+  const stage = (() => {
   if (battle) {
     return (
       <SoloBattle
-        battle={{ id: `solo-${battle.item.id}`, artist: battle.item.artist, song: battle.item.song }}
+        battle={{
+          id: `solo-${battle.item.id}`,
+          artist: battle.item.artist,
+          song: battle.item.song,
+          // Exactly as long as the clip has left to run. Nobody sets this.
+          performanceEndsAt: battle.endsAt,
+        }}
         cpu={battle.cpu}
         onSettled={({ won }) => {
           const item = battle.item;
@@ -4522,7 +4682,23 @@ function SoloBingoGame({ onExit }) {
         <div className="solo-roster">
           {CPU_PLAYERS.map((c) => <span key={c.name} className="solo-chip"><b>{c.avatar}</b>{c.name}</span>)}
         </div>
-        <button type="button" className="bingo-btn gold" onClick={start}>Start Solo Round</button>
+        {/* The deck IS the night. Picking it before the round, rather than
+            getting whatever the app felt like, is the difference between a
+            generic game and Ladies Night. Same decks the room plays. */}
+        <p className="venue-connect-note">pick tonight&apos;s theme</p>
+        <div className="deck-picker">
+          {SOLO_DECK_OPTIONS.map((d) => (
+            <button type="button" key={d.id}
+                    className={`deck-chip${d.id === deckId ? ' on' : ''}`}
+                    onClick={() => setDeckId(d.id)}>
+              <strong>{d.name}</strong>
+              <small>{d.description}</small>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="bingo-btn gold" onClick={start}>
+          Start Solo Round · {soloDeckById(deckId).name}
+        </button>
         {onExit && <button type="button" className="bingo-btn ghost" onClick={onExit}>← Back</button>}
       </AppPanel>
     );
@@ -4533,10 +4709,19 @@ function SoloBingoGame({ onExit }) {
   const waiting = game.card.filter((it) => it && called.has(it.id) && !game.covered.has(it.id)).length;
   const over = game.status !== 'playing';
   const myProgress = soloProgress(game.card, game.covered, game.pattern);
+  // Time left before the next call. Clamped: a backgrounded tab can wake up
+  // with a deadline long past, and a negative clock reads as broken.
+  const callLeft = Math.max(0, Math.min(SOLO_CALL_MS, (game.nextCallAt || 0) - Date.now()));
   const soloOneAway = oneAwayIds(soloCard(game.card), game.covered, called, game.pattern);
 
+  // A dealt round is not a tab any more — it is the game. It takes the screen,
+  // and it takes it sideways: a 5x5 card of artist/song squares is unreadable
+  // in a portrait column on a phone, which is the whole reason the venue round
+  // has always demanded landscape. Solo plays by the same rules, so it gets the
+  // same gate and the same big card.
   return (
-    <>
+    <RotateToPlay>
+    <div className="solo-stage">
       {over && (
         <div className={`bingo-winner-banner${game.status === 'lost' ? ' lost' : ''}`}>
           <strong>
@@ -4566,6 +4751,25 @@ function SoloBingoGame({ onExit }) {
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[game.pattern]}</span>
             </div>
           </div>
+          {!over && (
+            <Meter
+              className="solo-callclock"
+              countdown
+              live={!performing}
+              value={callLeft / SOLO_CALL_MS}
+              label={performing ? 'Round held — you are performing' : 'Next song in'}
+              right={performing ? '⏸ paused' : `${(callLeft / 1000).toFixed(1)}s`}
+            />
+          )}
+          {!over && musicFailed && (
+            <p className="k-nudge k-nudge--no">
+              That one will not play here, so the round has stopped — no song, no game.
+              Leave the round and start another; a different deck usually plays fine.
+            </p>
+          )}
+          {!over && !musicFailed && awaitingSong && (
+            <p className="k-nudge">🎵 Cueing the song — the next call waits for it.</p>
+          )}
           {!over && waiting > 0 && (
             <p className="k-nudge">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
           )}
@@ -4579,6 +4783,8 @@ function SoloBingoGame({ onExit }) {
                 <b>{c.avatar}</b>
                 <span className="solo-cpu-name">{c.name}</span>
                 <span className="solo-cpu-prog">{p.done}/{p.need}</span>
+                {/* One square away is the moment worth seeing coming. */}
+                <Meter className="solo-cpu-meter" value={p.done / p.need} hot={p.done >= p.need - 1} />
               </div>
             );
           })}
@@ -4613,10 +4819,12 @@ function SoloBingoGame({ onExit }) {
           })}
         </div>
         <div className="k-cardfoot">
-          <div className="k-progressrow">
-            <span className="k-label">{myProgress.done} / {myProgress.need} to bingo</span>
-            <div className="k-progress"><i style={{ width: `${Math.round((myProgress.done / myProgress.need) * 100)}%` }} /></div>
-          </div>
+          <Meter
+            value={myProgress.done / myProgress.need}
+            label={BINGO_PATTERN_GOAL[game.pattern]}
+            right={`${myProgress.done} / ${myProgress.need}`}
+            hot={myProgress.done >= myProgress.need - 1}
+          />
         </div>
 
         {game.status === 'roundWon' && (
@@ -4625,8 +4833,28 @@ function SoloBingoGame({ onExit }) {
           </button>
         )}
         {over && game.status !== 'roundWon' && <button type="button" className="k-btn k-btn--gold" onClick={start}>Play Again</button>}
-        {onExit && <button type="button" className="k-btn k-btn--tertiary" onClick={onExit}>← Back</button>}
+        {/* Leaving the game goes back to the deck picker, not out of Bingo —
+            the way out of the whole screen is the tab bar you came in through. */}
+        <button type="button" className="k-btn k-btn--tertiary" onClick={() => { clearTimers(); setGame(null); }}>
+          ← Leave round
+        </button>
       </AppPanel>
+    </div>
+    </RotateToPlay>
+  );
+  })();
+
+  return (
+    <>
+      {/* Sealed exactly like play-along in the venue round: the title is drawn
+          inside the frame, and the title is the answer. Kept mounted across
+          every screen below so the song never restarts under a performer. */}
+      {armed && (
+        <div className="solo-player" aria-hidden="true">
+          <div className="playalong-frame"><div ref={song.hostRef} /></div>
+        </div>
+      )}
+      {stage}
     </>
   );
 }
@@ -5036,17 +5264,27 @@ function LobbyScreen({ navigate }) {
     // wants two columns in landscape; Solo, which shares this screen, does
     // not — scoping it to .staff-dash alone knocked Solo past the fold.
     <div className={`staff-dash mode-${mode}`}>
+      {/* Two ways to play and a shelf for what you recorded. Host was a fourth
+          peer tab here, which put a door only one person in the building ever
+          opens directly beside the two everybody uses — and made the first
+          thing a member reads a choice between four things instead of two.
+          It moved to the line underneath: still one tap, still behind the
+          venue's host code, no longer competing with the game. */}
       <div className="staff-hub-tabs bingo-mode-tabs">
         <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
         <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
         <button type="button" className={`staff-hub-tab${mode === 'record' ? ' on' : ''}`} onClick={() => setMode('record')}>Record</button>
-        <button type="button" className={`staff-hub-tab${mode === 'host' ? ' on' : ''}`} onClick={() => setMode('host')}>Host</button>
         <SfxToggle />
       </div>
       {mode === 'solo' ? <SoloBingoGame />
         : mode === 'record' ? <PlayerRecord />
-        : mode === 'host' ? <HostMode navigate={navigate} />
+        : mode === 'host' ? <HostMode navigate={navigate} onExit={() => setMode('venue')} />
         : <VenueLobby navigate={navigate} />}
+      {mode !== 'host' && (
+        <button type="button" className="bingo-host-link" onClick={() => setMode('host')}>
+          Running the night? <b>Host controls →</b>
+        </button>
+      )}
     </div>
   );
 }
@@ -5055,28 +5293,45 @@ function LobbyScreen({ navigate }) {
 // code once and the device keeps that session, so the person running the
 // night can host and play from the same phone instead of signing out of the
 // member app and back in through a staff door.
-function HostMode({ navigate }) {
+function HostMode({ navigate, onExit }) {
   const [unlocked, setUnlocked] = useState(() => !!apiStaffToken());
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  // Every hook this component calls has to run on every render of it, which is
+  // why the round poll and the deck list are up here above the two gates below
+  // rather than tucked in beside the thing that uses them.
+  const { state, refresh } = useBingoState(unlocked ? 3000 : 0);
+  const [decks, setDecks] = useState(null);
+  const [pick, setPick] = useState('');
+  useEffect(() => {
+    if (!unlocked) return;
+    apiBingoDecks().then((r) => setDecks(r.decks)).catch(() => setDecks([]));
+  }, [unlocked]);
+  // Follow the venue until the host actually chooses something, so the picker
+  // shows tonight's real deck rather than guessing.
+  useEffect(() => { if (state?.deckId && !pick) setPick(state.deckId); }, [state?.deckId, pick]);
+
   const unlock = async () => {
     setBusy(true); setErr('');
     try { await apiStaffLogin(code.trim()); setUnlocked(true); }
     catch { setErr('That code was not accepted by the venue.'); }
     setBusy(false);
   };
+  const act = async (fn) => { setBusy(true); setErr(''); try { await fn(); await refresh(); } catch (e) { setErr(e?.message || 'That did not go through.'); } setBusy(false); };
+
   if (!apiEnabled()) {
     return (
       <AppPanel title="Host the night" subtitle="Not connected to a venue">
         <p className="mem-fineprint">Hosting runs the real round for everyone in the room, so it needs a venue connection. Connect to the venue first.</p>
+        {onExit && <button type="button" className="k-btn k-btn--tertiary" onClick={onExit}>← Back to the game</button>}
       </AppPanel>
     );
   }
   if (!unlocked) {
     return (
       <AppPanel title="Host the night" subtitle="Venue host code required">
-        <p className="mem-fineprint">Running the round means calling songs for everyone in the room, so the venue gates it. Ask the venue for tonight's host code.</p>
+        <p className="mem-fineprint">Running the round means calling songs for everyone in the room, so the venue gates it. Ask the venue for tonight&apos;s host code.</p>
         <label className="host-code-label">Host code
           <input type="text" value={code} autoComplete="off" placeholder="Host code"
                  onChange={(e) => { setCode(e.target.value); setErr(''); }}
@@ -5086,30 +5341,97 @@ function HostMode({ navigate }) {
         <button type="button" className="k-btn k-btn--gold" disabled={!code.trim() || busy} onClick={unlock}>
           {busy ? 'Checking…' : 'Unlock hosting'}
         </button>
+        {onExit && <button type="button" className="k-btn k-btn--tertiary" onClick={onExit}>← Back to the game</button>}
       </AppPanel>
     );
   }
-  const tools = [
-    { target: 'host', title: 'Host Control', detail: 'Call songs, approve claims, run battles' },
-    { target: 'lipsyncBattle', title: 'Lip Sync Battle', detail: 'Run a bracket, king of the hill or open floor' },
-    { target: 'bingoStyle', title: 'Game Menu', detail: 'Pick the deck and win pattern, start or reset' },
-    { target: 'tv', title: 'TV Display', detail: 'Throw the round on the big screen' },
-    { target: 'songQueue', title: 'Song Queue', detail: 'Everything called so far' },
-    { target: 'winner', title: 'Winner · Payout', detail: 'Validate the claim and pay out' },
-  ];
+
+  // This used to be a flat grid of six tools in no particular order — Host
+  // Control next to Winner · Payout next to Song Queue — which told a host
+  // running their first night nothing about what to press or when. A night has
+  // an order: choose the theme, get people in, start it, run it, pay out. So
+  // does this now, and the step you are actually on is the one that is lit.
+  const status = state?.status || 'idle';
+  const live = status === 'live';
+  const ready = (state?.readyCount ?? 0);
+  const joined = (state?.playerCount ?? 0);
+  const step = live ? 3 : joined > 0 ? 2 : 1;
+
   return (
-    <AppPanel title="Host the night" subtitle="You are running this round">
-      <div className="host-tools">
-        {tools.map((t) => (
-          <button type="button" key={t.target} className="host-tool" onClick={() => navigate(t.target)}>
-            <strong>{t.title}</strong>
-            <span>{t.detail}</span>
+    <AppPanel title="Host the night" subtitle={state ? `${BINGO_STATUS_LABEL[status]} · ${state.deckName}` : 'Reading the room…'}>
+      <div className="host-flow">
+        <section className={`host-step${step === 1 ? ' now' : ''}${live ? ' done' : ''}`}>
+          <header><b>1</b><strong>Tonight&apos;s theme</strong>
+            <span>{live ? 'Locked in — the round is live' : 'The deck is the night'}</span>
+          </header>
+          {live ? (
+            <p className="mem-fineprint">Playing <b>{state?.deckName}</b>. Reset the round to change it.</p>
+          ) : (
+            <>
+              <div className="deck-picker">
+                {(decks || []).map((d) => (
+                  <button type="button" key={d.id} className={`deck-chip${d.id === pick ? ' on' : ''}`}
+                          onClick={() => setPick(d.id)}>
+                    <strong>{d.name}</strong>
+                    <small>{d.description}</small>
+                  </button>
+                ))}
+                {decks === null && <p className="mem-fineprint">Reading the venue&apos;s decks…</p>}
+              </div>
+              <button type="button" className="k-btn k-btn--secondary" disabled={busy || !pick}
+                      onClick={() => act(() => apiBingoReset(pick, state?.pattern || 'line'))}>
+                Deal a fresh game on {decks?.find((d) => d.id === pick)?.name || 'this deck'}
+              </button>
+            </>
+          )}
+        </section>
+
+        <section className={`host-step${step === 2 ? ' now' : ''}${live ? ' done' : ''}`}>
+          <header><b>2</b><strong>Get the room in</strong>
+            <span>{joined} joined · {ready} ready</span>
+          </header>
+          <Meter value={joined ? ready / joined : 0} label="Ready to play"
+                 right={`${ready} / ${joined}`} live={!live && joined > 0} hot={joined > 0 && ready === joined} />
+          <p className="mem-fineprint">Members join from Lip Sync Bingo on their own phones. You do not have to wait for everyone.</p>
+          <button type="button" className="k-btn k-btn--tertiary" onClick={() => navigate('tv')}>
+            Put the join screen on the TV →
           </button>
-        ))}
+        </section>
+
+        <section className={`host-step${step === 3 ? ' now' : ''}`}>
+          <header><b>3</b><strong>Run the round</strong>
+            <span>{live ? 'Live — call the songs' : 'Not started yet'}</span>
+          </header>
+          {!live && (
+            <button type="button" className="k-btn k-btn--go" disabled={busy || joined === 0}
+                    onClick={() => act(apiBingoStart)}>
+              {joined === 0 ? 'Waiting for the first player…' : `Start the round · ${joined} playing`}
+            </button>
+          )}
+          <button type="button" className="k-btn k-btn--gold" onClick={() => navigate('host')}>
+            {live ? 'Host Control — call songs, judge battles →' : 'Open Host Control →'}
+          </button>
+        </section>
+
+        <section className="host-step">
+          <header><b>4</b><strong>Finish it</strong><span>Validate the claim, pay the winner</span></header>
+          <button type="button" className="k-btn k-btn--tertiary" onClick={() => navigate('winner')}>Winner · Payout →</button>
+        </section>
       </div>
+
+      {err && <p className="gate-err">{err}</p>}
+
+      <details className="host-more">
+        <summary>Other tools</summary>
+        <button type="button" className="k-btn k-btn--tertiary" onClick={() => navigate('songQueue')}>Song Queue — everything called so far</button>
+        <button type="button" className="k-btn k-btn--tertiary" onClick={() => navigate('bingoStyle')}>Game Menu — win pattern, reset</button>
+        <button type="button" className="k-btn k-btn--tertiary" onClick={() => navigate('lipsyncBattle')}>Lip Sync Battle — bracket, king of the hill, open floor</button>
+      </details>
+
       <button type="button" className="k-btn k-btn--tertiary" onClick={() => { apiStaffSignOut(); setUnlocked(false); }}>
         Stop hosting
       </button>
+      {onExit && <button type="button" className="k-btn k-btn--tertiary" onClick={onExit}>← Back to the game</button>}
     </AppPanel>
   );
 }
@@ -5876,6 +6198,11 @@ function HostScreen() {
 
       {tab === 'media' && (
         <>
+          {/* The key is set once and then it is the venue's business, not the
+              host's. A password box sitting on the Music tab every night is an
+              invitation to break something that is already working, so it only
+              appears when songs actually are not playing — which is the only
+              night anyone needs it. */}
           <MediaSetupPanel onChange={poll} />
           <TvAutoMediaPanel nowPlaying={board?.nowPlaying} onChange={poll} />
         </>
@@ -5922,19 +6249,34 @@ function MediaSetupPanel({ onChange }) {
     setBusy(false);
   };
   const on = !!ytStatus?.youtubeEnabled || !!google?.connected;
-  return (
-    <AppPanel title="Music &amp; TV" subtitle={on ? 'Songs will play when you call them' : 'Not set up — songs will NOT play'}>
-      {!on && (
-        <p className="k-nudge k-nudge--no">
-          No YouTube access yet, so calling a song plays nothing. Set up either option below — one is enough.
+
+  // Still reading the venue's settings — say nothing rather than flashing
+  // "NOT SET UP" at a host whose music is fine.
+  if (ytStatus === null) return null;
+
+  // Working. The host gets one line confirming it and no controls: the key
+  // lives in the venue's own settings, it is already there, and there is
+  // nothing here for them to do. The exception is a venue that is set up and
+  // still silent — that has a cause, and the cause comes from YouTube itself.
+  if (on) {
+    return ytStatus?.lastError ? (
+      <AppPanel title="Music &amp; TV" subtitle="Set up, but the last song did not play">
+        <p className="k-nudge k-nudge--no">{ytStatus.lastError}</p>
+        <p className="mem-fineprint">
+          Usually a song with no playable result, or the day&apos;s search quota. The next call will try again.
         </p>
-      )}
-      {/* Set up but still not playing is a different problem, and the reason
-          comes straight from YouTube — a rejected key, an exhausted quota, a
-          song with no embeddable result. */}
-      {on && ytStatus?.lastError && (
-        <p className="k-nudge k-nudge--no">Last song didn&apos;t play: {ytStatus.lastError}</p>
-      )}
+      </AppPanel>
+    ) : (
+      <p className="mem-fineprint">♪ Songs are on — calling one plays it.</p>
+    );
+  }
+
+  return (
+    <AppPanel title="Music &amp; TV" subtitle="Not set up — songs will NOT play">
+      <p className="k-nudge k-nudge--no">
+        No YouTube access yet, so calling a song plays nothing. Set up either option below — one is enough.
+        This is the only night you should see this panel.
+      </p>
       <div className="media-route">
         <div className="media-route-head">
           <strong>Host&apos;s Google account</strong>
@@ -5978,12 +6320,6 @@ function MediaSetupPanel({ onChange }) {
         <button type="button" className="k-btn k-btn--secondary" disabled={busy || !key.trim()} onClick={saveKey}>
           {busy ? 'Saving…' : 'Save key'}
         </button>
-        {ytStatus?.usingHostKey && (
-          <button type="button" className="k-btn k-btn--tertiary" disabled={busy}
-                  onClick={async () => { setKey(''); setBusy(true); try { await apiSetYoutubeKey(''); await load(); await onChange?.(); } catch { /* ignore */ } setBusy(false); }}>
-            Remove the saved key
-          </button>
-        )}
       </div>
       {msg && <p className="mem-fineprint">{msg}</p>}
     </AppPanel>

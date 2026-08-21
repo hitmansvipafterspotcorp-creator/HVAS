@@ -20,6 +20,7 @@ import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
 import { hitkoinEnabled, mintForPayment, walletSummary } from './hitkoin.mjs';
 import { BINGO_DECKS, DEFAULT_DECK_ID, deckList, deckById } from './decks.mjs';
+import { clipWindowFor as clipWindowRule, windowAroundHook } from './clip.mjs';
 
 const TIERS = {
   Daily: { days: 1, vip: false, price: 20 }, Weekly: { days: 7, vip: false, price: 100 },
@@ -113,27 +114,9 @@ const hookFromChapters = (html) => {
   return null;
 };
 
-// Turn "the hook lands at 1:07" into the window to play: back up into the tail
-// of the verse so the performer gets a run-up, then carry through the hook.
-const windowAroundHook = (hookAt, durationSec) => {
-  const d = Number(durationSec) || 0;
-  const runUp = 18;                                  // enough verse to get set
-  const start = Math.max(0, Math.round(hookAt) - runUp);
-  let seconds = Math.min(75, Math.max(40, Math.round((d || 210) * 0.4)));
-  if (d) seconds = Math.min(seconds, Math.max(20, d - start - 2));
-  return { start, seconds };
-};
-
-const clipWindowFor = (durationSec) => {
-  const d = Number(durationSec) || 0;
-  // Unknown length: fall back to the shipped performance window, from the top.
-  if (d < 30) return { start: 0, seconds: Math.round(BINGO_LIPSYNC_MS / 1000), estimated: true };
-  const start = Math.max(12, Math.round(d * 0.12));            // clear the intro
-  const seconds = Math.min(75, Math.max(40, Math.round(d * 0.40)));  // verse tail + hook
-  // Never run past the end of the track.
-  const capped = Math.min(seconds, Math.max(20, d - start - 2));
-  return { start, seconds: capped, estimated: false };
-};
+// Both of these now live in src/clip.mjs, alone, because Solo vs CPU needs the
+// same numbers and has no backend to ask. See that file for why.
+const clipWindowFor = (durationSec) => clipWindowRule(durationSec, BINGO_LIPSYNC_MS / 1000);
 
 const bingoWindowFor = (item, clip) => {
   // The performance runs as long as the clip does — that is the whole point of
