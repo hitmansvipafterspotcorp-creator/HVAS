@@ -1131,3 +1131,40 @@
 /* The open floor's leader, marked without changing the row's shape. */
 .ev-rank.is-lead { color: var(--k-gold); }
 .ev-row:first-child { border-color: rgba(255, 207, 71, .35); }
+
+/* ── Sideways play ───────────────────────────────────────────────────────
+   Shown instead of a play screen while the phone is upright. Fills the window
+   so there is nothing half-rendered behind it to squint at, and uses dvh so an
+   iOS address bar sliding in does not crop the message. */
+.rotate-gate {
+  display: grid; place-content: center; justify-items: center; gap: 12px;
+  min-height: 78dvh; padding: 24px 22px; text-align: center;
+}
+/* The page carries the venue crest behind every screen. Without a ground of
+   its own the message sits on top of the crown and neither reads — the same
+   trap the champion plate fell into. */
+.rotate-gate > * { position: relative; z-index: 1; }
+.rotate-gate::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse at center, rgba(7, 2, 13, .93) 0%, rgba(7, 2, 13, .82) 55%, rgba(7, 2, 13, .6) 100%);
+}
+.rotate-gate { position: relative; }
+.rotate-gate-art { width: 92px; animation: rotate-nudge 2.6s ease-in-out infinite; }
+.rotate-gate-art svg { width: 100%; height: auto; }
+.rotate-gate strong {
+  font: 900 clamp(17px, 5vw, 22px)/1.15 var(--k-font); text-transform: uppercase;
+  color: var(--k-gold-lt);
+}
+.rotate-gate span {
+  max-width: 30ch; font: 700 12px/1.45 var(--k-font); color: var(--k-text-dim);
+}
+/* A quarter turn, paused, and back — it reads as an instruction rather than a
+   spinner. Stilled for anyone who asked for less motion. */
+@keyframes rotate-nudge {
+  0%, 38% { transform: rotate(0deg); }
+  55%, 88% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate-gate-art { animation: none; transform: rotate(-90deg); }
+}

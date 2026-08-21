@@ -1,16 +1,31 @@
 {
   "name": "HITMANS VIP After Spot",
   "short_name": "HVAS",
-  "description": "The members-only after spot — pass, entry, and Lip Sync Bingo.",
+  "description": "The members-only after spot \u2014 pass, entry, and Lip Sync Bingo.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#07020d",
   "theme_color": "#07020d",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

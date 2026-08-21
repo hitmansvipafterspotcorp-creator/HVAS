@@ -1534,6 +1534,68 @@ function ScreenHeader({ screen, onBack }) {
   );
 }
 
+// ── Sideways play ────────────────────────────────────────────────────────
+// The game is played in landscape. The card is a square grid with a status
+// rail beside it, a battle is a video, and both want width — held upright they
+// are cramped at best. So the play surfaces ask for the phone to be turned and
+// wait, rather than rendering something nobody can use.
+//
+// Only the PLAY screens are gated. The pass, the door, the lobby and the host
+// console are all fine upright, and locking those would make the app annoying
+// for the people who never play a round.
+function usePortrait() {
+  const [portrait, setPortrait] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(orientation: portrait)').matches;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = (e) => setPortrait(e.matches);
+    // Safari only got addEventListener on MediaQueryList in 14; older iOS in a
+    // venue is not hypothetical, so fall back rather than throwing on load.
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+    setPortrait(mq.matches);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+  return portrait;
+}
+
+function RotateToPlay({ children }) {
+  const portrait = usePortrait();
+  // Ask the browser to hold landscape where it can. This only works installed
+  // and/or fullscreen, and throws outright on iOS Safari — best effort, and the
+  // overlay below is what actually guarantees the rule.
+  useEffect(() => {
+    let locked = false;
+    try {
+      const o = window.screen?.orientation;
+      if (o?.lock) o.lock('landscape').then(() => { locked = true; }).catch(() => {});
+    } catch { /* not supported — the overlay covers it */ }
+    return () => { try { if (locked) window.screen?.orientation?.unlock?.(); } catch { /* ignore */ } };
+  }, []);
+  if (!portrait) return children;
+  return (
+    <div className="rotate-gate">
+      <div className="rotate-gate-art" aria-hidden="true">
+        <svg viewBox="0 0 64 64" fill="none">
+          <rect x="20" y="6" width="24" height="42" rx="4" stroke="url(#rg)" strokeWidth="3" />
+          <path d="M32 40.5h.02" stroke="url(#rg)" strokeWidth="3.4" strokeLinecap="round" />
+          <path d="M11 46a22 22 0 0 0 8 8" stroke="url(#rg)" strokeWidth="3" strokeLinecap="round" />
+          <path d="M12.5 39.5 10.5 47l7.5-1.5" stroke="url(#rg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe9a8" /><stop offset="1" stopColor="#e0991f" /></linearGradient></defs>
+        </svg>
+      </div>
+      <strong>Turn your phone sideways</strong>
+      <span>Lip Sync plays in landscape — your card and the battles need the width.</span>
+    </div>
+  );
+}
+
 function ScreenBody({ activeScreen, navigate, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
@@ -1547,15 +1609,15 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'bingoStyle') return <BingoStyleScreen navigate={navigate} />;
   if (activeScreen === 'tv') return <TvDisplayScreen />;
   if (activeScreen === 'lobby') return <LobbyScreen navigate={navigate} />;
-  if (activeScreen === 'playerCard') return <PlayerCardScreen navigate={navigate} />;
+  if (activeScreen === 'playerCard') return <RotateToPlay><PlayerCardScreen navigate={navigate} /></RotateToPlay>;
   if (activeScreen === 'host') return <HostScreen />;
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
   if (activeScreen === 'checkout') return <CheckoutScreen />;
   if (activeScreen === 'booking') return <TableBookingScreen />;
   if (activeScreen === 'bookingBoard') return <TableBookingBoardScreen />;
-  if (activeScreen === 'lipsyncBattle') return <LipSyncBattleScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
-  return <PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
+  if (activeScreen === 'lipsyncBattle') return <RotateToPlay><LipSyncBattleScreen isHost={session?.role === 'host' || session?.role === 'staff'} /></RotateToPlay>;
+  return <RotateToPlay><PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} /></RotateToPlay>;
 }
 
 // Landing role picker — the app entry gate. A user is one of three things,
