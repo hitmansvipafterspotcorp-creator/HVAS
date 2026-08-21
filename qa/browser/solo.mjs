@@ -124,6 +124,51 @@ ok(shareable,'the take is offered back to post — win or lose');
 const shareBtns=await js(`const el=document.querySelector('.share-take');return el?[...el.querySelectorAll('button')].map(b=>(b.innerText||'').trim()).join(' | '):'none';`);
 console.log('   [share offers]', shareBtns);
 
+console.log('\nKEPT ON THE PHONE');
+// The take should already be in the device's own store, not on any server.
+const stored = await jsA(`
+  return await new Promise((res) => {
+    const r = indexedDB.open('hvas-takes', 1);
+    r.onsuccess = () => { const db = r.result;
+      const os = db.transaction('takes','readonly').objectStore('takes');
+      const all = os.getAll();
+      all.onsuccess = () => { res((all.result||[]).map(t => ({ artist:t.artist, song:t.song, mode:t.mode, size:t.size }))); db.close(); };
+      all.onerror = () => { res('read-failed'); db.close(); };
+    };
+    r.onerror = () => res('open-failed');
+  });`);
+ok(Array.isArray(stored) && stored.length >= 1, `the take is written to this phone's own store (${Array.isArray(stored)?stored.length:stored})`);
+if (Array.isArray(stored) && stored[0]) {
+  ok(stored[0].size > 0, `and it is a real video, not an empty record (${Math.round((stored[0].size||0)/1024)} KB)`);
+  ok(stored[0].mode === 'solo', 'tagged as a solo take');
+  ok(!!stored[0].artist, `with the song it was performed to (${stored[0].artist} — ${stored[0].song})`);
+}
+
+// Survives a reload — that is what "saved" has to mean.
+await cdp('Page.navigate',{url:appUrl}); await settle(3000);
+const after = await jsA(`
+  return await new Promise((res) => {
+    const r = indexedDB.open('hvas-takes', 1);
+    r.onsuccess = () => { const db=r.result; const os=db.transaction('takes','readonly').objectStore('takes');
+      const c=os.count(); c.onsuccess=()=>{res(c.result); db.close();}; c.onerror=()=>{res(-1); db.close();}; };
+    r.onerror = () => res(-1);
+  });`);
+ok(after >= 1, `the take is still there after closing and reopening the app (${after})`);
+
+// And it is reachable in the Record tab with no venue connected at all.
+// A reload drops back to the door — the session is remembered, so this is one
+// tap rather than signing in again.
+await tapAny('Enter ·') || await tapAny('Member Sign In');
+await settle(2500);
+let onRecord=false;
+for(let i=0;i<20&&!onRecord;i++){await openTile('lobby');await settle(1300);onRecord=/solo vs cpu/i.test(await text());}
+await tap('Record'); await settle(1800);
+const rec = await text();
+ok(/your takes/i.test(rec), 'the Record tab shows the takes shelf with no venue connected');
+ok(/on this phone/i.test(rec), 'and says plainly that they are on this phone');
+const rows = await js(`return document.querySelectorAll('.take-row').length`);
+ok(rows >= 1, `the saved take is listed (${rows})`);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if(fail){const t=await text();console.log('\n--- screen ---\n'+t.slice(0,900));}
 ws.close();chrome.kill();web.close();

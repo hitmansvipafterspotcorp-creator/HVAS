@@ -1196,3 +1196,40 @@
 .solo-judging i:nth-child(3) { animation-delay: .32s; }
 @keyframes solo-judge { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-5px); } }
 @media (prefers-reduced-motion: reduce) { .solo-judging i { animation: none; opacity: .7; } }
+
+/* ── Your takes, kept on this phone ──────────────────────────────────────
+   A list of videos, so each row stays cheap until it is opened: the <video>
+   and its object URL are only created for the take being watched. */
+.takes-list { display: grid; gap: 6px; margin-top: 8px; }
+.take-row {
+  border-radius: var(--k-r); overflow: hidden;
+  border: 1px solid var(--k-edge-soft); background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
+}
+.take-row.is-open { border-color: var(--k-violet); }
+.take-head {
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 9px;
+  width: 100%; padding: 9px 10px; cursor: pointer; text-align: left;
+  background: none; border: 0; color: var(--k-text);
+}
+.take-when {
+  font: 900 9px/1.1 var(--k-font); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--k-text-faint); font-variant-numeric: tabular-nums;
+}
+.take-song { min-width: 0; display: grid; }
+.take-song strong {
+  font: 900 12px/1.2 var(--k-font); text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.take-song small {
+  font: 700 10px/1.2 var(--k-font); color: var(--k-text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.take-tag {
+  padding: 2px 6px; border-radius: 999px;
+  font: 900 7px/1.3 var(--k-font); letter-spacing: .1em;
+  border: 1px solid var(--k-edge-soft); color: var(--k-text-faint);
+}
+.take-tag--venue { border-color: var(--k-gold); color: var(--k-gold); }
+.take-tag--solo { border-color: var(--k-violet); color: var(--k-violet-lt); }
+.take-size { font: 700 9.5px/1 var(--k-font); color: var(--k-text-faint); font-variant-numeric: tabular-nums; }
+.take-body { padding: 0 10px 10px; display: grid; gap: 8px; }

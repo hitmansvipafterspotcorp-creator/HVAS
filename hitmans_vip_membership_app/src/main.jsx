@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import { listTakes, saveTake, removeTake, takesUsage, prettyBytes, MAX_TAKES } from './takes.js';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
@@ -3389,7 +3390,15 @@ function LipSyncBattlePanel({ battle, meId, onChanged, isHost }) {
       )}
       {mine?.state === 'declined' && <p className="battle-lost">You declined — this square is out for you.</p>}
       {iAmIn && battle.status === 'pending' && <p className="mem-fineprint">You're in. Waiting on the host to put you up.</p>}
-      {performing && battle.status === 'performing' && <BattleStage battle={battle} onDone={onChanged} onTake={setMyTake} />}
+      {performing && battle.status === 'performing' && (
+        <BattleStage battle={battle} onDone={onChanged}
+                     onTake={(blob) => {
+                       setMyTake(blob);
+                       // Kept on this phone, not uploaded. A failed save must
+                       // not disturb the battle, so nothing waits on it.
+                       saveTake({ blob, artist: battle.artist, song: battle.song, mode: 'venue' });
+                     }} />
+      )}
       {myTake && <SharePerformance blob={myTake} artist={battle.artist} song={battle.song} />}
       {!performing && battle.status === 'performing' && (
         <BattleWatch battleId={battle.id} label={`${battle.artist} — ${battle.song}`} />
@@ -4159,7 +4168,10 @@ function SoloBattle({ battle, cpu, onSettled }) {
     return (
       <BattleStage
         battle={{ ...battle, solo: true }}
-        onTake={(blob) => setTake(blob)}
+        onTake={(blob) => {
+          setTake(blob);
+          saveTake({ blob, artist: battle.artist, song: battle.song, mode: 'solo' });
+        }}
         onDone={() => setStage('judging')}
       />
     );
@@ -4941,6 +4953,79 @@ function HostMode({ navigate }) {
 // A member's career, and where they sit in the venue. The round resets every
 // night; this does not, which is the point. Shown as a tab in Lip Sync Bingo
 // so it is one tap from the game rather than buried in a profile.
+// Your takes, on your phone. Shown in the Record tab above the venue stats,
+// and — unlike those stats — available with no venue, no signal and no account,
+// because the videos never left the device in the first place.
+function MyTakes() {
+  const [takes, setTakes] = useState(null);
+  const [usage, setUsage] = useState({ count: 0, bytes: 0 });
+  const [open, setOpen] = useState(null);        // id of the take being watched
+  const urls = useRef(new Map());
+
+  const load = useCallback(async () => {
+    const rows = await listTakes();
+    setTakes(rows);
+    setUsage(await takesUsage());
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  // Object URLs are handed out per take and revoked together on unmount —
+  // holding a video blob URL open is a real leak on a phone.
+  useEffect(() => () => { for (const u of urls.current.values()) URL.revokeObjectURL(u); urls.current.clear(); }, []);
+  const urlFor = (t) => {
+    if (!urls.current.has(t.id)) urls.current.set(t.id, URL.createObjectURL(t.blob));
+    return urls.current.get(t.id);
+  };
+
+  const drop = async (t) => {
+    await removeTake(t.id);
+    const u = urls.current.get(t.id);
+    if (u) { URL.revokeObjectURL(u); urls.current.delete(t.id); }
+    if (open === t.id) setOpen(null);
+    await load();
+  };
+
+  if (takes === null) return null;
+  if (!takes.length) {
+    return (
+      <AppPanel title="Your takes" subtitle="Saved on this phone">
+        <p className="mem-fineprint">
+          Perform a LIP SYNC square and the video is kept here — on your phone, not the venue's.
+          Post it whenever you want, or delete it and it is gone.
+        </p>
+      </AppPanel>
+    );
+  }
+  return (
+    <AppPanel title="Your takes" subtitle={`${usage.count} on this phone · ${prettyBytes(usage.bytes)}`}>
+      <p className="mem-fineprint">
+        These never leave your phone unless you post them. The last {MAX_TAKES} are kept — older ones drop off.
+      </p>
+      <div className="takes-list">
+        {takes.map((t) => (
+          <div key={t.id} className={`take-row${open === t.id ? ' is-open' : ''}`}>
+            <button type="button" className="take-head" onClick={() => setOpen(open === t.id ? null : t.id)}>
+              <span className="take-when">{new Date(t.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+              <span className="take-song">
+                <strong>{t.artist || 'Your take'}</strong>
+                <small>{t.song}</small>
+              </span>
+              <span className={`take-tag take-tag--${t.mode}`}>{t.mode === 'venue' ? 'VENUE' : 'SOLO'}</span>
+              <span className="take-size">{prettyBytes(t.size)}</span>
+            </button>
+            {open === t.id && (
+              <div className="take-body">
+                <video className="share-preview" src={urlFor(t)} controls playsInline />
+                <SharePerformance blob={t.blob} artist={t.artist} song={t.song} />
+                <button type="button" className="bingo-btn ghost" onClick={() => drop(t)}>Delete this take</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </AppPanel>
+  );
+}
+
 function PlayerRecord() {
   const [stats, setStats] = useState(null);
   const [board, setBoard] = useState(null);
@@ -4955,9 +5040,20 @@ function PlayerRecord() {
     })();
     return () => { live = false; };
   }, []);
-  if (!apiEnabled()) return <AppPanel title="Your record" subtitle="Not connected"><p className="mem-fineprint">Connect to the venue to see your record and the leaderboard.</p></AppPanel>;
-  if (err) return <AppPanel title="Your record" subtitle="Offline"><p className="dash-empty">{err}</p></AppPanel>;
-  if (!stats) return <AppPanel title="Your record" subtitle="Loading…"><p className="dash-empty">Reading your card…</p></AppPanel>;
+  // Takes are on the phone, so they are shown whether or not there is a venue
+  // to talk to — that is the whole point of keeping them locally.
+  if (!apiEnabled()) {
+    return (
+      <>
+        <MyTakes />
+        <AppPanel title="Your record" subtitle="Not connected">
+          <p className="mem-fineprint">Connect to the venue to see your nights, titles and the leaderboard. Your takes above are on this phone either way.</p>
+        </AppPanel>
+      </>
+    );
+  }
+  if (err) return <><MyTakes /><AppPanel title="Your record" subtitle="Offline"><p className="dash-empty">{err}</p></AppPanel></>;
+  if (!stats) return <><MyTakes /><AppPanel title="Your record" subtitle="Loading…"><p className="dash-empty">Reading your card…</p></AppPanel></>;
   const cells = [
     ['Nights', stats.nights],
     ['Rounds won', stats.roundsWon],
@@ -4968,6 +5064,7 @@ function PlayerRecord() {
   ];
   return (
     <>
+      <MyTakes />
       <AppPanel title="Your record" subtitle={stats.playedTonight ? 'You have played tonight' : 'Not played yet tonight'}>
         <div className="rec-title k-frame k-frame--gold">
           <span className="k-label">Your title</span>

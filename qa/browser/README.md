@@ -5,7 +5,7 @@ app promises cannot be asserted from the server:
 
 | file | covers |
 |---|---|
-| `solo.mjs` | Solo vs CPU: lip sync squares are performed for, passing forfeits them, a take comes back ready to post. Runs with no backend at all. |
+| `solo.mjs` | Solo vs CPU: lip sync squares are performed for, passing forfeits them, a take comes back ready to post — and is kept on the phone, surviving a reload, listed in the Record tab with no venue at all. Runs with no backend. |
 | `lipsync-battle.mjs` | Standalone Lip Sync Battle: sign in, open the screen, join a lobby, watch a bout arrive. |
 | `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; and sideways-play-only in both orientations. |
 
