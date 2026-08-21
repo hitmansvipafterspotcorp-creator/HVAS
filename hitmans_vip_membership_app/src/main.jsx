@@ -1861,11 +1861,28 @@ function ConnectVenue() {
           <button type="button" onClick={() => { disconnectVenue(); window.location.reload(); }}>Disconnect</button>
         </div>
         {showQR && (
-          <JoinQR
-            url={`${window.location.origin}${window.location.pathname}?connect=${encodeURIComponent(base)}`}
-            label={base}
-            onClose={() => setShowQR(false)}
-          />
+          // "localhost" means THIS device, whatever device is reading it. A QR
+          // built from it sends every phone that scans it to itself, which is
+          // the one address guaranteed not to have a venue on it. Say so rather
+          // than handing out a code that cannot work.
+          /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|$|\/)/i.test(base) ? (
+            <div className="join-qr-wrap">
+              <p className="gate-err">This venue is connected as <b>{base}</b>.</p>
+              <p className="mem-fineprint">
+                “localhost” means whichever device is reading it — so a QR made from this
+                would send every phone to itself. Disconnect, then reconnect using the
+                public link from the tunnel window (or this laptop’s address on the venue
+                wifi, like http://192.168.1.20:8787). Then this QR works for everyone.
+              </p>
+              <button type="button" className="bingo-btn ghost" onClick={() => setShowQR(false)}>Close</button>
+            </div>
+          ) : (
+            <JoinQR
+              url={`${window.location.origin}${window.location.pathname}?connect=${encodeURIComponent(base)}`}
+              label={base}
+              onClose={() => setShowQR(false)}
+            />
+          )
         )}
       </div>
     );
