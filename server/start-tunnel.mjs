@@ -11,6 +11,58 @@ import path from 'node:path';
 const PORT = process.env.HVAS_PORT || 8787;
 const APP_URL = process.env.HVAS_APP_URL || 'https://hitmansvipafterspotcorp-creator.github.io/HVAS/';
 
+// ── Tailscale Funnel ─────────────────────────────────────────────────────
+// A quick tunnel mints a new random address every launch, which is useless for
+// a game people play from other cities: the link you gave someone last week is
+// dead and so is the QR on the flyer. A named Cloudflare tunnel fixes that but
+// needs a domain.
+//
+// Funnel gives the same thing for free and without one: a permanent HTTPS
+// address on the machine's own tailnet name. If it is set up, it wins.
+function tailscaleBin() {
+  const explicit = process.env.TAILSCALE_PATH;
+  if (explicit && existsSync(explicit)) return explicit;
+  if (process.platform === 'win32') {
+    const p = 'C:\\Program Files\\Tailscale\\tailscale.exe';
+    if (existsSync(p)) return p;
+    return 'tailscale.exe';
+  }
+  return 'tailscale';
+}
+
+// The machine's public Funnel address, or null if Funnel is not usable here.
+function funnelUrl() {
+  return new Promise((res) => {
+    const bin = tailscaleBin();
+    const child = spawn(bin, ['status', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.on('error', () => res(null));
+    child.on('close', () => {
+      try {
+        const st = JSON.parse(out);
+        // DNSName is the stable name this machine answers on, e.g.
+        // "dabiggest.tail1234.ts.net." — trailing dot and all.
+        const dns = String(st?.Self?.DNSName || '').replace(/\.$/, '');
+        res(dns ? `https://${dns}` : null);
+      } catch { res(null); }
+    });
+  });
+}
+
+// Point Funnel at the venue. Idempotent — running it again on an already
+// served port is fine.
+function startFunnel(port) {
+  return new Promise((res) => {
+    const child = spawn(tailscaleBin(), ['funnel', '--bg', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    child.on('error', () => res({ ok: false, out: 'tailscale not found' }));
+    child.on('close', (code) => res({ ok: code === 0, out }));
+  });
+}
+
 function findCloudflared() {
   const explicit = process.env.CLOUDFLARED_PATH;
   if (explicit && existsSync(explicit)) return explicit;
@@ -43,14 +95,39 @@ const namedHostname = () => {
   } catch { return null; }
 };
 
+// Set once a public address has been announced, so nothing announces twice.
+let found = false;
+
+// Prefer a permanent address over a disposable one, always. Funnel first
+// (free, no domain, never changes), then a named Cloudflare tunnel, and a
+// quick tunnel only when there is nothing else.
+const funnel = await funnelUrl();
+if (funnel) {
+  console.log(`Serving this venue on your Tailscale address -> http://localhost:${PORT} ...\n`);
+  const started = await startFunnel(PORT);
+  if (started.ok) {
+    announce(funnel, true);
+  } else {
+    console.log('Tailscale is installed but Funnel would not start:');
+    console.log(started.out.trim().split('\n').slice(0, 4).map((l) => `  ${l}`).join('\n'));
+    console.log('\nUsually this means Funnel is not enabled for the tailnet yet:');
+    console.log('  admin console -> DNS -> MagicDNS + HTTPS Certificates');
+    console.log('  admin console -> Access controls -> allow Funnel');
+    console.log('\nFalling back to a temporary Cloudflare link for now.\n');
+  }
+}
+
 const args = named
   ? ['tunnel', '--config', CONFIG, 'run']
   : ['tunnel', '--url', `http://localhost:${PORT}`];
-console.log(named
-  ? `Starting your named Cloudflare Tunnel (${bin}) -> http://localhost:${PORT} ...\n`
-  : `Starting a QUICK Cloudflare Tunnel (${bin}) -> http://localhost:${PORT} ...\n`);
+if (!found) {
+  console.log(named
+    ? `Starting your named Cloudflare Tunnel (${bin}) -> http://localhost:${PORT} ...\n`
+    : `Starting a QUICK Cloudflare Tunnel (${bin}) -> http://localhost:${PORT} ...\n`);
+}
 
-const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+const child = found ? { stdout: { on() {} }, stderr: { on() {} }, on() {}, kill() {} }
+                    : spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
 child.on('error', (e) => {
   console.log(`\nCouldn't start cloudflared: ${e.message}`);
@@ -115,8 +192,7 @@ async function waitUntilReachable(url, timeoutMs = 60000) {
   return { ok: false, local, lastPublic };
 }
 
-let found = false;
-const announce = (url, permanent) => {
+function announce(url, permanent) {
   found = true;
 
   const connectUrl2 = `${APP_URL}?connect=${encodeURIComponent(url)}`;
@@ -157,7 +233,7 @@ const announce = (url, permanent) => {
     console.log('\nOnce it opens, go to My Pass -> "Show join QR" to share with everyone else tonight.');
     console.log('Keep this window AND the HVAS Server window open all night.\n');
   });
-};
+}
 
 const onData = (buf) => {
   const text = buf.toString();
