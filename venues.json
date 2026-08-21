@@ -1,0 +1,5 @@
+{
+  "_comment": "Rooms running HVAS. Served from the app's own permanent address, so a member never needs a link that can die. Each venue is identified by the id its own database generated once; the url is only where it happens to be reachable right now. Publish an update with: node server/publish-beacon.mjs <public-url>",
+  "updatedAt": 0,
+  "venues": []
+}
