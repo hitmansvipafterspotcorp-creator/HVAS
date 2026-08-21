@@ -28,7 +28,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
   apiBookingRequest, apiBookingMine, apiBookingCancel, apiBookingBoard, apiBookingDecide } from './api.js';
 import { paypalConfigured, tierPayable, planFor, loadPayPal, paypalMeEnabled, paypalMeLink } from './paypal.js';
-import { hubOn, hubDeclined, startHub, stopHub, hubNode } from './hub.js';
+import { hubOn, startHub, stopHub, hubNode } from './hub.js';
 import { playSfx, sfxMuted, setSfxMuted } from './sfx.js';
 
 // ── Membership: the one source of truth ──────────────────────────────────
@@ -1205,12 +1205,17 @@ function App() {
         .catch(() => setConnectError({ url: saved, stale: true }));
       return;
     }
-    // The app IS the backend by default: it runs its own in-browser hub in
-    // the background so the social layer has something to attach to even
-    // with no server connected. Skipped if the user explicitly stopped
-    // hosting (e.g. to connect to a real venue backend instead) — otherwise
-    // that choice gets silently reverted on the very next boot.
-    if (!hubDeclined()) startHub();
+    // Hosting resumes for a device that WAS hosting, and only for that device.
+    //
+    // This used to start on any device with no venue connected, which meant a
+    // member opening the public link for the very first time was told they
+    // were "the venue hub" under a yellow DEMO MODE warning — two pieces of
+    // jargon that mean nothing to someone who just wants to play, on a screen
+    // whose actual job is to get them connected to a room. There is a rooms
+    // list and a Connect button right there; those are the right first thing
+    // to see. Being the hub is a real feature, but it is a choice somebody
+    // makes on purpose, not a state they wake up in.
+    if (hubOn()) startHub();
   }, []);
 
   // Signing out (from anywhere — the door or the profile) clears the member
