@@ -7,6 +7,7 @@ app promises cannot be asserted from the server:
 |---|---|
 | `solo.mjs` | Solo vs CPU: lip sync squares are performed for, passing forfeits them, a take comes back ready to post — and is kept on the phone, surviving a reload, listed in the Record tab with no venue at all. Runs with no backend. |
 | `lipsync-battle.mjs` | Standalone Lip Sync Battle: sign in, open the screen, join a lobby, watch a bout arrive. |
+| `offline.mjs` | The venue loses its internet: the laptop in the room keeps serving, and a member can still load the app from their phone's cache and reach the live round. |
 | `rooms.mjs` | The venue's permanent id, the room directory, and the one that matters: move a venue to a completely different address and the member's app reconnects itself with no failure screen and nothing to type. |
 | `card-and-rotation.mjs` | The card holds its order as songs are called; auto-fill; sideways-play-only in both orientations; and play-along keeping the video frame sealed so its title cannot be read. |
 

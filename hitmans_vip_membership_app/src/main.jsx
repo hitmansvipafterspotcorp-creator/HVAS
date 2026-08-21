@@ -6911,10 +6911,20 @@ function AssetButton({ src, label }) {
 createRoot(document.getElementById('root')).render(<App />);
 
 // Register the PWA service worker — this is what makes "Add to Home Screen" /
-// the Android install prompt available at all. First, kill any OTHER service
-// worker + cache this origin might already have (e.g. the old cache-first
-// legacy-app worker, which serves stale content forever and never rechecks
-// the network) so it can't keep shadowing real deploys.
+// the Android install prompt available at all, and what keeps the app loadable
+// when the venue loses its internet.
+//
+// Any OTHER worker on this origin is still unregistered on sight: the old
+// cache-first legacy-app worker serves stale content forever and would shadow
+// real deploys.
+//
+// What is NOT done here any more is emptying the caches. That ran on every
+// page load, which meant the offline cache was destroyed a moment after it was
+// filled and the app could never actually survive losing the network — the
+// exact thing it is for. Clearing old caches belongs to the worker's own
+// activate handler, which deletes everything that is not the current version
+// (including the legacy one) and does it once per deploy instead of once per
+// load.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     const swUrl = `${import.meta.env.BASE_URL}sw.js`;
@@ -6925,10 +6935,6 @@ if ('serviceWorker' in navigator) {
         if (!active || !active.scriptURL.endsWith('/sw.js')) return r.unregister();
         return Promise.resolve();
       }));
-    } catch { /* ignore */ }
-    try {
-      const names = await caches.keys();
-      await Promise.all(names.map((n) => caches.delete(n)));
     } catch { /* ignore */ }
     navigator.serviceWorker.register(swUrl).catch(() => {});
   });
