@@ -58,6 +58,24 @@ child.on('error', (e) => {
   console.log('If it\'s somewhere else, set CLOUDFLARED_PATH to its full path and try again.');
 });
 
+
+// Tell the room directory where this venue is now. Runs the same script a host
+// would run by hand; failure here never affects the night, so it reports and
+// moves on rather than throwing.
+function publishBeacon(publicUrl) {
+  const script = path.join(path.dirname(fileURLToPath(import.meta.url)), 'publish-beacon.mjs');
+  if (!existsSync(script)) return;
+  const child = spawn(process.execPath, [script, publicUrl], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '';
+  child.stdout.on('data', (d) => (out += d));
+  child.stderr.on('data', (d) => (out += d));
+  child.on('error', () => console.log('(Could not update the room directory — the link above still works.)'));
+  child.on('close', () => {
+    const line = out.split('\n').find((l) => /Published|not pushed|Wrote/.test(l));
+    console.log(line ? `\n[rooms] ${line.trim()}` : '\n[rooms] directory not updated — the link above still works.');
+  });
+}
+
 function openBrowser(url) {
   const opener = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
   const openerArgs = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
@@ -131,6 +149,11 @@ const announce = (url, permanent) => {
     }
     console.log('Confirmed reachable. Opening the app now, already connected to this venue...');
     openBrowser(connectUrl2);
+    // Put the room on the map without anyone having to remember to. The link
+    // moves every restart on a quick tunnel, and the whole point of the venue
+    // having a permanent id is that members should never chase it — but only
+    // if something actually publishes where it moved to.
+    publishBeacon(url);
     console.log('\nOnce it opens, go to My Pass -> "Show join QR" to share with everyone else tonight.');
     console.log('Keep this window AND the HVAS Server window open all night.\n');
   });
