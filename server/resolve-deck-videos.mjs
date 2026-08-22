@@ -50,6 +50,92 @@ if (!KEY && !has('dry')) {
   process.exit(1);
 }
 
+// Confirm every id already resolved will actually play, before a room finds out
+// it will not.
+//
+// This is the cheap half of the API: videos.list takes fifty ids per call and
+// costs ONE unit, where a search costs a hundred. Checking all 369 squares is
+// eight units — nothing — so there is no reason not to do it after a resolve
+// run, or before a big night.
+//
+// What it is looking for is not just "does this id exist":
+//   • embeddable      — a video that refuses embedding plays nowhere in this app
+//   • public          — private or unlisted uploads vanish without warning
+//   • region blocked  — fine in the venue, dead for a member playing elsewhere
+//   • duration        — a 30-second snippet has no verse-into-hook to cut, and a
+//                       one-hour mix is somebody's compilation, not the record
+if (has('verify')) {
+  const entries = Object.entries(DECK_VIDEO_IDS);
+  if (!entries.length) { console.log('\n  No ids to check yet — run the resolver first.\n'); process.exitCode = 1; }
+  else if (!KEY) { console.log('\n  Checking needs the API key (it is the cheap part of the API — 1 unit per 50).\n'); process.exitCode = 1; }
+  else {
+    // Which song each id belongs to, for a report that names names.
+    const song = {};
+    for (const deck of Object.values(BINGO_DECKS)) for (const it of deck.items) song[it.id] = `${it.artist} — ${it.song}`;
+
+    const iso = (d) => {
+      const m = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(d || '') || [];
+      return (+(m[1] || 0)) * 3600 + (+(m[2] || 0)) * 60 + (+(m[3] || 0));
+    };
+    // Almost every music video is blocked SOMEWHERE, and a country that is not
+    // this one does not matter. The first version of this reported "blocked in
+    // 1 countries" for two perfectly good videos, which is the kind of warning
+    // that teaches people to ignore warnings. Only this venue's country counts.
+    const HOME = (process.env.HVAS_COUNTRY || arg('country', 'US')).toUpperCase();
+    const regionProblem = (rr) => {
+      if (!rr) return false;
+      if (rr.blocked?.length && rr.blocked.includes(HOME)) return true;
+      if (rr.allowed?.length && !rr.allowed.includes(HOME)) return true;
+      return false;
+    };
+    const problems = [];
+    let checked = 0;
+    console.log(`\n  Checking ${entries.length} videos for ${HOME} (${Math.ceil(entries.length / 50)} calls, 1 unit each)\n`);
+
+    for (let i = 0; i < entries.length; i += 50) {
+      const batch = entries.slice(i, i + 50);
+      const u = 'https://www.googleapis.com/youtube/v3/videos?part=snippet,status,contentDetails'
+        + `&id=${batch.map(([, v]) => v).join(',')}&key=${KEY}`;
+      let j;
+      try {
+        const r = await fetch(u, { signal: AbortSignal.timeout(20000) });
+        j = await r.json();
+        if (!r.ok) { console.log(`  API answered ${r.status}: ${j?.error?.message || ''}`); break; }
+      } catch (e) { console.log(`  Could not reach the API: ${e.message}`); break; }
+
+      const by = {};
+      for (const v of j.items || []) by[v.id] = v;
+      for (const [id, videoId] of batch) {
+        checked += 1;
+        const v = by[videoId];
+        const name = song[id] || id;
+        if (!v) { problems.push(`GONE          ${name}  (${videoId})`); continue; }
+        if (v.status?.embeddable === false) problems.push(`NOT EMBEDDABLE ${name}  (${videoId})`);
+        else if (v.status?.privacyStatus !== 'public') problems.push(`${String(v.status?.privacyStatus).toUpperCase().padEnd(14)} ${name}  (${videoId})`);
+        else if (regionProblem(v.contentDetails?.regionRestriction))
+          problems.push(`BLOCKED IN ${HOME}   ${name}  (${videoId})`);
+        else {
+          const secs = iso(v.contentDetails?.duration);
+          if (secs && secs < 60) problems.push(`TOO SHORT (${secs}s) ${name}  (${videoId})`);
+          else if (secs > 12 * 60) problems.push(`TOO LONG (${Math.round(secs / 60)}m) ${name}  — probably a mix (${videoId})`);
+        }
+      }
+    }
+
+    console.log(`  ${checked} checked, ${problems.length} to look at`);
+    if (problems.length) {
+      console.log('');
+      for (const p2 of problems) console.log(`    ${p2}`);
+      console.log('\n  Fix one by deleting its line from src/deck-videos.mjs and running the');
+      console.log('  resolver again — it only fills in what is missing, so it will re-look-up');
+      console.log('  just that song.\n');
+      process.exitCode = 1;
+    } else {
+      console.log('\n  Every square has a real, public, embeddable video of a sensible length.\n');
+    }
+  }
+} else {
+
 // One call, and say plainly what came back. Guessing at a key from the other
 // side of a network is hopeless; this asks it directly.
 if (has('check-key')) {
@@ -341,4 +427,5 @@ if (ok) console.log(`\n  Now run:  node gen-client-decks.mjs\n  then commit both
 if (left > 0) console.log(`\n  ${left} left — run this again to carry on.`);
 console.log('');
 
+}
 }
