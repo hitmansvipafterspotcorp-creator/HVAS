@@ -331,7 +331,15 @@ let useApi = !!KEY && !has('free');
 if (!useApi) console.log('  using the no-quota lookup\n');
 
 for (const [id, item] of wanted) {
-  if (ok + missed >= budget && useApi) break;
+  // The budget caps API CALLS, not songs. It used to stop the whole run at 95
+  // even when every single lookup had come back from the free path and had cost
+  // nothing at all — which is exactly what happened on the first good run: 95
+  // resolved, 0 failed, 274 left for no reason. Reaching the budget just means
+  // stop spending units; it does not mean stop working.
+  if (useApi && apiCalls >= budget) {
+    console.log(`\n  API budget of ${budget} reached — carrying on with the free lookup.\n`);
+    useApi = false;
+  }
   const q = searchQuery(item.artist, item.song);
   let videoId = null, title = '', author = '', how = '';
 
