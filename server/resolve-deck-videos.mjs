@@ -22,6 +22,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BINGO_DECKS } from './src/decks.mjs';
 import { DECK_VIDEO_IDS } from './src/deck-videos.mjs';
+import { videoIdsFrom, searchQuery, looksRight } from './src/yt-search.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, 'src/deck-videos.mjs');
@@ -68,13 +69,59 @@ const known = Object.keys(DECK_VIDEO_IDS).length;
 console.log(`\n  ${known} songs already have an id`);
 console.log(`  ${wanted.size} still need one${onlyDeck ? ` in "${onlyDeck}"` : ''}`);
 if (!wanted.size) { console.log('\nNothing to do — every song has a video.\n'); process.exit(0); }
-console.log(`  doing up to ${budget} now (each costs 100 of your 10,000 daily units)\n`);
+console.log(`  up to ${budget} via the API (100 units each); the rest cost nothing\n`);
 
 if (has('dry')) {
   for (const [, it] of [...wanted].slice(0, budget)) console.log(`   ${it.artist} — ${it.song}`);
   console.log(`\n(dry run — nothing looked up, nothing written)\n`);
   process.exit(0);
 }
+
+// ── Finding an id without spending quota ────────────────────────────────────
+//
+// search.list costs 100 units and a project gets 10,000 a day, so the full deck
+// list is four days of quota. That is not a workable answer for the one thing
+// the game is built on, so there is a second path.
+//
+// It reads the same public search page a browser gets and takes the first
+// result's id out of the ytInitialData blob the page ships with. No key, no
+// quota, no account. The backend already reads public watch pages this way for
+// hook detection, so the venue is not doing anything here it was not doing
+// already — and the id is only ever used to embed the video in YouTube's own
+// player, which serves YouTube's ads and counts YouTube's views.
+//
+// It is HTML, so it can change shape without warning. Every id is checked
+// through oEmbed afterwards, which is a documented public endpoint: it confirms
+// the video exists AND that it is embeddable, and it hands back the real title
+// so a bad match is visible rather than silent.
+const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+             'Accept-Language': 'en-US,en;q=0.9' };
+
+const oembed = async (videoId) => {
+  const u = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
+  try {
+    const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return null;                       // 401/404 here means not embeddable
+    const j = await r.json();
+    return { title: j.title || '', author: j.author_name || '' };
+  } catch { return null; }
+};
+
+const lookupFree = async (q) => {
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+  const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+  if (!r.ok) return { error: `search page answered ${r.status}` };
+  const html = await r.text();
+  // Take the first handful and keep the first that oEmbed will actually serve,
+  // so a top result that cannot be embedded does not become a silent dead song.
+  const ids = videoIdsFrom(html).slice(0, 5);
+  if (!ids.length) return { error: 'no video id in the search page — the page shape may have changed' };
+  for (const id of ids) {
+    const meta = await oembed(id);
+    if (meta) return { videoId: id, title: meta.title, author: meta.author };
+  }
+  return { error: 'nothing in the first results is embeddable' };
+};
 
 const write = (map) => {
   const head = readFileSync(OUT, 'utf8').split('export const DECK_VIDEO_IDS')[0];
@@ -83,44 +130,72 @@ const write = (map) => {
 };
 
 const found = { ...DECK_VIDEO_IDS };
-let used = 0, ok = 0, missed = 0;
+let ok = 0, missed = 0, apiCalls = 0;
+const doubtful = [];
+// --free skips the API entirely; otherwise the API leads and this flips the
+// moment quota runs out, so one run finishes the job either way.
+let useApi = !!KEY && !has('free');
+if (!useApi) console.log('  using the no-quota lookup\n');
 
 for (const [id, item] of wanted) {
-  if (used >= budget) break;
-  const q = `${item.artist} ${item.song}`;
-  const url = 'https://www.googleapis.com/youtube/v3/search'
-    + '?part=snippet&type=video&maxResults=1&videoEmbeddable=true&videoSyndicated=true'
-    + `&q=${encodeURIComponent(q)}&key=${KEY}`;
-  used += 1;
-  let res;
-  try { res = await fetch(url, { signal: AbortSignal.timeout(15000) }); }
-  catch (e) { console.log(`   ✗ ${q} — ${e.message}`); missed += 1; continue; }
+  if (ok + missed >= budget && useApi) break;
+  const q = searchQuery(item.artist, item.song);
+  let videoId = null, title = '', how = '';
 
-  if (res.status === 403) {
-    const why = await res.text().catch(() => '');
-    // Out of quota is the expected end of a run, not a failure. Everything
-    // found so far is already on disk.
-    console.log(/quota/i.test(why)
-      ? `\n  Daily quota is gone — that is normal. ${ok} saved this run.\n  Run this again tomorrow to carry on.\n`
-      : `\n  YouTube refused the key (403). Check it is a YouTube Data API v3 key\n  with no HTTP-referrer restriction (this runs from a terminal, not a page).\n`);
-    break;
+  if (useApi) {
+    const url = 'https://www.googleapis.com/youtube/v3/search'
+      + '?part=snippet&type=video&maxResults=1&videoEmbeddable=true&videoSyndicated=true'
+      + `&q=${encodeURIComponent(q)}&key=${KEY}`;
+    apiCalls += 1;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (res.status === 403) {
+        const why = await res.text().catch(() => '');
+        if (/quota/i.test(why)) {
+          console.log(`\n  Daily API quota is gone after ${apiCalls - 1} lookups.`);
+          console.log('  Switching to the no-quota lookup — this run will still finish.\n');
+        } else {
+          console.log('\n  YouTube refused the key (403). Check it is a YouTube Data API v3 key');
+          console.log('  with no HTTP-referrer restriction — this runs from a terminal, not a page.');
+          console.log('  Carrying on without it.\n');
+        }
+        useApi = false;
+      } else if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        videoId = json?.items?.[0]?.id?.videoId || null;
+        title = json?.items?.[0]?.snippet?.title || '';
+        how = 'api';
+      }
+    } catch (e) { console.log(`   … ${q} — ${e.message}, trying the other way`); }
   }
-  if (!res.ok) { console.log(`   ✗ ${q} — YouTube answered ${res.status}`); missed += 1; continue; }
 
-  const json = await res.json().catch(() => ({}));
-  const vid = json?.items?.[0]?.id?.videoId;
-  const title = json?.items?.[0]?.snippet?.title || '';
-  if (!vid) { console.log(`   ✗ ${q} — nothing embeddable came back`); missed += 1; continue; }
+  if (!videoId) {
+    const r = await lookupFree(q);
+    if (r.videoId) { videoId = r.videoId; title = r.title; how = 'free'; }
+    else { console.log(`   ✗ ${q} — ${r.error}`); missed += 1; continue; }
+    // Be a good guest: this is somebody else's public page, read once per song.
+    await new Promise((r2) => setTimeout(r2, 400));
+  }
 
-  found[id] = vid;
+  found[id] = videoId;
   ok += 1;
   write(found);                                    // after every one, so a crash costs nothing
-  console.log(`   ✓ ${item.artist} — ${item.song}  →  ${vid}  ${title.slice(0, 46)}`);
+  // A wrong match is worse than a miss: the square plays the wrong record and
+  // nobody can work it out by ear. Flag the doubtful ones so they can be
+  // checked, rather than burying them in a wall of ticks.
+  const sure = !title || looksRight(item.artist, item.song, title);
+  console.log(`   ${sure ? '✓' : '?'} ${item.artist} — ${item.song}  →  ${videoId}  [${how}] ${title.slice(0, 44)}`);
+  if (!sure) doubtful.push(`${item.artist} — ${item.song}  →  ${title.slice(0, 60)}  (${videoId})`);
 }
 
 const left = wanted.size - ok;
 console.log(`\n  ${ok} resolved, ${missed} could not be matched, ${left} still to do.`);
 console.log(`  Written to src/deck-videos.mjs`);
+if (doubtful.length) {
+  console.log(`\n  ${doubtful.length} match${doubtful.length === 1 ? '' : 'es'} to eyeball — the title did not obviously match the song:`);
+  for (const d of doubtful) console.log(`    ? ${d}`);
+  console.log('  Fix any wrong one by editing its id in src/deck-videos.mjs.');
+}
 if (ok) console.log(`\n  Now run:  node gen-client-decks.mjs\n  then commit both files so the app ships with them.`);
-if (left > 0) console.log(`\n  ${left} left — run this again tomorrow, or pass --deck <id> to prioritise one.`);
+if (left > 0) console.log(`\n  ${left} left — run this again to carry on.`);
 console.log('');
