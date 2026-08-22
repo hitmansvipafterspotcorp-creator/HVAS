@@ -50,6 +50,44 @@ if (!KEY && !has('dry')) {
   process.exit(1);
 }
 
+// One call, and say plainly what came back. Guessing at a key from the other
+// side of a network is hopeless; this asks it directly.
+if (has('check-key')) {
+  if (!KEY) {
+    console.log('\n  No key found.\n  Expected YOUTUBE_API_KEY=... in server/.env\n');
+    process.exit(1);
+  }
+  console.log(`\n  Key found: ${KEY.slice(0, 10)}…${KEY.slice(-4)}  (${KEY.length} chars)`);
+  const u = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1'
+    + `&q=${encodeURIComponent('Usher Yeah official audio')}&key=${KEY}`;
+  let r;
+  try { r = await fetch(u, { signal: AbortSignal.timeout(15000) }); }
+  catch (e) { console.log(`\n  Could not reach the API at all: ${e.message}\n`); process.exit(1); }
+  const body = await r.text().catch(() => '');
+  console.log(`  HTTP ${r.status}\n`);
+  let j = {};
+  try { j = JSON.parse(body); } catch { /* not json */ }
+  if (r.ok) {
+    const n = j?.items?.length || 0;
+    console.log(n ? `  Working — found "${j.items[0].snippet.title}"\n`
+                  : `  Answered 200 but returned nothing, which is unusual.\n  Raw: ${body.slice(0, 300)}\n`);
+  } else {
+    const reason = j?.error?.errors?.[0]?.reason || '';
+    const msg = j?.error?.message || body.slice(0, 300);
+    console.log(`  Reason: ${reason || '(none given)'}`);
+    console.log(`  Message: ${msg}\n`);
+    if (/accessNotConfigured|SERVICE_DISABLED/i.test(reason + msg))
+      console.log('  FIX: YouTube Data API v3 is not switched on for this key\u2019s project.\n       Google Cloud console -> APIs & Services -> Library -> YouTube Data API v3 -> Enable.\n');
+    else if (/ipRefererBlocked|referer|API_KEY_HTTP/i.test(reason + msg))
+      console.log('  FIX: the key is restricted to websites. This runs in a terminal, so it has\n       no referrer. Either drop the restriction or add an IP restriction instead.\n');
+    else if (/quota/i.test(reason + msg))
+      console.log('  Out of quota for today. It resets at midnight Pacific.\n');
+    else if (/keyInvalid|API key not valid/i.test(reason + msg))
+      console.log('  FIX: the key itself is not valid. Copy it again from the Cloud console.\n');
+  }
+  process.exit(r.ok ? 0 : 1);
+}
+
 const onlyDeck = arg('deck');
 const budget = Number(arg('budget', '95'));     // a little under the 100/day a default quota allows
 
@@ -66,7 +104,7 @@ for (const [deckId, deck] of Object.entries(BINGO_DECKS)) {
 }
 
 const known = Object.keys(DECK_VIDEO_IDS).length;
-console.log(`\n  ${known} songs already have an id`);
+console.log(`\n  ${known} songs already have an id  (${OUT})`);
 console.log(`  ${wanted.size} still need one${onlyDeck ? ` in "${onlyDeck}"` : ''}`);
 if (!wanted.size) { console.log('\nNothing to do — every song has a video.\n'); process.exit(0); }
 console.log(`  up to ${budget} via the API (100 units each); the rest cost nothing\n`);
@@ -101,18 +139,37 @@ const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
              'Accept-Language': 'en-US,en;q=0.9',
              Cookie: 'CONSENT=YES+cb; SOCS=CAI' };
 
-/** One request, with a second go at the transient failures. Never throws. */
+/** One request. Never throws.
+ *
+ *  Redirects are followed BY HAND, at most three, because letting undici do it
+ *  ends in "redirect count exceeded": YouTube bounces a consent/sorry page back
+ *  to itself forever once it decides it does not like the traffic, and the
+ *  automatic follower has no way to notice it is going in a circle. Doing it
+ *  here means a loop is visible and can be reported as what it is. */
 const get = async (url, ms = 20000) => {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  let target = url;
+  for (let hop = 0; hop < 4; hop++) {
+    let r;
     try {
-      const r = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(ms) });
-      return { ok: r.ok, status: r.status, res: r };
+      r = await fetch(target, { headers: UA, redirect: 'manual', signal: AbortSignal.timeout(ms) });
     } catch (e) {
-      if (attempt) return { ok: false, status: 0, error: e?.cause?.message || e.message };
-      await new Promise((r) => setTimeout(r, 1200));
+      return { ok: false, status: 0, error: e?.cause?.message || e.message };
     }
+    if (r.status >= 300 && r.status < 400) {
+      const next = r.headers.get('location');
+      if (!next) return { ok: false, status: r.status, error: `redirect with no location` };
+      const abs = new URL(next, target).toString();
+      // A consent or "sorry" bounce is not a redirect worth following — it is
+      // YouTube declining, and the caller needs to know that specifically.
+      if (/consent\.|\/sorry\/|accounts\.google/i.test(abs)) {
+        return { ok: false, status: r.status, error: 'blocked', blocked: true };
+      }
+      target = abs;
+      continue;
+    }
+    return { ok: r.ok, status: r.status, res: r };
   }
-  return { ok: false, status: 0, error: 'unreachable' };
+  return { ok: false, status: 0, error: 'too many redirects', blocked: true };
 };
 
 const oembed = async (videoId) => {
@@ -128,6 +185,7 @@ const lookupFree = async (q) => {
   // the same answers wherever the venue laptop happens to be.
   const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&gl=US&hl=en`;
   const r = await get(url);
+  if (r.blocked) return { blocked: true, error: 'YouTube is refusing anonymous searches from this machine right now' };
   if (!r.ok) return { error: r.error ? `search page: ${r.error}` : `search page answered ${r.status}` };
   const html = await r.res.text().catch(() => '');
   // Take the first handful and keep the first that oEmbed will actually serve,
@@ -151,6 +209,7 @@ const found = { ...DECK_VIDEO_IDS };
 let ok = 0, missed = 0, apiCalls = 0;
 const doubtful = [];
 let apiDuds = 0;
+let blockedRun = 0;
 // --free skips the API entirely; otherwise the API leads and this flips the
 // moment quota runs out, so one run finishes the job either way.
 let useApi = !!KEY && !has('free');
@@ -199,10 +258,35 @@ for (const [id, item] of wanted) {
     let r;
     try { r = await lookupFree(q); }
     catch (e) { r = { error: e?.cause?.message || e.message || 'lookup failed' }; }
-    if (r.videoId) { videoId = r.videoId; title = r.title; author = r.author || ''; how = 'free'; }
-    else { console.log(`   ✗ ${item.artist} — ${item.song} — ${r.error}`); missed += 1; continue; }
-    // Be a good guest: this is somebody else's public page, read once per song.
-    await new Promise((r2) => setTimeout(r2, 400));
+    if (r.videoId) { videoId = r.videoId; title = r.title; author = r.author || ''; how = 'free'; blockedRun = 0; }
+    else {
+      missed += 1;
+      if (r.blocked) {
+        blockedRun += 1;
+        // The first run sailed through ten songs and then failed the next three
+        // hundred and fifty-nine in a row, printing the same line every time.
+        // That is not three hundred and fifty-nine problems, it is one, and the
+        // right response is to stop asking rather than to keep hammering
+        // somebody who has already said no.
+        if (blockedRun >= 3) {
+          console.log(`\n  YouTube has started refusing anonymous searches from this machine.`);
+          console.log(`  It let ${ok} through first — this is rate limiting, not a fault in the songs.`);
+          console.log(`\n  Two ways on, and the first is better:`);
+          console.log(`    1. Get the API key working — it is the supported route and does not`);
+          console.log(`       get throttled. Run:  node resolve-deck-videos.mjs --check-key`);
+          console.log(`    2. Or wait an hour or so and run this again; it resumes where it stopped.`);
+          break;
+        }
+        console.log(`   ✗ ${item.artist} — ${item.song} — ${r.error}`);
+        await new Promise((r2) => setTimeout(r2, 5000));   // give it room to relent
+        continue;
+      }
+      console.log(`   ✗ ${item.artist} — ${item.song} — ${r.error}`);
+      continue;
+    }
+    // Be a good guest: this is somebody else's public page, read once per song,
+    // slowly. The first run went too fast and got shut off after ten.
+    await new Promise((r2) => setTimeout(r2, 1500 + Math.random() * 1000));
   }
 
   found[id] = videoId;
@@ -218,7 +302,7 @@ for (const [id, item] of wanted) {
 
 const left = wanted.size - ok;
 console.log(`\n  ${ok} resolved, ${missed} could not be matched, ${left} still to do.`);
-console.log(`  Written to src/deck-videos.mjs`);
+console.log(`  ${Object.keys(found).length} ids now in ${OUT}`);
 if (doubtful.length) {
   console.log(`\n  ${doubtful.length} match${doubtful.length === 1 ? '' : 'es'} to eyeball — the title did not obviously match the song:`);
   for (const d of doubtful) console.log(`    ? ${d}`);
