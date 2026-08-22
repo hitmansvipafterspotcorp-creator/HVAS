@@ -55,9 +55,33 @@ if (!KEY && !has('dry')) {
 if (has('check-key')) {
   if (!KEY) {
     console.log('\n  No key found.\n  Expected YOUTUBE_API_KEY=... in server/.env\n');
-    process.exit(1);
-  }
-  console.log(`\n  Key found: ${KEY.slice(0, 10)}…${KEY.slice(-4)}  (${KEY.length} chars)`);
+    process.exitCode = 1;
+  } else {
+  // Show it in a way a Windows console cannot garble, and check it locally
+  // before spending a call. A Google API key is 39 characters of A-Z a-z 0-9 -
+  // and _ ; anything else in there is a copy-paste artefact — a smart quote, a
+  // stray space, a character from a PDF — and the answer from Google will be
+  // "API key not valid" with no hint that the key it received was not the key
+  // you think you pasted.
+  const bad = [...KEY].map((c, i) => (/[A-Za-z0-9_-]/.test(c) ? null : { i, c, code: c.codePointAt(0) })).filter(Boolean);
+  console.log(`\n  Key: ${KEY.slice(0, 8)}... (${KEY.length} characters)`);
+  if (bad.length) {
+    console.log(`\n  This key contains ${bad.length} character${bad.length === 1 ? '' : 's'} that cannot be in a Google API key:`);
+    for (const b of bad.slice(0, 8)) {
+      console.log(`    position ${b.i + 1}: U+${b.code.toString(16).toUpperCase().padStart(4, '0')}`
+        + (b.code === 0x2019 || b.code === 0x2018 ? '  (a curly quote)' : '')
+        + (b.code === 0x00A0 ? '  (a non-breaking space)' : '')
+        + (b.code === 0xFEFF ? '  (a byte-order mark — the file is saved as UTF-16 or UTF-8-with-BOM)' : ''));
+    }
+    console.log('\n  FIX: retype the line in server/.env as plain text —');
+    console.log('       YOUTUBE_API_KEY=AIza...');
+    console.log('       no quotes, no spaces around the =, and save it as UTF-8 or ANSI.\n');
+    process.exitCode = 1;
+  } else if (KEY.length !== 39) {
+    console.log(`\n  A Google API key is 39 characters; this one is ${KEY.length}.`);
+    console.log('  Check nothing was cut off or doubled when it was pasted.\n');
+    process.exitCode = 1;
+  } else {
   const u = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=1'
     + `&q=${encodeURIComponent('Usher Yeah official audio')}&key=${KEY}`;
   let r;
@@ -85,8 +109,13 @@ if (has('check-key')) {
     else if (/keyInvalid|API key not valid/i.test(reason + msg))
       console.log('  FIX: the key itself is not valid. Copy it again from the Cloud console.\n');
   }
-  process.exit(r.ok ? 0 : 1);
-}
+  process.exitCode = r.ok ? 0 : 1;
+  }
+  }
+  // Falling off the end rather than calling process.exit(): killing the process
+  // with a socket still closing trips a libuv assertion on Windows, which prints
+  // a wall of C internals under a perfectly good answer.
+} else {
 
 const onlyDeck = arg('deck');
 const budget = Number(arg('budget', '95'));     // a little under the 100/day a default quota allows
@@ -311,3 +340,5 @@ if (doubtful.length) {
 if (ok) console.log(`\n  Now run:  node gen-client-decks.mjs\n  then commit both files so the app ships with them.`);
 if (left > 0) console.log(`\n  ${left} left — run this again to carry on.`);
 console.log('');
+
+}
