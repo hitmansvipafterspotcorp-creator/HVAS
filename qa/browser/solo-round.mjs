@@ -208,7 +208,19 @@ await rotate(932,430); await settle(1200);
 await settle(6000);   // several call intervals with a dead player
 const dead=await text();
 console.log('   [screen]',dead.replace(/\n/g,' / ').slice(0,220));
-ok(/no song, no game|will not play/i.test(dead),'the round says plainly that it stopped for want of a song');
+ok(/did not start|will not play|no song, no game/i.test(dead),'the round says plainly that it stopped for want of a song');
+// And says what to do about it. A round that holds forever with no way forward
+// is what shipped: solo sat on one square, silent, with no explanation and no
+// button — because the only thing that could clear the hold was a song that
+// YouTube was never going to send.
+ok(/keep playing without music/i.test(dead),'and offers a way on rather than dead-ending the round');
+ok(await tap('Keep playing without music'),'which can be taken');
+await settle(5000);
+const on=await text();
+ok(/playing without music/i.test(on),'and the round says it is running without music');
+const called=(on.match(/(\d+) CALLED/i)||[])[1];
+console.log('   [after opting out]',String(called),'called');
+ok(Number(called)>=1,'and the calls actually resume');
 const deadCalls=(dead.match(/(\d+)\s+called/)||[])[1];
 console.log('   [calls with no music]',deadCalls);
 ok(Number(deadCalls||0)<=1,`and called at most the one song it was trying to play (${deadCalls})`);

@@ -4,6 +4,8 @@
 // lip-sync square per row when the deck supports it, so decks lean ~20%
 // lipsync entries. `id` is the stable identity used for call/cover/win
 // matching — never the display text, so retitling an item is always safe.
+import { DECK_VIDEO_IDS } from './deck-videos.mjs';
+
 const slug = (artist, song) => `${artist}-${song}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 const song = (artist, title, genre, era, energy = 'high') =>
   ({ id: slug(artist, title), artist, song: title, type: 'song', genre, era, energy, lipSyncPotential: 8 });
@@ -532,6 +534,16 @@ export const BINGO_DECKS = {
     ],
   },
 };
+// Attach the resolved YouTube id to every square that has one. Kept out of the
+// deck definitions above so the song list stays readable and the resolver only
+// ever rewrites one generated file — see src/deck-videos.mjs.
+for (const deck of Object.values(BINGO_DECKS)) {
+  for (const item of deck.items) {
+    const vid = DECK_VIDEO_IDS[item.id];
+    if (vid) item.videoId = vid;
+  }
+}
+
 export const DEFAULT_DECK_ID = 'after-spot-starter';
 export const deckList = () => Object.entries(BINGO_DECKS).map(([id, d]) => ({ id, name: d.name, description: d.description, count: d.items.length }));
 export const deckById = (id) => BINGO_DECKS[id] || BINGO_DECKS[DEFAULT_DECK_ID];

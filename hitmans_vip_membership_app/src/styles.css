@@ -1809,31 +1809,19 @@ button {
   gap: 12px;
 }
 
-.battle-stage {
-  min-height: 260px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 16px;
-}
+/* The three-column VS layout that used to live here is gone — the stage is now
+   a single performer's camera, its clip meter and one button (see .battle-stage
+   further down). What is NOT obvious is how much damage the leftover rule did
+   before it was removed, so: it styled `.battle-stage div` — every div on the
+   stage — with min-height 140px, a gold border and an opaque background. And
+   `.battle-stage div` (0,1,1) outranks `.battle-meter` (0,1,0), so the real
+   rules lost.
 
-.battle-stage div,
-.battle-stage strong {
-  min-height: 140px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 214, 109, 0.42);
-  border-radius: 8px;
-  background: rgba(12, 5, 21, 0.86);
-  color: #ffd66d;
-  font-size: 28px;
-  font-weight: 1000;
-}
-
-.battle-stage strong {
-  min-width: 92px;
-  color: #ff5cf4;
-}
+   On a phone that turned the 6px mic level into a 140px black slab sitting
+   across the performer's face, and the clip meter into a 287px one, with the
+   whole stage overflowing past the bottom of the screen. It looked broken
+   because it was, and it never failed a test: every element was present,
+   visible, correctly sized in the DOM sense, and completely wrong. */
 
 .meter-row {
   display: grid;
@@ -4421,9 +4409,47 @@ button {
 /* The recorder is deliberately PORTRAIT regardless of how the phone is held —
    a lip sync take is a vertical video, like the app it'll end up on. */
 .battle-stage { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 10px 0; }
+/* Sized from HEIGHT, not width. The camera is 9:16 inside a landscape screen,
+   so a width-driven box (260px wide => 462px tall) ran the button off the
+   bottom of the phone — you had to scroll, mid-performance, to start the
+   performance. Height-first keeps the whole stage on one screen at any size. */
 .battle-portrait {
-  position: relative; width: min(100%, 260px); aspect-ratio: 9 / 16; border-radius: 16px; overflow: hidden;
+  position: relative; height: min(462px, 54vh); width: auto; aspect-ratio: 9 / 16;
+  max-width: min(100%, 260px);
+  border-radius: 16px; overflow: hidden;
   background: #05030a; border: 2px solid #ff3cb4; box-shadow: 0 0 26px rgba(255,60,180,.45);
+}
+
+/* A performance owns the screen. The lobby's own title, its blurb and the mode
+   tabs are navigation for choosing what to play — during a take they are just
+   344px of chrome pushing the only button that matters below the fold. */
+body:has(.battle-stage) .screen-header > div { display: none; }
+body:has(.battle-stage) .staff-hub-tabs { display: none; }
+
+/* The button that starts a take. It was the app's generic full-width gold pill,
+   and at 652px across a dark stage it did not read as a button at all — it read
+   as a large yellow object, which is exactly what it got called. The brand's
+   own idiom everywhere else on this screen is a dark ground with a neon frame
+   and gold type (the HOME button, the camera's pink border), so it uses that,
+   at the width of a thing you press rather than the width of the page. */
+.battle-stage .bingo-btn {
+  width: auto; min-width: 240px; max-width: min(100%, 340px);
+  padding: 13px 30px; border-radius: 999px;
+  font: 900 15px/1 var(--k-font, inherit); letter-spacing: .1em; text-transform: uppercase;
+}
+.battle-stage .bingo-btn.gold {
+  background: linear-gradient(180deg, #2a0b3d, #14061f);
+  color: #ffd66b;
+  border: 2px solid #ff3cb4;
+  box-shadow: 0 0 22px rgba(255,60,180,.45), inset 0 0 18px rgba(255,60,180,.12);
+  text-shadow: 0 0 10px rgba(255,214,107,.5);
+}
+.battle-stage .bingo-btn.gold:disabled { border-color: #5a2a48; color: #8a7aa0; box-shadow: none; }
+/* Finishing is the opposite action and must not look like the same one. */
+.battle-stage .bingo-btn:not(.gold) {
+  background: linear-gradient(180deg, #3d0b16, #1f0609);
+  color: #ff8a8a; border: 2px solid #ff3b3b;
+  box-shadow: 0 0 22px rgba(255,59,59,.4);
 }
 .battle-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 .battle-rec {

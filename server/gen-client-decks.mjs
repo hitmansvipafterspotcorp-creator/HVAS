@@ -23,7 +23,13 @@ const OUT = resolve(__dirname, '../hitmans_vip_membership_app/src/decks.generate
 
 // Only what a card needs. The server keeps genre/era/energy for its own song
 // picking; shipping them would bloat the bundle for no gain on a phone.
-const trim = (i) => ({ id: i.id, artist: i.artist, song: i.song, type: i.type, ...(i.mood ? { mood: i.mood } : {}) });
+// videoId rides along because Solo has no backend to resolve a song with. It
+// used to hand the IFrame player a search query instead, which YouTube removed
+// in 2020 — so solo played silence. An id needs no key and no quota, which also
+// means an unlimited number of people can play at once without sharing a search
+// budget. Filled in by resolve-deck-videos.mjs.
+const trim = (i) => ({ id: i.id, artist: i.artist, song: i.song, type: i.type,
+  ...(i.mood ? { mood: i.mood } : {}), ...(i.videoId ? { videoId: i.videoId } : {}) });
 
 const decks = Object.fromEntries(Object.entries(BINGO_DECKS).map(([id, d]) => [id, {
   name: d.name, description: d.description, items: d.items.map(trim),

@@ -4427,16 +4427,44 @@ function useSoloPlayer({ item, armed, paused }) {
     };
   }, [armed]);
 
-  // Each call is a new search.
+  // Each call loads that song.
+  //
+  // This used to be `loadPlaylist({ listType: 'search' })` — hand the player a
+  // query and let it find the track, no API key needed. YouTube deprecated
+  // search in the IFrame Player API in November 2020 and it no longer returns
+  // anything. Crucially it does not throw and it does not fire onError: it
+  // simply plays nothing, forever. So the round sat on "Cueing the song", the
+  // call loop held waiting for music that could never arrive, and solo shipped
+  // with no sound at all while every test passed — because the tests supply
+  // their own player, and a stand-in has no reason to reproduce a third party's
+  // removed feature.
+  //
+  // A video id needs no key and no quota, so the deck carries one per song
+  // (server/resolve-deck-videos.mjs fills them in). Without an id there is
+  // nothing to play, and the watchdog below says so rather than hanging.
   useEffect(() => {
     const p = playerRef.current;
-    if (!armed || !p || !item) return;
+    if (!armed || !p || !item) return undefined;
     startedRef.current = { id: item.id, cued: false, clip: null };
     setClip(null);
     setStatus('loading');
-    try { p.loadPlaylist({ list: `${item.artist} ${item.song}`, listType: 'search', index: 0 }); }
-    catch { setStatus('error'); }
-  }, [armed, item?.id]);
+    try {
+      if (item.videoId) p.loadVideoById({ videoId: item.videoId });
+      // No id yet for this square. Fall back to the old search call rather than
+      // giving up: it is what shipped, and if it works anywhere it is better
+      // than silence. It is not expected to — see the note above — so the
+      // watchdog below is what actually ends this case, twelve seconds later,
+      // with something on screen that explains itself.
+      else p.loadPlaylist({ list: `${item.artist} ${item.song}`, listType: 'search', index: 0 });
+    } catch { setStatus('error'); return undefined; }
+    // Whatever goes wrong — a pulled video, a region block, no signal, another
+    // API that quietly stops answering — the round must not wait forever for a
+    // song that is not coming. If nothing is playing in twelve seconds, say so.
+    const watchdog = setTimeout(() => {
+      setStatus((cur) => (cur === 'loading' ? 'error' : cur));
+    }, 12000);
+    return () => clearTimeout(watchdog);
+  }, [armed, item?.id, item?.videoId]);
 
   // The round holding for a performance does not hold the music — the whole
   // point is that you perform TO the clip. Pausing here is only for when the
@@ -4545,7 +4573,13 @@ function SoloBingoGame({ onExit }) {
   const musicOn = song.status === 'playing';
   const musicFailed = song.status === 'error';
   const awaitingSong = !!game && game.calledCount > 0 && !musicOn;
-  const held = performing || musicFailed || awaitingSong;
+  // "No song, no game" is the venue's rule and it is the right default. But a
+  // rule that bricks the round when a third party changes an API is not a rule,
+  // it is a dead end — solo sat frozen on one square with no way forward and no
+  // explanation. The player can now choose to keep going without music, which
+  // is a worse game and their call to make, not the app's.
+  const [noMusic, setNoMusic] = useState(false);
+  const held = performing || (!noMusic && (musicFailed || awaitingSong));
   useEffect(() => {
     if (game?.status !== 'playing' || held) return undefined;
     // Coming back from a performance restarts the interval, so restart the
@@ -4762,13 +4796,20 @@ function SoloBingoGame({ onExit }) {
               right={performing ? '⏸ paused' : `${(callLeft / 1000).toFixed(1)}s`}
             />
           )}
-          {!over && musicFailed && (
-            <p className="k-nudge k-nudge--no">
-              That one will not play here, so the round has stopped — no song, no game.
-              Leave the round and start another; a different deck usually plays fine.
-            </p>
+          {!over && musicFailed && !noMusic && (
+            <div className="k-nudge k-nudge--no">
+              <p>That song did not start — it may be blocked here, pulled from
+                 YouTube, or the connection dropped.</p>
+              <p>The round is holding, because working a square out by ear is the game.</p>
+              <button type="button" className="bingo-btn ghost" onClick={() => setNoMusic(true)}>
+                Keep playing without music
+              </button>
+            </div>
           )}
-          {!over && !musicFailed && awaitingSong && (
+          {!over && noMusic && (
+            <p className="k-nudge">🔇 Playing without music — squares are called on the clock.</p>
+          )}
+          {!over && !musicFailed && !noMusic && awaitingSong && (
             <p className="k-nudge">🎵 Cueing the song — the next call waits for it.</p>
           )}
           {!over && waiting > 0 && (
