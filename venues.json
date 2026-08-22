@@ -1,13 +1,13 @@
 {
   "_comment": "Rooms running HVAS. Served from the app's own permanent address, so a member never needs a link that can die. Each venue is identified by the id its own database generated once; the url is only where it happens to be reachable right now. Publish an update with: node server/publish-beacon.mjs <public-url>",
-  "updatedAt": 1787331082075,
+  "updatedAt": 1787367807345,
   "venues": [
     {
       "venueId": "v43ebe363aa1e",
       "name": "HITMANS VIP After Spot",
       "url": "https://venue.tail374d24.ts.net",
-      "city": "Tallahassee",
-      "updatedAt": 1787331082075
+      "city": "",
+      "updatedAt": 1787367805562
     }
   ]
 }
