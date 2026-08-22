@@ -94,24 +94,42 @@ if (has('dry')) {
 // through oEmbed afterwards, which is a documented public endpoint: it confirms
 // the video exists AND that it is embeddable, and it hands back the real title
 // so a bad match is visible rather than silent.
+// The CONSENT cookie matters: without it YouTube bounces some regions around a
+// consent interstitial until undici gives up with "redirect count exceeded",
+// which is what ended the first real run at song 11 of 369.
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-             'Accept-Language': 'en-US,en;q=0.9' };
+             'Accept-Language': 'en-US,en;q=0.9',
+             Cookie: 'CONSENT=YES+cb; SOCS=CAI' };
+
+/** One request, with a second go at the transient failures. Never throws. */
+const get = async (url, ms = 20000) => {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(url, { headers: UA, redirect: 'follow', signal: AbortSignal.timeout(ms) });
+      return { ok: r.ok, status: r.status, res: r };
+    } catch (e) {
+      if (attempt) return { ok: false, status: 0, error: e?.cause?.message || e.message };
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
+  return { ok: false, status: 0, error: 'unreachable' };
+};
 
 const oembed = async (videoId) => {
   const u = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`;
-  try {
-    const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(12000) });
-    if (!r.ok) return null;                       // 401/404 here means not embeddable
-    const j = await r.json();
-    return { title: j.title || '', author: j.author_name || '' };
-  } catch { return null; }
+  const r = await get(u, 12000);
+  if (!r.ok) return null;                         // 401/404 here means not embeddable
+  try { const j = await r.res.json(); return { title: j.title || '', author: j.author_name || '' }; }
+  catch { return null; }
 };
 
 const lookupFree = async (q) => {
-  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-  const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
-  if (!r.ok) return { error: `search page answered ${r.status}` };
-  const html = await r.text();
+  // gl/hl pin the result set to one region and language, so the same run gives
+  // the same answers wherever the venue laptop happens to be.
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&gl=US&hl=en`;
+  const r = await get(url);
+  if (!r.ok) return { error: r.error ? `search page: ${r.error}` : `search page answered ${r.status}` };
+  const html = await r.res.text().catch(() => '');
   // Take the first handful and keep the first that oEmbed will actually serve,
   // so a top result that cannot be embedded does not become a silent dead song.
   const ids = videoIdsFrom(html).slice(0, 5);
@@ -132,6 +150,7 @@ const write = (map) => {
 const found = { ...DECK_VIDEO_IDS };
 let ok = 0, missed = 0, apiCalls = 0;
 const doubtful = [];
+let apiDuds = 0;
 // --free skips the API entirely; otherwise the API leads and this flips the
 // moment quota runs out, so one run finishes the job either way.
 let useApi = !!KEY && !has('free');
@@ -140,7 +159,7 @@ if (!useApi) console.log('  using the no-quota lookup\n');
 for (const [id, item] of wanted) {
   if (ok + missed >= budget && useApi) break;
   const q = searchQuery(item.artist, item.song);
-  let videoId = null, title = '', how = '';
+  let videoId = null, title = '', author = '', how = '';
 
   if (useApi) {
     const url = 'https://www.googleapis.com/youtube/v3/search'
@@ -164,15 +183,24 @@ for (const [id, item] of wanted) {
         const json = await res.json().catch(() => ({}));
         videoId = json?.items?.[0]?.id?.videoId || null;
         title = json?.items?.[0]?.snippet?.title || '';
-        how = 'api';
+        if (videoId) { how = 'api'; apiDuds = 0; }
+        else if (++apiDuds >= 3) {
+          console.log('\n  The API key answers but is not returning results — ignoring it from here.\n');
+          useApi = false;
+        }
       }
     } catch (e) { console.log(`   … ${q} — ${e.message}, trying the other way`); }
   }
 
   if (!videoId) {
-    const r = await lookupFree(q);
-    if (r.videoId) { videoId = r.videoId; title = r.title; how = 'free'; }
-    else { console.log(`   ✗ ${q} — ${r.error}`); missed += 1; continue; }
+    // This was not wrapped, and one failed request threw straight out of the
+    // loop and ended a 369-song run at song 11 — losing nothing already written,
+    // but stopping dead with hundreds to go. No single song may do that.
+    let r;
+    try { r = await lookupFree(q); }
+    catch (e) { r = { error: e?.cause?.message || e.message || 'lookup failed' }; }
+    if (r.videoId) { videoId = r.videoId; title = r.title; author = r.author || ''; how = 'free'; }
+    else { console.log(`   ✗ ${item.artist} — ${item.song} — ${r.error}`); missed += 1; continue; }
     // Be a good guest: this is somebody else's public page, read once per song.
     await new Promise((r2) => setTimeout(r2, 400));
   }
@@ -183,7 +211,7 @@ for (const [id, item] of wanted) {
   // A wrong match is worse than a miss: the square plays the wrong record and
   // nobody can work it out by ear. Flag the doubtful ones so they can be
   // checked, rather than burying them in a wall of ticks.
-  const sure = !title || looksRight(item.artist, item.song, title);
+  const sure = !title || looksRight(item.artist, item.song, title, author);
   console.log(`   ${sure ? '✓' : '?'} ${item.artist} — ${item.song}  →  ${videoId}  [${how}] ${title.slice(0, 44)}`);
   if (!sure) doubtful.push(`${item.artist} — ${item.song}  →  ${title.slice(0, 60)}  (${videoId})`);
 }

@@ -30,13 +30,22 @@ export const searchQuery = (artist, song) => `${artist} ${song} official audio`;
 /** Does this result look like the actual song? Used only to warn, never to
  *  reject: a false negative that drops a correct match is worse than a title
  *  that reads oddly, and the run prints every title for a human to scan. */
-export function looksRight(artist, song, title) {
+export function looksRight(artist, song, title, author = '') {
   const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const t = norm(title);
   if (!t) return false;
+  // The artist is very often NOT in the title — an official upload is called
+  // "Family Affair (Radio Edit)" or just "Hey Ya!", because the artist is the
+  // channel it is posted on. Checking the title alone flagged four correct
+  // matches out of the first ten as doubtful, which is how a warning becomes
+  // noise people stop reading. oEmbed gives us the channel, so use both.
+  const where = `${t} ${norm(author)}`.trim();
   const words = (s) => norm(s).split(' ').filter((w) => w.length > 2);
   const songWords = words(song);
   const artistWords = words(artist);
-  const hit = (ws) => ws.length === 0 || ws.some((w) => t.includes(w));
-  return hit(songWords) && hit(artistWords);
+  const hitTitle = (ws) => ws.length === 0 || ws.some((w) => t.includes(w));
+  const hitEither = (ws) => ws.length === 0 || ws.some((w) => where.includes(w));
+  // The song has to be in the TITLE — a channel named after the artist does not
+  // tell you which of their records this is. The artist may be in either.
+  return hitTitle(songWords) && hitEither(artistWords);
 }

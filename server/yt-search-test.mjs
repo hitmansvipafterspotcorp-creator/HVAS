@@ -31,6 +31,19 @@ ok(!looksRight('Usher', 'Yeah!', 'Top 100 Party Anthems Mix 2024 - 3 Hours'), 'a
 ok(!looksRight('SZA', 'Kill Bill', 'How to play guitar for beginners'), 'nor does something unrelated');
 ok(looksRight('Ciara', '1, 2 Step', 'Ciara - 1, 2 Step ft. Missy Elliott'), 'punctuation in a title is not a mismatch');
 
+console.log('\nTHE ARTIST IS USUALLY THE CHANNEL, NOT THE TITLE');
+// All four of these came back flagged on the first real run and all four were
+// correct. An official upload is named after the record; the artist is the
+// channel it sits on.
+ok(looksRight('Mary J. Blige', 'Family Affair', 'Family Affair (Radio Edit)', 'Mary J. Blige'), 'a bare song title with the artist as the channel is fine');
+ok(looksRight('Outkast', 'Hey Ya!', 'Hey Ya!', 'OutKastVEVO'), 'so is a VEVO channel');
+ok(looksRight('Missy Elliott', 'Work It', 'Work It', 'Missy Elliott'), 'and a one-word title');
+ok(looksRight('Rihanna', 'Work', 'Work', 'RihannaVEVO'), 'and the shortest title there is');
+ok(!looksRight('Rihanna', 'Work', 'Umbrella', 'RihannaVEVO'), 'but the right artist singing the wrong song is still wrong');
+// Right song, but nothing anywhere says Drake — which is exactly the case a
+// human should look at, because it is probably a cover.
+ok(!looksRight('Drake', 'Hotline Bling', 'Hotline Bling Cover', 'Some Guy With A Guitar'), 'the right song on a stranger\u2019s channel is flagged for a look');
+
 console.log('\nTHE QUERY ASKS FOR THE RECORD');
 ok(/official audio/i.test(searchQuery('Drake', 'Nice For What')), 'it asks for the official audio, not a live cut or an hour-long mix');
 ok(searchQuery('Drake', 'Nice For What').startsWith('Drake Nice For What'), 'artist and song lead it');
