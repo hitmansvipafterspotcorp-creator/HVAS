@@ -149,7 +149,7 @@ let inBingo = false;
 for (let i = 0; i < 18 && !inBingo; i++) {
   await openBingo();
   await settle(1500);
-  inBingo = /solo vs cpu/i.test(await text());
+  inBingo = await js(`return !!document.querySelector('.play-steps, .bingo-host-link')`);
 }
 ok(inBingo, 'Lip Sync Bingo opens');
 await tap('Host controls'); await settle(1200);

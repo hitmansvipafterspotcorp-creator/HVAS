@@ -1433,3 +1433,51 @@
 /* The clip draining on the battle stage. Full width under the camera, because
    it is the only number that decides when the take ends. */
 .battle-clipmeter { margin: 10px 0 6px; }
+
+/* ── The steps of setting up a round ──────────────────────────────────────
+   Lip Sync Bingo used to open on three peer tabs, so choosing a game led
+   straight to another menu. It now opens on the path the app already knows
+   is yours, and this says where you are on it: done, now, still to come.
+   One line, always the same shape, so it reads at a glance in a dark room. */
+.play-steps {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  list-style: none; margin: 0 0 12px; padding: 0; flex-wrap: wrap;
+}
+.play-steps li {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 13px 6px 7px; border-radius: 999px;
+  border: 1px solid rgba(255, 214, 109, .22);
+  background: rgba(12, 5, 21, .72);
+  font: 800 11px/1 var(--k-font, inherit); letter-spacing: .07em; text-transform: uppercase;
+  color: #8f7fb0; transition: color .2s ease, border-color .2s ease, background .2s ease;
+}
+.play-steps li b {
+  display: grid; place-items: center; width: 19px; height: 19px; border-radius: 50%;
+  background: rgba(255, 255, 255, .07); color: inherit; font-size: 10px; font-weight: 900;
+}
+.play-steps li.done { color: #7dffb4; border-color: rgba(125, 255, 180, .34); }
+.play-steps li.done b { background: rgba(125, 255, 180, .17); }
+.play-steps li.now {
+  color: #ffd66b; border-color: #ff3cb4; background: linear-gradient(180deg, #2a0b3d, #14061f);
+  box-shadow: 0 0 16px rgba(255, 60, 180, .3);
+}
+.play-steps li.now b { background: #ff3cb4; color: #14061f; }
+
+/* Everything that is not the game, kept under it rather than beside it. */
+.play-elsewhere {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  flex-wrap: wrap; margin: 14px 0 4px;
+}
+.play-switch {
+  appearance: none; cursor: pointer;
+  padding: 9px 15px; border-radius: 999px;
+  border: 1px dashed rgba(255, 214, 109, .3); background: transparent;
+  font: 700 12px/1.3 var(--k-font, inherit); color: #c9b6e8;
+}
+.play-switch b { color: #ffd66b; font-weight: 900; }
+.play-switch:hover { border-style: solid; border-color: rgba(255, 214, 109, .55); }
+
+@media (max-width: 560px) {
+  .play-steps li span { display: none; }        /* numbers only when it is tight */
+  .play-steps li { padding: 6px; }
+}

@@ -77,15 +77,23 @@ let reached=false;
 for(let i=0;i<20&&!reached;i++){await js(`const b=document.querySelector('[data-target="lobby"]');if(b)b.click();return 1;`);await settle(1300);reached=/solo vs cpu/i.test(await text());}
 ok(reached,'Lip Sync Bingo opens with no venue');
 
-console.log('\nTHE MENU IS THREE THINGS, NOT FOUR');
-const tabs=await js(`return [...document.querySelectorAll('.bingo-mode-tabs .staff-hub-tab')].map(b=>b.innerText.trim()).join(' | ')`);
-console.log('   [tabs]',tabs);
-ok(!/host/i.test(tabs),'Host is not a fourth tab competing with the game');
-ok(/venue round/i.test(tabs)&&/solo/i.test(tabs)&&/record/i.test(tabs),'the three that matter are there');
+console.log('\nNO MENU AT ALL — IT OPENS ON YOUR PATH');
+// This used to check that the tab row held the three that mattered. There is
+// no tab row: a member who has chosen Lip Sync Bingo should not then have to
+// choose between three more things. The app knows which path is theirs.
+ok(!(await js(`return !!document.querySelector('.bingo-mode-tabs')`)),'no row of peer tabs to choose from');
+const rail=await js(`return [...document.querySelectorAll('.play-steps li')].map(l=>l.innerText.replace(/\\s+/g,' ').trim()).join(' | ')`);
+console.log('   [steps]',rail);
+ok(/pick a theme/i.test(String(rail)),'the steps of the solo path are shown');
+ok(/play/i.test(String(rail)),'including where it ends');
 ok(await js(`return !!document.querySelector('.bingo-host-link')`),'and hosting is still one tap, on its own line');
 
 console.log('\nPICK THE NIGHT');
-await tap('Solo vs CPU');await settle(1400);
+// Lip Sync Bingo no longer opens on a row of tabs — it opens on the path the
+// app infers (venue when connected, solo when not) and shows the steps of that
+// path. So "is the solo screen up?" is now asked of the step rail, and getting
+// to solo from a connected phone is the switch link, not a tab.
+await settle(1400);
 const themes=await js(`return [...document.querySelectorAll('.deck-chip strong')].map(b=>b.innerText.trim())`);
 console.log('   [themes]',Array.isArray(themes)?themes.join(', '):themes);
 for(const want of ['Ladies Night','Trap','Crunk','Country','Pop','Movies','Kings of R&B','Afrobeats','EDM / House'])
@@ -230,8 +238,8 @@ await cdp('Page.navigate',{url:appUrl}); await settle(3000);
 await rotate(430,932); await settle(600);
 await tapAny('Enter ·') || await tapAny('Member Sign In'); await settle(2200);
 let back=false;
-for(let i=0;i<20&&!back;i++){await js(`const b=document.querySelector('[data-target="lobby"]');if(b)b.click();return 1;`);await settle(1200);back=/solo vs cpu/i.test(await text());}
-await tap('Solo vs CPU'); await settle(1200);
+for(let i=0;i<20&&!back;i++){await js(`const b=document.querySelector('[data-target="lobby"]');if(b)b.click();return 1;`);await settle(1200);back=await js("return !!document.querySelector('.play-steps')");}
+await settle(1200);
 await tap('Start Solo Round'); await settle(1500);
 await rotate(932,430); await settle(1200);
 await settle(6000);   // several call intervals with a dead player

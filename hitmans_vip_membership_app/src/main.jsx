@@ -896,10 +896,15 @@ const screens = [
   },
   {
     id: 'lobby',
-    label: 'Lobby',
+    label: 'Play',
     eyebrow: 'Lip Sync Bingo',
-    title: 'Lip Sync Bingo Lobby',
-    detail: 'Join tonight’s round, mark yourself ready, and see how many others already have.',
+    // No blurb. This screen now walks you through the steps itself, and the
+    // step you are on says what to do — a paragraph explaining the screen above
+    // a rail that explains the screen is just the top third of a phone spent
+    // twice on the same sentence. It also said "Lobby", which stopped being
+    // true when the lobby became a flow.
+    title: 'Lip Sync Bingo',
+    detail: '',
   },
   {
     id: 'playerCard',
@@ -997,9 +1002,12 @@ const ROLES = [
     // paths that reach them from inside the game keep working and putting a
     // tile back is one line, not a re-wiring.
     menu: [
-      { title: 'My Pass', detail: 'Pass, QR, event & venue access, renewal, loyalty & profile', chip: ui.chips.vip, target: 'membership' },
-      { title: 'Lip Sync Bingo', detail: 'Join, ready up, play your card live', chip: ui.chips.active, target: 'lobby' },
-      { title: 'History', detail: 'Past entries & activity', chip: ui.chips.checkedIn, target: 'history' },
+      // Two things. A member opens this app to play, or to show their pass at
+      // the door — everything else is a detail of one of those. History was a
+      // third tile and is now a tab inside My Pass, where the rest of their
+      // account already lives.
+      { title: 'Play Lip Sync Bingo', detail: 'Tonight’s round, or solo vs CPU', chip: ui.chips.active, target: 'lobby' },
+      { title: 'My Pass', detail: 'Pass & QR, access, renewal, loyalty, history', chip: ui.chips.vip, target: 'membership' },
     ],
     // Hosting is a member capability, not a staff one — a member runs the
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
@@ -1581,7 +1589,7 @@ function ScreenHeader({ screen, onBack }) {
       <div>
         <span className="eyebrow">{screen.eyebrow}</span>
         <h1>{screen.title}</h1>
-        <p>{screen.detail}</p>
+        {screen.detail && <p>{screen.detail}</p>}
       </div>
     </header>
   );
@@ -2961,6 +2969,11 @@ function MemberPass({ member, checkedIn, onRenew }) {
         <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>Pass</button>
         <button type="button" className={`mem-tab${tab === 'loyalty' ? ' on' : ''}`} onClick={() => setTab('loyalty')}>Loyalty &amp; Access</button>
         <button type="button" className={`mem-tab${tab === 'account' ? ' on' : ''}`} onClick={() => setTab('account')}>Account</button>
+        {/* History was its own tile on the main menu. It is a record of nights
+            already played — the least urgent thing a member ever opens — and it
+            was taking a third of the first screen they see. It belongs with the
+            rest of their account, not beside the game. */}
+        <button type="button" className={`mem-tab${tab === 'history' ? ' on' : ''}`} onClick={() => setTab('history')}>History</button>
       </div>
       {tab === 'pass' && (
       <>
@@ -3139,6 +3152,8 @@ function MemberPass({ member, checkedIn, onRenew }) {
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
       </>
       )}
+
+      {tab === 'history' && <HistoryScreen />}
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
     </div>
@@ -4504,6 +4519,8 @@ function useSoloPlayer({ item, armed, paused }) {
 // backend falls back to (BINGO_LIPSYNC_SECONDS).
 const SOLO_FALLBACK_CLIP_SECONDS = 120;
 
+const SOLO_STEPS = ['Pick a theme', 'Play'];
+
 function SoloBingoGame({ onExit }) {
   const [game, setGame] = useState(null);
   const timerRef = useRef(null);
@@ -4731,7 +4748,9 @@ function SoloBingoGame({ onExit }) {
 
   if (!game) {
     return (
-      <AppPanel title="Solo vs CPU" subtitle="Play a round on your own — no host, no wifi needed">
+      <>
+      <PlaySteps steps={SOLO_STEPS} current={0} />
+      <AppPanel title="Pick tonight’s theme" subtitle="Step 1 of 2 — then you play">
         <p className="mem-fineprint">You against three regulars, over three rounds — a line, then two lines, then the whole card. Tap your squares as they're called, before they get there first. LIP SYNC squares you perform for, same as the venue — and the take is yours to post.</p>
         <div className="k-ladder">
           {[1, 2, 3].map((r) => (
@@ -4748,7 +4767,6 @@ function SoloBingoGame({ onExit }) {
         {/* The deck IS the night. Picking it before the round, rather than
             getting whatever the app felt like, is the difference between a
             generic game and Ladies Night. Same decks the room plays. */}
-        <p className="venue-connect-note">pick tonight&apos;s theme</p>
         <div className="deck-picker">
           {SOLO_DECK_OPTIONS.map((d) => (
             <button type="button" key={d.id}
@@ -4764,6 +4782,7 @@ function SoloBingoGame({ onExit }) {
         </button>
         {onExit && <button type="button" className="bingo-btn ghost" onClick={onExit}>← Back</button>}
       </AppPanel>
+      </>
     );
   }
 
@@ -5330,31 +5349,73 @@ function SfxToggle() {
   );
 }
 
-function LobbyScreen({ navigate }) {
-  // Two ways to play, and solo has to work with no venue backend at all —
-  // so the mode switch lives ABOVE the connection check, not behind it.
-  const [mode, setMode] = useState('venue');
+/** Where you are in setting up a round, and how far is left.
+ *
+ *  A member should never have to work out what to do next. The steps are the
+ *  same every time, in the same order, and the one you are on is the only one
+ *  that is lit. */
+function PlaySteps({ steps, current }) {
   return (
-    // The mode is on the wrapper so layout rules can target one tab. Record
+    <ol className="play-steps" aria-label={`Step ${current + 1} of ${steps.length}`}>
+      {steps.map((label, i) => (
+        <li key={label} className={i < current ? 'done' : i === current ? 'now' : 'todo'}>
+          <b aria-hidden="true">{i < current ? '✓' : i + 1}</b>
+          <span>{label}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function LobbyScreen({ navigate }) {
+  // Lip Sync Bingo used to open on a row of peer tabs — Venue Round, Solo vs
+  // CPU, Record — so the first thing a member met after choosing a game was
+  // another menu asking them to choose again. Three doors, no indication which
+  // one was theirs.
+  //
+  // There is almost always a right answer, and the app already knows it: if
+  // this phone is connected to a venue, you are here to play with the room; if
+  // it is not, the room is not reachable and solo is the only thing that can
+  // work. So it picks, opens on the path, and shows the steps of that path.
+  // The other way is still one tap away on a line underneath — an escape
+  // hatch, not a question you have to answer before you can start.
+  const connected = apiEnabled();
+  const [mode, setMode] = useState(() => (connected ? 'venue' : 'solo'));
+  // Chosen once per visit, not pinned forever: connecting to the venue while
+  // sitting on the solo screen should move you to the round, because that is
+  // plainly what connecting was for.
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    if (connected && !wasConnected.current) setMode('venue');
+    wasConnected.current = connected;
+  }, [connected]);
+
+  const playing = mode === 'venue' || mode === 'solo';
+  return (
+    // The mode is on the wrapper so layout rules can target one path. Record
     // wants two columns in landscape; Solo, which shares this screen, does
     // not — scoping it to .staff-dash alone knocked Solo past the fold.
     <div className={`staff-dash mode-${mode}`}>
-      {/* Two ways to play and a shelf for what you recorded. Host was a fourth
-          peer tab here, which put a door only one person in the building ever
-          opens directly beside the two everybody uses — and made the first
-          thing a member reads a choice between four things instead of two.
-          It moved to the line underneath: still one tap, still behind the
-          venue's host code, no longer competing with the game. */}
-      <div className="staff-hub-tabs bingo-mode-tabs">
-        <button type="button" className={`staff-hub-tab${mode === 'venue' ? ' on' : ''}`} onClick={() => setMode('venue')}>Venue Round</button>
-        <button type="button" className={`staff-hub-tab${mode === 'solo' ? ' on' : ''}`} onClick={() => setMode('solo')}>Solo vs CPU</button>
-        <button type="button" className={`staff-hub-tab${mode === 'record' ? ' on' : ''}`} onClick={() => setMode('record')}>Record</button>
-        <SfxToggle />
-      </div>
       {mode === 'solo' ? <SoloBingoGame />
-        : mode === 'record' ? <PlayerRecord />
+        : mode === 'record' ? <PlayerRecord onBack={() => setMode(connected ? 'venue' : 'solo')} />
         : mode === 'host' ? <HostMode navigate={navigate} onExit={() => setMode('venue')} />
         : <VenueLobby navigate={navigate} />}
+
+      {/* Everything that is not the game itself lives down here, under the
+          thing you came to do — reachable, not competing with it. */}
+      {playing && (
+        <div className="play-elsewhere">
+          <button type="button" className="play-switch" onClick={() => setMode(mode === 'venue' ? 'solo' : 'venue')}>
+            {mode === 'venue'
+              ? <>Venue not running? <b>Play solo vs CPU →</b></>
+              : <>At the venue? <b>Join the room’s round →</b></>}
+          </button>
+          <button type="button" className="play-switch" onClick={() => setMode('record')}>
+            <b>My takes →</b>
+          </button>
+          <SfxToggle />
+        </div>
+      )}
       {mode !== 'host' && (
         <button type="button" className="bingo-host-link" onClick={() => setMode('host')}>
           Running the night? <b>Host controls →</b>
@@ -5677,6 +5738,8 @@ function PlayerRecord() {
   );
 }
 
+const VENUE_STEPS = ['Connect', 'Join', 'Ready'];
+
 function VenueLobby({ navigate }) {
   const { state, err, refresh } = useBingoState(3000);
   const [busy, setBusy] = useState(false);
@@ -5693,12 +5756,25 @@ function VenueLobby({ navigate }) {
   // one screen a member opens when the venue is unreachable was the one screen
   // that could not survive the venue being unreachable.
   const [msg, setMsg] = useState('');
+  // Auto-advance: once the host starts the round there is nothing left to
+  // decide, so stop asking and put the member on their card. Waiting on a
+  // lobby screen while the room has already started is the one place this flow
+  // could still strand somebody.
+  const live = state?.status === 'live';
+  const iAmIn = !!state?.me;
+  useEffect(() => {
+    if (live && iAmIn) navigate('playerCard');
+  }, [live, iAmIn, navigate]);
+
   if (err === 'not-connected') {
     return (
-      <AppPanel title="Venue Round" subtitle="Not connected to a venue">
-        <p className="dash-empty">Connect to the venue to join tonight's round with everyone else.</p>
-        <p className="mem-fineprint">No connection? Solo vs CPU works anywhere — switch tabs above.</p>
-      </AppPanel>
+      <>
+        <PlaySteps steps={VENUE_STEPS} current={0} />
+        <AppPanel title="Connect to the venue" subtitle="Step 1 of 3">
+          <p className="dash-empty">Scan the QR at the door, or pick the room from the door screen.</p>
+          <p className="mem-fineprint">Not at the venue tonight? Solo vs CPU works anywhere — the link is below.</p>
+        </AppPanel>
+      </>
     );
   }
   const me = state?.me;
@@ -5714,20 +5790,31 @@ function VenueLobby({ navigate }) {
     catch (e) { setMsg(e.message === 'Failed to fetch' ? "Couldn't reach the venue — check you're on the venue wifi." : (e.message || 'Could not change that — try again.')); }
     setBusy(false);
   };
+  const step = !me ? 1 : 2;
   return (
-    <AppPanel title="Lip Sync Bingo" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
-      <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
-      {!me ? (
-        <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
-      ) : (
-        <>
-          <button type="button" className={`bingo-btn${me.ready ? ' ready' : ''}`} disabled={busy} onClick={toggleReady}>{me.ready ? '✓ Ready' : 'Mark Ready'}</button>
-          <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>Go to My Card →</button>
-        </>
-      )}
-      {msg && <p className="gate-err">{msg}</p>}
-      {state?.status === 'live' && <p className="mem-fineprint">The round is live — head to your card to play!</p>}
-    </AppPanel>
+    <>
+      <PlaySteps steps={VENUE_STEPS} current={step} />
+      <AppPanel
+        title={!me ? 'Join tonight’s round' : me.ready ? 'You’re ready' : 'Mark yourself ready'}
+        subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
+        <p className="dash-num">{state ? `${state.playerCount} joined · ${state.readyCount} ready` : ''}</p>
+        {!me ? (
+          <>
+            <button type="button" className="bingo-btn" disabled={busy} onClick={join}>Join Game</button>
+            <p className="mem-fineprint">One tap. You get a card dealt from tonight’s deck.</p>
+          </>
+        ) : (
+          <>
+            <button type="button" className={`bingo-btn${me.ready ? ' ready' : ''}`} disabled={busy} onClick={toggleReady}>{me.ready ? '✓ Ready' : 'Mark Ready'}</button>
+            <p className="mem-fineprint">{me.ready
+              ? 'Waiting on the host to start. Your card opens on its own the moment it does.'
+              : 'Tell the host you’re in, then the round can start.'}</p>
+            <button type="button" className="bingo-btn ghost" onClick={() => navigate('playerCard')}>See my card →</button>
+          </>
+        )}
+        {msg && <p className="gate-err">{msg}</p>}
+      </AppPanel>
+    </>
   );
 }
 

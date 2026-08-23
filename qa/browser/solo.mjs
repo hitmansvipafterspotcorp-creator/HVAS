@@ -64,10 +64,15 @@ await tap('Send code'); await settle(1500);
 // Demo/local auth: no backend, so the app issues its own code path.
 await tap('Verify')||await tap('Continue'); await settle(2500);
 let reached=false;
-for(let i=0;i<20&&!reached;i++){await openTile('lobby');await settle(1300);reached=/solo vs cpu/i.test(await text());}
-ok(reached,'Lip Sync Bingo opens with no venue connected');
-await tap('Solo vs CPU'); await settle(1400);
-ok(/three regulars|start solo/i.test(await text()),'the Solo tab explains the ladder');
+for(let i=0;i<20&&!reached;i++){await openTile('lobby');await settle(1300);reached=await js("return !!document.querySelector('.play-steps')");}
+ok(reached,'Lip Sync Bingo opens with no venue connected, straight onto the solo path');
+// Lip Sync Bingo no longer opens on a row of tabs — it opens on the path the
+// app infers (venue when connected, solo when not) and shows the steps of that
+// path. So "is the solo screen up?" is now asked of the step rail, and getting
+// to solo from a connected phone is the switch link, not a tab.
+// With no venue reachable, solo is where this lands on its own.
+await settle(1400);
+ok(/three regulars|start solo/i.test(await text()),'the solo path explains the ladder');
 ok(/lip sync squares you perform for/i.test(await text()),'and says lip sync squares are performed for');
 
 console.log('\nA ROUND');

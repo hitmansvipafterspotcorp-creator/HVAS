@@ -206,7 +206,9 @@ const tiles = JSON.parse((await controls()) || '[]')
   .filter((t) => !DONT_TAP.test(t) && !/^home$/i.test(t));
 console.log('   menu:', tiles.join(' | '));
 // A sweep that walks nothing must fail, not pass quietly.
-ok(tiles.length >= 3, `the menu has tiles to walk (${tiles.length})`);
+// Two now, deliberately: play, and your pass. The point of this check is that
+// the sweep is walking a real menu rather than passing having seen nothing.
+ok(tiles.length >= 2, `the menu has tiles to walk (${tiles.length})`);
 
 for (const tile of tiles) {
   if (!(await goHome())) { problems.push(`could not get back to the menu before ${tile}`); break; }
