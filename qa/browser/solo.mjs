@@ -186,7 +186,7 @@ ok(after >= 1, `the take is still there after closing and reopening the app (${a
 await tapAny('Enter ·') || await tapAny('Member Sign In');
 await settle(2500);
 let onRecord=false;
-for(let i=0;i<20&&!onRecord;i++){await openTile('lobby');await settle(1300);onRecord=/solo vs cpu/i.test(await text());}
+for(let i=0;i<20&&!onRecord;i++){await openTile('lobby');await settle(1300);onRecord=await js("return !!document.querySelector('.play-steps')");}
 // Record was a peer tab beside the game. It is a link under it now — the shelf
 // of what you recorded is not a thing you choose between before playing.
 await tap('My takes'); await settle(1800);
