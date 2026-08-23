@@ -4209,9 +4209,19 @@ const soloHasPattern = (card, covered, pattern) => bingoHasPattern(soloCard(card
 // player taps their own called squares, and each CPU covers theirs after a
 // short random delay — so you can watch them close in on a line. First
 // completed line wins.
-// Faster than the venue round's ~6s: solo has no crowd, no host patter and no
-// performance between calls, so the same pacing just reads as dead air on a
-// phone. ~2.2s keeps a round in the 60–90s arcade range.
+//
+// How long a called song gets before the next one is called.
+//
+// This used to be a flat 2.2 seconds, chosen back when solo had no music at
+// all: with silence between calls, anything slower read as dead air. With the
+// songs actually playing it meant you heard about two seconds of a record
+// before it cut to the next one — which is not a game you can play by ear, it
+// is a slideshow.
+//
+// A called song now runs for its CLIP, the same rule the venue backend uses
+// (bingoWindowFor in server/src/app.mjs): the verse into the hook, the part of
+// a record a room knows. This constant is only the fallback for before a clip
+// is known — the very first call, when nothing is playing yet.
 const SOLO_CALL_MS = 2200;
 // ── Solo lip sync battles ────────────────────────────────────────────────
 // Solo plays by the venue's rules, not an easier version of them: a LIP SYNC
@@ -4516,7 +4526,9 @@ function SoloBingoGame({ onExit }) {
   const song = useSoloPlayer({ item: nowCallingItem, armed, paused: !!game && game.status !== 'playing' });
 
   const clearTimers = () => {
-    clearInterval(timerRef.current);
+    clearTimeout(timerRef.current);      // the call timer is a timeout now
+    clearInterval(timerRef.current);     // harmless, and covers anything older
+
     cpuTimersRef.current.forEach(clearTimeout);
     cpuTimersRef.current = [];
   };
@@ -4570,6 +4582,13 @@ function SoloBingoGame({ onExit }) {
   // moved. The order is call, then song, then next call. So the FIRST call
   // always goes out; after that, each new call waits for the one before it to
   // actually be playing, and a player that has failed stops the round dead.
+  // The song that is up gets exactly as long as its clip runs. Identical to the
+  // venue's bingoWindowFor, so practising alone teaches the real pacing rather
+  // than a faster arcade version of it.
+  const callWindowMs = () => {
+    const secs = song.clip?.seconds;
+    return secs ? Math.round(secs * 1000) : SOLO_CALL_MS;
+  };
   const musicOn = song.status === 'playing';
   const musicFailed = song.status === 'error';
   const awaitingSong = !!game && game.calledCount > 0 && !musicOn;
@@ -4582,10 +4601,14 @@ function SoloBingoGame({ onExit }) {
   const held = performing || (!noMusic && (musicFailed || awaitingSong));
   useEffect(() => {
     if (game?.status !== 'playing' || held) return undefined;
-    // Coming back from a performance restarts the interval, so restart the
+    // Coming back from a performance restarts the timer, so restart the
     // countdown with it rather than showing a deadline that passed mid-song.
-    setGame((g) => (g && g.status === 'playing' ? { ...g, nextCallAt: Date.now() + SOLO_CALL_MS } : g));
-    timerRef.current = setInterval(() => {
+    const wait = callWindowMs();
+    setGame((g) => (g && g.status === 'playing' ? { ...g, nextCallAt: Date.now() + wait } : g));
+    // A self-rescheduling timeout, not an interval: each song's window is its
+    // own length, so there is no one period to tick on. The effect re-runs on
+    // every call (calledCount is a dependency) and arms the next one.
+    timerRef.current = setTimeout(() => {
       setGame((g) => {
         if (!g || g.status !== 'playing') return g;
         if (g.calledCount >= g.order.length) return { ...g, status: 'draw' };
@@ -4610,11 +4633,16 @@ function SoloBingoGame({ onExit }) {
           }, lo + Math.random() * (hi - lo));
           cpuTimersRef.current.push(t);
         });
+        // The next window is not known yet — the next song has not loaded. The
+        // effect re-arms with the real one the moment it starts playing.
         return { ...g, calledCount: g.calledCount + 1, nextCallAt: Date.now() + SOLO_CALL_MS };
       });
-    }, SOLO_CALL_MS);
+    }, wait);
     return () => clearTimers();
-  }, [game?.status, held]);
+    // clip.seconds is in here because the window is not known until the song is
+    // actually playing: the effect has to re-arm once the real length arrives,
+    // or every song would run on the fallback.
+  }, [game?.status, held, game?.calledCount, song.clip?.seconds]);
 
   // The heartbeat behind the countdown. Only runs while a round is actually
   // moving — no timer ticking behind a finished round, a battle, or a silence.
@@ -4746,7 +4774,12 @@ function SoloBingoGame({ onExit }) {
   const myProgress = soloProgress(game.card, game.covered, game.pattern);
   // Time left before the next call. Clamped: a backgrounded tab can wake up
   // with a deadline long past, and a negative clock reads as broken.
-  const callLeft = Math.max(0, Math.min(SOLO_CALL_MS, (game.nextCallAt || 0) - Date.now()));
+  // Clamped to the window actually in use, not the fallback constant. Clamping
+  // to SOLO_CALL_MS left the countdown reading a frozen "2.2s" for the whole of
+  // a 75-second song, and the meter beside it permanently full — the round was
+  // pacing correctly and the only thing on screen reporting it was lying.
+  const callWindow = callWindowMs();
+  const callLeft = Math.max(0, Math.min(callWindow, (game.nextCallAt || 0) - Date.now()));
   const soloOneAway = oneAwayIds(soloCard(game.card), game.covered, called, game.pattern);
 
   // A dealt round is not a tab any more — it is the game. It takes the screen,
@@ -4791,7 +4824,7 @@ function SoloBingoGame({ onExit }) {
               className="solo-callclock"
               countdown
               live={!performing}
-              value={callLeft / SOLO_CALL_MS}
+              value={callLeft / callWindow}
               label={performing ? 'Round held — you are performing' : 'Next song in'}
               right={performing ? '⏸ paused' : `${(callLeft / 1000).toFixed(1)}s`}
             />

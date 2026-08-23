@@ -37,7 +37,13 @@ await cdp('Page.enable');
 const FAKE_YT = await readFile(new URL('./fake-youtube.js', import.meta.url), 'utf8');
 const fakeYouTube = (cfg) => cdp('Page.addScriptToEvaluateOnNewDocument',
   { source: `window.__FAKE_YT=${JSON.stringify(cfg||{})};\n${FAKE_YT}` });
-await fakeYouTube({ duration: 210 });
+// A deliberately SHORT track. The venue's clip rule floors a window at 20
+// seconds, so a 34s track gives the fastest round the real rule allows — and
+// the round now paces on that window rather than a flat 2.2s, which is what a
+// song getting its full run actually means. With the old 210s track every call
+// was 75 seconds apart and this suite spent minutes waiting for a second song.
+// The rule is unchanged and untouched; only the track is short.
+await fakeYouTube({ duration: 34 });
 const text=async()=>(await js('return document.body?document.body.innerText:""'))||'';
 const tap=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const el=[...document.querySelectorAll('button')].find(b=>(b.innerText||'').toLowerCase().includes(t)&&!b.disabled&&b.offsetParent);if(!el)return false;el.click();return true;`);
 const tapAny=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const hit=s=>[...document.querySelectorAll(s)].find(b=>(b.innerText||'').toLowerCase().includes(t)&&b.offsetParent&&(b.innerText||'').length<220);const el=hit('button')||hit('a,[role="button"]')||hit('li,article,div');if(!el)return false;el.click();return true;`);

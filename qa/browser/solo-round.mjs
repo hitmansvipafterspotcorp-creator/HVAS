@@ -50,7 +50,13 @@ await cdp('Page.enable');
 const FAKE_YT = await readFile(new URL('./fake-youtube.js', import.meta.url), 'utf8');
 const fakeYouTube = (cfg) => cdp('Page.addScriptToEvaluateOnNewDocument',
   { source: `window.__FAKE_YT=${JSON.stringify(cfg||{})};\n${FAKE_YT}` });
-await fakeYouTube({ duration: 210 });
+// A deliberately SHORT track. The venue's clip rule floors a window at 20
+// seconds, so a 34s track gives the fastest round the real rule allows — and
+// the round now paces on that window rather than a flat 2.2s, which is what a
+// song getting its full run actually means. With the old 210s track every call
+// was 75 seconds apart and this suite spent minutes waiting for a second song.
+// The rule is unchanged and untouched; only the track is short.
+await fakeYouTube({ duration: 34 });
 const text=async()=>(await js('return document.body?document.body.innerText:""'))||'';
 const tap=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const el=[...document.querySelectorAll('button')].find(b=>(b.innerText||'').toLowerCase().includes(t)&&!b.disabled&&b.offsetParent);if(!el)return false;el.click();return true;`);
 const tapAny=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const hit=s=>[...document.querySelectorAll(s)].find(b=>(b.innerText||'').toLowerCase().includes(t)&&b.offsetParent&&(b.innerText||'').length<220);const el=hit('button')||hit('a,[role="button"]')||hit('li,article,div');if(!el)return false;el.click();return true;`);
@@ -167,7 +173,7 @@ ok(resumed>after,`the round resumes once the performance is over (${resumed})`);
 
 console.log('\nTHE CLIP IS THE CLOCK');
 // Nobody sets a performance length. A 210s track cuts to the venue's window —
-// 25s in, 75s long — so a take started at the top of the clip has ~75s to run,
+// A 34s track cuts to 12s in for 20s, so a take started at the top of the clip
 // and the stage shows that countdown rather than waiting on the performer.
 await settle(1200);
 let opened2=false;
@@ -189,14 +195,14 @@ const mm=String(clock).match(/^(\d+):(\d+)$/);
 const secs=mm?Number(mm[1])*60+Number(mm[2]):null;
 console.log('   [stage clock]',clock||'(none)',secs!=null?`= ${secs}s`:'');
 ok(secs!=null,'the stage carries a countdown rather than an open-ended take');
-// A 210s track cuts to 25s in for 75s. The take opens with what is left of it.
-ok(secs!=null&&secs>10&&secs<=75,`and it is the clip's length, not a fixed timer (${secs}s of a 75s window)`);
+// The take opens with whatever is left of that 20s window.
+ok(secs!=null&&secs>2&&secs<=20,`and it is the clip's length, not a fixed timer (${secs}s of a 20s window)`);
 ok(await js(`return !!document.querySelector('.battle-clipmeter')`),'and the clip draining is on a meter, not just a number');
 
 console.log('\nNO YOUTUBE, NO GAME');
 // Make the player fail on its very first song and start a fresh round. Nothing
 // should get called into the silence.
-await fakeYouTube({ duration: 210, failAfter: 1 });
+await fakeYouTube({ duration: 34, failAfter: 1 });
 await cdp('Page.navigate',{url:appUrl}); await settle(3000);
 await rotate(430,932); await settle(600);
 await tapAny('Enter ·') || await tapAny('Member Sign In'); await settle(2200);
