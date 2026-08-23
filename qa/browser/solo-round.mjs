@@ -89,10 +89,19 @@ ok(!(await js(`return !!document.querySelector('.bingo-mode-tabs')`)),'no row of
 // textContent, not innerText: on a phone-width screen the step LABELS are
 // deliberately hidden and only the numbers show, and innerText omits what CSS
 // hides — so this read an empty rail and called a working one missing.
-const rail=await js(`return [...document.querySelectorAll('.play-steps li')].map(l=>l.textContent.replace(/\\s+/g,' ').trim()).join(' | ')`);
-console.log('   [steps]',rail);
-ok(/pick a theme/i.test(String(rail)),'the steps of the solo path are shown');
-ok(/play/i.test(String(rail)),'including where it ends');
+// The rail is a named step, a count and a line — not a row of numbered pills.
+const rail=await js(`
+  const el=document.querySelector('.play-steps'); if(!el) return 'none';
+  const now=el.querySelector('.play-steps-now'), count=el.querySelector('.play-steps-count'),
+        fill=el.querySelector('.play-steps-rail span');
+  return JSON.stringify({now:now?now.textContent.trim():'', count:count?count.textContent.replace(/\\s+/g,''):'',
+    fillPct:fill?fill.style.width:'', pills:el.querySelectorAll('li').length});`);
+console.log('   [step]',rail);
+const rr=(()=>{try{return JSON.parse(rail);}catch{return null;}})();
+ok(rr&&/pick a theme/i.test(rr.now),'the step you are on is named in words');
+ok(rr&&rr.count.replace(/[^0-9]/g,'')==='12',`and counted (${rr?rr.count:'?'})`);
+ok(rr&&/%$/.test(rr.fillPct),`with one line that fills (${rr?rr.fillPct:'?'})`);
+ok(rr&&rr.pills===0,'and no row of numbered pills');
 ok(await js(`return !!document.querySelector('.bingo-host-link')`),'and hosting is still one tap, on its own line');
 
 console.log('\nPICK THE NIGHT');
@@ -153,21 +162,33 @@ const t2=await js(`const e=document.querySelector('.solo-callclock .ui-meter-rig
 console.log('   [clock]',t1,'→',t2);
 ok(t1!==t2,'and it is actually moving, not a painted number');
 
-console.log('\nTHE METERS ARE THE VENUE’S OWN ART');
-const art=await js(`
+console.log('\nONE BAR, ONE FILL');
+// This used to assert the meter was built from three rank-kit images — a track
+// line, a fill bar and a diamond marker. That is exactly what made it read as a
+// DOUBLED bar: three overlaid pieces of art at different weights and heights.
+// The bar is now a groove and a fill, so what is worth pinning is that it has
+// one of each, that the fill actually reflects the value, and that it is not
+// wider than the track it sits in.
+const bar=await js(`
   const m=document.querySelector('.ui-meter'); if(!m) return 'no meter';
-  const track=m.querySelector('.ui-meter-track-art'), head=m.querySelector('.ui-meter-head-art'),
-        fill=m.querySelector('.ui-meter-fill-art');
-  return JSON.stringify({track:track?.getAttribute('src')||'', head:head?.getAttribute('src')||'',
-    fill:getComputedStyle(fill||document.body).backgroundImage,
-    trackLoaded:!!(track&&track.naturalWidth>0), headLoaded:!!(head&&head.naturalWidth>0)});`);
-console.log('   [art]',art);
-const a=(()=>{try{return JSON.parse(art);}catch{return null;}})();
-ok(!!a,'a meter is on screen');
-ok(a&&/loy_track\.png$/.test(a.track),'the track is the rank track art');
-ok(a&&/loy_marker\.png$/.test(a.head),'the head is the rank marker art');
-ok(a&&/loy_fill\.png/.test(a.fill),'and the fill is the rank fill art');
-ok(a&&a.trackLoaded&&a.headLoaded,'the art actually loaded, rather than 404ing into an empty box');
+  const track=m.querySelector('.ui-meter-track'), fill=m.querySelector('.ui-meter-fill');
+  if(!track||!fill) return 'missing parts';
+  const tr=track.getBoundingClientRect(), fr=fill.getBoundingClientRect();
+  return JSON.stringify({
+    tracks:m.querySelectorAll('.ui-meter-track').length,
+    fills:m.querySelectorAll('.ui-meter-fill').length,
+    imgs:m.querySelectorAll('img').length,
+    tw:Math.round(tr.width), th:Math.round(tr.height),
+    fw:Math.round(fr.width), fh:Math.round(fr.height),
+    now:track.getAttribute('aria-valuenow')});`);
+console.log('   [bar]',bar);
+const b=(()=>{try{return JSON.parse(bar);}catch{return null;}})();
+ok(!!b,'a meter is on screen');
+ok(b&&b.tracks===1&&b.fills===1,`exactly one track and one fill (${b?b.tracks+'/'+b.fills:'?'})`);
+ok(b&&b.imgs===0,`and no stacked art to double it up (${b?b.imgs:'?'} images)`);
+ok(b&&b.fw<=b.tw+1,`the fill never runs past the track (${b?b.fw+' of '+b.tw:'?'})`);
+ok(b&&b.th>0&&b.th<=14,`it is a bar, not a slab (${b?b.th:'?'}px tall)`);
+ok(b&&Number(b.now)>=0,'and it reports its value to a screen reader');
 ok(await js(`return [...document.querySelectorAll('.ui-meter')].length >= 3`),
    'the clock, the rivals and your own progress all read on the same instrument');
 

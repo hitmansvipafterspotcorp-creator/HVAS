@@ -2615,6 +2615,11 @@ function useCountdown(target) {
 function MembershipScreen({ checkedIn }) {
   const member = useMember();
   const [renew, setRenew] = useState(false);
+  // Cancelling used to be a single unconfirmed tap that wiped the membership.
+  // The member vanished, so this screen re-rendered as the tier rail — and from
+  // the outside that is the app throwing you onto a sales screen for no reason
+  // you can see. It now lands on an acknowledgement you leave when you choose.
+  const [cancelled, setCancelled] = useState(false);
   const boughtAt = useRef(member?.purchasedAt);
   useEffect(() => {                                   // purchased in renew mode -> back to pass
     if (renew && member && member.purchasedAt !== boughtAt.current) setRenew(false);
@@ -2628,9 +2633,19 @@ function MembershipScreen({ checkedIn }) {
     const id = setInterval(syncMemberFromBackend, 8000);
     return () => clearInterval(id);
   }, []);
+
+  if (cancelled) {
+    return (
+      <AppPanel title="Membership cancelled" subtitle="Nothing is charged again">
+        <p className="dash-empty">Your pass is closed. You can join again whenever you want — your member number stays yours.</p>
+        <button type="button" className="bingo-btn gold" onClick={() => setCancelled(false)}>See memberships</button>
+      </AppPanel>
+    );
+  }
   if (member && !renew) {
     return <MemberPass member={member} checkedIn={checkedIn}
-      onRenew={() => { boughtAt.current = member.purchasedAt; setRenew(true); }} />;
+      onRenew={() => { boughtAt.current = member.purchasedAt; setRenew(true); }}
+      onCancelled={() => setCancelled(true)} />;
   }
   return <BuyMembership renewMode={!!member} currentTier={member?.tier} onBack={member ? () => setRenew(false) : undefined} />;
 }
@@ -2902,7 +2917,7 @@ function RenewsIn({ expiresAt }) {
 
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
-function MemberPass({ member, checkedIn, onRenew }) {
+function MemberPass({ member, checkedIn, onRenew, onCancelled }) {
   const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.fullLogoClear);
   const isVip = member.vip;
   const verified = member.status === 'verified';
@@ -2940,6 +2955,7 @@ function MemberPass({ member, checkedIn, onRenew }) {
   // Pass / Loyalty & Access / Account — three focused screens instead of one
   // long stack. Nothing was removed, it's just not all on screen at once.
   const [tab, setTab] = useState('pass');
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const penalty = memberPenalty(member.number);
   return (
@@ -3147,7 +3163,17 @@ function MemberPass({ member, checkedIn, onRenew }) {
           </button>
         ))}
         <button type="button" className="mem-signout" onClick={memberSignOut}>Sign out</button>
-        <button type="button" className="mem-cancel" onClick={resetMembership}>Cancel membership</button>
+        {/* Two taps, and the second one says what it does. Closing a membership
+            is not undoable and this was one unguarded tap next to Sign out. */}
+        {!confirmCancel ? (
+          <button type="button" className="mem-cancel" onClick={() => setConfirmCancel(true)}>Cancel membership</button>
+        ) : (
+          <div className="mem-confirm">
+            <p>Close this membership? Your rank and nights go with it.</p>
+            <button type="button" className="mem-cancel" onClick={() => { resetMembership(); onCancelled?.(); }}>Yes, cancel it</button>
+            <button type="button" className="bingo-btn ghost" onClick={() => setConfirmCancel(false)}>Keep my membership</button>
+          </div>
+        )}
       </section>
       <p className="mem-fineprint">Everything for your membership lives here — pass, QR, renewal, loyalty rank, and profile.</p>
       </>
@@ -4225,19 +4251,21 @@ const soloHasPattern = (card, covered, pattern) => bingoHasPattern(soloCard(card
 // short random delay — so you can watch them close in on a line. First
 // completed line wins.
 //
-// How long a called song gets before the next one is called.
+// How long a called song plays before the next one is called.
 //
-// This used to be a flat 2.2 seconds, chosen back when solo had no music at
-// all: with silence between calls, anything slower read as dead air. With the
-// songs actually playing it meant you heard about two seconds of a record
-// before it cut to the next one — which is not a game you can play by ear, it
-// is a slideshow.
+// Thirty seconds. Long enough to recognise a record and find it on your card,
+// short enough that a 25-square round is not an hour long.
 //
-// A called song now runs for its CLIP, the same rule the venue backend uses
-// (bingoWindowFor in server/src/app.mjs): the verse into the hook, the part of
-// a record a room knows. This constant is only the fallback for before a clip
-// is known — the very first call, when nothing is playing yet.
-const SOLO_CALL_MS = 2200;
+// It has been two things before this and both were wrong. A flat 2.2s came from
+// when solo had no music at all, and meant you heard two seconds of a song —
+// unplayable by ear. Then it ran the full clip, 75 seconds of every record,
+// which is the right length for PERFORMING to a song and far too long for
+// merely naming one.
+//
+// Those are two different clocks and this is only the first: a lip sync
+// performance still runs exactly as long as its clip, because the take ends
+// when the music does.
+const SOLO_CALL_MS = 30000;
 // ── Solo lip sync battles ────────────────────────────────────────────────
 // Solo plays by the venue's rules, not an easier version of them: a LIP SYNC
 // square is never covered by tapping it. You perform it, or you pass and lose
@@ -4359,6 +4387,17 @@ function Meter({ value, label, right, live = false, hot = false, countdown = fal
   const isHot = hot || (countdown ? pct <= 22 : pct >= 88);
   const cls = ['ui-meter', live && 'is-live', isHot && 'is-hot', countdown && 'is-countdown', className]
     .filter(Boolean).join(' ');
+  // One track, one fill, nothing else.
+  //
+  // This used to draw three overlaid images from the rank kit: a thin purple
+  // line for the track, a thicker gold bar for the fill, and a diamond marker
+  // riding the end. They are different weights and sit at different heights, so
+  // what actually rendered was TWO lines with an ornament between them — read
+  // as a doubled bar, and on a small screen as a mess.
+  //
+  // A progress bar has one job: show how full it is. A groove and a fill do
+  // that at any width, on any device, with no art to load, mis-scale or 404 —
+  // which is also why it can now be a single element instead of five.
   return (
     <div className={cls}>
       {(label || right) && (
@@ -4369,14 +4408,7 @@ function Meter({ value, label, right, live = false, hot = false, countdown = fal
       )}
       <div className="ui-meter-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
            aria-label={typeof label === 'string' ? label : undefined}>
-        <img className="ui-meter-track-art" src={`${RANK_ART}loy_track.png`} alt="" aria-hidden="true" />
-        <span className="ui-meter-fill" style={{ width: `${pct}%` }}>
-          <i className="ui-meter-fill-art" style={{ backgroundImage: `url(${RANK_ART}loy_fill.png)` }} />
-          <i className="ui-meter-sheen" aria-hidden="true" />
-        </span>
-        {/* clamped so the head stays on the rail at both ends */}
-        <img className="ui-meter-head-art" src={`${RANK_ART}loy_marker.png`} alt="" aria-hidden="true"
-             style={{ left: `${Math.max(2, Math.min(98, pct))}%` }} />
+        <span className="ui-meter-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -4602,9 +4634,13 @@ function SoloBingoGame({ onExit }) {
   // The song that is up gets exactly as long as its clip runs. Identical to the
   // venue's bingoWindowFor, so practising alone teaches the real pacing rather
   // than a faster arcade version of it.
+  // Thirty seconds, or the whole clip if the clip is shorter than that. You
+  // cannot play thirty seconds of a twenty-second cut, and a round that sits in
+  // silence waiting out a timer longer than its own music is the dead air this
+  // pacing exists to avoid.
   const callWindowMs = () => {
     const secs = song.clip?.seconds;
-    return secs ? Math.round(secs * 1000) : SOLO_CALL_MS;
+    return secs ? Math.min(SOLO_CALL_MS, Math.round(secs * 1000)) : SOLO_CALL_MS;
   };
   const musicOn = song.status === 'playing';
   const musicFailed = song.status === 'error';
@@ -5349,21 +5385,27 @@ function SfxToggle() {
   );
 }
 
-/** Where you are in setting up a round, and how far is left.
+/** Where you are in setting up a round.
  *
- *  A member should never have to work out what to do next. The steps are the
- *  same every time, in the same order, and the one you are on is the only one
- *  that is lit. */
+ *  This was a row of numbered pills — ① PICK A THEME ② PLAY — which is the
+ *  shape of a checkout wizard, not a game. It read as cheesy because it was
+ *  loud about a thing that should be quiet: nobody opens a bingo app to admire
+ *  its progress tracker.
+ *
+ *  What apps that get this right do is state the step in words and draw one
+ *  thin line that fills. So: the step you are on, the count, and a bar. It
+ *  takes one line of height instead of a row of chips, which is also what makes
+ *  it survive a landscape phone. */
 function PlaySteps({ steps, current }) {
+  const pct = Math.round(((current + 1) / steps.length) * 100);
   return (
-    <ol className="play-steps" aria-label={`Step ${current + 1} of ${steps.length}`}>
-      {steps.map((label, i) => (
-        <li key={label} className={i < current ? 'done' : i === current ? 'now' : 'todo'}>
-          <b aria-hidden="true">{i < current ? '✓' : i + 1}</b>
-          <span>{label}</span>
-        </li>
-      ))}
-    </ol>
+    <div className="play-steps" role="group" aria-label={`Step ${current + 1} of ${steps.length}: ${steps[current]}`}>
+      <div className="play-steps-head">
+        <span className="play-steps-now">{steps[current]}</span>
+        <span className="play-steps-count">{current + 1}<i>/</i>{steps.length}</span>
+      </div>
+      <div className="play-steps-rail"><span style={{ width: `${pct}%` }} /></div>
+    </div>
   );
 }
 
