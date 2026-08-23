@@ -18,6 +18,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
+import { clipWindowFor } from '../../hitmans_vip_membership_app/src/decks.generated.js';
 const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
@@ -56,7 +57,8 @@ const fakeYouTube = (cfg) => cdp('Page.addScriptToEvaluateOnNewDocument',
 // song getting its full run actually means. With the old 210s track every call
 // was 75 seconds apart and this suite spent minutes waiting for a second song.
 // The rule is unchanged and untouched; only the track is short.
-await fakeYouTube({ duration: 34 });
+const FAKE_TRACK_SECONDS = 34;
+await fakeYouTube({ duration: FAKE_TRACK_SECONDS });
 const text=async()=>(await js('return document.body?document.body.innerText:""'))||'';
 const tap=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const el=[...document.querySelectorAll('button')].find(b=>(b.innerText||'').toLowerCase().includes(t)&&!b.disabled&&b.offsetParent);if(!el)return false;el.click();return true;`);
 const tapAny=n=>js(`const t=${JSON.stringify(n)}.toLowerCase();const hit=s=>[...document.querySelectorAll(s)].find(b=>(b.innerText||'').toLowerCase().includes(t)&&b.offsetParent&&(b.innerText||'').length<220);const el=hit('button')||hit('a,[role="button"]')||hit('li,article,div');if(!el)return false;el.click();return true;`);
@@ -178,9 +180,12 @@ await settle(1500);
 const after=await calls();
 console.log('   [calls]',before,'→',after,'(7s spent on the battle stage)');
 ok(after===before,`and called nothing more while the performer was on the floor (${after})`);
-// And it picks straight back up rather than staying frozen.
-await settle(3000);
-const resumed=await calls();
+// And it picks straight back up rather than staying frozen. Waited on with a
+// deadline, not a fixed 3s: a call is now a clip apart, so three seconds proves
+// nothing either way — it would pass only by accident.
+let resumed=after;
+const resumeBy=Date.now()+45000;
+while(resumed<=after && Date.now()<resumeBy){ await settle(1500); resumed=await calls(); }
 console.log('   [calls] after returning:',resumed);
 ok(resumed>after,`the round resumes once the performance is over (${resumed})`);
 
@@ -201,7 +206,12 @@ const cue=await js(`return JSON.stringify(window.__FAKE_YT_STATE||{})`);
 console.log('   [player]',cue);
 const st=(()=>{try{return JSON.parse(cue);}catch{return{};}})();
 ok(st.loads>0,`the round cued songs on the player (${st.loads})`);
-ok(st.seekedTo===25,`and cut to the venue's window on a 210s track (seeked to ${st.seekedTo}s)`);
+// Asked of the rule rather than written down. This said 25 — correct for the
+// 210s track the suite used to fake — and went stale the moment the track
+// changed, reporting a working cut as a failure.
+const expectStart = clipWindowFor(FAKE_TRACK_SECONDS, 120).start;
+ok(st.seekedTo===expectStart,
+   `and cut to the venue's window on a ${FAKE_TRACK_SECONDS}s track (seeked to ${st.seekedTo}s, rule says ${expectStart}s)`);
 await tap('Perform it'); await settle(2500);
 const clock=await js(`const e=document.querySelector('.battle-clock');return e?e.innerText.trim():''`);
 const mm=String(clock).match(/^(\d+):(\d+)$/);
@@ -215,7 +225,7 @@ ok(await js(`return !!document.querySelector('.battle-clipmeter')`),'and the cli
 console.log('\nNO YOUTUBE, NO GAME');
 // Make the player fail on its very first song and start a fresh round. Nothing
 // should get called into the silence.
-await fakeYouTube({ duration: 34, failAfter: 1 });
+await fakeYouTube({ duration: FAKE_TRACK_SECONDS, failAfter: 1 });
 await cdp('Page.navigate',{url:appUrl}); await settle(3000);
 await rotate(430,932); await settle(600);
 await tapAny('Enter ·') || await tapAny('Member Sign In'); await settle(2200);
