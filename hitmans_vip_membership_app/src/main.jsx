@@ -1663,7 +1663,7 @@ function RotateToPlay({ children }) {
 function ScreenBody({ activeScreen, navigate, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
-  if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} />;
+  if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} navigate={navigate} />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
@@ -2636,7 +2636,7 @@ function useCountdown(target) {
 
 // THE single membership screen: not a member -> buy a tier; member -> your pass.
 // "Renew plan" from the pass opens the same tier selector (renew mode).
-function MembershipScreen({ checkedIn }) {
+function MembershipScreen({ checkedIn, navigate }) {
   const member = useMember();
   const [renew, setRenew] = useState(false);
   // Cancelling used to be a single unconfirmed tap that wiped the membership.
@@ -2667,7 +2667,7 @@ function MembershipScreen({ checkedIn }) {
     );
   }
   if (member && !renew) {
-    return <MemberPass member={member} checkedIn={checkedIn}
+    return <MemberPass member={member} checkedIn={checkedIn} navigate={navigate}
       onRenew={() => { boughtAt.current = member.purchasedAt; setRenew(true); }}
       onCancelled={() => setCancelled(true)} />;
   }
@@ -2807,8 +2807,14 @@ function BuyMembership({ renewMode = false, currentTier, onBack } = {}) {
         </p>
         {free ? (
           // Open contribution set to $0 — join free, straight onto the network.
-          <button type="button" className="asset-cta" onClick={() => finalize('Free', 0)} aria-label="Join free">
-            <img src={ui.buttons.selectPlan} alt="Join free" />
+          //
+          // Text, not the SELECT PLAN artwork. There is no art in the kit that
+          // says "join free", and this is the first button a new member ever
+          // presses — a plate reading SELECT PLAN on the control that actually
+          // completes a membership is the app naming the wrong action at the
+          // one moment somebody is deciding whether to trust it.
+          <button type="button" className="buy-free-btn" onClick={() => finalize('Free', 0)}>
+            Join free — get my card
           </button>
         ) : pay === 'PayPal' && tierPayable(tier) && !t.open ? (
           // Recurring subscription buttons (card / Apple Pay / Venmo / balance)
@@ -2941,7 +2947,7 @@ function RenewsIn({ expiresAt }) {
 
 // Combined Membership + Profile hub — one page: pass, renewal, loyalty rank,
 // access ribbons, and preferences.
-function MemberPass({ member, checkedIn, onRenew, onCancelled }) {
+function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
   const qr = useQrDataUrl(`HVAS-MEMBER:${member.number}`, ui.fullLogoClear);
   const isVip = member.vip;
   const verified = member.status === 'verified';
@@ -3017,6 +3023,15 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled }) {
       </div>
       {tab === 'pass' && (
       <>
+      {/* The road in was Continue, pick a tier, join, and then a member is
+          looking at their card with no idea that the game is two taps away
+          behind HOME. This is the thing they came for, so it says so — right
+          here, on the screen they land on the moment they are a member. */}
+      {navigate && (
+        <button type="button" className="mem-play-cta" onClick={() => navigate('lobby')}>
+          ▶ Play Lip Sync Bingo
+        </button>
+      )}
       {/* Wrapper so landscape (short height, wide width) can lay the pass
           card and everything below it side by side instead of stacking —
           stacked, this tab alone needs ~2x the height a landscape phone has. */}

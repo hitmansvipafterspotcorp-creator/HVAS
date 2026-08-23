@@ -1552,3 +1552,31 @@
   margin: 0; font: 700 13px/1.4 var(--k-font, inherit); color: #ffb4b4;
 }
 .mem-confirm .bingo-btn { margin-top: 0; }
+
+/* The button that completes a free membership. The kit has no "join free"
+   plate, and borrowing the SELECT PLAN one made the first button a new member
+   presses name the wrong action. Same idiom as the rest of the brand — dark
+   ground, neon frame, gold type — just with words that are true. */
+.buy-free-btn {
+  display: block; width: auto; max-width: min(100%, 340px); margin: 4px auto 0;
+  padding: 14px 30px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, #2a0b3d, #14061f);
+  color: #ffd66b; border: 2px solid #ff3cb4;
+  font: 900 15px/1 var(--k-font, inherit); letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: 0 0 22px rgba(255, 60, 180, .45), inset 0 0 18px rgba(255, 60, 180, .12);
+  text-shadow: 0 0 10px rgba(255, 214, 107, .5);
+}
+.buy-free-btn:active { transform: translateY(1px); }
+
+/* The one thing a member is here for, on the screen they land on. */
+.mem-play-cta {
+  display: block; width: 100%; max-width: 420px; margin: 0 auto 12px;
+  padding: 14px 22px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, #2a0b3d, #14061f);
+  color: #ffd66b; border: 2px solid #ff3cb4;
+  font: 900 15px/1 var(--k-font, inherit); letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: 0 0 22px rgba(255, 60, 180, .45), inset 0 0 18px rgba(255, 60, 180, .12);
+  text-shadow: 0 0 10px rgba(255, 214, 107, .5);
+}
+.mem-play-cta:active { transform: translateY(1px); }
+@media (max-height: 460px) and (min-width: 560px) { .mem-play-cta { padding: 9px 16px; font-size: 12px; margin-bottom: 8px; } }
