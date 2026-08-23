@@ -88,7 +88,11 @@ ok(lipInfo>0,`the card carries lip sync squares (${lipInfo})`);
 
 // Drive the clock: the call loop reveals squares over time.
 let opened=false;
-for(let i=0;i<40&&!opened;i++){
+// Deadline, not a loop count. A square is called every clip now, so "forty
+// turns of 1.2s" stopped being long enough to see one — and the failure looked
+// like a broken game rather than a test that stopped watching too early.
+const huntUntil=Date.now()+200000;
+while(!opened && Date.now()<huntUntil){
   await settle(1200);
   // Tap every enabled lip sync tile; only a called one does anything.
   await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
@@ -110,7 +114,8 @@ ok(dead===true,'and cannot be tapped again');
 console.log('\nPERFORMING — and the take is yours to post');
 // Open another battle; the fake camera/mic above make the recorder real.
 let again=false;
-for(let i=0;i<40&&!again;i++){
+const huntUntil2=Date.now()+200000;
+while(!again && Date.now()<huntUntil2){
   await settle(1200);
   await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
   await settle(500);

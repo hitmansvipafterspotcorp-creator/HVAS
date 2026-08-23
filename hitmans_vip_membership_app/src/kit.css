@@ -1313,10 +1313,14 @@
 .ui-meter-fill { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
   height: 10px; border-radius: 999px; overflow: hidden; min-width: 0;
   transition: width .18s cubic-bezier(.4,0,.2,1); will-change: width; }
-/* loy_fill is a short gold segment — repeat it along the filled length so the
-   bar keeps the kit's texture at any width instead of smearing one copy. */
+/* loy_fill is a short gold segment with rounded, transparent caps. Repeating it
+   along the bar was meant to keep the kit's texture at any width — but tiling a
+   piece that fades out at both ends puts a gap every 92px, so the fill rendered
+   as a dashed line rather than a bar filling up. A progress bar with holes in it
+   does not read as progress.
+   One copy, stretched: one continuous fill, which is the thing the bar is for. */
 .ui-meter-fill-art { position: absolute; inset: 0; display: block; border-radius: 999px;
-  background-repeat: repeat-x; background-size: auto 100%; }
+  background-repeat: no-repeat; background-size: 100% 100%; }
 
 /* The travelling highlight. Only while something is actually moving — a sheen
    sweeping a bar that is not changing is the kind of motion that reads as a

@@ -74,7 +74,11 @@ await tapAny('Member Sign In');await settle(1400);
 await fill('First name','Round');await fill('(850)','850-960-0007');await settle(400);
 await tap('Continue');await settle(2500);
 let reached=false;
-for(let i=0;i<20&&!reached;i++){await js(`const b=document.querySelector('[data-target="lobby"]');if(b)b.click();return 1;`);await settle(1300);reached=/solo vs cpu/i.test(await text());}
+for(let i=0;i<20&&!reached;i++){await js(`const b=document.querySelector('[data-target="lobby"]');if(b)b.click();return 1;`);await settle(1300);// NOT a text match. The menu tile now reads "Tonight's round, or solo vs CPU",
+// so looking for those words said "arrived" while still on the menu, and every
+// assertion after it ran against the wrong screen. The step rail only exists on
+// the play screen.
+  reached=await js("return !!document.querySelector('.play-steps')");}
 ok(reached,'Lip Sync Bingo opens with no venue');
 
 console.log('\nNO MENU AT ALL — IT OPENS ON YOUR PATH');
