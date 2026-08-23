@@ -4672,7 +4672,12 @@ function SoloBingoGame({ onExit }) {
     if (game?.status !== 'playing' || held) return undefined;
     // Coming back from a performance restarts the timer, so restart the
     // countdown with it rather than showing a deadline that passed mid-song.
-    const wait = callWindowMs();
+    // The FIRST call goes out immediately. The window is the gap BETWEEN songs,
+    // and applying it before the first one meant starting a round and watching
+    // "Dealing…" for thirty seconds with no music and nothing on the card — a
+    // game that looks frozen at the exact moment someone is deciding whether it
+    // works. Deal, play, then pace.
+    const wait = game.calledCount === 0 ? 350 : callWindowMs();
     setGame((g) => (g && g.status === 'playing' ? { ...g, nextCallAt: Date.now() + wait } : g));
     // A self-rescheduling timeout, not an interval: each song's window is its
     // own length, so there is no one period to tick on. The effect re-runs on
