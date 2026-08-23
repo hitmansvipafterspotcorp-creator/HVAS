@@ -91,10 +91,23 @@ for(const want of ['Ladies Night','Trap','Crunk','Country','Pop','Movies','Kings
 ok(Array.isArray(themes)&&themes.some(t=>/Tallahassee/i.test(t)),'and the home-team deck is too');
 
 console.log('\nAND THE PICK IS WHAT YOU PLAY');
-ok(await js(`const el=[...document.querySelectorAll('.deck-chip')].find(b=>/^Trap/.test(b.innerText.trim()));if(!el)return false;el.click();return true;`),
-   'Trap is selectable');
-await settle(500);
-ok(/start solo round · trap/i.test(await text()),'the start button names the deck you picked');
+// Click it until the start button agrees. A single click and a fixed 500ms
+// sometimes landed before the picker was interactive, and the round then dealt
+// the DEFAULT deck while the suite went on believing it had picked Trap — so
+// the theme assertion failed on a card that was never Trap in the first place.
+let picked = false;
+for (let i = 0; i < 12 && !picked; i++) {
+  await js(`const el=[...document.querySelectorAll('.deck-chip')].find(b=>/^Trap/.test(b.innerText.trim()));if(el)el.click();return true;`);
+  await settle(500);
+  picked = /start solo round · trap/i.test(await text());
+}
+ok(picked, 'Trap is selectable');
+ok(picked, 'the start button names the deck you picked');
+// Say portrait explicitly rather than trusting the window size. Without an
+// emulation override the headless browser does not report an orientation the
+// app's portrait check believes, so the rotate gate never engaged and the card
+// rendered upright — which is the exact thing this section exists to forbid.
+await rotate(430,932); await settle(800);
 await tap('Start Solo Round');await settle(2000);
 // Portrait: the card must not be drawn at all.
 console.log('\nSIDEWAYS PLAY ONLY');
