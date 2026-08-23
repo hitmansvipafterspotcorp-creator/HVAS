@@ -349,8 +349,13 @@
      which is worse than scrolling. Everything is sized to fit instead, and
      the panel's own title bar goes since the screen header already says
      Bingo Card. */
-  .screen-playerCard .app-panel > header,
-  .screen-lobby .app-panel > header { display: none; }
+  /* The card panel's own title is redundant — the screen header already says
+     Bingo Card — so it goes to buy back a row of squares. But NOT on a battle
+     panel: its header is where the result is announced. Hiding it made "You
+     took it" invisible in landscape, which is the one word a performer is
+     waiting for after they finish. */
+  .screen-playerCard .app-panel:not(.battle-panel) > header,
+  .screen-lobby .app-panel:not(.battle-panel) > header { display: none; }
   .battle-alert { padding: 5px 10px; margin-bottom: 4px; }
   .battle-alert-text strong { font-size: 12px; }
   .battle-alert-text small { font-size: 10.5px; }
@@ -514,7 +519,9 @@
      tabs already say ("Lip Sync Bingo Lobby" / "Solo vs CPU"), and it costs
      about 50px — roughly a row of squares. The call count it carried moves
      into the HUD label instead. */
-  .screen-lobby .app-panel > header { display: none; }
+  /* Same exception: a battle panel announces its result in that header, and
+     "You took it" is the one word a performer is waiting for. */
+  .screen-lobby .app-panel:not(.battle-panel) > header { display: none; }
   .screen-lobby .app-panel-body { padding: 8px 10px; gap: 6px; }
   .screen-lobby .bingo-mode-tabs { margin-bottom: 6px; }
 }

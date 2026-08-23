@@ -3483,15 +3483,31 @@ function BattleStage({ battle, onDone, onTake }) {
   // has something to be a fraction of.
   const totalRef = useRef(0);
   const [total, setTotal] = useState(0);
+  // The window is a LENGTH, and the clock does not start until you do.
+  //
+  // performanceEndsAt is an absolute time stamped when the square was tapped —
+  // which is while the performer is still on the "Perform it / Pass" screen
+  // deciding. Ticking from there meant reading that screen for fifteen seconds
+  // cost fifteen seconds of your performance, and if you took long enough the
+  // take was cut off the instant you started: `recording && left === 0` stops
+  // it. The clock you are racing has to be the one that starts when you do.
+  const windowRef = useRef(0);
+  const endsAtRef = useRef(0);
   useEffect(() => {
     if (!battle?.performanceEndsAt) { setLeft(null); setTotal(0); return undefined; }
-    totalRef.current = Math.max(1, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000));
-    setTotal(totalRef.current);
-    const tick = () => setLeft(Math.max(0, Math.ceil((battle.performanceEndsAt - Date.now()) / 1000)));
+    if (!windowRef.current) {
+      windowRef.current = Math.max(1000, battle.performanceEndsAt - Date.now());
+      totalRef.current = Math.ceil(windowRef.current / 1000);
+      setTotal(totalRef.current);
+    }
+    // Not performing yet: show the whole window, standing still.
+    if (!recording) { setLeft(totalRef.current); endsAtRef.current = 0; return undefined; }
+    if (!endsAtRef.current) endsAtRef.current = Date.now() + windowRef.current;
+    const tick = () => setLeft(Math.max(0, Math.ceil((endsAtRef.current - Date.now()) / 1000)));
     tick();
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [battle?.performanceEndsAt]);
+  }, [battle?.performanceEndsAt, recording]);
 
   // Auto-stop when the window runs out — the host's clock ends the take, not
   // the performer deciding they're done.
