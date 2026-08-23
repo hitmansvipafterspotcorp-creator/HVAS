@@ -364,7 +364,7 @@ export const DECK_VIDEO_IDS = {
   "usher-you-make-me-wanna-lip": "1Ujajo3Uzuc",
   "vanessa-williams-colors-of-the-wind-lip": "YRSmToaXySU",
   "victoria-mon-t-on-my-mama": "xSXOHksF_8g",
-  "waka-flocka-flame-no-hands-lip": "CQB0ox8-ddg",
+  "waka-flocka-flame-no-hands-lip": "skhxizRYxps",
   "warren-g-regulate": "l3Re2-scHUI",
   "webbie-independent-lip": "oLAvnouB0mc",
   "whitney-houston-i-m-every-woman-lip": "gwKu7A7Fxsw",
