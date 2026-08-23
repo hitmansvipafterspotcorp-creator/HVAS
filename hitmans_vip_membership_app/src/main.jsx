@@ -5801,7 +5801,13 @@ function PlayerRecord() {
   );
 }
 
-const VENUE_STEPS = ['Connect', 'Join', 'Ready'];
+// Two step sets, because connecting is not a step you are ABOUT to take once
+// you have already taken it. Counting it anyway opened the venue path at
+// "Join 2/3" — which tells a member they have skipped something, and leaves
+// them looking for the step they missed. If the phone is on the venue, the
+// journey is Join then Ready, and it starts at one.
+const VENUE_STEPS_UNCONNECTED = ['Connect', 'Join', 'Ready'];
+const VENUE_STEPS = ['Join', 'Ready'];
 
 function VenueLobby({ navigate }) {
   const { state, err, refresh } = useBingoState(3000);
@@ -5832,7 +5838,7 @@ function VenueLobby({ navigate }) {
   if (err === 'not-connected') {
     return (
       <>
-        <PlaySteps steps={VENUE_STEPS} current={0} />
+        <PlaySteps steps={VENUE_STEPS_UNCONNECTED} current={0} />
         <AppPanel title="Connect to the venue" subtitle="Step 1 of 3">
           <p className="dash-empty">Scan the QR at the door, or pick the room from the door screen.</p>
           <p className="mem-fineprint">Not at the venue tonight? Solo vs CPU works anywhere — the link is below.</p>
@@ -5853,7 +5859,7 @@ function VenueLobby({ navigate }) {
     catch (e) { setMsg(e.message === 'Failed to fetch' ? "Couldn't reach the venue — check you're on the venue wifi." : (e.message || 'Could not change that — try again.')); }
     setBusy(false);
   };
-  const step = !me ? 1 : 2;
+  const step = !me ? 0 : 1;
   return (
     <>
       <PlaySteps steps={VENUE_STEPS} current={step} />

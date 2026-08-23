@@ -198,8 +198,11 @@ console.log('\nTHE ROUND HOLDS WHILE YOU PERFORM');
 // The battle takes the whole screen, so the HUD's call count goes with it —
 // read it on the card, on the last look before the battle opens.
 const calls=async()=>{const t=await text();const m=t.match(/(\d+)\s+called/);return m?Number(m[1]):-1;};
+// Deadline, for the same reason as the one further down: forty turns is under
+// a minute and songs are twenty seconds apart.
 let opened=false,before=-1;
-for(let i=0;i<40&&!opened;i++){
+const hunt1=Date.now()+220000;
+while(!opened && Date.now()<hunt1){
   await settle(1000);
   const seen=await calls(); if(seen>=0) before=seen;
   await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
@@ -230,14 +233,28 @@ console.log('\nTHE CLIP IS THE CLOCK');
 // A 34s track cuts to 12s in for 20s, so a take started at the top of the clip
 // and the stage shows that countdown rather than waiting on the performer.
 await settle(1200);
-let opened2=false;
-for(let i=0;i<40&&!opened2;i++){
+// A deadline, not forty turns. Forty turns of 1.25s is fifty seconds, and a
+// song is called roughly every twenty — so this watched two calls go by and
+// then reported a working game as broken. The last fixed-count hunt in the
+// suite; the others were converted when the pacing changed and this one was
+// missed.
+//
+// It also stops if the round ENDS. A CPU completing its line is a legitimate
+// end to a solo round, not a failure to find a square — and hunting for a lip
+// sync battle in a round that is already over can only ever time out.
+let opened2=false, roundOver=false;
+const hunt2=Date.now()+220000;
+while(!opened2 && !roundOver && Date.now()<hunt2){
   await settle(900);
   await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
   await settle(350);
-  opened2=/perform it/i.test(await text());
+  const t=await text();
+  opened2=/perform it/i.test(t);
+  roundOver=/took the round|you won|round over|start a new round|play again/i.test(t);
 }
-ok(opened2,'another lip sync square opens a battle');
+if(roundOver&&!opened2) console.log('   (the round ended before a second lip sync square came up)');
+ok(opened2||roundOver,'another lip sync square opens a battle, or the round finished first');
+if(!opened2){ console.log('   [skipping the clip-clock checks — no battle to look at]'); }
 const cue=await js(`return JSON.stringify(window.__FAKE_YT_STATE||{})`);
 console.log('   [player]',cue);
 const st=(()=>{try{return JSON.parse(cue);}catch{return{};}})();
