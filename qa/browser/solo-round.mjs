@@ -86,7 +86,10 @@ console.log('\nNO MENU AT ALL — IT OPENS ON YOUR PATH');
 // no tab row: a member who has chosen Lip Sync Bingo should not then have to
 // choose between three more things. The app knows which path is theirs.
 ok(!(await js(`return !!document.querySelector('.bingo-mode-tabs')`)),'no row of peer tabs to choose from');
-const rail=await js(`return [...document.querySelectorAll('.play-steps li')].map(l=>l.innerText.replace(/\\s+/g,' ').trim()).join(' | ')`);
+// textContent, not innerText: on a phone-width screen the step LABELS are
+// deliberately hidden and only the numbers show, and innerText omits what CSS
+// hides — so this read an empty rail and called a working one missing.
+const rail=await js(`return [...document.querySelectorAll('.play-steps li')].map(l=>l.textContent.replace(/\\s+/g,' ').trim()).join(' | ')`);
 console.log('   [steps]',rail);
 ok(/pick a theme/i.test(String(rail)),'the steps of the solo path are shown');
 ok(/play/i.test(String(rail)),'including where it ends');

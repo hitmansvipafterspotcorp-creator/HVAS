@@ -187,7 +187,9 @@ await tapAny('Enter ·') || await tapAny('Member Sign In');
 await settle(2500);
 let onRecord=false;
 for(let i=0;i<20&&!onRecord;i++){await openTile('lobby');await settle(1300);onRecord=/solo vs cpu/i.test(await text());}
-await tap('Record'); await settle(1800);
+// Record was a peer tab beside the game. It is a link under it now — the shelf
+// of what you recorded is not a thing you choose between before playing.
+await tap('My takes'); await settle(1800);
 const rec = await text();
 ok(/your takes/i.test(rec), 'the Record tab shows the takes shelf with no venue connected');
 ok(/on this phone/i.test(rec), 'and says plainly that they are on this phone');
