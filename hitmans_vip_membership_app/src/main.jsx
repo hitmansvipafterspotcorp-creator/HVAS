@@ -6180,7 +6180,17 @@ function PlayerCardScreen({ navigate }) {
               {nowCalling ? (
                 <>
                   <strong className="k-value k-listen">🎧 Listen</strong>
-                  <span className="k-hud-song k-dim">Find it on your card and tap it</span>
+                  {/* Not while a call-out is live. A lip sync square is
+                      performed for, never tapped — telling the player to tap it
+                      contradicts the rule the battle above is enforcing, on the
+                      same screen, about the same song.
+
+                      Saying so gives nothing away either: the call-out already
+                      names the artist and the song. The secret is only a secret
+                      until somebody is called out on it. */}
+                  <span className="k-hud-song k-dim">{activeBattle
+                    ? 'This one is performed for — answer the call-out above'
+                    : 'Find it on your card and tap it'}</span>
                 </>
               ) : <span className="k-hud-song k-dim">Waiting on the host…</span>}
             </div>
