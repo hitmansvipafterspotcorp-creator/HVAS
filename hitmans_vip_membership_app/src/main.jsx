@@ -1587,7 +1587,10 @@ function ScreenHeader({ screen, onBack }) {
     <header className="screen-header">
       <button className="back-to-menu" type="button" onClick={onBack}>Home</button>
       <div>
-        <span className="eyebrow">{screen.eyebrow}</span>
+        {/* Only when it adds something. On the play screen the eyebrow and the
+            title were both "Lip Sync Bingo" — the same words twice, on the
+            screen with the least vertical room in the app. */}
+        {screen.eyebrow && screen.eyebrow !== screen.title && <span className="eyebrow">{screen.eyebrow}</span>}
         <h1>{screen.title}</h1>
         {screen.detail && <p>{screen.detail}</p>}
       </div>
@@ -2008,13 +2011,28 @@ function MemberAuthScreen({ onBack, onDone }) {
 
   const sendCode = async () => {
     if (!idOk) return;
-    if (!backend) return finishLocal();          // no backend → local demo
+    if (!backend) return finishLocal();          // no backend → local account on this phone
     setBusy(true); setErr('');
     try {
       const r = await memberOtpStart(contact.trim());
-      setDevCode(r.devCode || '');               // set when the venue echoes the code instead of sending it
+      const echoed = r.devCode || '';            // set when the venue echoes the code instead of sending it
+      // If the venue hands the code straight back, it is not confirming anything
+      // — nothing was sent anywhere, so nobody's phone proved it was theirs. All
+      // the extra screen did was make a member read a number off their own
+      // display and type it into the field below it. Finish the sign-in.
+      //
+      // A venue that really sends an SMS or an email returns no code here, and
+      // that case still goes through the code screen, because there the typing
+      // is the whole point.
+      if (echoed) {
+        await memberOtpVerify(contact.trim(), echoed, name.trim());
+        memberSignIn(name, contact);
+        onDone();
+        return;
+      }
+      setDevCode('');
       setStage('code');
-    } catch (e) { setErr('Could not send a code — check the connection.'); }
+    } catch (e) { setErr('Could not sign you in — check the connection.'); }
     finally { setBusy(false); }
   };
   const verify = async () => {
@@ -2038,10 +2056,16 @@ function MemberAuthScreen({ onBack, onDone }) {
               <label>Phone or email<input type="text" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="(850) 000-0000 or you@email.com" autoComplete="tel" /></label>
               {err && <p className="gate-err">{err}</p>}
               <button type="button" className="auth-continue" disabled={!idOk || busy} onClick={sendCode}>
-                {busy ? 'Sending…' : backend ? 'Send code →' : 'Continue →'}
+                {busy ? 'Signing you in…' : 'Continue →'}
               </button>
+              {/* The label used to read "Send code →" and the line under it
+                  promised a one-time code. Neither is true when the venue hands
+                  the code straight back — and a button that names a step the app
+                  is about to skip is worse than no label at all. A venue that
+                  really does send one still shows the code screen; the member
+                  finds that out there, where it is actually happening. */}
               <p className="auth-fine">{backend
-                ? 'We’ll send a one-time code to confirm it’s you, then create your member account.'
+                ? 'This confirms it’s you and creates your member account.'
                 : 'New here? This creates your member account on this phone — no code needed.'}</p>
             </>
           ) : (

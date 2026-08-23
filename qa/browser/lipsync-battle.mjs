@@ -118,13 +118,18 @@ await tapAny('Member Sign In'); await settle(1200);
 await fill('First name', 'Rico');
 await fill('(850)', '850-900-0777');
 await settle(300);
-ok(await tap('Send code'), 'the sign-in form takes a name and number');
-await settle(1500);
-// Reissue the OTP from the server so the test knows the code it must type.
-const dev = (await call('POST', '/auth/member/start', { contact: '850-900-0777' })).devCode;
-await fill('000000', String(dev)); await settle(300);
-await tap('Verify') || await tap('Continue') || await tap('Enter');
-await settle(2200);
+// One tap. When the venue echoes the code back rather than sending it, nothing
+// was confirmed by making the member retype it — so sign-in finishes here. A
+// venue that really sends an SMS returns no code and still shows the code
+// screen, which is why the fallback below is kept rather than deleted.
+ok(await tap('Continue'), 'the sign-in form takes a name and number');
+await settle(2500);
+if (/6-digit code|enter code/i.test(await text())) {
+  const dev = (await call('POST', '/auth/member/start', { contact: '850-900-0777' })).devCode;
+  await fill('000000', String(dev)); await settle(300);
+  await tap('Verify') || await tap('Continue') || await tap('Enter');
+  await settle(2200);
+}
 let body = await text();
 ok(!/Member Sign In/i.test(body), 'signed in — the door screen is behind us');
 
