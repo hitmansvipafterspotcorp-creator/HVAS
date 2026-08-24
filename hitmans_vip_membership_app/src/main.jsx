@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useAppUpdate, useHoldUpdates, BUILD_ID } from './updates.js';
 import { listTakes, saveTake, removeTake, takesUsage, prettyBytes, MAX_TAKES } from './takes.js';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
@@ -1190,6 +1191,11 @@ function App() {
     message: loadingPhases[0].message,
   });
 
+  // Keeps this phone on the published build. Silent almost always — `ready` is
+  // only true when a new build is waiting AND something on screen would be
+  // ruined by reloading right now, which is the one case worth asking about.
+  const update = useAppUpdate();
+
   const current = screens.find((screen) => screen.id === activeScreen) ?? screens[0];
 
   useEffect(() => {
@@ -1413,7 +1419,21 @@ function App() {
           )}
         </section>
       )}
+      {update.ready && <UpdatePill onApply={update.apply} />}
     </main>
+  );
+}
+
+// The only time an update is ever mentioned to anybody. The app updates itself
+// on its own at every safe moment; this appears only when it has a new build in
+// hand and cannot take it yet without wrecking something — a live round, a
+// performance being recorded. It stays out of the way and it is not a warning.
+function UpdatePill({ onApply }) {
+  return (
+    <button type="button" className="update-pill" onClick={onApply}>
+      <span className="update-pill-dot" />
+      New version ready · tap to load
+    </button>
   );
 }
 
@@ -3265,6 +3285,10 @@ function HitKoinWidget() {
           )}
         </>
       )}
+      {/* Which build this phone is running. The app keeps itself current on its
+          own, but "am I actually on the new one?" had no answer before — for a
+          member, for the door, or for me trying to reproduce a bug over text. */}
+      <p className="build-stamp">App build {BUILD_ID} · updates automatically</p>
     </section>
   );
 }
@@ -3497,6 +3521,9 @@ function BattleStage({ battle, onDone, onTake }) {
   const [err, setErr] = useState('');
   const [left, setLeft] = useState(null);
   const level = useMicLevel(stream, recording);
+  // A take cannot be redone — the song has played, the room has watched. An
+  // app update that reloads the page here destroys it, so updates wait.
+  useHoldUpdates(recording);
 
   useEffect(() => {
     let live = true;
@@ -4628,6 +4655,10 @@ function SoloBingoGame({ onExit }) {
   const [armed, setArmed] = useState(false);
   const nowCallingItem = game && game.calledCount > 0 ? game.order[game.calledCount - 1] : null;
   const song = useSoloPlayer({ item: nowCallingItem, armed, paused: !!game && game.status !== 'playing' });
+  // A round in progress lives in memory — reloading mid-game loses the card,
+  // the round and the streak. Hold updates until the round is over; the seam
+  // between rounds is a free moment to take one.
+  useHoldUpdates(!!game && game.status === 'playing');
 
   const clearTimers = () => {
     clearTimeout(timerRef.current);      // the call timer is a timeout now
@@ -7656,6 +7687,16 @@ if ('serviceWorker' in navigator) {
         return Promise.resolve();
       }));
     } catch { /* ignore */ }
-    navigator.serviceWorker.register(swUrl).catch(() => {});
+    // updateViaCache:'none' is the difference between an app that updates and
+    // one that does not. By default the browser may serve sw.js itself from its
+    // HTTP cache for up to 24 hours — so the file that exists to notice new
+    // deploys is the one file guaranteed to be stale. Never cache it.
+    try {
+      const reg = await navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' });
+      // Ask right away rather than waiting for the browser's own schedule: a
+      // home-screen app that is never closed can otherwise go a full day
+      // between checks.
+      reg.update().catch(() => {});
+    } catch { /* no worker: the app still runs, it just cannot work offline */ }
   });
 }

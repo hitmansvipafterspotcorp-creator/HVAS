@@ -1580,3 +1580,39 @@
 }
 .mem-play-cta:active { transform: translateY(1px); }
 @media (max-height: 460px) and (min-width: 560px) { .mem-play-cta { padding: 9px 16px; font-size: 12px; margin-bottom: 8px; } }
+
+/* The update pill. Only ever shown when a new build is in hand and something
+   on screen — a live round, a take being recorded — would be destroyed by
+   reloading to get it. Every other update lands silently. Bottom-centre, above
+   everything, clear of the thumb zone the game uses. */
+.update-pill {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 4000;
+  display: inline-flex; align-items: center; gap: 9px;
+  max-width: calc(100vw - 28px);
+  padding: 11px 20px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, #2a0b3d, #14061f);
+  color: #ffd66b; border: 2px solid #ff3cb4;
+  font: 800 13px/1 var(--k-font, inherit); letter-spacing: .05em; text-transform: uppercase;
+  box-shadow: 0 6px 26px rgba(0, 0, 0, .55), 0 0 22px rgba(255, 60, 180, .4);
+  animation: update-pill-in .32s ease-out both;
+}
+.update-pill:active { transform: translateX(-50%) translateY(1px); }
+.update-pill-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #4ce07a; flex: 0 0 auto;
+  box-shadow: 0 0 8px #4ce07a; animation: update-pill-pulse 1.8s ease-in-out infinite;
+}
+@keyframes update-pill-in { from { opacity: 0; transform: translateX(-50%) translateY(12px); } }
+@keyframes update-pill-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .update-pill, .update-pill-dot { animation: none; }
+}
+
+/* What build this phone is running. Small, quiet, and in Account rather than
+   on the pass — but present, because "is my app up to date?" was previously a
+   question nobody could answer, including me. */
+.build-stamp {
+  margin: 14px 0 2px; text-align: center;
+  font: 600 11px/1.5 var(--k-font, inherit); letter-spacing: .06em;
+  color: rgba(255, 255, 255, .38);
+}

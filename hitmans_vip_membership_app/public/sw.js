@@ -16,7 +16,12 @@
 // it is — a stale answer to any of those is worse than an honest error, and the
 // API is a different origin anyway.
 
-const VERSION = 'hvas-v1';
+// Stamped at build time by stampBuild() in vite.config.js. It has to change
+// every deploy: a browser only installs a new worker when the script's BYTES
+// change, and while this was the constant 'hvas-v1' the worker never
+// reinstalled — so it never re-primed its cache with the new bundle, and a
+// member who went offline kept running whatever build first reached them.
+const VERSION = 'hvas-dev';
 const SHELL = [
   './',
   './index.html',
@@ -57,6 +62,12 @@ self.addEventListener('activate', (e) => {
     // fighting over the same cache.
     for (const k of await caches.keys()) if (k !== VERSION) await caches.delete(k);
     await self.clients.claim();
+    // A worker activating means a real deploy landed. Anything already open is
+    // now running the old bundle against a new cache, so tell it — the app
+    // decides when it is safe to reload (never mid-performance).
+    for (const c of await self.clients.matchAll({ type: 'window' })) {
+      c.postMessage({ type: 'hvas-updated', version: VERSION });
+    }
   })());
 });
 
@@ -68,6 +79,10 @@ self.addEventListener('fetch', (e) => {
   // Only ever cache this app's own files. Anything else — the venue backend,
   // YouTube, the room directory — must be live or fail honestly.
   if (url.origin !== self.location.origin) return;
+  // version.json is how the running app finds out it is out of date. Serving a
+  // cached copy would answer "you are current" forever, which is the one answer
+  // that makes the whole update check pointless. Always live, or nothing.
+  if (url.pathname.endsWith('/version.json')) return;
 
   e.respondWith((async () => {
     try {
