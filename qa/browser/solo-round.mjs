@@ -129,20 +129,32 @@ for (let i = 0; i < 12 && !picked; i++) {
 }
 ok(picked, 'Trap is selectable');
 ok(picked, 'the start button names the deck you picked');
-// Say portrait explicitly rather than trusting the window size. Without an
-// emulation override the headless browser does not report an orientation the
-// app's portrait check believes, so the rotate gate never engaged and the card
-// rendered upright — which is the exact thing this section exists to forbid.
 await rotate(430,932); await settle(800);
 await tap('Start Solo Round');await settle(2000);
-// Portrait: the card must not be drawn at all.
-console.log('\nSIDEWAYS PLAY ONLY');
+
+// This used to assert the OPPOSITE: that a card held upright refused to draw
+// and demanded the phone be turned sideways. A 5x5 card is square, and a phone
+// held upright has more width to give a square than a phone on its side has
+// height — so the rotation made the card SMALLER while costing every player a
+// step. Upright is how the game is played now, and sideways still works.
+console.log('\nIT PLAYS THE WAY A PHONE IS HELD');
 let body=await text();
-ok(/turn|sideways|rotate/i.test(body),'held upright, a dealt round asks for the phone to be turned');
-ok(await js(`return document.querySelectorAll('.k-tile').length`)===0,'and no card is drawn behind the gate');
+ok(!/turn your phone|sideways/i.test(body),'held upright, nothing asks for the phone to be turned');
+const upright=await js(`return document.querySelectorAll('.k-tile').length`);
+ok(upright===25,`the card is dealt upright (${upright} squares)`);
+// The card is the point of the screen, so it has to be the biggest thing on it
+// and it has to be whole — a row below the fold is a row nobody plays.
+const fit=await js(`
+  const g=document.querySelector('.k-grid'); if(!g) return 'none';
+  const r=g.getBoundingClientRect();
+  return JSON.stringify({w:Math.round(r.width),whole:r.top>=-1&&r.bottom<=window.innerHeight+1,vpW:window.innerWidth});`);
+const ff=(()=>{try{return JSON.parse(fit);}catch{return null;}})();
+console.log('   [upright card]',fit);
+ok(!!ff&&ff.w>=ff.vpW*0.85,`and it takes the width of the phone (${ff?ff.w:'?'} of ${ff?ff.vpW:'?'})`);
+ok(!!ff&&ff.whole,'with every row above the fold');
 await rotate(932,430);await settle(1500);
 const tiles=await js(`return document.querySelectorAll('.k-tile').length`);
-ok(tiles===25,`turned sideways, the big card is there (${tiles} squares)`);
+ok(tiles===25,`turned sideways it still plays (${tiles} squares)`);
 const artists=await js(`return [...document.querySelectorAll('.k-tile-artist')].map(e=>e.innerText.trim())`);
 console.log('   [card]',Array.isArray(artists)?artists.slice(0,6).join(', ')+'…':artists);
 const TRAP=['Future','Migos','Gucci Mane','21 Savage','Young Thug','Travis Scott','Lil Baby','Playboi Carti','Lil Uzi Vert','Gunna','Roddy Ricch','Moneybagg Yo','Chief Keef','Rae Sremmurd','Metro Boomin','Waka Flocka Flame','Lil Durk','Key Glock','2 Chainz','Young Dolph','Jeezy','Desiigner','Sheck Wes'];

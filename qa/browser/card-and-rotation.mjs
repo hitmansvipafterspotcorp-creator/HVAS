@@ -60,31 +60,46 @@ for(let i=0;i<12;i++){await tap('Go to My Card');await settle(1400);if(/now play
 
 let pass=0,fail=0; const ok=(c,m)=>{if(c){pass++;console.log('  ✓',m);}else{fail++;console.log('  ✗',m);}};
 
-console.log('SIDEWAYS PLAY ONLY');
-await rotate(430,932);                     // upright
+// This section used to be called SIDEWAYS PLAY ONLY and asserted that a phone
+// held upright refused to draw the card. That rule is gone: a 5x5 card is
+// square, and a phone held upright has more width to give a square than a phone
+// on its side has height, so demanding a rotation made the card smaller and
+// cost every player a step to get there. Both orientations play now — and the
+// upright one, being the way a phone is actually held, is the one that has to
+// be good rather than merely allowed.
+console.log('IT PLAYS BOTH WAYS UP');
+await rotate(430,932);                     // upright — the normal way
 await settle(1800);
 let t = await text();
-ok(/turn your phone sideways/i.test(t), 'held upright, the card asks for the phone to be turned');
-ok(!/now playing|listen/i.test(t), 'and the game itself is not rendered behind it');
-ok((await gridOrder()) === '', 'no card grid is drawn in portrait');
+ok(!/turn your phone sideways/i.test(t), 'held upright, nothing demands a rotation');
+ok(/your card|standing by|to bingo|claim bingo/i.test(t), 'the card screen is really there');
+const upCells = (await gridOrder()).split(',').filter(Boolean).length;
+ok(upCells === 25, `the full 5x5 card renders upright (${upCells} squares)`);
+const upFit = await js(`
+  const g=document.querySelector('.k-grid'); if(!g) return 'none';
+  const r=g.getBoundingClientRect();
+  return JSON.stringify({w:Math.round(r.width),vpW:window.innerWidth,whole:r.top>=-1&&r.bottom<=window.innerHeight+1});`);
+console.log('   [upright card]', upFit);
+const uf = (()=>{try{return JSON.parse(upFit);}catch{return null;}})();
+ok(!!uf && uf.w >= uf.vpW * 0.85, `and takes the width of the phone (${uf?uf.w:'?'} of ${uf?uf.vpW:'?'})`);
+ok(!!uf && uf.whole, 'with no row hidden below the fold');
 await shot('portrait');
 
-await rotate(932,430);                     // turned
+await rotate(932,430);                     // turned — still fine
 await settle(1800);
 t = await text();
-ok(!/turn your phone sideways/i.test(t), 'turned sideways, the prompt goes');
-ok(/your card|standing by|to bingo|claim bingo/i.test(t), 'and the card is there to play');
+ok(/your card|standing by|to bingo|claim bingo/i.test(t), 'turned sideways it still plays');
 console.log('   [landscape reads]', t.replace(/\n/g,' / ').slice(0, 110));
 const cells = (await gridOrder()).split(',').filter(Boolean).length;
-ok(cells === 25, `the full 5x5 card renders in landscape (${cells} squares)`);
+ok(cells === 25, `the full 5x5 card renders in landscape too (${cells} squares)`);
 await shot('landscape');
 
-await rotate(430,932);                     // and back
+await rotate(430,932);                     // and back, without breaking
 await settle(1600);
-ok(/turn your phone sideways/i.test(await text()), 'turning back upright asks again rather than half-rendering');
+ok((await gridOrder()).split(',').filter(Boolean).length === 25,
+   'and turning back upright keeps a whole card rather than half-rendering');
 
 console.log('\nPLAY ALONG FROM ANYWHERE');
-await rotate(932,430);                     // play is sideways
 await settle(1600);
 const t2 = await text();
 ok(/hear the song here|playing from somewhere else/i.test(t2), 'the card offers to play the song on your own phone');

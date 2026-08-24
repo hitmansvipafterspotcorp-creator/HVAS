@@ -1627,59 +1627,13 @@ function ScreenHeader({ screen, onBack }) {
 // Only the PLAY screens are gated. The pass, the door, the lobby and the host
 // console are all fine upright, and locking those would make the app annoying
 // for the people who never play a round.
-function usePortrait() {
-  const [portrait, setPortrait] = useState(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia('(orientation: portrait)').matches;
-  });
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
-    const mq = window.matchMedia('(orientation: portrait)');
-    const onChange = (e) => setPortrait(e.matches);
-    // Safari only got addEventListener on MediaQueryList in 14; older iOS in a
-    // venue is not hypothetical, so fall back rather than throwing on load.
-    if (mq.addEventListener) mq.addEventListener('change', onChange);
-    else mq.addListener(onChange);
-    setPortrait(mq.matches);
-    return () => {
-      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
-      else mq.removeListener(onChange);
-    };
-  }, []);
-  return portrait;
-}
 
-function RotateToPlay({ children }) {
-  const portrait = usePortrait();
-  // Ask the browser to hold landscape where it can. This only works installed
-  // and/or fullscreen, and throws outright on iOS Safari — best effort, and the
-  // overlay below is what actually guarantees the rule.
-  useEffect(() => {
-    let locked = false;
-    try {
-      const o = window.screen?.orientation;
-      if (o?.lock) o.lock('landscape').then(() => { locked = true; }).catch(() => {});
-    } catch { /* not supported — the overlay covers it */ }
-    return () => { try { if (locked) window.screen?.orientation?.unlock?.(); } catch { /* ignore */ } };
-  }, []);
-  if (!portrait) return children;
-  return (
-    <div className="rotate-gate">
-      <div className="rotate-gate-art" aria-hidden="true">
-        <svg viewBox="0 0 64 64" fill="none">
-          <rect x="20" y="6" width="24" height="42" rx="4" stroke="url(#rg)" strokeWidth="3" />
-          <path d="M32 40.5h.02" stroke="url(#rg)" strokeWidth="3.4" strokeLinecap="round" />
-          <path d="M11 46a22 22 0 0 0 8 8" stroke="url(#rg)" strokeWidth="3" strokeLinecap="round" />
-          <path d="M12.5 39.5 10.5 47l7.5-1.5" stroke="url(#rg)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          <defs><linearGradient id="rg" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ffe9a8" /><stop offset="1" stopColor="#e0991f" /></linearGradient></defs>
-        </svg>
-      </div>
-      <strong>Turn your phone sideways</strong>
-      <span>Lip Sync plays in landscape — your card and the battles need the width.</span>
-    </div>
-  );
-}
-
+// Lip Sync Bingo used to refuse to draw at all until the phone was turned
+// sideways. A 5x5 card is square, so landscape was never actually the roomier
+// shape — a phone held upright has MORE width to give a square than one on its
+// side has height. The gate cost every player a rotation, cost the app the
+// orientation everyone holds a phone in, and bought nothing. Portrait is the
+// way the game is played now; landscape still works, it is just never demanded.
 function ScreenBody({ activeScreen, navigate, session }) {
   // 'home' is rendered directly by App (role-scoped); ScreenBody only handles
   // the individual screens below.
@@ -1693,15 +1647,15 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'bingoStyle') return <BingoStyleScreen navigate={navigate} />;
   if (activeScreen === 'tv') return <TvDisplayScreen />;
   if (activeScreen === 'lobby') return <LobbyScreen navigate={navigate} />;
-  if (activeScreen === 'playerCard') return <RotateToPlay><PlayerCardScreen navigate={navigate} /></RotateToPlay>;
+  if (activeScreen === 'playerCard') return <PlayerCardScreen navigate={navigate} />;
   if (activeScreen === 'host') return <HostScreen />;
   if (activeScreen === 'songQueue') return <SongQueueScreen />;
   if (activeScreen === 'winner') return <WinnerScreen />;
   if (activeScreen === 'checkout') return <CheckoutScreen />;
   if (activeScreen === 'booking') return <TableBookingScreen />;
   if (activeScreen === 'bookingBoard') return <TableBookingBoardScreen />;
-  if (activeScreen === 'lipsyncBattle') return <RotateToPlay><LipSyncBattleScreen isHost={session?.role === 'host' || session?.role === 'staff'} /></RotateToPlay>;
-  return <RotateToPlay><PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} /></RotateToPlay>;
+  if (activeScreen === 'lipsyncBattle') return <LipSyncBattleScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
+  return <PartyScreen isHost={session?.role === 'host' || session?.role === 'staff'} />;
 }
 
 // Landing role picker — the app entry gate. A user is one of three things,
@@ -3031,15 +2985,22 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
           </button>
         )}
       </div>
-      <div className="mem-tabs">
-        <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>Pass</button>
-        <button type="button" className={`mem-tab${tab === 'loyalty' ? ' on' : ''}`} onClick={() => setTab('loyalty')}>Loyalty &amp; Access</button>
+      {/* Two tabs, not four.
+      
+          Four was one row of choices to open a membership card. And they were
+          not four subjects — they were two, cut in half: Pass and "Loyalty &
+          Access" are both the answer to "who am I here and what does that get
+          me", and Account and History are both "what have I paid and what have
+          I done". A member arriving at their own card should not have to work
+          out which of four places their rank lives in.
+
+          So: MY CARD is everything about standing in the room — the card, the
+          QR, tonight's perks, rank, and what you can get into. ACCOUNT is
+          everything you do to the membership — renew, upgrade, cancel, HITKOIN,
+          and the record of the nights behind it. */}
+      <div className="mem-tabs mem-tabs--two">
+        <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>My Card</button>
         <button type="button" className={`mem-tab${tab === 'account' ? ' on' : ''}`} onClick={() => setTab('account')}>Account</button>
-        {/* History was its own tile on the main menu. It is a record of nights
-            already played — the least urgent thing a member ever opens — and it
-            was taking a third of the first screen they see. It belongs with the
-            rest of their account, not beside the game. */}
-        <button type="button" className={`mem-tab${tab === 'history' ? ' on' : ''}`} onClick={() => setTab('history')}>History</button>
       </div>
       {tab === 'pass' && (
       <>
@@ -3131,7 +3092,7 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
       </>
       )}
 
-      {tab === 'loyalty' && (
+      {tab === 'pass' && (
       <>
       {/* — loyalty rank (earned by nights, not bought) — */}
       <section className="loyalty">
@@ -3238,7 +3199,7 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
       </>
       )}
 
-      {tab === 'history' && <HistoryScreen />}
+      {tab === 'account' && <HistoryScreen />}
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
     </div>
@@ -4946,7 +4907,6 @@ function SoloBingoGame({ onExit }) {
   // has always demanded landscape. Solo plays by the same rules, so it gets the
   // same gate and the same big card.
   return (
-    <RotateToPlay>
     <div className="solo-stage">
       {over && (
         <div className={`bingo-winner-banner${game.status === 'lost' ? ' lost' : ''}`}>
@@ -4959,6 +4919,9 @@ function SoloBingoGame({ onExit }) {
         </div>
       )}
       <AppPanel title="Solo vs CPU" subtitle={over ? 'Round over' : `Live · ${game.calledCount} called`}>
+        {/* The status rail: what is playing, the round, and who you are racing.
+            Above the card on a phone, beside it on a laptop. */}
+        <div className="play-rail">
         <div className="bingo-side">
           <div className="k-hud">
             {/* The song that is playing is the QUESTION. Printing its artist
@@ -5043,6 +5006,12 @@ function SoloBingoGame({ onExit }) {
           })}
         </div>
 
+        </div>
+
+        {/* The card and everything that belongs to it. On a phone this simply
+            stacks under the status rail; from a laptop up, the rail moves
+            alongside it and this is the column it sits next to. */}
+        <div className="play-board">
         <div className={`k-grid${soloWin.id ? ' k-grid--win' : ''}`} key={`sg${soloWin.token}`} ref={soloGridRef}>
           {game.card.map((item, i) => {
             const isFree = i === 12;
@@ -5091,9 +5060,9 @@ function SoloBingoGame({ onExit }) {
         <button type="button" className="k-btn k-btn--tertiary" onClick={() => { clearTimers(); setGame(null); }}>
           ← Leave round
         </button>
+        </div>
       </AppPanel>
     </div>
-    </RotateToPlay>
   );
   })();
 
@@ -6251,6 +6220,7 @@ function PlayerCardScreen({ navigate }) {
             landscape the strip becomes the right-hand rail beside the grid —
             a 5x5 card is square, so it is sized off height and leaves a wide
             gutter that this exactly fills. */}
+        <div className="play-rail">
         <div className="bingo-side">
           {/* Calling stops while the podium is being settled, so "Now playing
               — Listen" would be telling players to listen to silence. The
@@ -6302,6 +6272,11 @@ function PlayerCardScreen({ navigate }) {
               listening — so it belongs to the host screen and the TV, not to
               a player's card. */}
         </div>
+        </div>
+
+        {/* Same two-part shape as the solo card: the board here, the status
+            rail above it on a phone and beside it on anything wider. */}
+        <div className="play-board">
         <div className={`k-grid${win.id ? ' k-grid--win' : ''}`} key={`g${win.token}`} ref={gridRef}>
           {me.card.map((item, i) => {
             const isFree = i === 12;
@@ -6355,6 +6330,7 @@ function PlayerCardScreen({ navigate }) {
             <span className="k-autofill-box" aria-hidden="true">{me.autofill ? '✓' : ''}</span>
             {me.autofill ? 'Filling my card for me' : 'Fill my card for me'}
           </button>
+        </div>
         </div>
       </AppPanel>
     </div>

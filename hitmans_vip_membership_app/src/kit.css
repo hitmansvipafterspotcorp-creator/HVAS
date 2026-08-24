@@ -1392,7 +1392,6 @@
 /* A dealt solo round takes the screen. It is the game now, not a tab in a
    panel — same as the venue card, which has always played this way. */
 .solo-stage { position: relative; width: 100%; }
-.solo-stage .k-grid { max-width: min(100%, 92vh); margin-inline: auto; }
 
 /* Host is one line under the tabs rather than a fourth tab: reachable in one
    tap by the person running the night, invisible as a choice to everyone else. */
@@ -1662,3 +1661,149 @@
   font: 700 9px/1.3 var(--k-font, inherit); letter-spacing: .08em; text-transform: uppercase;
   color: #ff9d9d;
 }
+
+/* ══ How the card is laid out, on the three things people actually hold ══════
+   
+   The card used to be landscape-only: it refused to draw until the phone was
+   turned. A 5x5 card is SQUARE, and a phone held upright has more width to
+   give a square than a phone on its side has height — so the rotation cost a
+   step, fought the way everyone holds a phone, and made the card smaller. It
+   is upright-first now.
+
+   The shape is the same everywhere and only the arrangement changes: a status
+   rail (what is playing, the round, the clock) and a board (the card, the
+   progress meter, the buttons). Stacked on a phone, side by side once there is
+   width worth using.
+
+   Sizes are driven by --card, a real length, so the tile type can be derived
+   from the card rather than guessed at per breakpoint. */
+
+.play-board { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.play-rail { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.k-grid {
+  /* Fall back to the full column, then let each breakpoint below say what the
+     card may actually grow to. */
+  --card: 100%;
+  width: var(--card);
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+/* ── A phone, held the way phones are held ─────────────────────────────────
+   The card is the screen. It takes the full width it can get, and the rail
+   above it is trimmed to a strip so the board is never pushed off the fold. */
+@media (max-width: 767px) {
+  .screen-playerCard .app-panel,
+  .screen-lobby .app-panel { padding-left: 8px; padding-right: 8px; }
+  .k-grid { --card: min(100%, calc(100vh - 300px)); gap: 5px; }
+  /* Type sized off the card itself, not the viewport: the card is the thing
+     the words have to fit inside. 5 columns, so a tile is about a fifth of it. */
+  .k-tile-artist { font-size: clamp(9px, 3vw, 15px); line-height: 1.15; }
+  .k-tile-song { font-size: clamp(8px, 2.4vw, 13px); line-height: 1.15; }
+  .k-hud { gap: 6px; }
+  .k-hud-now, .k-hud-round { padding: 7px 9px; }
+}
+
+/* A short phone (or a phone on its side after all): height is the scarce axis,
+   so the card is sized off it and the rail takes the width that frees up. */
+@media (max-height: 560px) and (min-width: 640px) {
+  .k-grid { --card: min(100%, calc(100vh - 130px)); }
+  .play-layout-wide .bingo-side { max-width: 340px; }
+}
+
+/* ── A tablet ──────────────────────────────────────────────────────────────
+   Room to breathe: a bigger card, centred, with the rail as a full-width strip
+   above it rather than crushed into a corner. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .k-grid { --card: min(calc(100% - 16px), 620px, calc(100vh - 320px)); gap: 8px; }
+  .k-tile-artist { font-size: clamp(13px, 2vw, 19px); }
+  .k-tile-song { font-size: clamp(11px, 1.6vw, 16px); }
+  .k-hud { flex-direction: row; gap: 12px; }
+  .k-hud > * { flex: 1 1 0; }
+  .k-cardfoot { max-width: 620px; margin-inline: auto; }
+}
+
+/* ── A laptop ──────────────────────────────────────────────────────────────
+   The one arrangement that is genuinely different: the rail stops being a strip
+   above the card and becomes a column beside it, so the card gets the height of
+   the window instead of what is left after the chrome. */
+@media (min-width: 1200px) {
+  /* Exactly two children — the rail and the board — so this is a plain two
+     column split with nothing else able to wander into the row. An earlier
+     version left the CPU meters as a third sibling, and three items sharing a
+     flex row gave the card a third of the width instead of two thirds. */
+  .screen-playerCard .app-panel-body,
+  .solo-stage .app-panel-body {
+    display: flex; align-items: flex-start; gap: 26px;
+  }
+  .screen-playerCard .app-panel-body > .play-rail,
+  .solo-stage .app-panel-body > .play-rail {
+    order: 2; flex: 0 0 clamp(280px, 23vw, 350px); width: clamp(280px, 23vw, 350px);
+    display: flex; flex-direction: column; gap: 14px;
+    position: sticky; top: 8px;
+  }
+  .screen-playerCard .app-panel-body > .play-board,
+  .solo-stage .app-panel-body > .play-board { order: 1; flex: 1 1 0; min-width: 0; }
+  .k-grid { --card: min(100%, calc(100vh - 225px), 760px); gap: 9px; }
+  .k-tile-artist { font-size: 16px; }
+  .k-tile-song { font-size: 13px; }
+  .k-hud { display: flex; flex-direction: column; gap: 12px; }
+}
+
+/* ── Room for the card to actually be big ──────────────────────────────────
+   .screen is a 720px column with 34px of padding — right for a form, wrong for
+   a game board. On a phone that padding was 68px of the 430 the card had to
+   live in; on a laptop the 720px cap meant there was never width for a second
+   column no matter what the layout asked for. Both are lifted, for the two
+   screens that are a card and nothing else. */
+@media (max-width: 767px) {
+  .screen-playerCard.screen,
+  .screen-lobby.screen { padding-left: 6px; padding-right: 6px; }
+  .screen-playerCard .app-panel,
+  .screen-lobby .app-panel { padding-left: 6px; padding-right: 6px; }
+  /* Long names — LUTHER VANDROSS, WHITNEY HOUSTON, GLORILLA — are wider than a
+     69px tile at any weight worth reading. break-word only breaks a word that
+     cannot fit ON ITS OWN LINE, which left them centred and sliced down the
+     middle instead. anywhere breaks them properly. */
+  .k-tile-artist, .k-tile-song { overflow-wrap: anywhere; }
+  .k-tile-artist { font-size: clamp(8px, 2.6vw, 13px); }
+  .k-tile-song { font-size: clamp(7px, 2.1vw, 11px); }
+  .k-tile { padding: 3px 1px; }
+}
+
+@media (min-width: 1200px) {
+  .screen-playerCard.screen,
+  .screen-lobby.screen { max-width: 1200px; padding: 20px 24px; }
+  /* flex-basis: 0 and grow, NOT auto. With `auto` the board sizes from its own
+     contents, the card inside asks for a percentage of that, and the two size
+     each other in a circle that resolves to zero — a 0x0 card and 6px tiles. */
+  .screen-playerCard .app-panel-body > .play-board,
+  .solo-stage .app-panel-body > .play-board { flex: 1 1 0; }
+}
+
+/* A tablet has the height for a big card AND the chrome, but only just — cap it
+   against the window so the board never falls below the fold. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  /* The 720px app column is right for a form and wrong for a board — it left a
+     834px tablet showing a 620px panel with the card squeezed inside it. */
+  .screen-playerCard.screen,
+  .screen-lobby.screen { max-width: 100%; padding: 20px 22px; }
+  .play-rail { flex-direction: row; align-items: flex-start; gap: 14px; }
+  /* Not an even split: the status side carries the song, the clock and the
+     prompt, the opponents are three small meters. Halves gave the first one a
+     truncated line and the second one empty space. */
+  .play-rail > .bingo-side { flex: 2 1 0; min-width: 0; }
+  .play-rail > .solo-cpus { flex: 1 1 0; min-width: 0; }
+  /* The height reserve is measured against the chrome that is actually above
+     the card on this size (~400px), not guessed — six pixels over and the last
+     row of a bingo card is below the fold, which is the whole thing the card
+     screen exists to prevent. */
+  .k-grid { --card: min(calc(100% - 8px), 720px, calc(100vh - 405px)); }
+  .k-tile-artist, .k-tile-song { overflow-wrap: anywhere; }
+}
+
+/* Two tabs, so they get the row to themselves rather than being four cramped
+   pills wrapping onto a second line on a narrow phone. */
+.mem-tabs--two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mem-tabs--two .mem-tab { width: 100%; text-align: center; padding: 11px 8px; font-size: 13px; }
