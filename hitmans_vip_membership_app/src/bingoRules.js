@@ -10,7 +10,56 @@
 
 export const BINGO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
 export const BINGO_FINAL_ROUND = 3;
-export const BINGO_ROUND_PRIZE = { 1: 5, 2: 10, 3: 20 };
+// ── Money ─────────────────────────────────────────────────────────────────
+//
+// A round only pays when it is a real game: a host running it, and at least two
+// members who have paid the entry. Anything else is free play and pays nothing
+// — including every solo round, which is played against three CPUs in an empty
+// room and used to print this table as if somebody were going to hand over $20.
+//
+// The pot is what was actually paid in. It is NOT a fixed promise: printing
+// "$20" on a screen does not conjure twenty dollars, and a round with three
+// players in it does not owe the same as a round with thirty.
+export const BINGO_ENTRY_FEE = 15;
+export const BINGO_CASH_MIN_PAID = 2;
+
+// How the pot is split across the three rounds. Same 1:2:4 shape the old fixed
+// table had, so the last round is still the one worth playing for.
+export const BINGO_ROUND_SHARE = { 1: 0.2, 2: 0.3, 3: 0.5 };
+
+/** Is this a game that pays? Both conditions, every time. */
+export function bingoIsCashGame({ hosted = false, paidPlayers = 0 } = {}) {
+  return !!hosted && Number(paidPlayers) >= BINGO_CASH_MIN_PAID;
+}
+
+/** Everything paid in. Zero unless it is a cash game. */
+export function bingoPot({ hosted = false, paidPlayers = 0 } = {}) {
+  if (!bingoIsCashGame({ hosted, paidPlayers })) return 0;
+  return Math.floor(Number(paidPlayers)) * BINGO_ENTRY_FEE;
+}
+
+/**
+ * What one round pays. Whole dollars, and the three rounds can never add up to
+ * more than was collected — the last round takes the rounding rather than the
+ * pot quietly growing a dollar.
+ */
+export function bingoRoundPrize(round, { hosted = false, paidPlayers = 0 } = {}) {
+  const pot = bingoPot({ hosted, paidPlayers });
+  if (!pot) return 0;
+  const share = BINGO_ROUND_SHARE[round];
+  if (!share) return 0;
+  if (Number(round) !== BINGO_FINAL_ROUND) return Math.floor(pot * share);
+  const earlier = Object.entries(BINGO_ROUND_SHARE)
+    .filter(([r]) => Number(r) !== BINGO_FINAL_ROUND)
+    .reduce((sum, [, sh]) => sum + Math.floor(pot * sh), 0);
+  return pot - earlier;
+}
+
+/** What to put on screen where a prize used to be printed unconditionally. */
+export function bingoPrizeLabel(round, ctx) {
+  const prize = bingoRoundPrize(round, ctx);
+  return prize > 0 ? `$${prize}` : 'Free play';
+}
 
 export const BINGO_PATTERN_LABEL = {
   line: 'complete a line', two_lines: 'complete two lines', four_corners: 'cover all four corners',

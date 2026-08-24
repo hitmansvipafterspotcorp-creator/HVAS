@@ -9,7 +9,8 @@ import './kit.css';
 import { burstCover, celebrate } from './vfx';
 import {
   BINGO_LINES, BINGO_PATTERN_LABEL, BINGO_PATTERN_NAME, BINGO_PATTERN_IDS, BINGO_PATTERN_GOAL,
-  BINGO_ROUND_PATTERN, BINGO_ROUND_PRIZE, BINGO_FINAL_ROUND as BINGO_FINAL_ROUND_CLIENT,
+  BINGO_ROUND_PATTERN, BINGO_FINAL_ROUND as BINGO_FINAL_ROUND_CLIENT,
+  BINGO_ENTRY_FEE, BINGO_CASH_MIN_PAID, bingoIsCashGame, bingoPot, bingoPrizeLabel,
   bingoProgress, bingoHasPattern, oneAwayIds,
 } from './bingoRules';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
@@ -972,12 +973,58 @@ const screens = [
   },
 ];
 
-const loadingPhases = [
-  { until: 25, label: 'Access', message: 'Securing access' },
-  { until: 55, label: 'Pass', message: 'Verifying pass' },
-  { until: 82, label: 'Venue', message: 'Opening venue' },
-  { until: 100, label: 'Ready', message: 'Ready' },
-];
+// What the loading screen says, and it is now said out loud.
+//
+// The app already worked out a phase and a message on every animation frame —
+// "Securing access", "Verifying pass", "Opening venue" — and rendered NONE of
+// it. The film has a progress bar baked into it, so what a member actually saw
+// was a fixed nine and a half second clip with a fake bar, the same words never
+// appearing, whether they were opening their pass or starting a game. That is
+// what made it feel like it did not belong to anything.
+//
+// It says where you are going now, in the words of that place. Each script is
+// [until%, label, message]; the last entry must reach 100.
+const LOADING_SCRIPTS = {
+  // Boot deliberately does NOT echo the film, which already says "assembling
+  // VIP access". Saying the same thing twice on one screen is how the loading
+  // screen stopped meaning anything in the first place. This is the room
+  // opening up instead.
+  Boot: [
+    [24, 'Lights', 'Lights up'],
+    [52, 'Sound', 'Sound check'],
+    [78, 'Door', 'Unlocking the door'],
+    [100, 'Ready', 'Welcome back'],
+  ],
+  lobby: [
+    [38, 'Decks', 'Pulling tonight’s themes'],
+    [72, 'Card', 'Shuffling the squares'],
+    [100, 'Ready', 'Take your card'],
+  ],
+  playerCard: [
+    [40, 'Room', 'Finding the room'],
+    [74, 'Card', 'Dealing you in'],
+    [100, 'Ready', 'You’re on the floor'],
+  ],
+  myPass: [[55, 'Pass', 'Reading your pass'], [100, 'Ready', 'Here it is']],
+  membership: [[55, 'Pass', 'Reading your pass'], [100, 'Ready', 'Here it is']],
+  lipsyncBattle: [
+    [42, 'Stage', 'Clearing the stage'],
+    [78, 'Crowd', 'Getting the room in'],
+    [100, 'Ready', 'Battle up'],
+  ],
+  party: [[50, 'Room', 'Opening the room'], [100, 'Ready', 'You’re in']],
+  history: [[60, 'Nights', 'Pulling your nights'], [100, 'Ready', 'Here they are']],
+  staffDashboard: [[55, 'Door', 'Opening the door'], [100, 'Ready', 'Door ready']],
+  entry: [[55, 'Door', 'Opening the door'], [100, 'Ready', 'Door ready']],
+  default: [[55, 'Loading', 'One second'], [100, 'Ready', 'Ready']],
+};
+const scriptFor = (id) => LOADING_SCRIPTS[id] || LOADING_SCRIPTS.default;
+
+// Boot rides the branded film at 1x. A page change plays the same film sped up:
+// it used to hold for 3.6 SECONDS on every single tap, which on a screen where
+// nothing is actually loading is just a toll on getting anywhere.
+const BOOT_MS = 9550;
+const NAV_MS = 1500;
 
 // ── Roles & access control ──────────────────────────────────────────────
 // Three distinct experiences. A user lands on a role picker and only ever
@@ -1048,7 +1095,7 @@ const prefixAssets = (node) => {
   }
   return node;
 };
-[ui, screens, loadingPhases, ROLES].forEach(prefixAssets);
+[ui, screens, ROLES].forEach(prefixAssets);
 
 // Shown the instant a "?connect=" link is present, before the request even
 // resolves — an unreachable address can take a while to actually reject, and
@@ -1182,13 +1229,16 @@ function App() {
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
   const left = isLeftTonight(member);            // was inside tonight, has since checked out
+  // Only what actually changes when a transition starts and stops. The progress,
+  // the phase and the message used to live here and were rewritten on every
+  // animation frame — sixty re-renders a second of the whole application, for
+  // nine and a half seconds on boot, to compute three values that were never
+  // rendered. The overlay runs its own clock now; this just says go.
   const [transition, setTransition] = useState({
     active: true,
-    from: 'Loading',
+    from: 'Boot',
     to: 'After Spot Access Hub',
-    progress: 0,
-    phase: loadingPhases[0].label,
-    message: loadingPhases[0].message,
+    duration: BOOT_MS,
   });
 
   // Keeps this phone on the published build. Silent almost always — `ready` is
@@ -1260,61 +1310,26 @@ function App() {
     if (role === 'member' && !auth.member) switchRole();
   }, [role, auth.member]);
 
-  function phaseFor(progress) {
-    return loadingPhases.find((phase) => progress <= phase.until) ?? loadingPhases.at(-1);
-  }
-
+  // Two timers instead of six hundred renders.
+  //
+  // The commit — the actual screen swap — lands behind the film while it is at
+  // its busiest, so the change is never seen happening. Everything else is the
+  // overlay's own business.
+  const transitionTimers = useRef([]);
   function runTransition(from, to, commit) {
     const isBoot = from === 'Boot';
-    // boot rides the loading film to the frame; ~9.7s clip → hold until it lands
-    const duration = isBoot ? 9550 : 3600;
-    let committed = false;
-    let rafId = 0;
-    const startedAt = performance.now();
+    const duration = isBoot ? BOOT_MS : NAV_MS;
+    transitionTimers.current.forEach(clearTimeout);
+    transitionTimers.current = [];
 
-    setTransition({
-      active: true,
-      from,
-      to,
-      progress: 0,
-      phase: loadingPhases[0].label,
-      message: loadingPhases[0].message,
-    });
+    setTransition({ active: true, from, to, duration });
 
-    const frame = (now) => {
-      const t = Math.min(1, (now - startedAt) / duration);
-      const eased = t;                                   // linear fill — classic arcade, watchable build
-      const progress = Math.min(100, Math.round(eased * 100));
-      const phase = phaseFor(progress);
-
-      if (!committed && progress >= 72) {
-        committed = true;
-        commit();
-      }
-
-      setTransition({
-        active: true,
-        from,
-        to,
-        progress,
-        phase: phase.label,
-        message: phase.message,
-      });
-
-      if (progress >= 100) {
-        // hold on the WELCOME VIP MEMBER / PRESS START beat, longer on boot
-        window.setTimeout(() => {
-          setTransition((state) => ({ ...state, active: false, progress: 100 }));
-        }, isBoot ? 500 : 320);
-        return;
-      }
-
-      rafId = window.requestAnimationFrame(frame);
-    };
-
-    rafId = window.requestAnimationFrame(frame);
-    return () => window.cancelAnimationFrame(rafId);
+    transitionTimers.current.push(setTimeout(commit, Math.round(duration * 0.66)));
+    transitionTimers.current.push(setTimeout(() => {
+      setTransition((state) => ({ ...state, active: false }));
+    }, duration + (isBoot ? 420 : 160)));
   }
+  useEffect(() => () => transitionTimers.current.forEach(clearTimeout), []);
 
   function navigate(nextId) {
     if (nextId === activeScreen || transition.active) return;
@@ -1583,21 +1598,51 @@ function PixelAssembly({ progress, active }) {
 // One loading screen everywhere: the branded film (logo shatters → vortex → reforms
 // into the retro logo, bar 0→100 baked in), full-screen on pure black. Boot plays at
 // 1×; page-to-page plays the SAME film sped up so a nav stays quick but looks identical.
-function TransitionOverlay({ transition }) {
+function TransitionOverlay({ transition, destination }) {
   const isBoot = transition.from === 'Boot';
   const vref = useRef(null);
+  const script = isBoot ? scriptFor('Boot') : scriptFor(destination);
+  const duration = transition.duration || NAV_MS;
+  // The one piece of state that moves during a transition, and it lives HERE —
+  // in the overlay — so stepping it re-renders four lines of caption instead of
+  // the entire application.
+  const [step, setStep] = useState(0);
+
   useEffect(() => {
-    const v = vref.current; if (!v) return undefined;
-    v.playbackRate = isBoot ? 1 : 2.7;
-    if (transition.active) { try { v.currentTime = 0; const p = v.play(); if (p?.catch) p.catch(() => {}); } catch { /* ignore */ } }
-    return undefined;
-  }, [transition.active, isBoot]);
+    const v = vref.current;
+    if (v) {
+      v.playbackRate = isBoot ? 1 : 2.7;
+      if (transition.active) { try { v.currentTime = 0; const p = v.play(); if (p?.catch) p.catch(() => {}); } catch { /* ignore */ } }
+    }
+    if (!transition.active) { setStep(0); return undefined; }
+    setStep(0);
+    // One timer per phase, fired at the share of the run that phase ends on —
+    // no polling, and the words land with the bar rather than near it.
+    const timers = script.slice(0, -1).map(([until], i) =>
+      setTimeout(() => setStep(i + 1), Math.round(duration * (until / 100))));
+    return () => timers.forEach(clearTimeout);
+  }, [transition.active, isBoot, destination, duration]);
+
+  const [, label, message] = script[Math.min(step, script.length - 1)];
   return (
     <div className={transition.active ? 'transition-overlay boot active' : 'transition-overlay boot'} aria-hidden={!transition.active}>
       <video ref={vref} className="boot-film" autoPlay muted playsInline preload="auto" disablePictureInPicture>
         <source src={ui.loadingVideoWebm} type="video/webm" />
         <source src={ui.loadingVideo} type="video/mp4" />
       </video>
+      {/* One line, and deliberately only one.
+      
+          The film already carries a bar and a percentage, baked into the video
+          — a second bar underneath it is the doubled-progress mess this app has
+          been through once already. What the film CANNOT say, because it is the
+          same clip every time, is where you are going. So that is all this adds:
+          the step being done, and the place being opened. */}
+      {transition.active && (
+        <div className="boot-caption">
+          <strong className="boot-caption-msg">{message}</strong>
+          <span className="boot-caption-dest">{label} · {transition.to}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -4428,7 +4473,23 @@ const RANK_ART = `${A_}assets/ui/rank/`;
 function Meter({ value, label, right, live = false, hot = false, countdown = false, className = '' }) {
   const pct = Math.max(0, Math.min(100, Math.round((Number(value) || 0) * 100)));
   const isHot = hot || (countdown ? pct <= 22 : pct >= 88);
-  const cls = ['ui-meter', live && 'is-live', isHot && 'is-hot', countdown && 'is-countdown', className]
+  // A meter that only slides is furniture. This one reacts to the two things
+  // that actually happen to it: it GAINED (you took a square, you got closer)
+  // and it is FULL. Both are momentary — a class that puts itself back — so
+  // nothing on screen is permanently animating, which is what made the old
+  // marker read as cheesy rather than alive.
+  const prev = useRef(pct);
+  const [bumped, setBumped] = useState(false);
+  useEffect(() => {
+    const gained = !countdown && pct > prev.current;
+    prev.current = pct;
+    if (!gained) return undefined;
+    setBumped(true);
+    const t = setTimeout(() => setBumped(false), 520);
+    return () => clearTimeout(t);
+  }, [pct, countdown]);
+  const cls = ['ui-meter', live && 'is-live', isHot && 'is-hot', countdown && 'is-countdown',
+    bumped && 'is-bumped', pct >= 100 && !countdown && 'is-full', className]
     .filter(Boolean).join(' ');
   // One track, one fill, nothing else.
   //
@@ -4608,8 +4669,57 @@ const SOLO_FALLBACK_CLIP_SECONDS = 120;
 
 const SOLO_STEPS = ['Pick a theme', 'Play'];
 
+// Solo pays nothing, and now says so.
+//
+// It was printing the venue's real prize table — $5, $10, $25 — on a game
+// against three CPU players in an empty room. Nobody was ever going to be paid
+// that, which makes it the one thing in the app that lies to a member, on the
+// screen they are most likely to try first. The stakes are a record instead:
+// rounds are worth stars, and the only thing on the line is your own best.
+const SOLO_ROUND_STARS = { 1: 1, 2: 2, 3: 3 };
+const SOLO_BEST_KEY = 'hvas_solo_best_v1';
+
+function readSoloBest() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SOLO_BEST_KEY) || '{}');
+    return { stars: Number(raw.stars) || 0, rounds: Number(raw.rounds) || 0, games: Number(raw.games) || 0 };
+  } catch { return { stars: 0, rounds: 0, games: 0 }; }
+}
+function writeSoloBest(next) {
+  try { localStorage.setItem(SOLO_BEST_KEY, JSON.stringify(next)); } catch { /* private mode — the run still counts on screen */ }
+}
+
 function SoloBingoGame({ onExit }) {
   const [game, setGame] = useState(null);
+  // Solo's only stake. Stars banked this run, and the best run there has been.
+  const [best, setBest] = useState(readSoloBest);
+  const starsThisRun = game ? [...Array(game.wins || 0)].reduce((n, _, i) => n + (SOLO_ROUND_STARS[i + 1] || 0), 0) : 0;
+  // A finished run is a result whether it was won or not, so it is banked
+  // either way — a best you can only beat by winning is not a best, it is a
+  // trophy case.
+  //
+  // This lives HERE, above every early return in this component, and must stay
+  // here. Below one it is React error #300: the render that takes the early
+  // path calls fewer hooks than the one before it, and React does not degrade
+  // gracefully — it unmounts the whole app to a white screen. That exact bug
+  // has shipped from this file once already.
+  const runStatus = game && game.status !== 'playing' && game.status !== 'roundWon' ? game.status : null;
+  useEffect(() => {
+    if (!runStatus) return;
+    setBest((cur) => {
+      const next = {
+        stars: Math.max(cur.stars, starsThisRun),
+        rounds: Math.max(cur.rounds, game?.wins || 0),
+        games: cur.games + 1,
+      };
+      writeSoloBest(next);
+      return next;
+    });
+    // Banked once, when the run ends — not on every re-render of the screen it
+    // ends on, which is why the status and not the whole game object is the
+    // dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runStatus]);
   const timerRef = useRef(null);
   const cpuTimersRef = useRef([]);
   const soloGridRef = useRef(null);
@@ -4852,12 +4962,25 @@ function SoloBingoGame({ onExit }) {
       <PlaySteps steps={SOLO_STEPS} current={0} />
       <AppPanel title="Pick tonight’s theme" subtitle="Step 1 of 2 — then you play">
         <p className="mem-fineprint">You against three regulars, over three rounds — a line, then two lines, then the whole card. Tap your squares as they're called, before they get there first. LIP SYNC squares you perform for, same as the venue — and the take is yours to post.</p>
+        {/* Said plainly, because the screen used to print the venue's real
+            prize table over a game played against nobody. Solo is practice and
+            bragging rights; the money is at the venue. */}
+        <div className="solo-stakes">
+          <span className="solo-stakes-free">Free play · no prize money</span>
+          {best.games > 0 ? (
+            <span className="solo-stakes-best">
+              Best run <b>{'★'.repeat(best.stars) || '—'}</b> · {best.rounds} of {BINGO_FINAL_ROUND_CLIENT} rounds
+            </span>
+          ) : (
+            <span className="solo-stakes-best">Set your first record</span>
+          )}
+        </div>
         <div className="k-ladder">
           {[1, 2, 3].map((r) => (
             <span key={r} className="k-ladder-step">
               <b>Round {r}</b>
               <i>{BINGO_PATTERN_GOAL[BINGO_ROUND_PATTERN[r]]}</i>
-              <u>${BINGO_ROUND_PRIZE[r]}</u>
+              <u className="k-ladder-stars">{'★'.repeat(SOLO_ROUND_STARS[r])}</u>
             </span>
           ))}
         </div>
@@ -4956,9 +5079,23 @@ function SoloBingoGame({ onExit }) {
             </div>
             <div className="k-hud-round k-frame k-frame--gold">
               <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {game.round} of {BINGO_FINAL_ROUND_CLIENT}</span>
-              <strong className="k-money">${BINGO_ROUND_PRIZE[game.round] ?? 5}</strong>
+              {/* Stars, not dollars. Solo is free and pays nothing — see
+                  SOLO_ROUND_STARS. What is actually at stake is the run. */}
+              <strong className="k-stars" aria-label={`Worth ${SOLO_ROUND_STARS[game.round] ?? 1} stars`}>
+                {'★'.repeat(SOLO_ROUND_STARS[game.round] ?? 1)}
+              </strong>
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[game.pattern]}</span>
             </div>
+          </div>
+          {/* The run, and the record. This is what solo is played for. */}
+          <div className="solo-run">
+            <span className="solo-run-now">
+              <i>This run</i><b>{'★'.repeat(starsThisRun) || '—'}</b>
+            </span>
+            <span className={`solo-run-best${starsThisRun > best.stars ? ' beaten' : ''}`}>
+              <i>{starsThisRun > best.stars ? 'New best' : 'Best'}</i>
+              <b>{'★'.repeat(Math.max(best.stars, starsThisRun)) || '—'}</b>
+            </span>
           </div>
           {!over && (
             <Meter
@@ -6065,6 +6202,13 @@ function PlayerCardScreen({ navigate }) {
   const roundNo = state?.roundNo || 1;
   const finalRound = state?.finalRound || 3;
   const pattern = state?.pattern || 'line';
+  // Whether tonight's round is playing for money, decided by the rule rather
+  // than by a number typed into a screen. `paidPlayers` is what the backend
+  // says has actually been collected — until it reports that, this is a free
+  // game and says so, which is the honest default. A round that claims a pot
+  // nobody paid into is worse than a round that pays nothing.
+  const cashCtx = { hosted: !!state?.hosted, paidPlayers: state?.paidPlayers ?? 0 };
+  const cash = bingoIsCashGame(cashCtx);
   const progress = bingoProgress(me?.card, covered, pattern);
   const clock = useCallClock(state);
   const gridRef = useRef(null);
@@ -6259,9 +6403,17 @@ function PlayerCardScreen({ navigate }) {
             {/* Round + goal. Until now the round ladder existed only on the
                 server, so a player had no way to know that round 2 needs two
                 lines and round 3 needs the whole card. */}
-            <div className="k-hud-round k-frame k-frame--gold">
+            {/* What this round pays, and it is the truth or it is nothing.
+                This used to print a flat $5 / $10 / $20 on every card drawn,
+                whoever was in the room and whether or not a cent had been
+                collected. A round pays only when a host is running it and at
+                least two members have paid the entry; the pot is what was
+                actually paid in. Everything else says free play. */}
+            <div className={`k-hud-round k-frame k-frame--gold${cash ? '' : ' is-free'}`}>
               <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {roundNo} of {finalRound}</span>
-              <strong className="k-money">${BINGO_ROUND_PRIZE[roundNo] ?? 5}</strong>
+              {cash
+                ? <strong className="k-money">{bingoPrizeLabel(roundNo, cashCtx)}</strong>
+                : <strong className="k-freeplay">Free play</strong>}
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[pattern] || '1 LINE'}</span>
             </div>
           </div>
