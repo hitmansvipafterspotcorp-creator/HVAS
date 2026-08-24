@@ -125,6 +125,38 @@ await js(`if(window.__release)window.__release();return 1;`);
 ok(await waitFor(`!window.__before2`, 20000), 'and it took the update the instant the take was finished');
 ok(await waitBooted(), 'coming back up mounted again');
 
+// ── The failure that would take the app down, not just leave it stale. ─────
+//
+// version.json and index.html are two objects behind a CDN and GitHub Pages
+// holds HTML for ten minutes, so "build X is published" can be true while the
+// page being served is still the old one. Without a guard that is an infinite
+// reload loop on every member's phone at once — the app simply gone until a
+// cache somewhere turns over. This asserts it gives up and asks instead.
+console.log('  … and when the published version can never actually be reached');
+await js(`try{sessionStorage.clear();}catch(e){}return 1;`);
+published = 'a-build-that-is-never-served';
+await js(`window.dispatchEvent(new Event('focus'));return 1;`);
+await settle(4000);
+await waitBooted();
+
+// Count reloads by marking the window and seeing how often the mark vanishes.
+let reloads = 0;
+const deadline = Date.now() + 40000;
+await js(`window.__loopMark = 1; return 1;`);
+while (Date.now() < deadline) {
+  await settle(1500);
+  if ((await js(`return !window.__loopMark;`)) === true) {
+    reloads += 1;
+    await waitBooted();
+    await js(`window.__loopMark = 1; return 1;`);
+    await js(`window.dispatchEvent(new Event('focus'));return 1;`);
+  }
+}
+console.log(`   reloads while chasing an unreachable build: ${reloads}`);
+ok(reloads <= 2, `it stops chasing instead of looping forever (${reloads} reload${reloads === 1 ? '' : 's'})`);
+const giveUp = await js(`const b=document.querySelector('.update-pill');return b?(b.innerText||'').trim():'';`);
+ok(/new version/i.test(giveUp || ''), 'and offers the update by hand instead');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 ws.close(); chrome.kill(); web.close();
 process.exit(fail ? 1 : 0);

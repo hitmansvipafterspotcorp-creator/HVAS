@@ -4519,6 +4519,11 @@ function useSoloPlayer({ item, armed, paused }) {
   const [status, setStatus] = useState('idle');   // idle | loading | playing | error
   const [clip, setClip] = useState(null);         // { start, seconds } for the current song
   const startedRef = useRef(null);                // item id we have already cued the window for
+  // The player object exists the moment YT.Player() returns, but it cannot be
+  // driven until onReady fires — loadVideoById before that is a silent no-op.
+  // This is state and not a ref on purpose: the effect that loads each song has
+  // to RE-RUN when the player becomes usable, and a ref cannot wake it.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!armed) return undefined;
@@ -4530,7 +4535,7 @@ function useSoloPlayer({ item, armed, paused }) {
         width: '100%', height: '100%',
         playerVars: { autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, controls: 0, disablekb: 1 },
         events: {
-          onReady: (e) => { if (live) { e.target.unMute?.(); e.target.setVolume?.(100); } },
+          onReady: (e) => { if (!live) return; e.target.unMute?.(); e.target.setVolume?.(100); setReady(true); },
           onError: () => live && setStatus('error'),
           onStateChange: (e) => {
             if (!live) return;
@@ -4561,6 +4566,7 @@ function useSoloPlayer({ item, armed, paused }) {
     }).catch(() => live && setStatus('error'));
     return () => {
       live = false;
+      setReady(false);
       try { playerRef.current?.destroy?.(); } catch { /* already gone */ }
       playerRef.current = null;
     };
@@ -4581,9 +4587,15 @@ function useSoloPlayer({ item, armed, paused }) {
   // A video id needs no key and no quota, so the deck carries one per song
   // (server/resolve-deck-videos.mjs fills them in). Without an id there is
   // nothing to play, and the watchdog below says so rather than hanging.
+  // Waiting on `ready` is what makes the FIRST song of a round play at all.
+  // The player is built behind a network fetch of YouTube's API script, and the
+  // first square is called 350ms after Start — so this effect used to run with
+  // no player yet, return early, and never run again, because `item` never
+  // changed afterwards. The round then sat holding for music that was never
+  // asked for. Silent, and it looked exactly like YouTube being broken.
   useEffect(() => {
     const p = playerRef.current;
-    if (!armed || !p || !item) return undefined;
+    if (!armed || !ready || !p || !item) return undefined;
     startedRef.current = { id: item.id, cued: false, clip: null };
     setClip(null);
     setStatus('loading');
@@ -4603,16 +4615,16 @@ function useSoloPlayer({ item, armed, paused }) {
       setStatus((cur) => (cur === 'loading' ? 'error' : cur));
     }, 12000);
     return () => clearTimeout(watchdog);
-  }, [armed, item?.id, item?.videoId]);
+  }, [armed, ready, item?.id, item?.videoId]);
 
   // The round holding for a performance does not hold the music — the whole
   // point is that you perform TO the clip. Pausing here is only for when the
   // round itself is over.
   useEffect(() => {
     const p = playerRef.current;
-    if (!armed || !p) return;
+    if (!armed || !ready || !p) return;
     try { paused ? p.pauseVideo?.() : p.playVideo?.(); } catch { /* mid-swap */ }
-  }, [armed, paused]);
+  }, [armed, ready, paused]);
 
   /** How much of the current clip is left, in ms. This is the performance
    *  length: the take ends when the clip does. */
@@ -4949,14 +4961,34 @@ function SoloBingoGame({ onExit }) {
       <AppPanel title="Solo vs CPU" subtitle={over ? 'Round over' : `Live · ${game.calledCount} called`}>
         <div className="bingo-side">
           <div className="k-hud">
+            {/* The song that is playing is the QUESTION. Printing its artist
+                and title here answered it — solo told you exactly what was on,
+                and finding it on the card stopped being a game and became
+                reading a label. The venue card has never done this, on purpose.
+
+                So while the music is on, this says a song is on and nothing
+                more. The one case that does name it is music having failed:
+                with nothing to hear, a hidden title is not a challenge, it is
+                a dead end — so the round keeps going in a plainly worse mode
+                that says so. */}
             <div className="k-hud-now k-frame k-frame--flat">
-              <span className="k-label">{nowCalling && !over ? `Now calling · ${game.calledCount} called` : 'Standing by'}</span>
+              <span className="k-label">{nowCalling && !over ? `Now playing · ${game.calledCount} called` : 'Standing by'}</span>
               {nowCalling && !over ? (
-                <>
-                  <strong className="k-value">{nowCalling.artist}</strong>
-                  <span className="k-hud-song k-dim">{nowCalling.song}</span>
-                  {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
-                </>
+                musicOn ? (
+                  <>
+                    <span className="k-hud-ear" aria-hidden="true"><i /><i /><i /><i /></span>
+                    <strong className="k-value k-value--ear">Name it by ear</strong>
+                    <span className="k-hud-song k-dim">Find it on your card</span>
+                    {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                  </>
+                ) : (
+                  <>
+                    <strong className="k-value">{nowCalling.artist}</strong>
+                    <span className="k-hud-song k-dim">{nowCalling.song}</span>
+                    <span className="k-hud-noear">no sound — shown instead</span>
+                    {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                  </>
+                )
               ) : <span className="k-hud-song k-dim">{over ? 'Round over' : 'Dealing…'}</span>}
             </div>
             <div className="k-hud-round k-frame k-frame--gold">
@@ -5072,7 +5104,15 @@ function SoloBingoGame({ onExit }) {
           every screen below so the song never restarts under a performer. */}
       {armed && (
         <div className="solo-player" aria-hidden="true">
-          <div className="playalong-frame"><div ref={song.hostRef} /></div>
+          {/* The player is a real, full-size, on-screen element — and then it is
+              covered. It used to be two pixels across at one percent opacity,
+              which reads to a phone as "not visible", and a browser will not
+              autoplay a video it thinks nobody can see. That is the other half
+              of why solo was silent. Occluding it with an opaque shield keeps
+              the title unreadable while leaving the player genuinely rendered,
+              which is the part the autoplay rules actually measure. */}
+          <div className="playalong-frame playalong-frame--real"><div ref={song.hostRef} /></div>
+          <div className="playalong-shield" />
         </div>
       )}
       {stage}

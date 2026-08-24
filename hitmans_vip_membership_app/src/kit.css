@@ -1435,8 +1435,10 @@
 /* The round's player. Mounted for the whole round and never torn down, so the
    song survives walking onto the battle stage — but sealed, because the video
    title is the answer to the square. */
-.solo-player { position: fixed; left: -9999px; top: 0; width: 2px; height: 2px;
-  opacity: .01; pointer-events: none; overflow: hidden; }
+/* The real rule lives further down (search .solo-player). It used to be parked
+   at left:-9999px at two pixels square, which is precisely what a phone reads
+   as "nobody can see this" — and a browser will not autoplay a video nobody can
+   see. That was half of why solo was silent. */
 
 /* The clip draining on the battle stage. Full width under the camera, because
    it is the only number that decides when the take ends. */
@@ -1615,4 +1617,48 @@
   margin: 14px 0 2px; text-align: center;
   font: 600 11px/1.5 var(--k-font, inherit); letter-spacing: .06em;
   color: rgba(255, 255, 255, .38);
+}
+
+/* Solo's music player.
+   
+   It has to be a genuinely rendered, genuinely sized element that is genuinely
+   on screen: phones refuse to autoplay video they consider invisible, and the
+   old two-pixel one-percent-opacity frame was invisible by every measure a
+   browser uses. So it is real, it sits in a corner out of the way, and an
+   opaque shield covers it — because the video's own title is the answer to the
+   square, and the whole game is working it out by ear. */
+.solo-player {
+  position: fixed; right: 0; bottom: 0; left: auto; top: auto;
+  width: 160px; height: 90px;
+  z-index: 0; pointer-events: none; overflow: hidden;
+}
+.playalong-frame--real { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 1; }
+.playalong-frame--real iframe { width: 100%; height: 100%; border: 0; display: block; }
+/* Inset by a pixel on every side so no sliver of the frame can peek out at a
+   fractional device pixel ratio. */
+.playalong-shield {
+  position: absolute; inset: -2px; background: #08040f; pointer-events: none;
+}
+
+/* "Name it by ear" — what the calling panel shows while a song is actually
+   playing, in place of the answer it used to print. */
+.k-hud-ear { display: flex; align-items: flex-end; gap: 3px; height: 16px; margin: 0 auto 3px; }
+.k-hud-ear i {
+  width: 4px; border-radius: 2px; background: var(--k-cyan, #48e5ff);
+  box-shadow: 0 0 6px var(--k-cyan, #48e5ff);
+  animation: k-hud-ear-bars .9s ease-in-out infinite;
+}
+.k-hud-ear i:nth-child(1) { height: 40%; animation-delay: 0s; }
+.k-hud-ear i:nth-child(2) { height: 95%; animation-delay: .12s; }
+.k-hud-ear i:nth-child(3) { height: 60%; animation-delay: .24s; }
+.k-hud-ear i:nth-child(4) { height: 100%; animation-delay: .36s; }
+@keyframes k-hud-ear-bars { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .k-hud-ear i { animation: none; } }
+.k-value--ear { letter-spacing: .04em; }
+/* Says why the answer is on screen, so a title showing never reads as the game
+   simply giving it away. */
+.k-hud-noear {
+  display: block; margin-top: 2px;
+  font: 700 9px/1.3 var(--k-font, inherit); letter-spacing: .08em; text-transform: uppercase;
+  color: #ff9d9d;
 }

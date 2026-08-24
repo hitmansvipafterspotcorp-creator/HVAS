@@ -12,21 +12,30 @@
 // Page.addScriptToEvaluateOnNewDocument, so loadYoutubeApi() finds window.YT
 // already present and resolves immediately.
 //
-//   window.__FAKE_YT = { duration, failAfter, autoplay }
+//   window.__FAKE_YT = { duration, failAfter, autoplay, readyDelay }
 //     duration    what getDuration() reports (seconds)
 //     failAfter   fire onError on the Nth loadPlaylist (1-based); 0 = never
 //     autoplay    whether loading a song reaches PLAYING at all
+//     readyDelay  ms before onReady fires (default 10)
+//
+// Two things here model the real API exactly because getting them wrong hid a
+// real bug for a whole release. A player is NOT usable between construction and
+// onReady — YouTube silently drops loadVideoById in that window, no error, no
+// throw — and this fake used to accept it. Being instant and forgiving, it
+// happily played a song that real YouTube never would have, so every suite
+// passed while solo was silent on an actual phone.
 //
 // Tests can flip window.__FAKE_YT at runtime to make the music die mid-round.
 (function () {
   const cfg = () => Object.assign({ duration: 210, failAfter: 0, autoplay: true }, window.__FAKE_YT || {});
   let loads = 0;
-  window.__FAKE_YT_STATE = { loads: 0, lastQuery: '', seekedTo: null, playing: false };
+  window.__FAKE_YT_STATE = { loads: 0, lastQuery: '', seekedTo: null, playing: false, ready: false, droppedBeforeReady: 0 };
 
   function FakePlayer(el, opts) {
     const events = (opts && opts.events) || {};
     let currentTime = 0;
     let ticking = null;
+    let ready = false;
 
     const target = {
       unMute() {}, setVolume() {},
@@ -38,6 +47,10 @@
       stopVideo() { window.__FAKE_YT_STATE.playing = false; },
       loadVideoById() { this.loadPlaylist({ list: 'byid' }); },
       loadPlaylist(o) {
+        // Before onReady the real player ignores this completely. Anything
+        // that only works because a fake was more forgiving is a bug waiting
+        // for a slow connection.
+        if (!ready) { window.__FAKE_YT_STATE.droppedBeforeReady += 1; return; }
         loads += 1;
         window.__FAKE_YT_STATE.loads = loads;
         window.__FAKE_YT_STATE.lastQuery = (o && o.list) || '';
@@ -57,7 +70,11 @@
       destroy() { clearInterval(ticking); },
     };
     // The real API replaces the element it is handed; nothing here needs to.
-    setTimeout(() => events.onReady && events.onReady({ target }), 10);
+    setTimeout(() => {
+      ready = true;
+      window.__FAKE_YT_STATE.ready = true;
+      events.onReady && events.onReady({ target });
+    }, Math.max(0, Number(cfg().readyDelay ?? 10)));
     return target;
   }
 

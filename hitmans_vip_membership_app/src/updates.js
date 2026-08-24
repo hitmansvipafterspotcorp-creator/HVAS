@@ -82,6 +82,33 @@ async function publishedBuild() {
   return typeof body?.build === 'string' ? body.build : null;
 }
 
+// How many times we have already reloaded trying to reach a particular build.
+//
+// This guard is the difference between an update mechanism and an outage. The
+// version file and the HTML are two separate objects behind a CDN, and GitHub
+// Pages holds HTML for ten minutes — so there is a real window where the check
+// correctly reports "build X is published" while the page being served is still
+// the old one. Reload, still old, reload, still old: every member's phone spins
+// in a loop it cannot escape, and the app is simply gone until the cache turns
+// over. Two attempts, then stop trying and offer it instead.
+const RELOAD_KEY = 'hvas_reload_for';
+const MAX_RELOAD_ATTEMPTS = 2;
+
+function reloadAttempts(target) {
+  try {
+    const raw = sessionStorage.getItem(RELOAD_KEY);
+    if (!raw) return 0;
+    const seen = JSON.parse(raw);
+    return seen?.target === target ? Number(seen.n) || 0 : 0;
+  } catch { return 0; }        // private mode, or storage disabled
+}
+
+function noteReloadAttempt(target) {
+  try {
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ target, n: reloadAttempts(target) + 1 }));
+  } catch { /* if we cannot remember, the worst case is the old behaviour */ }
+}
+
 /**
  * Watches for a new build and applies it when it is safe to.
  *
@@ -92,6 +119,7 @@ async function publishedBuild() {
 export function useAppUpdate() {
   const [ready, setReady] = useState(false);
   const pending = useRef(false);      // a new build is out there
+  const target = useRef(null);        // ...and which one, so a failed chase can stop
   const startedAt = useRef(Date.now());
 
   useEffect(() => {
@@ -102,6 +130,13 @@ export function useAppUpdate() {
     let reloading = false;
     const applyNow = () => {
       if (reloading || stopped) return;
+      // Already tried and still not there: the published file and the served
+      // page disagree, and reloading again just spins. Offer it and stop.
+      if (target.current && reloadAttempts(target.current) >= MAX_RELOAD_ATTEMPTS) {
+        setReady(true);
+        return;
+      }
+      if (target.current) noteReloadAttempt(target.current);
       reloading = true;
       // Straight to the network, no history entry: the point is to stop being
       // the old build, and going "back" to it afterwards makes no sense.
@@ -134,8 +169,14 @@ export function useAppUpdate() {
 
       try {
         const published = await publishedBuild();
-        if (!published || published === BUILD_ID) return;
+        if (!published || published === BUILD_ID) {
+          // We are current. Anything remembered about chasing a build is stale
+          // now — clear it so the NEXT deploy gets its full two attempts.
+          try { sessionStorage.removeItem(RELOAD_KEY); } catch { /* nothing to clear */ }
+          return;
+        }
         pending.current = true;
+        target.current = published;
         applyWhenSafe();
       } catch { /* offline or the file is briefly missing mid-deploy — try again later */ }
     };
