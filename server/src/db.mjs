@@ -409,6 +409,55 @@ export function openDb(path) {
     resolved_at INTEGER
   )`);
 
+  // ── ProofVault (§45) ─────────────────────────────────────────────────────
+  // Evidence for both HITKOIN and WORLD, in one place, so the SAPEMS questions
+  // in §44 have somewhere to be answered from: what happened, who authorized
+  // it, what money was used, was that money restricted, who received value.
+  //
+  // Append-only by construction — there is no UPDATE and no DELETE anywhere
+  // that touches this table. Evidence you can edit is not evidence. A
+  // correction is a NEW row that points at the one it corrects.
+  db.exec(`CREATE TABLE IF NOT EXISTS proof_vault (
+    receipt_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    member_id TEXT,
+    amount_units INTEGER,
+    amount_currency TEXT,
+    amount_layer TEXT,                 -- FIAT | HITK | WORLD, never merged (§3)
+    rail TEXT,
+    authorized_by TEXT,                -- §44: who said yes
+    restriction_status TEXT,           -- §28: was this somebody else's money
+    delivered TEXT,                    -- §44: what the person actually got
+    reference TEXT,
+    settled INTEGER NOT NULL DEFAULT 0,-- §41: pending is pending until it is not
+    at INTEGER NOT NULL,
+    meta TEXT NOT NULL DEFAULT '{}',
+    proof_hash TEXT NOT NULL
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_proof_member ON proof_vault(member_id, at)`);
+
+  // WORLD reserve contributions (§29). Refusals are stored too: money turned
+  // away is something that happened, and Book II's Covenant Test requires that
+  // records prove what happened.
+  db.exec(`CREATE TABLE IF NOT EXISTS world_contributions (
+    contribution_id TEXT PRIMARY KEY,
+    source_type TEXT NOT NULL,
+    source_entity TEXT,
+    source_transaction TEXT,
+    amount_units INTEGER NOT NULL,
+    currency TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    restriction_status TEXT NOT NULL,
+    authorization_id TEXT,
+    vault TEXT,
+    legal_custodian TEXT,              -- §22: real assets have a lawful keeper
+    beneficial_purpose TEXT,
+    refused INTEGER NOT NULL DEFAULT 0,
+    reason TEXT,
+    timestamp INTEGER NOT NULL,
+    proof_hash TEXT NOT NULL
+  )`);
+
   // ── The room's vote on a called lip sync square ──────────────────────────
   // Who voted to make the holder perform, per called square. Kept per round and
   // wiped with it — a vote is about one square in one moment, and carrying it
