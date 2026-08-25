@@ -10,6 +10,90 @@
 
 export const BINGO_ROUND_PATTERN = { 1: 'line', 2: 'two_lines', 3: 'blackout' };
 export const BINGO_FINAL_ROUND = 3;
+// ── Being handed the mic ──────────────────────────────────────────────────
+//
+// When a LIP SYNC square is called, everyone holding it is asked the same
+// question and gets the SAME time to answer it. That is the whole point of
+// putting it here rather than letting each phone run its own clock: in a room,
+// two people holding the same square must not get different deadlines, and the
+// host has to be able to keep the night moving — a round cannot sit waiting on
+// whoever is slowest to look at their phone.
+//
+// The deadline is derived, not sent: every phone computes it from the call's
+// own timestamp, which came from the host. Same input, same answer, no extra
+// round trip, and nobody's clock drift decides who got longer.
+export const BINGO_MIC_DECIDE_SECONDS = 20;
+
+/**
+ * When the offer on a called square closes.
+ *
+ * Never outlasts the song — being handed a mic for a record that has already
+ * finished is not an offer. `windowMs` is the call's own window (the venue
+ * sends it as currentWindowMs; solo reads it off the clip).
+ */
+export function micDecideEndsAt(calledAt, windowMs) {
+  const at = Number(calledAt) || 0;
+  if (!at) return 0;
+  const cap = Number(windowMs) > 0 ? Number(windowMs) : BINGO_MIC_DECIDE_SECONDS * 1000;
+  return at + Math.min(BINGO_MIC_DECIDE_SECONDS * 1000, cap);
+}
+
+// ── The room decides whether you have to sing for it ──────────────────────
+//
+// A called LIP SYNC square is YOURS to take. You do not have to perform for it
+// — which sounds like it makes the game easier and does the opposite, because
+// the people who DON'T hold that square get a vote on whether you get away with
+// it. They can force the performance. Take the free square and somebody who
+// wanted it makes you earn it instead.
+//
+// And if you are forced and still will not do it, they can block you: the
+// square is gone. Refusing is allowed. Refusing for free is not.
+//
+// Only players who do not hold the square may vote. Somebody voting on their
+// own square is voting on whether they themselves have to sing, which is not a
+// vote, and a holder voting to force a rival is the same conflict from the
+// other side.
+
+/** Who is entitled to vote on a called square: everyone who does not hold it. */
+export function micVoters(players, squareId) {
+  return (players || []).filter((p) => !(p?.card || []).some((sq) => sq && sq.id === squareId));
+}
+
+/**
+ * Forced when MORE than half of those entitled to vote say so. Strictly more,
+ * so a tie is not a force — the room has to actually want it, and the default
+ * when the room is indifferent is that you keep your free square.
+ */
+export function micIsForced(forceVotes, eligibleVoters) {
+  const eligible = Number(eligibleVoters) || 0;
+  if (eligible <= 0) return false;             // nobody to force you
+  return (Number(forceVotes) || 0) > eligible / 2;
+}
+
+/**
+ * What the holder's answer actually does.
+ *
+ *   answer 'take'    — claim it without performing
+ *   answer 'perform' — do it
+ *   answer 'refuse'  — will not
+ *
+ * Returns 'taken' | 'performing' | 'passed' | 'blocked'.
+ */
+export function micOutcome({ forced = false, answer = 'take' } = {}) {
+  // Choosing to perform means performing, forced or not. This is the whole
+  // point of "perform anyway": somebody who could have taken a free square and
+  // decided to get up instead should get up — folding that into 'taken'
+  // silently covered the square and never put them on the stage.
+  if (answer === 'perform') return 'performing';
+  if (!forced) {
+    // Nobody made you sing, so taking it is simply taking it. Walking away from
+    // an unforced square is your own choice and it costs you the square.
+    return answer === 'refuse' ? 'passed' : 'taken';
+  }
+  // Forced, and anything other than doing it. The room takes it off you.
+  return 'blocked';
+}
+
 // ── Money ─────────────────────────────────────────────────────────────────
 //
 // A round only pays when it is a real game: a host running it, and at least two

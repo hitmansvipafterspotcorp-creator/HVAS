@@ -153,15 +153,15 @@ console.log('\nTHE SONG IS THE QUESTION — IT IS NOT PRINTED');
 // The card's own squares list every artist and song in the deck; that is the
 // board. What must not appear is the CALLING panel naming the one now playing.
 const hud = await js(`
-  const el = document.querySelector('.k-hud-now');
+  const el = document.querySelector('.hud-strip-now');
   return el ? el.textContent.replace(/\\s+/g,' ').trim() : 'MISSING';
 `);
 console.log('   [now playing]', hud);
-ok(hud !== 'MISSING', 'the calling panel is there');
+ok(hud !== 'MISSING', 'the calling strip is there');
 ok(/by ear/i.test(hud || ''), 'and it says to name it by ear');
 // The decisive one: whatever is playing must not be named in that panel.
 const leaked = await js(`
-  const el = document.querySelector('.k-hud-now');
+  const el = document.querySelector('.hud-strip-now');
   if (!el) return 'NOPANEL';
   const hud = el.textContent.toLowerCase();
   // Every artist and song on the card — one of them is the answer.
@@ -177,19 +177,19 @@ console.log('\nBUT WITH NO SOUND IT TELLS YOU, RATHER THAN DEAD-ENDING');
 // Kill the music mid-round. A hidden title with nothing to hear is not a
 // harder game, it is an unplayable one.
 await js(`window.__FAKE_YT = Object.assign({}, window.__FAKE_YT, { autoplay: false, failAfter: 1 }); return 1;`);
-const told = await waitFor(`(() => {
-  const el = document.querySelector('.k-hud-now');
-  return el && /no sound/i.test(el.textContent);
-})()`, 90000);
-ok(told, 'when the music fails the panel says so');
+// The "no sound" marker is an icon now rather than a line of copy — the strip
+// exists so the play screen stops being something to read — but it still has to
+// be THERE, or a named song reads as the game giving the answer away.
+const told = await waitFor(`!!document.querySelector('.hud-strip-mute')`, 90000);
+ok(told, 'when the music fails the strip marks it');
 // Asked of the panel itself, not of the card. Cross-referencing the squares
 // looked rigorous and was wrong: the square being called gets COVERED, which
 // takes its artist out of the DOM, so the check reported a leak-free panel that
 // was in fact naming the song perfectly well.
 const named = await js(`
-  const el = document.querySelector('.k-hud-now');
+  const el = document.querySelector('.hud-strip-now');
   if (!el) return 'NOPANEL';
-  const v = el.querySelector('.k-value');
+  const v = el.querySelector('b');
   return JSON.stringify({ hud: el.textContent.replace(/\\s+/g,' ').trim(), value: v ? v.textContent.trim() : '' });
 `);
 console.log('   [failed panel]', named);

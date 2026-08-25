@@ -168,9 +168,13 @@ ok(Array.isArray(artists)&&artists.length>0&&strays.length===0,
 
 console.log('\nTHE CLOCK IS RUNNING');
 ok(await js(`return !!document.querySelector('.solo-callclock')`),'there is a countdown to the next song');
-const t1=await js(`const e=document.querySelector('.solo-callclock .ui-meter-right');return e?e.innerText.trim():''`);
-await settle(700);
-const t2=await js(`const e=document.querySelector('.solo-callclock .ui-meter-right');return e?e.innerText.trim():''`);
+// Whole seconds now — the tenths moved off the play screen with the rest of the
+// reading — so this waits for a change rather than sampling twice 700ms apart
+// and hoping the two landed in different seconds.
+const readClock=()=>js(`const e=document.querySelector('.hud-strip-clock');return e?e.innerText.trim():''`);
+const t1=await readClock();
+let t2=t1; const clockBy=Date.now()+4000;
+while(t2===t1 && Date.now()<clockBy){ await settle(200); t2=await readClock(); }
 console.log('   [clock]',t1,'→',t2);
 ok(t1!==t2,'and it is actually moving, not a painted number');
 
@@ -209,7 +213,12 @@ console.log('\nTHE ROUND HOLDS WHILE YOU PERFORM');
 // interval. It must not move.
 // The battle takes the whole screen, so the HUD's call count goes with it —
 // read it on the card, on the last look before the battle opens.
-const calls=async()=>{const t=await text();const m=t.match(/(\d+)\s+called/);return m?Number(m[1]):-1;};
+const calls=async()=>{
+  const n=await js(`const e=document.querySelector('.hud-strip-count');return e?e.textContent.trim():''`);
+  const m1=String(n).match(/(\d+)/); if(m1) return Number(m1[1]);
+  const t=await js(`return document.body?document.body.textContent:''`);
+  const m=String(t).match(/(\d+)\s+called/); return m?Number(m[1]):-1;
+};
 // Deadline, for the same reason as the one further down: forty turns is under
 // a minute and songs are twenty seconds apart.
 let opened=false,before=-1;
@@ -217,16 +226,21 @@ const hunt1=Date.now()+220000;
 while(!opened && Date.now()<hunt1){
   await settle(1000);
   const seen=await calls(); if(seen>=0) before=seen;
-  await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
+  // The mic offer opens on its own when a lip sync square of yours is called.
+  // Answering it with "perform" is what puts somebody on the stage — tapping
+  // the square does nothing while the offer is up, which is the point of it.
+  await js(`const b=[...document.querySelectorAll('.mic-offer button')].find(x=>/perform/i.test(x.innerText||''));if(b)b.click();return 1;`);
   await settle(400);
   opened=/perform it/i.test(await text());
 }
-ok(opened,'a called lip sync square opens a battle');
+ok(opened,'a called lip sync square hands you the mic, and taking it opens a battle');
 ok(before>0,`the round had called songs before the battle opened (${before})`);
 // Stand on the battle stage for longer than several call intervals, then come
 // back to the card. If the round kept running, the count moved.
 await settle(7000);   // ~3x the call interval
-await tap('Pass');
+// Off the stage. The battle's own exit, not the mic offer's — "Pass" belongs to
+// the offer now and would not be on screen here.
+if (!(await tap('Pass'))) { if (!(await tap('Leave'))) await tap('Back'); }
 await settle(1500);
 const after=await calls();
 console.log('   [calls]',before,'→',after,'(7s spent on the battle stage)');
@@ -258,7 +272,7 @@ let opened2=false, roundOver=false;
 const hunt2=Date.now()+220000;
 while(!opened2 && !roundOver && Date.now()<hunt2){
   await settle(900);
-  await js(`for(const b of document.querySelectorAll('.k-tile--lipsync')) if(!b.disabled) b.click();`);
+  await js(`const b=[...document.querySelectorAll('.mic-offer button')].find(x=>/perform/i.test(x.innerText||''));if(b)b.click();return 1;`);
   await settle(350);
   const t=await text();
   opened2=/perform it/i.test(t);
@@ -311,7 +325,9 @@ ok(/keep playing without music/i.test(dead),'and offers a way on rather than dea
 ok(await tap('Keep playing without music'),'which can be taken');
 await settle(5000);
 const on=await text();
-ok(/playing without music/i.test(on),'and the round says it is running without music');
+// Said with an icon in the strip now rather than a line of copy under it.
+ok(/playing without music/i.test(on) || await js(`return !!document.querySelector('.hud-strip-mute')`),
+   'and the round marks that it is running without music');
 const called=(on.match(/(\d+) CALLED/i)||[])[1];
 console.log('   [after opting out]',String(called),'called');
 ok(Number(called)>=1,'and the calls actually resume');

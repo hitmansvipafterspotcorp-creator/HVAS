@@ -11,6 +11,7 @@
 // members have paid the entry. The pot is what was actually collected.
 import {
   BINGO_ENTRY_FEE, BINGO_CASH_MIN_PAID, BINGO_FINAL_ROUND,
+  BINGO_MIC_DECIDE_SECONDS, micDecideEndsAt, micVoters, micIsForced, micOutcome,
   bingoIsCashGame, bingoPot, bingoRoundPrize, bingoPrizeLabel,
 } from '../hitmans_vip_membership_app/src/bingoRules.js';
 
@@ -65,6 +66,62 @@ eq(bingoPrizeLabel(3, big), `$${bingoRoundPrize(3, big)}`, 'and the label is the
 console.log('\nA ROUND THAT DOES NOT EXIST PAYS NOTHING');
 eq(bingoRoundPrize(0, big), 0, 'round 0');
 eq(bingoRoundPrize(9, big), 0, 'round 9');
+
+console.log('\nEVERYBODY GETS THE SAME TIME TO ANSWER');
+// Two phones, same called square, same host. If these ever disagree, one member
+// in the room got longer to decide than another — and the host cannot keep the
+// night moving if a round waits on whoever looks down last.
+const calledAt = 1_700_000_000_000;
+const windowMs = 30_000;
+eq(micDecideEndsAt(calledAt, windowMs), micDecideEndsAt(calledAt, windowMs),
+   'two phones deriving from the same call agree exactly');
+eq(micDecideEndsAt(calledAt, windowMs) - calledAt, BINGO_MIC_DECIDE_SECONDS * 1000,
+   `and it is the shared ${BINGO_MIC_DECIDE_SECONDS}s window`);
+// Being handed a mic for a record that already finished is not an offer.
+ok(micDecideEndsAt(calledAt, 8000) - calledAt === 8000, 'a short song shortens it rather than outlasting the music');
+ok(micDecideEndsAt(calledAt, 999_000) - calledAt === BINGO_MIC_DECIDE_SECONDS * 1000,
+   'a long song does not stretch it — the round still has to move');
+eq(micDecideEndsAt(0, windowMs), 0, 'no call, no deadline');
+eq(micDecideEndsAt(undefined, windowMs), 0, 'and nothing to derive from is not a deadline either');
+ok(micDecideEndsAt(calledAt, 0) - calledAt === BINGO_MIC_DECIDE_SECONDS * 1000,
+   'a missing window falls back to the shared one rather than to zero');
+
+console.log('\nONLY THE PEOPLE WITHOUT THE SQUARE GET A VOTE');
+const sq = (id) => ({ id });
+const players = [
+  { name: 'Holder', card: [sq('a'), sq('b')] },
+  { name: 'Rell',   card: [sq('c')] },
+  { name: 'Tasha',  card: [sq('a'), sq('d')] },   // also holds it
+  { name: 'Marcus', card: [sq('e')] },
+];
+eq(micVoters(players, 'a').map((p) => p.name).join(','), 'Rell,Marcus',
+   'the two who do not hold it can vote');
+ok(!micVoters(players, 'a').some((p) => p.name === 'Holder'),
+   'you never get a vote on whether YOU have to sing');
+ok(!micVoters(players, 'a').some((p) => p.name === 'Tasha'),
+   'and neither does the rival holding the same square');
+eq(micVoters([], 'a').length, 0, 'an empty room votes on nothing');
+eq(micVoters(players, 'zzz').length, 4, 'a square nobody holds is everybody\'s to vote on');
+
+console.log('\nIT TAKES MORE THAN HALF TO MAKE SOMEBODY SING');
+ok(!micIsForced(1, 2), 'a tie is not a force — the room has to actually want it');
+ok(micIsForced(2, 2), 'both of two is');
+ok(!micIsForced(1, 3), 'one of three is not');
+ok(micIsForced(2, 3), 'two of three is');
+ok(!micIsForced(0, 5), 'nobody voting leaves you your free square');
+ok(!micIsForced(3, 0), 'with nobody eligible there is no force, whatever the count says');
+
+console.log('\nWHAT THE ANSWER DOES');
+eq(micOutcome({ forced: false, answer: 'take' }), 'taken', 'unforced, taking it is taking it — no performance');
+// This assertion used to say 'taken', which is what the code did and NOT what
+// the button says. "Perform anyway" that quietly covers the square instead of
+// putting somebody on the stage is the feature not existing.
+eq(micOutcome({ forced: false, answer: 'perform' }), 'performing', 'unforced, choosing to perform puts you on the stage');
+eq(micOutcome({ forced: false, answer: 'refuse' }), 'passed', 'unforced, walking away costs you the square');
+eq(micOutcome({ forced: true, answer: 'perform' }), 'performing', 'forced and you do it — that is the performance');
+eq(micOutcome({ forced: true, answer: 'refuse' }), 'blocked', 'forced and you will not — the room blocks you');
+eq(micOutcome({ forced: true, answer: 'take' }), 'blocked', 'and forced, you cannot quietly take it anyway');
+eq(micOutcome(), 'taken', 'called with nothing, the default is the free square');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -11,6 +11,7 @@ import {
   BINGO_LINES, BINGO_PATTERN_LABEL, BINGO_PATTERN_NAME, BINGO_PATTERN_IDS, BINGO_PATTERN_GOAL,
   BINGO_ROUND_PATTERN, BINGO_FINAL_ROUND as BINGO_FINAL_ROUND_CLIENT,
   BINGO_ENTRY_FEE, BINGO_CASH_MIN_PAID, bingoIsCashGame, bingoPot, bingoPrizeLabel,
+  BINGO_MIC_DECIDE_SECONDS, micDecideEndsAt, micVoters, micIsForced, micOutcome,
   bingoProgress, bingoHasPattern, oneAwayIds,
 } from './bingoRules';
 import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
@@ -4518,6 +4519,113 @@ function Meter({ value, label, right, live = false, hot = false, countdown = fal
   );
 }
 
+const TILE_ART = {
+  covered: `${import.meta.env.BASE_URL}assets/ui/kit/mark_covered.png`,   // magenta star  — icon_star_accent
+  called:  `${import.meta.env.BASE_URL}assets/ui/kit/mark_called.png`,    // violet diamond — icon_diamond_accent
+  bonus:   `${import.meta.env.BASE_URL}assets/ui/kit/mark_bonus.png`,     // crown          — icon_membership
+  lipsync: `${import.meta.env.BASE_URL}assets/ui/kit/mark_lipsync.png`,   // mic            — lsb sheet 03
+};
+
+// Being handed the mic.
+//
+// A LIP SYNC square is the one thing on the card you cannot win by tapping, and
+// when one of yours is called the app is not marking a square — it is putting a
+// microphone in somebody's hand in a room full of people and asking whether
+// they are going to do it. That deserves to arrive like an event, so it does:
+// the mic comes up out of the card, turns over, and lands in their face.
+//
+// Yes or no, and nothing else on screen. Passing gives the square up for good,
+// which is why the answer is a decision and not a dismissal.
+function MicOffer({ artist, song, endsAt, forced = false, votes = 0, voters = 0, onAnswer }) {
+  // The offer is not open-ended, because the SONG is not. You are being handed
+  // a mic while the record is playing — decide before it runs out and it is
+  // yours to perform, let it run out and it goes the same way as saying no.
+  // That is also what stops this being a modal somebody can sit behind: the
+  // round is held while it is up, so without a deadline a player could park the
+  // whole game here forever.
+  const [left, setLeft] = useState(() => Math.max(0, (endsAt || 0) - Date.now()));
+  // Letting the clock run out is refusing. Held in a ref so the interval below
+  // never closes over a stale handler.
+  const passRef = useRef(onAnswer);
+  passRef.current = onAnswer;
+  useEffect(() => {
+    if (!endsAt) return undefined;
+    const tick = () => {
+      const ms = Math.max(0, endsAt - Date.now());
+      setLeft(ms);
+      if (ms <= 0) passRef.current?.('refuse');
+    };
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  // The window this offer opened with. Lazy state, and the parent gives each
+  // offer its own key, so it is captured once per offer and never recomputed.
+  const [total] = useState(() => Math.max(1, (endsAt || 0) - Date.now()));
+  const secs = Math.ceil(left / 1000);
+  const urgent = left > 0 && left <= 5000;
+
+  return (
+    <div className="mic-offer" role="dialog" aria-modal="true" aria-label={`You have been called out to perform ${artist} — ${song}`}>
+      <div className={`mic-offer-scene${urgent ? ' urgent' : ''}`} aria-hidden="true">
+        {/* The ring is the song draining. It is drawn around the mic rather than
+            put somewhere else on screen, so the thing running out and the thing
+            being offered are one object. */}
+        {!!endsAt && (
+          <svg className="mic-ring" viewBox="0 0 100 100" aria-hidden="true">
+            <circle className="mic-ring-bg" cx="50" cy="50" r="46" />
+            <circle className="mic-ring-fill" cx="50" cy="50" r="46"
+                    style={{ strokeDashoffset: 289 - 289 * Math.max(0, Math.min(1, left / total)) }} />
+          </svg>
+        )}
+        <img className="mic-offer-mic" src={TILE_ART.lipsync} alt="" />
+        <i className="mic-spark s1" /><i className="mic-spark s2" /><i className="mic-spark s3" />
+        <i className="mic-spark s4" /><i className="mic-spark s5" /><i className="mic-spark s6" />
+      </div>
+      <strong className={`mic-offer-title${forced ? ' forced' : ''}`}>
+        {forced ? 'Room says sing' : 'It\u2019s yours'}
+      </strong>
+      <span className="mic-offer-song">{artist} — {song}</span>
+      {!!endsAt && <span className={`mic-offer-clock${urgent ? ' urgent' : ''}`}>{secs}s to decide</span>}
+
+      {/* The vote, while it is happening. This is the tension: the square is
+          free until enough of the people who do NOT have it decide it should
+          not be, and you are watching that land while your clock runs. */}
+      {voters > 0 && (
+        <div className={`mic-vote${forced ? ' forced' : ''}`}>
+          <span className="mic-vote-bar">
+            <i style={{ width: `${Math.round((votes / voters) * 100)}%` }} />
+          </span>
+          <span className="mic-vote-label">
+            {forced ? `${votes} of ${voters} forced it — you have to perform`
+                    : `${votes} of ${voters} want you to sing for it`}
+          </span>
+        </div>
+      )}
+
+      <p className="mic-offer-fine">
+        {forced
+          ? 'They voted. Perform it, or they block you and the square is gone.'
+          : 'Take it without performing — unless enough of them vote to make you sing.'}
+      </p>
+      <div className="mic-offer-buttons">
+        {forced ? (
+          <>
+            <button type="button" className="mic-yes" onClick={() => onAnswer('perform')}>🎤 Perform it</button>
+            <button type="button" className="mic-no" onClick={() => onAnswer('refuse')}>Refuse</button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="mic-yes" onClick={() => onAnswer('take')}>✋ Take the square</button>
+            <button type="button" className="mic-perform" onClick={() => onAnswer('perform')}>🎤 Perform anyway</button>
+            <button type="button" className="mic-no" onClick={() => onAnswer('refuse')}>Pass</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Solo's music, and solo's clock — they are the same thing.
 //
 // The rule the venue plays by: a performance runs exactly as long as the clip
@@ -4737,6 +4845,17 @@ function SoloBingoGame({ onExit }) {
   // mobile browser demands before it will play audio out loud.
   const [armed, setArmed] = useState(false);
   const nowCallingItem = game && game.calledCount > 0 ? game.order[game.calledCount - 1] : null;
+  // The moment the app hands somebody the mic: a LIP SYNC square has been
+  // called, it is on THIS card, and it is still up for grabs. Computed up here,
+  // before the call loop, because an offer that does not stop the round is not
+  // an offer — the next song lands mid-decision and silently swaps the one
+  // being asked about.
+  const micUp = game && game.status === 'playing' && !battle && nowCallingItem
+    && nowCallingItem.type === 'lipsync'
+    && game.card.some((sq) => sq && sq.id === nowCallingItem.id)
+    && !game.covered.has(nowCallingItem.id)
+    && !game.lost?.has(nowCallingItem.id)
+    ? nowCallingItem : null;
   const song = useSoloPlayer({ item: nowCallingItem, armed, paused: !!game && game.status !== 'playing' });
   // A round in progress lives in memory — reloading mid-game loses the card,
   // the round and the streak. Hold updates until the round is over; the seam
@@ -4820,7 +4939,81 @@ function SoloBingoGame({ onExit }) {
   // explanation. The player can now choose to keep going without music, which
   // is a worse game and their call to make, not the app's.
   const [noMusic, setNoMusic] = useState(false);
-  const held = performing || (!noMusic && (musicFailed || awaitingSong));
+  // Being asked holds the round exactly the way performing does. The clip keeps
+  // running underneath — that is what the answer is racing.
+  const held = performing || !!micUp || (!noMusic && (musicFailed || awaitingSong));
+  // Stamped once, when the offer opens, and stamped DURING the render that
+  // opens it rather than in an effect — an effect runs afterwards, so the
+  // offer's first frame would draw a ring against a stale deadline. Reading the
+  // clip every render instead would slide the deadline along with the song and
+  // the ring would never move: the offer has to be racing a fixed moment.
+  const micStamp = useRef({ id: null, at: 0 });
+  const micId = micUp?.id || null;
+  if (micId && micStamp.current.id !== micId) {
+    // The same window every player gets, from the shared rule — not this
+    // phone's leftover clip. In a room two people holding the same square must
+    // be asked for the same length of time, and the host has to be able to keep
+    // the night moving rather than waiting on whoever looks down last.
+    micStamp.current = { id: micId, at: micDecideEndsAt(Date.now(), song.clipLeftMs()) };
+  }
+  const micEndsAt = micId ? micStamp.current.at : 0;
+
+  // The room's vote on whether you have to sing for it.
+  //
+  // Only the players who do NOT hold this square get one — voting on your own
+  // square is voting on whether you personally have to sing, which is not a
+  // vote. The CPUs make up their minds over the first few seconds of the offer
+  // rather than instantly, so the count climbs while you are deciding and you
+  // can watch a free square turn into a performance in front of you.
+  const eligible = micUp ? micVoters(game?.cpus || [], micUp.id) : [];
+  const [micVotes, setMicVotes] = useState([]);
+  useEffect(() => {
+    setMicVotes([]);
+    if (!micId) return undefined;
+    // Somebody one square from the pattern has every reason to make you work
+    // for it; the rest are likelier to let it go.
+    const timers = eligible.map((c, i) => setTimeout(() => {
+      const p = soloProgress(c.card, c.covered, game.pattern);
+      const keen = p.done >= p.need - 1 ? 0.85 : 0.45;
+      if (Math.random() < keen) setMicVotes((v) => (v.includes(c.name) ? v : [...v, c.name]));
+    }, 900 + i * 1200 + Math.random() * 900));
+    return () => timers.forEach(clearTimeout);
+    // Re-run per offer, not per render — eligible is rebuilt every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micId]);
+  const forced = micIsForced(micVotes.length, eligible.length);
+
+  // One place where an answer becomes a result, so the rule decides and the
+  // buttons only report what was pressed.
+  const answerMic = (item, answer) => {
+    const outcome = micOutcome({ forced, answer });
+    if (outcome === 'performing') {
+      playSfx('battle');
+      const rival = game.cpus.find((c) => c.card.some((sq) => sq && sq.id === item.id) && !c.covered.has(item.id));
+      setBattle({ item, cpu: rival || null, endsAt: Date.now() + song.clipLeftMs() });
+      return;
+    }
+    if (outcome === 'taken') {
+      // No performance. The room let it go, so the square is simply yours —
+      // this is the case that makes the vote worth caring about.
+      playSfx('mark');
+      setGame((g) => {
+        if (!g || g.status !== 'playing') return g;
+        const covered = new Set(g.covered); covered.add(item.id);
+        const won = soloHasPattern(g.card, covered, g.pattern);
+        const done = won && g.round >= BINGO_FINAL_ROUND_CLIENT;
+        return won
+          ? { ...g, covered, wins: g.wins + 1, status: done ? 'won' : 'roundWon', winner: 'you' }
+          : { ...g, covered };
+      });
+      return;
+    }
+    // 'passed' — walked away from a free square. 'blocked' — forced, refused,
+    // and the room took it. Both end the same way for the card: it is gone.
+    playSfx('buzz');
+    setGame((g) => (g && g.status === 'playing'
+      ? { ...g, lost: new Set([...(g.lost || []), item.id]) } : g));
+  };
   useEffect(() => {
     if (game?.status !== 'playing' || held) return undefined;
     // Coming back from a performance restarts the timer, so restart the
@@ -5031,6 +5224,18 @@ function SoloBingoGame({ onExit }) {
   // same gate and the same big card.
   return (
     <div className="solo-stage">
+      {micUp && (
+        <MicOffer
+          key={micUp.id}
+          artist={micUp.artist}
+          song={micUp.song}
+          endsAt={micEndsAt}
+          forced={forced}
+          votes={micVotes.length}
+          voters={eligible.length}
+          onAnswer={(answer) => answerMic(micUp, answer)}
+        />
+      )}
       {over && (
         <div className={`bingo-winner-banner${game.status === 'lost' ? ' lost' : ''}`}>
           <strong>
@@ -5039,6 +5244,16 @@ function SoloBingoGame({ onExit }) {
               : game.status === 'lost' ? `${game.winner} got it first`
               : 'Deck ran out — draw'}
           </strong>
+          {/* The run and the record. They used to sit above the card for the
+              whole round, where they were two more things to read and never
+              changed mid-square. Here they are the result. */}
+          <span className="winner-run">
+            <em>This run</em><b>{'★'.repeat(starsThisRun) || '—'}</b>
+            <em className={starsThisRun > best.stars ? 'beaten' : ''}>
+              {starsThisRun > best.stars ? 'New best!' : 'Best'}
+            </em>
+            <b>{'★'.repeat(Math.max(best.stars, starsThisRun)) || '—'}</b>
+          </span>
         </div>
       )}
       <AppPanel title="Solo vs CPU" subtitle={over ? 'Round over' : `Live · ${game.calledCount} called`}>
@@ -5046,85 +5261,78 @@ function SoloBingoGame({ onExit }) {
             Above the card on a phone, beside it on a laptop. */}
         <div className="play-rail">
         <div className="bingo-side">
-          <div className="k-hud">
-            {/* The song that is playing is the QUESTION. Printing its artist
-                and title here answered it — solo told you exactly what was on,
-                and finding it on the card stopped being a game and became
-                reading a label. The venue card has never done this, on purpose.
+          {/* One strip, not six panels.
+          
+              This was a stack: a three-line "now playing" card, a round card, a
+              run-and-record pair, a labelled clock, and up to two paragraphs of
+              nudge — all ABOVE the card, on the screen where the card is the
+              entire point. It pushed the thing you came to play to the bottom
+              and asked you to read your way down to it.
 
-                So while the music is on, this says a song is on and nothing
-                more. The one case that does name it is music having failed:
-                with nothing to hear, a hidden title is not a challenge, it is
-                a dead end — so the round keeps going in a plainly worse mode
-                that says so. */}
-            <div className="k-hud-now k-frame k-frame--flat">
-              <span className="k-label">{nowCalling && !over ? `Now playing · ${game.calledCount} called` : 'Standing by'}</span>
+              Everything still here earns its place while a square is live: what
+              is playing, which round, how long is left, and who is closing in.
+              The run and the record moved to the end of the round, where they
+              are actually news. */}
+          <div className="hud-strip">
+            <span className="hud-strip-now">
               {nowCalling && !over ? (
                 musicOn ? (
                   <>
                     <span className="k-hud-ear" aria-hidden="true"><i /><i /><i /><i /></span>
-                    <strong className="k-value k-value--ear">Name it by ear</strong>
-                    <span className="k-hud-song k-dim">Find it on your card</span>
-                    {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                    <b>By ear</b>
                   </>
                 ) : (
+                  /* No sound means the title is all there is to go on, so it is
+                     shown — and marked, so it never reads as the game simply
+                     giving the answer away. The mark is an icon rather than the
+                     paragraph it used to be, but it still has to be THERE. */
                   <>
-                    <strong className="k-value">{nowCalling.artist}</strong>
-                    <span className="k-hud-song k-dim">{nowCalling.song}</span>
-                    <span className="k-hud-noear">no sound — shown instead</span>
-                    {nowCalling.type === 'lipsync' && <span className="k-chip k-chip--neon k-chip--live">Lip sync</span>}
+                    <em className="hud-strip-mute" title="No sound — the song is shown instead">🔇</em>
+                    <b>{nowCalling.artist}</b><i>{nowCalling.song}</i>
                   </>
                 )
-              ) : <span className="k-hud-song k-dim">{over ? 'Round over' : 'Dealing…'}</span>}
-            </div>
-            <div className="k-hud-round k-frame k-frame--gold">
-              <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {game.round} of {BINGO_FINAL_ROUND_CLIENT}</span>
-              {/* Stars, not dollars. Solo is free and pays nothing — see
-                  SOLO_ROUND_STARS. What is actually at stake is the run. */}
-              <strong className="k-stars" aria-label={`Worth ${SOLO_ROUND_STARS[game.round] ?? 1} stars`}>
-                {'★'.repeat(SOLO_ROUND_STARS[game.round] ?? 1)}
-              </strong>
-              <span className="k-hud-goal">{BINGO_PATTERN_GOAL[game.pattern]}</span>
-            </div>
-          </div>
-          {/* The run, and the record. This is what solo is played for. */}
-          <div className="solo-run">
-            <span className="solo-run-now">
-              <i>This run</i><b>{'★'.repeat(starsThisRun) || '—'}</b>
+              ) : <b>{over ? 'Round over' : 'Dealing…'}</b>}
+              {nowCalling && !over && nowCalling.type === 'lipsync' && <em className="hud-strip-lip">Lip sync</em>}
             </span>
-            <span className={`solo-run-best${starsThisRun > best.stars ? ' beaten' : ''}`}>
-              <i>{starsThisRun > best.stars ? 'New best' : 'Best'}</i>
-              <b>{'★'.repeat(Math.max(best.stars, starsThisRun)) || '—'}</b>
+
+            {/* How deep into the deck. One number — it was a sentence, but the
+                count itself is worth keeping: it is how you know whether the
+                squares you need are still coming. */}
+            <span className="hud-strip-count" title={`${game.calledCount} called`}>{game.calledCount} called</span>
+
+            <span className="hud-strip-round">
+              <b>R{game.round}</b>
+              <u>{'★'.repeat(SOLO_ROUND_STARS[game.round] ?? 1)}</u>
+              <i>{BINGO_PATTERN_GOAL[game.pattern]}</i>
             </span>
+
+            {!over && (
+              <span className={`hud-strip-clock${callLeft <= 5000 && !performing ? ' hot' : ''}`}>
+                {performing ? '⏸' : `${Math.ceil(callLeft / 1000)}s`}
+              </span>
+            )}
           </div>
+
           {!over && (
             <Meter
               className="solo-callclock"
               countdown
               live={!performing}
               value={callLeft / callWindow}
-              label={performing ? 'Round held — you are performing' : 'Next song in'}
-              right={performing ? '⏸ paused' : `${(callLeft / 1000).toFixed(1)}s`}
             />
           )}
+
+          {/* The only nudge left, because it is the only one with something to
+              do about it. A square waiting to be tapped is already lit on the
+              card, and telling somebody in a sentence what a glowing square
+              tells them instantly is the reading this screen had too much of. */}
           {!over && musicFailed && !noMusic && (
             <div className="k-nudge k-nudge--no">
-              <p>That song did not start — it may be blocked here, pulled from
-                 YouTube, or the connection dropped.</p>
-              <p>The round is holding, because working a square out by ear is the game.</p>
+              <p>That song did not start. The round is holding — working it out by ear is the game.</p>
               <button type="button" className="bingo-btn ghost" onClick={() => setNoMusic(true)}>
                 Keep playing without music
               </button>
             </div>
-          )}
-          {!over && noMusic && (
-            <p className="k-nudge">🔇 Playing without music — squares are called on the clock.</p>
-          )}
-          {!over && !musicFailed && !noMusic && awaitingSong && (
-            <p className="k-nudge">🎵 Cueing the song — the next call waits for it.</p>
-          )}
-          {!over && waiting > 0 && (
-            <p className="k-nudge">👆 {waiting} called {waiting === 1 ? 'square is' : 'squares are'} on your card — tap to cover</p>
           )}
         </div>
 
@@ -5132,12 +5340,10 @@ function SoloBingoGame({ onExit }) {
           {game.cpus.map((c) => {
             const p = soloProgress(c.card, c.covered, game.pattern);
             return (
-              <div key={c.name} className={`solo-cpu${p.done >= p.need - 1 ? ' close' : ''}`}>
+              <div key={c.name} className={`solo-cpu${p.done >= p.need - 1 ? ' close' : ''}`} title={c.name}>
                 <b>{c.avatar}</b>
-                <span className="solo-cpu-name">{c.name}</span>
-                <span className="solo-cpu-prog">{p.done}/{p.need}</span>
-                {/* One square away is the moment worth seeing coming. */}
                 <Meter className="solo-cpu-meter" value={p.done / p.need} hot={p.done >= p.need - 1} />
+                <span className="solo-cpu-prog">{p.done}/{p.need}</span>
               </div>
             );
           })}
@@ -5149,7 +5355,18 @@ function SoloBingoGame({ onExit }) {
             stacks under the status rail; from a laptop up, the rail moves
             alongside it and this is the column it sits next to. */}
         <div className="play-board">
-        <div className={`k-grid${soloWin.id ? ' k-grid--win' : ''}`} key={`sg${soloWin.token}`} ref={soloGridRef}>
+        {/* The board's own temperature. `--heat` is how close this card is to
+            the pattern, 0 to 1, and the frame burns harder as it climbs — so
+            being one square away is something you can SEE without a word of it
+            being written down. The flash is keyed on the call count, which
+            remounts it, which replays the animation: every new song lands as a
+            pulse across the card instead of a sentence above it. */}
+        <div className={`k-grid${soloWin.id ? ' k-grid--win' : ''}${over ? '' : ' is-live'}`}
+             style={{ '--heat': Math.max(0, Math.min(1, myProgress.done / myProgress.need)) }}
+             key={`sg${soloWin.token}`} ref={soloGridRef}>
+          {!over && game.calledCount > 0 && (
+            <span key={`call${game.calledCount}`} className="k-callflash" aria-hidden="true" />
+          )}
           {game.card.map((item, i) => {
             const isFree = i === 12;
             const isCalled = !isFree && called.has(item.id);
@@ -5236,12 +5453,6 @@ function SoloBingoGame({ onExit }) {
 // here shipped a live site with every one of these missing. Same failure as
 // the loyalty badges earlier: if it is not a whole string, the deploy cannot
 // find it.
-const TILE_ART = {
-  covered: `${import.meta.env.BASE_URL}assets/ui/kit/mark_covered.png`,   // magenta star  — icon_star_accent
-  called:  `${import.meta.env.BASE_URL}assets/ui/kit/mark_called.png`,    // violet diamond — icon_diamond_accent
-  bonus:   `${import.meta.env.BASE_URL}assets/ui/kit/mark_bonus.png`,     // crown          — icon_membership
-  lipsync: `${import.meta.env.BASE_URL}assets/ui/kit/mark_lipsync.png`,   // mic            — lsb sheet 03
-};
 
 const BINGO_STATUS_LABEL = { lobby: 'Lobby — waiting to start', live: 'Live now', ended: 'Round over' };
 // One-shot animation flags, driven by state rather than by touching
