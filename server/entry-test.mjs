@@ -132,6 +132,55 @@ const onFree = await call('POST', '/bingo/entry/claim', { rail: 'cash' }, a.toke
 eq(onFree.status, 400, 'a free round refuses to take an entry');
 await call('POST', '/bingo/mode', { mode: 'cash' }, host);
 
+console.log('\nTHE SPLIT IS DISCLOSED, AND IT NEVER COMES OUT OF THE POT (§46)');
+// Reset to a known room: three players, all paid.
+for (const m of [a, b, c3]) await call('POST', '/bingo/entry', { member_id: m.member.id, how: 'cash' }, host);
+st = await state();
+eq(st.paidPlayers, 3, 'three paid');
+eq(st.split.housePercent, 0, 'the default house share is zero');
+eq(st.split.worldPercent, 0, 'and so is the reserve share');
+eq(st.pot, 45, 'so the players take everything — $45 of $45');
+eq(st.split.collected, 45, 'collected is stated');
+eq(st.split.pot + st.split.houseFee, st.split.collected, 'and the arithmetic closes');
+
+// Adopt a split.
+const setSplit = await call('POST', '/bingo/split', { housePercent: 0.2, worldPercent: 0.1 }, host);
+eq(setSplit.status, 200, 'the house can adopt a split');
+st = await state();
+eq(st.split.collected, 45, '$45 still comes in');
+eq(st.split.houseFee, 9, 'the house keeps $9 (20%)');
+eq(st.split.worldReserve, 4, 'of which $4 goes to the commons (10%)');
+eq(st.split.houseKeeps, 5, 'leaving the house $5');
+eq(st.pot, 36, 'and the pot is $36 — visibly smaller, before anybody paid');
+eq(st.split.pot + st.split.houseFee, st.split.collected, 'the arithmetic still closes exactly');
+ok(st.split.worldReserve <= st.split.houseFee, 'the reserve is a slice of the HOUSE share, never of the players’');
+
+console.log('\nA RESERVE SHARE BIGGER THAN THE HOUSE SHARE IS REFUSED, NOT CLAMPED');
+const greedy = await call('POST', '/bingo/split', { housePercent: 0.1, worldPercent: 0.5 }, host);
+eq(greedy.status, 400, 'taking more for the commons than the house keeps is refused');
+ok(/never out of the players/i.test(greedy.body.error || ''), 'and the refusal says whose money it would have been');
+eq((await state()).split.houseFee, 9, 'and the adopted split is unchanged');
+ok((await call('POST', '/bingo/split', { housePercent: 0.2, worldPercent: 0.1 }, a.token)).status === 401,
+   'a member cannot set the split');
+
+console.log('\nTHE PRIZE FOLLOWS THE POT, NOT THE OTHER WAY ROUND');
+st = await state();
+const rounds = [1, 2, 3].map((r) => Math.floor(st.pot * ({ 1: 0.2, 2: 0.3, 3: 0.5 })[r]));
+ok(st.pot === 36, `the pot is $${st.pot} after the split`);
+ok(rounds[0] + rounds[1] <= st.pot, 'and the rounds are shares of THAT pot, not of what came in');
+
+console.log('\nWHAT THE COMMONS ACTUALLY RECEIVED');
+// Re-confirm an entry through the claim path so a contribution is recorded.
+await call('POST', '/bingo/entry', { member_id: c3.member.id, paid: false }, host);
+const cl = await call('POST', '/bingo/entry/claim', { rail: 'cash' }, c3.token);
+await call('POST', '/bingo/entry/resolve', { id: cl.body.id, confirm: true }, host);
+const reserve = (await call('GET', '/world/reserve', null, host)).body;
+ok(reserve.totalCents > 0, `the commons received something ($${(reserve.totalCents / 100).toFixed(2)})`);
+eq(reserve.totalCents, 150, 'exactly 10% of one $15 entry');
+ok(Object.keys(reserve.byVault).length >= 1, 'into a named vault');
+eq(reserve.refusedCount, 0, 'with nothing refused on this path');
+ok((await call('GET', '/world/reserve', null, a.token)).status === 401, 'and a member cannot read the reserve board');
+
 console.log('\nYOU DO NOT GET A VOTE ON YOUR OWN SQUARE');
 // Call lip sync squares until one lands on a card we can reason about.
 // Not just any lip sync call — one that somebody in the room does NOT hold.

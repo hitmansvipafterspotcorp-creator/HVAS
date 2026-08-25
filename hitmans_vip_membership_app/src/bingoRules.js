@@ -117,9 +117,11 @@ export function bingoIsCashGame({ hosted = false, paidPlayers = 0 } = {}) {
 }
 
 /** Everything paid in. Zero unless it is a cash game. */
-export function bingoPot({ hosted = false, paidPlayers = 0 } = {}) {
+export function bingoPot({ hosted = false, paidPlayers = 0, housePercent = 0 } = {}) {
   if (!bingoIsCashGame({ hosted, paidPlayers })) return 0;
-  return Math.floor(Number(paidPlayers)) * BINGO_ENTRY_FEE;
+  // Through the split, so the pot on the screen and the pot that gets paid out
+  // are the same number by construction rather than by both being maintained.
+  return bingoSplit({ paidPlayers, housePercent }).pot;
 }
 
 /**
@@ -127,8 +129,8 @@ export function bingoPot({ hosted = false, paidPlayers = 0 } = {}) {
  * more than was collected — the last round takes the rounding rather than the
  * pot quietly growing a dollar.
  */
-export function bingoRoundPrize(round, { hosted = false, paidPlayers = 0 } = {}) {
-  const pot = bingoPot({ hosted, paidPlayers });
+export function bingoRoundPrize(round, { hosted = false, paidPlayers = 0, housePercent = 0 } = {}) {
+  const pot = bingoPot({ hosted, paidPlayers, housePercent });
   if (!pot) return 0;
   const share = BINGO_ROUND_SHARE[round];
   if (!share) return 0;
@@ -137,6 +139,55 @@ export function bingoRoundPrize(round, { hosted = false, paidPlayers = 0 } = {})
     .filter(([r]) => Number(r) !== BINGO_FINAL_ROUND)
     .reduce((sum, [, sh]) => sum + Math.floor(pot * sh), 0);
   return pot - earlier;
+}
+
+// ── Where the money goes, said out loud before anybody pays ───────────────
+//
+// §46 of the directive routes reserve contributions out of the PLATFORM FEE —
+// booking → creator paid → platform fee → authorized reserve allocation. Never
+// out of what the provider earns. Applied to a bingo entry, the players are the
+// providers: the pot is their money, and anything the house keeps is the
+// house's own share, disclosed.
+//
+// §46 also ends with the line that makes this a screen and not just a
+// calculation: "Do not deduct undisclosed reserve allocations from providers."
+// So the split is shown BEFORE the entry is paid, not reconciled afterwards.
+//
+// The default is the honest one: no house fee, no reserve cut, players take
+// everything. A venue that wants to fund the commons has to adopt a policy
+// saying so, and the moment it does, every member sees it.
+
+/**
+ * The split of what the door collects.
+ *
+ *   collected = pot + houseFee          (always, exactly)
+ *   worldReserve <= houseFee            (the reserve is a slice of the house's
+ *                                        share, never of the players')
+ *
+ * Percentages are of the total collected. Rounding goes to the POT — if a cent
+ * cannot be divided, the players get it, not the house.
+ */
+export function bingoSplit({ paidPlayers = 0, housePercent = 0, worldPercent = 0 } = {}) {
+  const collected = Math.max(0, Math.floor(paidPlayers)) * BINGO_ENTRY_FEE;
+  const house = clampPct(housePercent);
+  const world = Math.min(clampPct(worldPercent), house);   // cannot exceed the house's own share
+  const houseFee = Math.floor(collected * house);
+  const worldReserve = Math.floor(collected * world);
+  return {
+    collected,
+    pot: collected - houseFee,        // the remainder, so the arithmetic always closes
+    houseFee,
+    worldReserve,
+    houseKeeps: houseFee - worldReserve,
+    housePercent: house,
+    worldPercent: world,
+  };
+}
+
+function clampPct(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return 0;
+  return Math.min(v, 1);
 }
 
 /** What to put on screen where a prize used to be printed unconditionally. */

@@ -4582,7 +4582,7 @@ const TILE_ART = {
 // own entry would make every pot in the app a number a member typed. So the
 // honest thing to show is the truth: you have told them, and they have not
 // agreed yet.
-function EntryPay({ fee, pot, paidPlayers, claim, onClaim, busy }) {
+function EntryPay({ fee, pot, paidPlayers, split, claim, onClaim, busy }) {
   const [rail, setRail] = useState('cashapp');
   if (claim?.status === 'pending') {
     return (
@@ -4598,6 +4598,32 @@ function EntryPay({ fee, pot, paidPlayers, claim, onClaim, busy }) {
       <p>
         Pot is <b>${pot}</b> from {paidPlayers} {paidPlayers === 1 ? 'entry' : 'entries'} so far — it grows with the room.
       </p>
+      {/* Where the money goes, BEFORE it is taken.
+      
+          §46: do not deduct undisclosed reserve allocations from providers.
+          Here the players are the providers — the pot is their money — so
+          anything the house keeps is shown as the house's, and the community
+          share is shown as a slice of THAT, never of the pot. Most places hide
+          the rake. This is the opposite move, and it is the reason a member
+          should believe the pot number directly above it. */}
+      {split && (
+        <ul className="entry-split">
+          <li><span>Players&rsquo; pot</span><b>${split.pot}</b></li>
+          {split.houseFee > 0 ? (
+            <>
+              <li><span>House</span><b>${split.houseKeeps}</b></li>
+              {split.worldReserve > 0 && (
+                <li className="to-commons">
+                  <span>Community reserve</span><b>${split.worldReserve}</b>
+                </li>
+              )}
+            </>
+          ) : (
+            <li className="all-players"><span>House takes</span><b>$0</b></li>
+          )}
+          <li className="entry-split-total"><span>Collected</span><b>${split.collected}</b></li>
+        </ul>
+      )}
       <div className="entry-rails">
         {['cashapp', 'zelle', 'paypal', 'cash'].map((r) => (
           <button key={r} type="button" className={`entry-rail${rail === r ? ' on' : ''}`} onClick={() => setRail(r)}>
@@ -6822,6 +6848,7 @@ function PlayerCardScreen({ navigate }) {
           fee={state.entryFee ?? 15}
           pot={state.pot ?? 0}
           paidPlayers={state.paidPlayers ?? 0}
+          split={state.split || null}
           claim={me.entryClaim}
           onClaim={claimEntry}
           busy={entryBusy}

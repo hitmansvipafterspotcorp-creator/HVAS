@@ -2466,3 +2466,19 @@
   color: #7dffb4; word-break: break-all;
 }
 .take-registered small { font: 600 10px/1.45 var(--k-font, inherit); color: rgba(255,255,255,.55); }
+
+/* Where the entry money goes, shown before it is taken. Plain rows and real
+   numbers — the persuasive thing here is that it is boring and it adds up. */
+.entry-split {
+  list-style: none; margin: 2px 0 0; padding: 9px 11px; display: grid; gap: 5px;
+  border-radius: 9px; background: rgba(0, 0, 0, .28);
+}
+.entry-split li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.entry-split span { font: 700 11px/1.2 var(--k-font, inherit); color: var(--k-text-dim, #b6a8cf); }
+.entry-split b { font: 800 12px/1.2 var(--k-font, inherit); color: #fff; font-variant-numeric: tabular-nums; }
+.entry-split .to-commons span, .entry-split .to-commons b { color: #8ef0c0; }
+.entry-split .all-players span, .entry-split .all-players b { color: #8ef0c0; }
+.entry-split-total {
+  margin-top: 2px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .14);
+}
+.entry-split-total span, .entry-split-total b { color: #ffd66b; }

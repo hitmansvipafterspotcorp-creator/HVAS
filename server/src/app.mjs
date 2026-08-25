@@ -16,12 +16,13 @@ import { openDb, nightKey } from './db.mjs';
 // or a vote threshold that exists twice is a prize table that will eventually
 // disagree with itself, and the disagreement would be about money in a room.
 import {
-  BINGO_ENTRY_FEE, bingoIsCashGame, bingoPot, bingoRoundPrize,
+  BINGO_ENTRY_FEE, bingoIsCashGame, bingoPot, bingoRoundPrize, bingoSplit,
   micIsForced, micDecideEndsAt,
 } from '../../hitmans_vip_membership_app/src/bingoRules.js';
 import { makeReceipt, proofVault } from './economy/receipts.mjs';
 import { economyFlags } from './economy/flags.mjs';
 import { usd } from './economy/money.mjs';
+import { makeContribution } from './economy/world-reserve.mjs';
 import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
   sessionSecret, signSession, readSession, venueSecret,
@@ -485,6 +486,62 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       songSeconds: Math.round(BINGO_SONG_MS / 1000),
       lipsyncSeconds: Math.round(BINGO_LIPSYNC_MS / 1000),
     };
+  };
+
+  // The adopted split of what the door collects.
+  //
+  // Absent means ZERO, and that is the honest default: with no adopted policy
+  // the players take everything and the screen says so. A venue that wants to
+  // fund the commons has to set it deliberately, and the moment it does every
+  // member sees the split before they pay — §46: do not deduct undisclosed
+  // reserve allocations from providers.
+  const bingoSplitPolicy = () => ({
+    housePercent: Number(setting('bingo_house_percent') || 0) || 0,
+    worldPercent: Number(setting('bingo_world_percent') || 0) || 0,
+    adoptedBy: setting('bingo_split_adopted_by') || null,
+    adoptedAt: Number(setting('bingo_split_adopted_at') || 0) || null,
+  });
+
+  /**
+   * One entry's share of the commons.
+   *
+   * Runs through the SAME eligibility check as any other contribution — a
+   * booking platform fee is on §27's authorized list, and going through the
+   * check rather than around it is what stops this becoming the one path where
+   * money enters the reserve unexamined.
+   */
+  const recordEntryContribution = ({ memberId, entryId, by }) => {
+    const pol = bingoSplitPolicy();
+    if (!(pol.worldPercent > 0) || !economyFlags().WORLD_RESERVE_LEDGER) return null;
+    const cents = Math.floor(BINGO_ENTRY_FEE * 100 * pol.worldPercent);
+    if (cents <= 0) return null;
+    const made = makeContribution({
+      sourceType: 'booking_platform_fee',
+      sourceEntity: process.env.HVAS_VENUE_NAME || 'HITMANS VIP AFTER SPOT',
+      sourceTransaction: entryId,
+      amount: usd(cents),
+      vault: setting('bingo_world_vault') || 'CORE_RESILIENCE',
+      legalCustodian: setting('world_custodian') || 'HITMANS VIP AFTER SPOT CORP',
+      beneficialPurpose: 'Community reserve share of a Lip Sync Bingo entry',
+    });
+    const rec = made.ok ? made.contribution : made.refusal;
+    try {
+      db.prepare(`INSERT OR IGNORE INTO world_contributions
+        (contribution_id, source_type, source_entity, source_transaction, amount_units, currency,
+         asset_type, restriction_status, authorization_id, vault, legal_custodian,
+         beneficial_purpose, refused, reason, timestamp, proof_hash)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(rec.contributionId, rec.sourceType, rec.sourceEntity, rec.sourceTransaction,
+             rec.amount.units, rec.currency, rec.assetType, rec.restrictionStatus,
+             rec.authorizationId, rec.vault, rec.legalCustodian, rec.beneficialPurpose,
+             rec.refused ? 1 : 0, rec.reason, rec.timestamp, rec.proofHash);
+    } catch { return null; }
+    record({ eventType: 'RESERVE_UPDATE', memberId, amount: usd(cents),
+             authorizedBy: by, restrictionStatus: rec.restrictionStatus,
+             delivered: made.ok ? `contributed to ${rec.vault}` : null,
+             reference: rec.contributionId, settled: !!made.ok,
+             meta: { entry: entryId, refused: !!rec.refused, reason: rec.reason } });
+    return rec;
   };
 
   // Everything material that happens in a room, written once, in one place.
@@ -1536,7 +1593,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         // The client decides what to PRINT from these — it never invents a pot.
         mode: r.mode, entryFee: BINGO_ENTRY_FEE, paidPlayers, hosted,
         cash: r.mode === 'cash' && bingoIsCashGame({ hosted, paidPlayers }),
-        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers }) : 0,
+        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers, housePercent: bingoSplitPolicy().housePercent }) : 0,
+        // Where the money goes, shown before anybody pays rather than
+        // reconciled after (§46).
+        split: r.mode === 'cash'
+          ? { ...bingoSplit({ paidPlayers, ...bingoSplitPolicy() }), ...bingoSplitPolicy() }
+          : null,
         // The room's vote on the square being called: who may vote, how many
         // have, and whether that has forced it. Derived the same way on every
         // phone from the same numbers, so nobody sees a different verdict.
@@ -2045,6 +2107,28 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       commit('bingo.mode', { mode, at: Date.now() });
       json(res, 200, { ok: true, mode, entryFee: BINGO_ENTRY_FEE });
     },
+    // Adopting the split. This is the venue deciding, in public, what it keeps
+    // and what it sends to the commons — and it only ever comes out of the
+    // house's own share, never out of the players' pot (§46).
+    'POST /bingo/split': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { housePercent, worldPercent } = await readBody(req);
+      const h = Number(housePercent), w = Number(worldPercent);
+      if (!Number.isFinite(h) || h < 0 || h > 1) return json(res, 400, { error: 'housePercent must be 0..1' });
+      if (!Number.isFinite(w) || w < 0 || w > 1) return json(res, 400, { error: 'worldPercent must be 0..1' });
+      if (w > h) {
+        // Refused rather than silently clamped: a host who typed this meant
+        // something, and quietly changing it would hide a decision they think
+        // they made.
+        return json(res, 400, { error: 'the reserve share cannot exceed the house share — the reserve comes out of what the house keeps, never out of the players\' pot (§46)' });
+      }
+      putSetting('bingo_house_percent', h > 0 ? String(h) : '');
+      putSetting('bingo_world_percent', w > 0 ? String(w) : '');
+      putSetting('bingo_split_adopted_by', h > 0 || w > 0 ? c.sub : '');
+      putSetting('bingo_split_adopted_at', h > 0 || w > 0 ? String(Date.now()) : '');
+      const players = db.prepare('SELECT paid FROM bingo_cards').all().filter((p) => p.paid).length;
+      json(res, 200, { ok: true, split: { ...bingoSplit({ paidPlayers: players, housePercent: h, worldPercent: w }), housePercent: h, worldPercent: w } });
+    },
     // The door takes an entry. Staff-only, because this is money changing hands
     // in a room — a member cannot mark themselves paid any more than they can
     // wave themselves through the door.
@@ -2106,6 +2190,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
                delivered: confirm ? 'entry to tonight’s round' : null,
                reference: id, settled: !!confirm,
                meta: { claim: id, outcome: confirm ? 'confirmed' : 'rejected' } });
+      // The commons share of THIS entry, recorded as it is collected rather
+      // than reconciled at the end of the night. Per-entry so the reserve
+      // ledger can be walked back to the individual payments that built it.
+      if (confirm) recordEntryContribution({ memberId: row.member_id, entryId: id, by: c.sub });
       const players = db.prepare('SELECT paid FROM bingo_cards').all();
       const paidPlayers = players.filter((p) => p.paid).length;
       const hosted = getBingoRound().status !== 'lobby';
@@ -2201,6 +2289,26 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         receiptId: receipt?.receiptId || null,
       });
     },
+    // What the commons has actually received, and from what. Aggregate only —
+    // §51 says show safe aggregate information and never expose private
+    // beneficiary data.
+    'GET /world/reserve': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare('SELECT vault, refused, SUM(amount_units) units, COUNT(*) n FROM world_contributions GROUP BY vault, refused').all();
+      const byVault = {}; let total = 0, refusedTotal = 0, refusedCount = 0;
+      for (const r of rows) {
+        if (r.refused) { refusedTotal += r.units; refusedCount += r.n; continue; }
+        byVault[r.vault] = (byVault[r.vault] || 0) + r.units;
+        total += r.units;
+      }
+      json(res, 200, {
+        totalCents: total, byVault, contributions: rows.filter((r) => !r.refused).reduce((n, r) => n + r.n, 0),
+        // Refusals are reported, not hidden. Money the firewall turned away is
+        // the clearest evidence the firewall is working.
+        refusedCents: refusedTotal, refusedCount,
+        split: bingoSplitPolicy(),
+      });
+    },
     // What a member has registered. Their own only.
     'GET /ip/mine': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
@@ -2275,7 +2383,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         const players = db.prepare('SELECT paid FROM bingo_cards').all();
         const paidPlayers = players.filter((p) => p.paid).length;
         const cash = after.mode === 'cash' && bingoIsCashGame({ hosted: true, paidPlayers });
-        const owed = cash ? bingoRoundPrize(before.roundNo, { hosted: true, paidPlayers }) : 0;
+        const owed = cash ? bingoRoundPrize(before.roundNo, { hosted: true, paidPlayers, housePercent: bingoSplitPolicy().housePercent }) : 0;
         record({ eventType: 'PAYMENT', memberId: claim.member_id, amount: usd(owed * 100),
                  authorizedBy: c.sub,
                  delivered: approve ? (owed > 0 ? `round ${before.roundNo} prize owed` : `round ${before.roundNo} won — free play, no payout`) : null,
@@ -2326,8 +2434,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         // The money, as it actually stands, so the console never shows the host
         // a pot they have not collected.
         mode: r.mode, entryFee: BINGO_ENTRY_FEE, paidPlayers,
-        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers }) : 0,
+        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers, housePercent: bingoSplitPolicy().housePercent }) : 0,
         cash: r.mode === 'cash' && bingoIsCashGame({ hosted, paidPlayers }),
+        split: { ...bingoSplit({ paidPlayers, ...bingoSplitPolicy() }), ...bingoSplitPolicy() },
         songMs: BINGO_SONG_MS,
         // So Host Control can say plainly that calling a song will play nothing.
         youtubeEnabled: mediaReady(),
