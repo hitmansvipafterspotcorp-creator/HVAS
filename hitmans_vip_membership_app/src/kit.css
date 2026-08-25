@@ -2451,3 +2451,18 @@
 @media (prefers-reduced-motion: reduce) {
   .mic-offer-scene::after, .mic-offer-scene::before { animation: none; }
 }
+
+/* A take registered as the performer's own work. Deliberately plain — this is
+   a record, not a trophy, and overselling it would be the one thing that makes
+   somebody distrust it. */
+.take-registered {
+  display: grid; gap: 4px; margin-top: 10px; padding: 11px 13px; border-radius: 11px;
+  border: 1px solid rgba(125, 255, 180, .45); background: rgba(125, 255, 180, .08);
+}
+.take-registered strong { font: 900 13px/1.2 var(--k-font, inherit); color: #8ef0c0; }
+.take-registered span { font: 700 11px/1.3 var(--k-font, inherit); color: var(--k-text-dim, #b6a8cf); }
+.take-registered code {
+  font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #7dffb4; word-break: break-all;
+}
+.take-registered small { font: 600 10px/1.45 var(--k-font, inherit); color: rgba(255,255,255,.55); }

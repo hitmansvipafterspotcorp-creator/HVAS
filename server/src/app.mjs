@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { resolve as pathResolve, join as pathJoin, normalize as pathNormalize, extname, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
 // The SAME rules the phones run. Imported rather than restated: a prize table
 // or a vote threshold that exists twice is a prize table that will eventually
@@ -19,6 +19,9 @@ import {
   BINGO_ENTRY_FEE, bingoIsCashGame, bingoPot, bingoRoundPrize,
   micIsForced, micDecideEndsAt,
 } from '../../hitmans_vip_membership_app/src/bingoRules.js';
+import { makeReceipt, proofVault } from './economy/receipts.mjs';
+import { economyFlags } from './economy/flags.mjs';
+import { usd } from './economy/money.mjs';
 import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
   sessionSecret, signSession, readSession, venueSecret,
@@ -482,6 +485,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       songSeconds: Math.round(BINGO_SONG_MS / 1000),
       lipsyncSeconds: Math.round(BINGO_LIPSYNC_MS / 1000),
     };
+  };
+
+  // Everything material that happens in a room, written once, in one place.
+  //
+  // This is the event spine. Before it, the app had a bingo event log, a
+  // payments table, a takes store on each phone and nothing that could answer
+  // the SAPEMS questions in §44 across all of them. Now a door scan, a paid
+  // entry, a settled pot and a membership all land in the SAME table with the
+  // same shape, so "what happened, who authorized it, what money, whose money,
+  // who received value" has one place to be asked.
+  //
+  // Fails soft, deliberately and on every path: a receipt that cannot be
+  // written must never stop somebody getting through a door or being paid. The
+  // record is evidence of the thing, not the thing.
+  const vault = proofVault(db);
+  const record = (fields) => {
+    if (!economyFlags().WORLD_PROOFVAULT) return null;
+    try { return vault.put(makeReceipt(fields)); } catch { return null; }
   };
 
   // The room's vote on the square being called.
@@ -1358,6 +1379,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       // grant → admission op (idempotent per night; clears OTW in the reducer;
       // re-admits someone who'd left as a real "back inside" event)
       commit('entry.admit', { member_id: m.id, night: nightKey(), at: Date.now(), by_staff: c.sub, searched: !!searched });
+      // Proof of presence: a named person, admitted by a named member of staff,
+      // at a known time. Nothing else this system records is as hard to fake.
+      record({ eventType: 'ACCESS', memberId: m.id, authorizedBy: c.sub,
+               delivered: 'admitted to the venue', reference: nightKey(), settled: true,
+               meta: { night: nightKey(), searched: !!searched, tier: ms.tier } });
       return decide('granted', m);
     },
 
@@ -2073,6 +2099,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const now = Date.now();
       commit('bingo.entry.claim.resolve', { id, status: confirm ? 'confirmed' : 'rejected', by: c.sub, at: now });
       if (confirm) commit('bingo.entry', { member_id: row.member_id, how: row.rail, at: now });
+      // Both outcomes are recorded. A refused entry is something that happened
+      // to somebody who says they paid, and it has to be reviewable.
+      record({ eventType: 'ACCESS', memberId: row.member_id, amount: usd(BINGO_ENTRY_FEE * 100),
+               rail: String(row.rail || '').toUpperCase(), authorizedBy: c.sub,
+               delivered: confirm ? 'entry to tonight’s round' : null,
+               reference: id, settled: !!confirm,
+               meta: { claim: id, outcome: confirm ? 'confirmed' : 'rejected' } });
       const players = db.prepare('SELECT paid FROM bingo_cards').all();
       const paidPlayers = players.filter((p) => p.paid).length;
       const hosted = getBingoRound().status !== 'lobby';
@@ -2101,6 +2134,98 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (endsAt && Date.now() > endsAt) return json(res, 409, { error: 'too late — that one is decided' });
       commit('bingo.micvote', { square_id: last.id, member_id: c.sub, at: Date.now() });
       json(res, 200, { ok: true, mic: micState(getBingoRound()) });
+    },
+    // ── A performance, registered as the performer's own work ──────────────
+    //
+    // §12 classifies a Model Appearance as PERFORMANCE, and §11 registers an
+    // asset by contentHash + rightsHash + ownerController. This does exactly
+    // that for a lip sync take — and does it WITHOUT the video, because the
+    // video belongs to the person who made it and this app has never uploaded
+    // one. The phone hashes the file; the venue registers the hash.
+    //
+    // What the member gets is the thing almost no app gives them: a dated,
+    // venue-witnessed record naming them as the performer, which they can prove
+    // later by producing the file and matching the hash. §13's warning applies
+    // and is stated on the record itself — this registers authorship of a
+    // performance, it does not transfer or create copyright in the song.
+    'POST /ip/performance': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      if (!economyFlags().HITK_IP_REGISTRY) return json(res, 503, { error: 'ip registry is off' });
+      const { contentHash, artist, song, durationMs, performedAt } = await readBody(req);
+      // A hash is the whole submission, so it has to actually be one.
+      if (!/^sha256:[0-9a-f]{64}$/.test(String(contentHash || ''))) {
+        return json(res, 400, { error: 'contentHash must be sha256:<64 hex>' });
+      }
+      const m = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
+      if (!m) return json(res, 400, { error: 'no member' });
+
+      const existing = db.prepare('SELECT * FROM performance_rights WHERE member_id=? AND content_hash=?')
+        .get(c.sub, contentHash);
+      if (existing) {
+        // Idempotent: the same file registered twice is one fact stated twice.
+        return json(res, 200, { ok: true, alreadyRegistered: true, assetId: existing.asset_id,
+          contentHash: existing.content_hash, rightsHash: existing.rights_hash, registeredAt: existing.registered_at });
+      }
+
+      const now = Date.now();
+      const assetId = `PERF-${randomBytes(6).toString('hex').toUpperCase()}`;
+      // The rights statement is hashed so the CLAIM is fixed too, not just the
+      // file — otherwise a record could be reinterpreted later.
+      const rightsStatement = {
+        assetType: 'PERFORMANCE',
+        ownerController: m.number,
+        claim: 'the named member performed this recording',
+        notClaimed: 'no ownership of the underlying composition or master recording is claimed or transferred',
+        venue: process.env.HVAS_VENUE_NAME || 'HITMANS VIP AFTER SPOT',
+        night: nightKey(), performedAt: performedAt || now,
+      };
+      const rightsHash = `sha256:${createHash('sha256').update(JSON.stringify(rightsStatement, Object.keys(rightsStatement).sort())).digest('hex')}`;
+
+      const receipt = record({
+        eventType: 'IP_REGISTRATION', memberId: c.sub, authorizedBy: 'venue-registry',
+        delivered: `performance registered to ${m.number}`, reference: assetId, settled: true,
+        meta: { contentHash, rightsHash, artist: artist || null, song: song || null, night: nightKey() },
+      });
+
+      db.prepare(`INSERT INTO performance_rights
+        (asset_id, member_id, content_hash, rights_hash, artist, song, duration_ms,
+         venue_night, performed_at, registered_at, owner_controller, status, receipt_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(assetId, c.sub, contentHash, rightsHash, artist || null, song || null,
+             Number(durationMs) || null, nightKey(), performedAt || now, now, m.number,
+             'registered', receipt?.receiptId || null);
+
+      json(res, 200, {
+        ok: true, assetId, contentHash, rightsHash, registeredAt: now,
+        ownerController: m.number, rightsStatement,
+        receiptId: receipt?.receiptId || null,
+      });
+    },
+    // What a member has registered. Their own only.
+    'GET /ip/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare('SELECT * FROM performance_rights WHERE member_id=? ORDER BY registered_at DESC LIMIT 100').all(c.sub);
+      json(res, 200, { performances: rows.map((r) => ({
+        assetId: r.asset_id, contentHash: r.content_hash, rightsHash: r.rights_hash,
+        artist: r.artist, song: r.song, night: r.venue_night,
+        performedAt: r.performed_at, registeredAt: r.registered_at,
+        ownerController: r.owner_controller, status: r.status, receiptId: r.receipt_id,
+      })) });
+    },
+    // Proving it later: hand back the file's hash and see what the venue holds.
+    // Open to any signed-in member because a proof nobody can check is not a
+    // proof — it returns the registration, never the file, which does not exist
+    // here to return.
+    'POST /ip/verify': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { contentHash } = await readBody(req);
+      const row = db.prepare('SELECT * FROM performance_rights WHERE content_hash=? ORDER BY registered_at ASC').get(String(contentHash || ''));
+      if (!row) return json(res, 404, { registered: false, reason: 'no performance registered with that hash' });
+      json(res, 200, {
+        registered: true, assetId: row.asset_id, ownerController: row.owner_controller,
+        night: row.venue_night, performedAt: row.performed_at, registeredAt: row.registered_at,
+        rightsHash: row.rights_hash,
+      });
     },
     'POST /bingo/claim': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
@@ -2135,10 +2260,28 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const { claimId, approve } = await readBody(req);
       const claim = db.prepare(`SELECT * FROM bingo_claims WHERE id=? AND status='pending'`).get(claimId);
       if (!claim) return json(res, 404, { error: 'no pending claim' });
+      // Read BEFORE the reducer advances the ladder: the prize belongs to the
+      // round that was just won, not to the one that starts next.
+      const before = getBingoRound();
       commit('bingo.resolve', { claim_id: claimId, approve: !!approve, member_id: claim.member_id, by: c.sub,
         at: Date.now(), final_round: BINGO_FINAL_ROUND,
         podium_ends_at: approve ? Date.now() + bingoPodiumMs() : null });
       const after = getBingoRound();
+      // A round settled by the house, with the money it is worth attached. On a
+      // free night the amount is zero and the receipt says so — which is the
+      // point: the record is true either way, and nobody can later claim a
+      // payout that has no row behind it.
+      {
+        const players = db.prepare('SELECT paid FROM bingo_cards').all();
+        const paidPlayers = players.filter((p) => p.paid).length;
+        const cash = after.mode === 'cash' && bingoIsCashGame({ hosted: true, paidPlayers });
+        const owed = cash ? bingoRoundPrize(before.roundNo, { hosted: true, paidPlayers }) : 0;
+        record({ eventType: 'PAYMENT', memberId: claim.member_id, amount: usd(owed * 100),
+                 authorizedBy: c.sub,
+                 delivered: approve ? (owed > 0 ? `round ${before.roundNo} prize owed` : `round ${before.roundNo} won — free play, no payout`) : null,
+                 reference: String(claimId), settled: !!approve && owed === 0,
+                 meta: { round: before.roundNo, approved: !!approve, mode: after.mode, paidPlayers } });
+      }
       json(res, 200, { ok: true, roundNo: after.roundNo, pattern: after.pattern, status: after.status });
     },
     // Reset also sets up the NEXT game's deck/pattern — chosen here, before

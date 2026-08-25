@@ -193,6 +193,14 @@ export function apiBingoEntryClaim(rail, reference) {
   return call('POST', '/bingo/entry/claim', { rail, reference }, apiToken());
 }
 // The house agreeing (or not). Staff/host only, server-enforced.
+// ── A performance, registered as the performer's own work ─────────────────
+// The hash goes up. The video never does — see hashTake() in takes.js.
+export function apiRegisterPerformance({ contentHash, artist, song, durationMs, performedAt }) {
+  return call('POST', '/ip/performance', { contentHash, artist, song, durationMs, performedAt }, apiToken());
+}
+export function apiMyPerformances() { return call('GET', '/ip/mine', null, apiToken()); }
+export function apiVerifyPerformance(contentHash) { return call('POST', '/ip/verify', { contentHash }, apiToken()); }
+
 export function apiBingoEntryResolve(id, confirm) {
   return call('POST', '/bingo/entry/resolve', { id, confirm }, apiToken());
 }

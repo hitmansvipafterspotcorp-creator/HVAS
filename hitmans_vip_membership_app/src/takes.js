@@ -93,6 +93,38 @@ export async function saveTake({ blob, artist, song, mode, won }) {
   }
 }
 
+/**
+ * The fingerprint of a take, computed HERE, on the phone.
+ *
+ * This is what makes registering a performance possible without uploading it.
+ * The venue never receives the video — it receives 64 hex characters that only
+ * this exact file can produce. Later, the member proves authorship by producing
+ * the file and showing it still hashes to the registered value.
+ *
+ * Returns null rather than throwing: a phone with no WebCrypto (an insecure
+ * origin, an old browser) still keeps its takes, it just cannot register them.
+ */
+export async function hashTake(blob) {
+  try {
+    if (!blob || !blob.size || !globalThis.crypto?.subtle) return null;
+    const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+    const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    return `sha256:${hex}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Remember that a take was registered, so the badge survives a reload. */
+export async function markRegistered(id, registration) {
+  try {
+    const rec = await tx('readonly', (s) => s.get(id));
+    if (!rec) return false;
+    await tx('readwrite', (s) => s.put({ ...rec, registration }));
+    return true;
+  } catch { return false; }
+}
+
 export async function removeTake(id) {
   try { await tx('readwrite', (s) => s.delete(id)); return true; } catch { return false; }
 }

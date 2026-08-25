@@ -458,6 +458,34 @@ export function openDb(path) {
     proof_hash TEXT NOT NULL
   )`);
 
+  // Registered performances (§11, §12: a performance is PERFORMANCE, and the
+  // classification decides what proof object is appropriate).
+  //
+  // The video itself is NOT here and never will be. Takes live on the member's
+  // own phone and this app has never uploaded one — that is a deliberate
+  // property of a room where people lip sync in a bar. What is registered is
+  // the HASH, which is enough to prove later that a given file is the one that
+  // was registered, by whom, and when, without anybody surrendering the file.
+  //
+  // That is the whole trick: provable authorship without custody.
+  db.exec(`CREATE TABLE IF NOT EXISTS performance_rights (
+    asset_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    content_hash TEXT NOT NULL,        -- sha256 of the take, computed on the phone
+    rights_hash TEXT NOT NULL,         -- hash of the rights statement below
+    artist TEXT, song TEXT,
+    duration_ms INTEGER,
+    venue_night TEXT,
+    performed_at INTEGER NOT NULL,
+    registered_at INTEGER NOT NULL,
+    owner_controller TEXT NOT NULL,    -- who this names as owning the performance
+    status TEXT NOT NULL DEFAULT 'registered',
+    receipt_id TEXT
+  )`);
+  // One registration per file per member. Registering the same take twice is
+  // the same fact stated twice, not two performances.
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_perf_unique ON performance_rights(member_id, content_hash)`);
+
   // ── The room's vote on a called lip sync square ──────────────────────────
   // Who voted to make the holder perform, per called square. Kept per round and
   // wiped with it — a vote is about one square in one moment, and carrying it

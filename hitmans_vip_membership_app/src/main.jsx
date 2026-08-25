@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useAppUpdate, useHoldUpdates, BUILD_ID } from './updates.js';
-import { listTakes, saveTake, removeTake, takesUsage, prettyBytes, MAX_TAKES } from './takes.js';
+import { listTakes, saveTake, removeTake, takesUsage, prettyBytes, MAX_TAKES, hashTake } from './takes.js';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import './styles.css';
@@ -26,7 +26,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoAuto, apiBingoAutofill, apiBingoMode, apiBingoEntry, apiBingoMicVote,
-  apiBingoEntryClaim, apiBingoEntryResolve,
+  apiBingoEntryClaim, apiBingoEntryResolve, apiRegisterPerformance,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -3483,6 +3483,30 @@ function BattleChat({ battle, onChanged }) {
 // Desktop and older browsers get a plain save instead.
 function SharePerformance({ blob, artist, song }) {
   const [msg, setMsg] = useState('');
+  // Registering the take as the performer's own work.
+  //
+  // The video does NOT go anywhere. The phone hashes it and the venue records
+  // the 64 characters only this exact file can produce, with the member named
+  // as the performer and the night it happened. Proving it later means
+  // producing the file and showing it still hashes to the same value — which
+  // is why this can be honest about authorship without ever taking custody of
+  // somebody's video.
+  const [reg, setReg] = useState(null);          // null | 'working' | result | 'off'
+  const registerTake = async () => {
+    setReg('working');
+    try {
+      const contentHash = await hashTake(blob);
+      if (!contentHash) { setReg('off'); return; }
+      const r = await apiRegisterPerformance({
+        contentHash, artist, song,
+        durationMs: null, performedAt: Date.now(),
+      });
+      setReg(r);
+    } catch (e) {
+      setMsg(e.message || 'Could not register that right now — your take is still yours and still here.');
+      setReg(null);
+    }
+  };
   const name = `HVAS-lipsync-${String(artist || 'take').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.webm`;
   const file = new File([blob], name, { type: blob.type || 'video/webm' });
   const canShareFile = typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] });
@@ -3511,6 +3535,30 @@ function SharePerformance({ blob, artist, song }) {
         ? <button type="button" className="bingo-btn gold" onClick={share}>Share to TikTok · IG · FB · X · Snapchat</button>
         : <p className="mem-fineprint">Direct sharing isn't available on this browser — save it and post from your camera roll.</p>}
       <button type="button" className="bingo-btn ghost" onClick={save}>Save video</button>
+
+      {/* Only offered where there is a venue to register with — solo has no
+          witness, and a registration nobody witnessed is worth less than not
+          claiming one. */}
+      {apiEnabled() && (
+        reg && reg.ok ? (
+          <div className="take-registered">
+            <strong>✓ Registered to you</strong>
+            <span>{reg.alreadyRegistered ? 'Already registered' : 'Recorded'} · {reg.ownerController}</span>
+            <code>{reg.contentHash.slice(0, 23)}…</code>
+            <small>
+              The venue holds this fingerprint and the night, naming you as the performer.
+              Your video never left this phone. This records that you performed it — it does
+              not claim the song.
+            </small>
+          </div>
+        ) : reg === 'off' ? (
+          <p className="mem-fineprint">This browser can&rsquo;t fingerprint the file, so it can&rsquo;t be registered here.</p>
+        ) : (
+          <button type="button" className="bingo-btn ghost" disabled={reg === 'working'} onClick={registerTake}>
+            {reg === 'working' ? 'Registering…' : '🔏 Register this as mine'}
+          </button>
+        )
+      )}
       {msg && <p className="mem-fineprint">{msg}</p>}
     </div>
   );
