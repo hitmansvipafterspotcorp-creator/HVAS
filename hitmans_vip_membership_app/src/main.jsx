@@ -25,7 +25,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiEventState, apiEventCreate, apiEventJoin, apiEventLeave, apiEventStart, apiEventNext,
   apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
-  apiBingoAuto, apiBingoAutofill,
+  apiBingoAuto, apiBingoAutofill, apiBingoMode, apiBingoEntry, apiBingoMicVote,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -6418,9 +6418,51 @@ function PlayerCardScreen({ navigate }) {
   // says has actually been collected — until it reports that, this is a free
   // game and says so, which is the honest default. A round that claims a pot
   // nobody paid into is worse than a round that pays nothing.
+  // The server does this arithmetic too, from the same shared rules, and its
+  // answer is the one that counts — `state.cash` and `state.pot` are what the
+  // house will actually pay. Recomputing here keeps the screen honest if a poll
+  // is briefly stale, but it can only ever agree: same rule, same inputs.
   const cashCtx = { hosted: !!state?.hosted, paidPlayers: state?.paidPlayers ?? 0 };
-  const cash = bingoIsCashGame(cashCtx);
+  const cash = state?.mode === 'cash' && bingoIsCashGame(cashCtx);
+  const pot = cash ? (state?.pot ?? bingoPot(cashCtx)) : 0;
   const progress = bingoProgress(me?.card, covered, pattern);
+
+  // Being handed the mic, in a room. Everything about the vote is the server's
+  // — this only works out whether the square is MINE, and remembers that I have
+  // already answered so the offer does not come back while the same square is
+  // still the one being called.
+  const [micAnswered, setMicAnswered] = useState(null);
+  const rawMic = state?.mic || null;
+  const mic = rawMic ? {
+    ...rawMic,
+    iHold: !!me?.card?.some((sq) => sq && sq.id === rawMic.squareId),
+    answered: micAnswered === rawMic.squareId,
+  } : null;
+  const answerMic = async (answer) => {
+    if (!rawMic) return;
+    setMicAnswered(rawMic.squareId);
+    const outcome = micOutcome({ forced: !!rawMic.forced, answer });
+    if (outcome === 'performing') { playSfx('battle'); setBattleOpen(true); return; }
+    if (outcome === 'taken') {
+      // No performance: the room let it go, so the square is simply covered.
+      playSfx('mark');
+      try { await apiBingoMark(rawMic.squareId, true); await refresh(); }
+      catch { /* the poll will put it right */ }
+      return;
+    }
+    // 'passed' or 'blocked' — either way the square is gone for this round.
+    playSfx('buzz');
+  };
+  // Voting to make whoever holds it get up. Only offered to people who do not
+  // hold the square, which the server enforces as well — a rule that lives only
+  // in a hidden button is not a rule.
+  const [micVoted, setMicVoted] = useState(null);
+  const voteMic = async () => {
+    if (!rawMic || micVoted === rawMic.squareId) return;
+    setMicVoted(rawMic.squareId);
+    try { await apiBingoMicVote(); await refresh(); } catch { /* already voted, or too late */ }
+  };
+
   const clock = useCallClock(state);
   const gridRef = useRef(null);
   const [pop, firePop] = useOneShot(320);
@@ -6568,6 +6610,23 @@ function PlayerCardScreen({ navigate }) {
           <BattleChat battle={activeBattle} onChanged={loadBattles} />
         </div>
       )}
+      {/* The same moment solo has, with a real room behind it. Who holds the
+          square, who may vote and whether they have forced it all come from the
+          server, so every phone shows the same verdict and the same deadline —
+          two people holding one square must never be asked for different
+          lengths of time, and the host has to be able to keep the night moving. */}
+      {mic && mic.iHold && !mic.answered && (
+        <MicOffer
+          key={mic.squareId}
+          artist={mic.artist}
+          song={mic.song}
+          endsAt={mic.endsAt}
+          forced={mic.forced}
+          votes={mic.votes}
+          voters={mic.voters}
+          onAnswer={answerMic}
+        />
+      )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
         {/* Layout follows lsb_sheet_03's assembled card screen: a status strip
             across the top (what's playing, how long is left, what this round
@@ -6576,6 +6635,24 @@ function PlayerCardScreen({ navigate }) {
             a 5x5 card is square, so it is sized off height and leaves a wide
             gutter that this exactly fills. */}
         <div className="play-rail">
+        {/* The other side of the mic: a lip sync square is up and you do NOT
+            hold it. Somebody is about to get a free square unless enough of the
+            room says otherwise. Only shown to people entitled to vote — the
+            server refuses the rest, so this is the polite half of the rule
+            rather than the whole of it. */}
+        {mic && !mic.iHold && !mic.forced && (
+          <button type="button" className={`mic-force${micVoted === mic.squareId ? ' voted' : ''}`}
+                  onClick={voteMic} disabled={micVoted === mic.squareId}>
+            <span className="mic-force-top">
+              {micVoted === mic.squareId ? '✓ You voted — make them sing' : '🎤 Make them sing for it'}
+            </span>
+            <span className="mic-force-sub">{mic.artist} — {mic.song} · {mic.votes} of {mic.voters}</span>
+            <span className="mic-force-bar"><i style={{ width: `${mic.voters ? Math.round((mic.votes / mic.voters) * 100) : 0}%` }} /></span>
+          </button>
+        )}
+        {mic && !mic.iHold && mic.forced && (
+          <p className="mic-forced-note">🔥 The room forced it — they have to perform {mic.song}.</p>
+        )}
         <div className="bingo-side">
           {/* Calling stops while the podium is being settled, so "Now playing
               — Listen" would be telling players to listen to silence. The
@@ -6623,7 +6700,7 @@ function PlayerCardScreen({ navigate }) {
             <div className={`k-hud-round k-frame k-frame--gold${cash ? '' : ' is-free'}`}>
               <span className="k-label"><img className="k-hud-crown" src={TILE_ART.bonus} alt="" aria-hidden="true" />Round {roundNo} of {finalRound}</span>
               {cash
-                ? <strong className="k-money">{bingoPrizeLabel(roundNo, cashCtx)}</strong>
+                ? <strong className="k-money" title={`Pot $${pot} from ${state?.paidPlayers ?? 0} entries`}>{bingoPrizeLabel(roundNo, cashCtx)}</strong>
                 : <strong className="k-freeplay">Free play</strong>}
               <span className="k-hud-goal">{BINGO_PATTERN_GOAL[pattern] || '1 LINE'}</span>
             </div>
@@ -6841,6 +6918,24 @@ function HostScreen() {
               )}
             </div>
           )}
+          {/* Free or cash, and it is the host's call every night — never
+              inferred from how many turned up. A round that starts charging
+              because the room filled is a round nobody agreed to pay for.
+              The pot below is what the door has actually taken, not a target. */}
+          <div className={`host-money${board?.mode === 'cash' ? ' is-cash' : ''}`}>
+            <button type="button" className="host-money-toggle" disabled={busy}
+                    onClick={() => act(() => apiBingoMode(board?.mode === 'cash' ? 'free' : 'cash'))}>
+              {board?.mode === 'cash'
+                ? `💵 Cash game · $${board?.entryFee ?? 15} entry`
+                : '🆓 Free play · tap to make it a cash game'}
+            </button>
+            {board?.mode === 'cash' && (
+              <p className="host-money-pot">
+                {board?.paidPlayers ?? 0} paid · pot <b>${board?.pot ?? 0}</b>
+                {(board?.paidPlayers ?? 0) < 2 && <em> — needs 2 paid before it pays anything</em>}
+              </p>
+            )}
+          </div>
           <button type="button" className="bingo-btn" disabled={busy || board?.status === 'live'} onClick={() => act(apiBingoStart)}>Start Round</button>
           <button type="button" className="bingo-btn gold" disabled={busy || board?.status !== 'live'} onClick={() => act(apiBingoCall)}>Call Next Phrase</button>
           {/* The night is manual by default — the host decides when the next
@@ -6876,10 +6971,22 @@ function HostScreen() {
           {board && board.players.length === 0 && <p className="dash-empty">Nobody has joined yet.</p>}
           <div className="host-scroll">
             {board?.players.map((p) => (
-              <div key={p.member_id} className="dash-row">
+              <div key={p.member_id} className={`dash-row${p.paid ? ' is-paid' : ''}`}>
                 <span className={`dash-dot ${p.ready ? 'green' : 'amber'}`} />
                 <div className="dash-info"><strong>{p.name}</strong><span className="dash-num">{p.number}</span></div>
-                <span className="dash-when">{p.ready ? 'ready' : 'not ready'}</span>
+                {/* Taking the money, on the list of people standing in front of
+                    you. On a cash night this is the whole job: tap a name when
+                    they pay, tap it again if you took it in error. Nothing else
+                    in the app can mark somebody paid — a member's own phone is
+                    refused by the server. */}
+                {board?.mode === 'cash' ? (
+                  <button type="button" className={`entry-btn${p.paid ? ' on' : ''}`} disabled={busy}
+                          onClick={() => act(() => apiBingoEntry(p.member_id, { paid: !p.paid }))}>
+                    {p.paid ? `✓ Paid $${board?.entryFee ?? 15}` : `Take $${board?.entryFee ?? 15}`}
+                  </button>
+                ) : (
+                  <span className="dash-when">{p.ready ? 'ready' : 'not ready'}</span>
+                )}
               </div>
             ))}
           </div>

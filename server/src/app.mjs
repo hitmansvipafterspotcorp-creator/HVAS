@@ -12,6 +12,13 @@ import { resolve as pathResolve, join as pathJoin, normalize as pathNormalize, e
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
+// The SAME rules the phones run. Imported rather than restated: a prize table
+// or a vote threshold that exists twice is a prize table that will eventually
+// disagree with itself, and the disagreement would be about money in a room.
+import {
+  BINGO_ENTRY_FEE, bingoIsCashGame, bingoPot, bingoRoundPrize,
+  micIsForced, micDecideEndsAt,
+} from '../../hitmans_vip_membership_app/src/bingoRules.js';
 import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
   sessionSecret, signSession, readSession, venueSecret,
@@ -471,8 +478,33 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       podiumEndsAt: r.podium_ends_at,
       podiumFirst: r.podium_first,
       autoCall: !!r.auto_call,
+      mode: r.mode === 'cash' ? 'cash' : 'free',
       songSeconds: Math.round(BINGO_SONG_MS / 1000),
       lipsyncSeconds: Math.round(BINGO_LIPSYNC_MS / 1000),
+    };
+  };
+
+  // The room's vote on the square being called.
+  //
+  // Everything here is derived from what the host already did — which square is
+  // up, when it was called — so every phone gets the same verdict without a
+  // deadline having to be pushed around. Only players who do NOT hold the
+  // square may vote: voting on your own square is voting on whether you
+  // personally have to sing.
+  const micState = (r) => {
+    const last = r.calls[r.calls.length - 1];
+    if (!last || last.type !== 'lipsync' || r.status !== 'live') return null;
+    const cards = db.prepare('SELECT member_id, card FROM bingo_cards').all()
+      .map((row) => ({ member_id: row.member_id, card: JSON.parse(row.card) }));
+    const holders = cards.filter((c) => c.card.some((sq) => sq && sq.id === last.id)).map((c) => c.member_id);
+    const voters = cards.length - holders.length;
+    const votes = db.prepare('SELECT COUNT(*) c FROM bingo_mic_votes WHERE square_id=?').get(String(last.id)).c;
+    return {
+      squareId: last.id, artist: last.artist, song: last.song,
+      holders, voters, votes,
+      forced: micIsForced(votes, voters),
+      // Same input, same answer, on every phone in the room.
+      endsAt: micDecideEndsAt(last.at, bingoWindowFor(last, r.nowPlaying?.clip)),
     };
   };
 
@@ -1435,7 +1467,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     'GET /bingo/state': (req, res) => {
       const r = getBingoRound();
-      const players = db.prepare('SELECT member_id, ready FROM bingo_cards').all();
+      const players = db.prepare('SELECT member_id, ready, paid FROM bingo_cards').all();
+      // The pot, from what was actually collected. Counting rows is the whole
+      // point: a prize figure that is not backed by entries in this table is a
+      // number on a screen, and the app has told a member that lie once already.
+      const paidPlayers = players.filter((p) => p.paid).length;
+      const hosted = r.status === 'live' || r.status === 'podium' || r.status === 'ended';
       const pendingClaims = db.prepare(`SELECT COUNT(*) c FROM bingo_claims WHERE status='pending'`).get().c;
       const winner = r.winner_member_id ? publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(r.winner_member_id)) : null;
       let me = null;
@@ -1459,6 +1496,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         // window for the square currently on screen (lip sync squares run longer)
         currentWindowMs: r.calls.length ? bingoWindowFor(r.calls[r.calls.length - 1], r.nowPlaying?.clip) : BINGO_SONG_MS,
         playerCount: players.length, readyCount: players.filter((p) => p.ready).length,
+        // Money, and only what is true: which kind of night the host set, how
+        // many have actually paid, and whether that adds up to a game that pays.
+        // The client decides what to PRINT from these — it never invents a pot.
+        mode: r.mode, entryFee: BINGO_ENTRY_FEE, paidPlayers, hosted,
+        cash: r.mode === 'cash' && bingoIsCashGame({ hosted, paidPlayers }),
+        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers }) : 0,
+        // The room's vote on the square being called: who may vote, how many
+        // have, and whether that has forced it. Derived the same way on every
+        // phone from the same numbers, so nobody sees a different verdict.
+        mic: micState(r),
         pendingClaims, winner, me, nowPlaying: r.nowPlaying,
       });
     },
@@ -1950,6 +1997,63 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       }
       json(res, 200, { ok: true, autofill: !!on });
     },
+    // ── Money ──────────────────────────────────────────────────────────────
+    // The host says which kind of night it is. Free is the default and this is
+    // the ONLY way it becomes a cash game — a round must never start charging
+    // because enough people happened to turn up.
+    'POST /bingo/mode': async (req, res) => {
+      // Staff or host, the same pair every other control on the night takes —
+      // the door and the person running it are both "the house".
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { mode } = await readBody(req);
+      if (mode !== 'cash' && mode !== 'free') return json(res, 400, { error: 'mode must be cash or free' });
+      commit('bingo.mode', { mode, at: Date.now() });
+      json(res, 200, { ok: true, mode, entryFee: BINGO_ENTRY_FEE });
+    },
+    // The door takes an entry. Staff-only, because this is money changing hands
+    // in a room — a member cannot mark themselves paid any more than they can
+    // wave themselves through the door.
+    'POST /bingo/entry': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { member_id: memberId, how, paid = true } = await readBody(req);
+      if (!memberId) return json(res, 400, { error: 'member_id required' });
+      const card = db.prepare('SELECT member_id FROM bingo_cards WHERE member_id=?').get(memberId);
+      if (!card) return json(res, 400, { error: 'that member has not joined the round' });
+      // Taking one back has to be possible, or a miskey at the desk is
+      // permanent and the pot is wrong for the rest of the night.
+      commit(paid ? 'bingo.entry' : 'bingo.entry.void', { member_id: memberId, how: how || 'cash', at: Date.now() });
+      const players = db.prepare('SELECT paid FROM bingo_cards').all();
+      const paidPlayers = players.filter((p) => p.paid).length;
+      const hosted = getBingoRound().status !== 'lobby';
+      json(res, 200, {
+        ok: true, paid: !!paid, paidPlayers,
+        pot: bingoPot({ hosted, paidPlayers }),
+        cash: bingoIsCashGame({ hosted, paidPlayers }),
+      });
+    },
+    // ── The room's vote on a called lip sync square ────────────────────────
+    // You may only vote on a square you do NOT hold. Enforced here and not just
+    // hidden in the UI: the rule is about who is allowed to make somebody else
+    // sing, and a rule that only exists in a button is not a rule.
+    'POST /bingo/micvote': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const r = getBingoRound();
+      const last = r.calls[r.calls.length - 1];
+      if (r.status !== 'live' || !last || last.type !== 'lipsync') {
+        return json(res, 400, { error: 'nothing to vote on' });
+      }
+      const mine = db.prepare('SELECT card FROM bingo_cards WHERE member_id=?').get(c.sub);
+      if (!mine) return json(res, 400, { error: 'join first' });
+      if (JSON.parse(mine.card).some((sq) => sq && sq.id === last.id)) {
+        return json(res, 403, { error: 'you hold that square — you do not get a vote on it' });
+      }
+      // Past the deadline the answer is already settled; a late vote would
+      // change a verdict somebody has acted on.
+      const endsAt = micDecideEndsAt(last.at, bingoWindowFor(last, r.nowPlaying?.clip));
+      if (endsAt && Date.now() > endsAt) return json(res, 409, { error: 'too late — that one is decided' });
+      commit('bingo.micvote', { square_id: last.id, member_id: c.sub, at: Date.now() });
+      json(res, 200, { ok: true, mic: micState(getBingoRound()) });
+    },
     'POST /bingo/claim': async (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const r = getBingoRound();
@@ -2013,13 +2117,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     'GET /bingo/board': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      const players = db.prepare(`SELECT bc.member_id, bc.ready, bc.joined_at, m.name, m.number
+      // `paid` is on this list because taking the money happens against the
+      // names of the people standing at the desk — the host's player list IS
+      // the door's till sheet on a cash night.
+      const players = db.prepare(`SELECT bc.member_id, bc.ready, bc.joined_at, bc.paid, bc.paid_how, m.name, m.number
         FROM bingo_cards bc JOIN members m ON m.id=bc.member_id ORDER BY bc.joined_at ASC`).all();
       const claims = db.prepare(`SELECT bc.*, m.name, m.number FROM bingo_claims bc
         JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
       const r = getBingoRound();
+      const paidPlayers = players.filter((p) => p.paid).length;
+      const hosted = r.status !== 'lobby';
       json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying,
         deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
+        // The money, as it actually stands, so the console never shows the host
+        // a pot they have not collected.
+        mode: r.mode, entryFee: BINGO_ENTRY_FEE, paidPlayers,
+        pot: r.mode === 'cash' ? bingoPot({ hosted, paidPlayers }) : 0,
+        cash: r.mode === 'cash' && bingoIsCashGame({ hosted, paidPlayers }),
+        songMs: BINGO_SONG_MS,
         // So Host Control can say plainly that calling a song will play nothing.
         youtubeEnabled: mediaReady(),
         mediaError: setting('media_last_error') || null,

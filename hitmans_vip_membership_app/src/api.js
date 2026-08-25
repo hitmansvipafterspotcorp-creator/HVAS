@@ -175,6 +175,17 @@ export function apiMemberFlags() { return call('GET', '/members/flags', null, ap
 export function apiBingoState() { return call('GET', '/bingo/state', null, apiToken() || apiStaffToken()); }
 export function apiBingoAuto(on) { return call('POST', '/bingo/auto', { on }, apiStaffToken()); }
 export function apiBingoAutofill(on) { return call('POST', '/bingo/autofill', { on }, apiToken()); }
+
+// ── Money ─────────────────────────────────────────────────────────────────
+// Free or cash, set by the house and by nobody else.
+export function apiBingoMode(mode) { return call('POST', '/bingo/mode', { mode }, apiToken()); }
+// The door taking an entry, or taking one back. Staff/host only, server-side —
+// a member marking themselves paid would make the pot fiction.
+export function apiBingoEntry(memberId, { paid = true, how = 'cash' } = {}) {
+  return call('POST', '/bingo/entry', { member_id: memberId, paid, how }, apiToken());
+}
+// Voting to make whoever holds the called lip sync square actually perform it.
+export function apiBingoMicVote() { return call('POST', '/bingo/micvote', {}, apiToken()); }
 export function apiBingoJoin() { return call('POST', '/bingo/join', {}, apiToken()); }
 export function apiBingoReady(ready) { return call('POST', '/bingo/ready', { ready }, apiToken()); }
 export function apiBingoClaim() { return call('POST', '/bingo/claim', {}, apiToken()); }

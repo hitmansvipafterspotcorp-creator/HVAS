@@ -367,6 +367,41 @@ export function openDb(path) {
   if (!rcols.includes('podium_first')) {
     db.exec(`ALTER TABLE bingo_round ADD COLUMN podium_first TEXT`);                 // who claimed it
   }
+  // ── Money ────────────────────────────────────────────────────────────────
+  // A round pays only when a host is running it and at least two members have
+  // paid the entry, and the pot is what was actually collected. Both of those
+  // need the round to know which kind of night it is, and need the entry to be
+  // a recorded fact rather than a number somebody typed into a screen.
+  //
+  // FREE is the default, deliberately. A round that defaults to cash is a round
+  // that claims a pot on the very first night somebody installs this, before a
+  // cent has changed hands.
+  if (!rcols.includes('mode')) {
+    db.exec(`ALTER TABLE bingo_round ADD COLUMN mode TEXT NOT NULL DEFAULT 'free'`);   // free | cash
+  }
+  if (!ccols.includes('paid')) {
+    db.exec(`ALTER TABLE bingo_cards ADD COLUMN paid INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!ccols.includes('paid_at')) {
+    db.exec(`ALTER TABLE bingo_cards ADD COLUMN paid_at INTEGER`);
+  }
+  if (!ccols.includes('paid_how')) {
+    // How the door took it — cash at the desk, or through the app. The host has
+    // to be able to reconcile a pot against what is actually in the till.
+    db.exec(`ALTER TABLE bingo_cards ADD COLUMN paid_how TEXT`);
+  }
+
+  // ── The room's vote on a called lip sync square ──────────────────────────
+  // Who voted to make the holder perform, per called square. Kept per round and
+  // wiped with it — a vote is about one square in one moment, and carrying it
+  // forward would mean a member's old vote forcing somebody months later.
+  db.exec(`CREATE TABLE IF NOT EXISTS bingo_mic_votes (
+    square_id TEXT NOT NULL,
+    member_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (square_id, member_id)
+  )`);
+
   const bcols = db.prepare(`PRAGMA table_info(lipsync_battles)`).all().map((c) => c.name);
   if (!bcols.includes('pick_ends_at')) {
     // How long the room gets to choose the two battlers, when there are more

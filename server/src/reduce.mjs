@@ -270,6 +270,11 @@ export function applyOp(db, op) {
       db.prepare(`DELETE FROM lipsync_battle_players`).run();
       db.prepare(`DELETE FROM lipsync_battles`).run();
       db.prepare(`DELETE FROM lipsync_locks`).run();
+      // Entries and votes belong to the game that collected them. Cards are
+      // deleted above, which takes `paid` with them; the votes are their own
+      // table and have to be cleared explicitly or a member's vote on an old
+      // square would still be counted against a brand new one.
+      db.prepare(`DELETE FROM bingo_mic_votes`).run();
       db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL,
         now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]',
         podium='[]', podium_ends_at=NULL, podium_first=NULL WHERE id=1`)
@@ -284,6 +289,33 @@ export function applyOp(db, op) {
       break;
     case 'bingo.autofill':
       db.prepare('UPDATE bingo_cards SET autofill=? WHERE member_id=?').run(d.on ? 1 : 0, d.member_id);
+      break;
+    // ── Money ──────────────────────────────────────────────────────────────
+    // Which kind of night this is. Free by default and set by the host, never
+    // inferred: a round should not start charging because enough people
+    // happened to turn up.
+    case 'bingo.mode':
+      db.prepare(`UPDATE bingo_round SET mode=? WHERE id=1`).run(d.mode === 'cash' ? 'cash' : 'free');
+      break;
+    // One member's entry, recorded as a fact. This is the only thing that makes
+    // a pot real — everything downstream counts these rows and nothing else.
+    case 'bingo.entry':
+      db.prepare(`UPDATE bingo_cards SET paid=1, paid_at=?, paid_how=? WHERE member_id=?`)
+        .run(d.at ?? ts, d.how || 'cash', d.member_id);
+      break;
+    // Taking an entry back — a member left before the game, the door refunded
+    // them, or the host miskeyed. The pot has to be able to go DOWN, or a
+    // mistake at the desk is permanent.
+    case 'bingo.entry.void':
+      db.prepare(`UPDATE bingo_cards SET paid=0, paid_at=NULL, paid_how=NULL WHERE member_id=?`).run(d.member_id);
+      break;
+    // ── The room's vote on a called lip sync square ────────────────────────
+    // Voting twice is still one vote. The primary key does the enforcing rather
+    // than a read-then-write, which under two phones voting at once would count
+    // the same member twice.
+    case 'bingo.micvote':
+      db.prepare(`INSERT OR IGNORE INTO bingo_mic_votes(square_id, member_id, at) VALUES(?,?,?)`)
+        .run(String(d.square_id), d.member_id, d.at ?? ts);
       break;
     case 'bingo.mark': {
       const row = db.prepare('SELECT covered FROM bingo_cards WHERE member_id=?').get(d.member_id);

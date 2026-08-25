@@ -2290,3 +2290,61 @@
 }
 .hud-strip-mute { font-style: normal; font-size: 12px; flex: 0 0 auto; filter: saturate(.4); }
 @media (max-width: 400px) { .hud-strip-count { display: none; } }
+
+/* The other side of the mic: somebody else's square is up and you can make them
+   sing for it. Deliberately loud — this is the most interesting thing you can
+   do on a turn where nothing on your own card is happening. */
+.mic-force {
+  display: grid; gap: 4px; width: 100%; padding: 10px 14px; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(180deg, rgba(255, 60, 180, .2), rgba(120, 20, 80, .18));
+  border: 2px solid rgba(255, 60, 180, .6); color: #fff; text-align: left;
+  box-shadow: 0 0 18px rgba(255, 60, 180, .22);
+  animation: mic-force-in .3s ease-out both;
+}
+@keyframes mic-force-in { from { opacity: 0; transform: translateY(-6px); } }
+.mic-force:active { transform: translateY(1px); }
+.mic-force[disabled] { cursor: default; opacity: .8; border-color: rgba(125, 255, 180, .55); }
+.mic-force-top { font: 900 13px/1.1 var(--k-font, inherit); letter-spacing: .03em; }
+.mic-force-sub { font: 700 10px/1.2 var(--k-font, inherit); color: rgba(255,255,255,.62); }
+.mic-force-bar {
+  display: block; height: 5px; border-radius: 999px; overflow: hidden; margin-top: 2px;
+  background: rgba(0, 0, 0, .35);
+}
+.mic-force-bar i {
+  display: block; height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #ffb43c, #ff3cb4);
+  transition: width .4s cubic-bezier(.4, 0, .2, 1);
+}
+.mic-forced-note {
+  margin: 0; padding: 9px 12px; border-radius: 10px;
+  border: 1px solid rgba(255, 60, 180, .5); background: rgba(255, 60, 180, .12);
+  font: 800 12px/1.35 var(--k-font, inherit); color: #ff9dd8;
+}
+@media (prefers-reduced-motion: reduce) { .mic-force { animation: none; } .mic-force-bar i { transition: none; } }
+
+/* The host's money controls. Free is the resting state and looks like it; cash
+   is a deliberate, visible choice for the night. */
+.host-money {
+  display: grid; gap: 6px; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--k-edge-soft, rgba(255,255,255,.12)); background: rgba(255,255,255,.03);
+}
+.host-money.is-cash { border-color: rgba(255, 214, 107, .55); background: rgba(255, 214, 107, .07); }
+.host-money-toggle {
+  width: 100%; padding: 11px 14px; border-radius: 10px; cursor: pointer; text-align: left;
+  background: none; border: 1px dashed rgba(176, 107, 255, .4); color: #d9cbf5;
+  font: 800 13px/1.2 var(--k-font, inherit);
+}
+.host-money.is-cash .host-money-toggle { border-style: solid; border-color: rgba(255, 214, 107, .6); color: #ffd66b; }
+.host-money-pot { margin: 0; font: 700 12px/1.4 var(--k-font, inherit); color: var(--k-text-dim, #b6a8cf); }
+.host-money-pot b { color: #ffd66b; font-size: 15px; }
+.host-money-pot em { font-style: normal; color: #ffb4b4; }
+
+/* Taking the money, against the name of the person in front of you. */
+.entry-btn {
+  flex: 0 0 auto; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  background: none; border: 1px solid rgba(255, 214, 107, .55); color: #ffd66b;
+  font: 800 11px/1 var(--k-font, inherit); letter-spacing: .04em; white-space: nowrap;
+}
+.entry-btn.on { background: rgba(76, 224, 122, .16); border-color: #4ce07a; color: #8ef0c0; }
+.entry-btn:active { transform: translateY(1px); }
+.dash-row.is-paid { border-left: 3px solid #4ce07a; }
