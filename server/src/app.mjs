@@ -22,7 +22,12 @@ import {
 import { makeReceipt, proofVault } from './economy/receipts.mjs';
 import { economyFlags } from './economy/flags.mjs';
 import { usd } from './economy/money.mjs';
-import { makeContribution } from './economy/world-reserve.mjs';
+import { makeContribution, reserveHealth, VAULTS } from './economy/world-reserve.mjs';
+import { draftAllocationPolicy, adopt } from './economy/policy.mjs';
+import {
+  NEED_KINDS, PROGRAMS, classify, assess, approvalsSatisfied,
+  makeAward, markPaid, confirmDelivery,
+} from './economy/jubilee.mjs';
 import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
   sessionSecret, signSession, readSession, venueSecret,
@@ -1136,6 +1141,61 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     if (role && claims.role !== role) return null;
     return claims;
   };
+
+  // ── Jubilee ──────────────────────────────────────────────────────────────
+  //
+  // The reserve's real numbers, from the rows that produced them. Nothing here
+  // is a figure somebody typed: the reserve is the sum of accepted
+  // contributions, and commitments are awards that have been approved and not
+  // yet paid — money already spoken for, which is the part a naive balance
+  // would double-count into a release it cannot fund.
+  const reserveNow = () => {
+    const accepted = db.prepare(`SELECT vault, SUM(amount_units) u FROM world_contributions WHERE refused=0 GROUP BY vault`).all();
+    const total = accepted.reduce((n, r) => n + r.u, 0);
+    const committed = db.prepare(`SELECT SUM(amount_units) u FROM jubilee_awards WHERE status LIKE 'APPROVED%'`).get()?.u || 0;
+    const byVault = Object.fromEntries(VAULTS.map((v) => [v, 0]));
+    for (const r of accepted) if (byVault[r.vault] !== undefined) byVault[r.vault] += r.u;
+    return {
+      health: reserveHealth({
+        actualReserve: usd(total),
+        restricted: usd(0),                       // refused money never entered
+        commitments: usd(committed),
+        operatingFloor: usd(Number(setting('world_operating_floor_cents') || 0) || 0),
+        emergencyMinimum: usd(Number(setting('world_emergency_min_cents') || 0) || 0),
+      }),
+      byVault,
+    };
+  };
+
+  // The adopted release policy. Absent means nothing releases — a draft policy
+  // funds nothing, which is the KODEX's own rule about instruments that have
+  // been written but not adopted.
+  const jubileePolicy = () => {
+    const pct = Number(setting('world_max_release_percent') || 0) || 0;
+    const by = setting('world_policy_adopted_by');
+    if (!by || pct <= 0) return draftAllocationPolicy({ transactionType: 'JUBILEE', paymentRail: 'BANK' });
+    return {
+      ...adopt(draftAllocationPolicy({
+        transactionType: 'JUBILEE', paymentRail: 'BANK',
+        maxJubileeReleasePercent: pct,
+        maximumSingleProgramRelease: Number(setting('world_max_single_cents') || 0) > 0
+          ? usd(Number(setting('world_max_single_cents'))) : null,
+      }), { approver: by, effectiveDate: Number(setting('world_policy_adopted_at') || Date.now()) }),
+      normalApprovals: Number(setting('world_normal_approvals') || 3) || 3,
+      emergencyApprovals: Number(setting('world_emergency_approvals') || 2) || 2,
+      maximumEmergencyRelease: Number(setting('world_max_emergency_cents') || 0) > 0
+        ? usd(Number(setting('world_max_emergency_cents'))) : null,
+      emergencyWindowMs: Number(setting('world_emergency_window_ms') || 24 * 3600000) || 24 * 3600000,
+    };
+  };
+
+  const vendorRow = (v) => ({ providerId: v.provider_id, name: v.name, kind: v.kind, approved: !!v.approved, contact: v.contact });
+  const appRow = (r) => ({
+    applicationId: r.application_id, memberId: r.member_id, needKind: r.need_kind,
+    amount: usd(r.amount_units), detail: r.detail, providerHint: r.provider_hint,
+    evidenceNote: r.evidence_note, evidenceVerified: !!r.evidence_verified,
+    verifiedBy: r.verified_by, status: r.status, at: r.at,
+  });
 
   // ── routes ──
   const routes = {
@@ -2289,6 +2349,230 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         receiptId: receipt?.receiptId || null,
       });
     },
+    // ── Jubilee: a member asking for help ──────────────────────────────────
+    //
+    // A member submits a NEED. They do not submit an approval, an amount the
+    // reserve owes them, or a verification of their own evidence — every one of
+    // those belongs to somebody else, and putting them here is how a support
+    // programme becomes a self-service withdrawal.
+    'GET /jubilee/kinds': (req, res) => {
+      json(res, 200, {
+        kinds: Object.entries(NEED_KINDS).map(([id, k]) => ({ id, label: k.label, program: k.program, providerKind: k.providerKind })),
+        programs: PROGRAMS,
+        // Said plainly on the form: this is a community support network, not a
+        // government emergency authority (§38).
+        notice: 'HITMANS VIP is a community support network, not a government emergency service. Applying does not guarantee support.',
+      });
+    },
+    'POST /jubilee/apply': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      if (!economyFlags().WORLD_JUBILEE_PROGRAMS) return json(res, 503, { error: 'jubilee programmes are not running' });
+      const { needKind, amountCents, detail, providerHint } = await readBody(req);
+      const cls = classify(needKind);
+      if (!cls.ok) return json(res, 400, { error: cls.reason });
+      const cents = Math.floor(Number(amountCents) || 0);
+      if (cents <= 0) return json(res, 400, { error: 'how much is needed?' });
+      const open = db.prepare(`SELECT application_id FROM jubilee_applications WHERE member_id=? AND status IN ('SUBMITTED','VERIFIED')`).get(c.sub);
+      if (open) return json(res, 200, { applicationId: open.application_id, duplicate: true, status: 'already open' });
+      const id = `APP-${randomBytes(5).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO jubilee_applications
+        (application_id, member_id, need_kind, amount_units, detail, provider_hint, status, at)
+        VALUES (?,?,?,?,?,?, 'SUBMITTED', ?)`)
+        .run(id, c.sub, needKind, cents, String(detail || '').slice(0, 600), String(providerHint || '').slice(0, 200), Date.now());
+      json(res, 200, { applicationId: id, status: 'SUBMITTED', program: cls.program, label: cls.label });
+    },
+    'GET /jubilee/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const apps = db.prepare('SELECT * FROM jubilee_applications WHERE member_id=? ORDER BY at DESC LIMIT 20').all(c.sub).map(appRow);
+      const awards = db.prepare('SELECT * FROM jubilee_awards WHERE member_id=? ORDER BY at DESC LIMIT 20').all(c.sub)
+        .map((a) => ({ awardId: a.award_id, status: a.status, amountCents: a.amount_units, provider: a.provider_name, delivered: a.delivered, at: a.at }));
+      json(res, 200, { applications: apps, awards });
+    },
+
+    // ── The house's side ───────────────────────────────────────────────────
+    'GET /jubilee/queue': (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT ja.*, m.name, m.number FROM jubilee_applications ja
+        JOIN members m ON m.id=ja.member_id WHERE ja.status IN ('SUBMITTED','VERIFIED') ORDER BY ja.at ASC`).all();
+      const { health, byVault } = reserveNow();
+      const policy = jubileePolicy();
+      json(res, 200, {
+        applications: rows.map((r) => ({ ...appRow(r), name: r.name, number: r.number,
+          approvals: db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(r.application_id) })),
+        vendors: db.prepare('SELECT * FROM jubilee_vendors ORDER BY name').all().map(vendorRow),
+        capacityCents: health.availableJubileeCapacity.units,
+        reserveCents: health.actualReserve.units,
+        committedCents: health.commitments.units,
+        byVault,
+        policyAdopted: !!policy.adopted,
+        normalApprovals: policy.normalApprovals ?? 3,
+      });
+    },
+    // Evidence is verified BY THE HOUSE. A member cannot verify their own need,
+    // for the same reason they cannot confirm their own payment.
+    'POST /jubilee/verify': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { applicationId, note, verified = true } = await readBody(req);
+      const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
+      if (!row) return json(res, 404, { error: 'no such application' });
+      if (verified && !note) return json(res, 400, { error: 'say what was checked — a verification nobody can review is not one' });
+      db.prepare(`UPDATE jubilee_applications SET evidence_verified=?, evidence_note=?, verified_by=?, verified_at=?, status=? WHERE application_id=?`)
+        .run(verified ? 1 : 0, String(note || '').slice(0, 400), c.sub, Date.now(), verified ? 'VERIFIED' : 'SUBMITTED', applicationId);
+      json(res, 200, { ok: true, applicationId, evidenceVerified: !!verified });
+    },
+    // One approval, from one person. Three of these make a release (§55).
+    'POST /jubilee/approve': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { applicationId, emergency = false } = await readBody(req);
+      const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
+      if (!row) return json(res, 404, { error: 'no such application' });
+      // INSERT OR IGNORE on (award_ref, by): approving twice is still one
+      // approval, enforced by the key rather than by a read-then-write two
+      // people could race.
+      db.prepare('INSERT OR IGNORE INTO jubilee_approvals(award_ref, by, at, emergency) VALUES(?,?,?,?)')
+        .run(applicationId, c.sub, Date.now(), emergency ? 1 : 0);
+      const approvals = db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(applicationId);
+      const policy = jubileePolicy();
+      const sat = approvalsSatisfied({ approvals, emergency: !!emergency, amount: usd(row.amount_units), policy });
+      json(res, 200, { ok: true, approvals: approvals.length, satisfied: sat.ok, reason: sat.reason });
+    },
+    // Turning an approved, verified, funded need into an award against a real
+    // provider. This is where §68's gate actually runs.
+    'POST /jubilee/award': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { applicationId, providerId, emergency = false } = await readBody(req);
+      const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
+      if (!row) return json(res, 404, { error: 'no such application' });
+      if (row.status === 'AWARDED') return json(res, 409, { error: 'that application already has an award' });
+      const vendor = db.prepare('SELECT * FROM jubilee_vendors WHERE provider_id=?').get(providerId);
+      if (!vendor) return json(res, 400, { error: 'no such provider' });
+
+      const application = { ...appRow(row), amount: usd(row.amount_units) };
+      const { health, byVault } = reserveNow();
+      const policy = jubileePolicy();
+      const cls = classify(row.need_kind);
+      const prior = db.prepare(`SELECT member_id, need_kind, status, at FROM jubilee_awards WHERE member_id=? AND need_kind=?`)
+        .all(row.member_id, row.need_kind).map((a) => ({ memberId: a.member_id, needKind: a.need_kind, status: a.status, at: a.at }));
+
+      const decision = assess({
+        application, health, policy,
+        vaultBalance: usd(byVault[cls.ok ? cls.vault : 'CORE_RESILIENCE'] || 0),
+        priorAwards: prior, provider: vendorRow(vendor),
+      });
+      if (!decision.ok) return json(res, 400, { error: decision.reason, stage: decision.stage });
+
+      const approvals = db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(applicationId);
+      const sat = approvalsSatisfied({ approvals, emergency: !!emergency, amount: application.amount, policy });
+      if (!sat.ok) return json(res, 400, { error: sat.reason, stage: 'APPROVALS' });
+
+      const made = makeAward({ application, assessment: decision, approvals, provider: vendorRow(vendor), emergency: !!emergency });
+      if (!made.ok) return json(res, 400, { error: made.reason });
+      const a = made.award;
+      db.prepare(`INSERT INTO jubilee_awards
+        (award_id, application_id, member_id, need_kind, program, vault, amount_units,
+         provider_id, provider_name, emergency, status, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(a.awardId, a.applicationId, a.memberId, a.needKind, a.program, a.vault,
+             a.amount.units, a.providerId, a.providerName, a.emergency ? 1 : 0, a.status, a.at);
+      db.prepare(`UPDATE jubilee_applications SET status='AWARDED' WHERE application_id=?`).run(applicationId);
+      record({ eventType: 'RESERVE_UPDATE', memberId: a.memberId, amount: a.amount,
+               authorizedBy: approvals.map((x) => x.by).join('+'),
+               delivered: null, reference: a.awardId, settled: false,
+               meta: { stage: 'approved', provider: a.providerName, vault: a.vault, emergency: a.emergency } });
+      json(res, 200, { ok: true, award: { ...a, amountCents: a.amount.units } });
+    },
+    // The money leaving, to the provider.
+    'POST /jubilee/pay': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { awardId, reference } = await readBody(req);
+      const row = db.prepare('SELECT * FROM jubilee_awards WHERE award_id=?').get(awardId);
+      if (!row) return json(res, 404, { error: 'no such award' });
+      const paid = markPaid({ ...row, awardId: row.award_id }, { by: c.sub, reference });
+      if (!paid.ok) return json(res, 400, { error: paid.reason });
+      db.prepare(`UPDATE jubilee_awards SET status=?, paid_at=?, paid_by=?, payment_reference=? WHERE award_id=?`)
+        .run(paid.award.status, paid.award.paidAt, c.sub, reference, awardId);
+      json(res, 200, { ok: true, status: paid.award.status });
+    },
+    // The provider confirming what they delivered. Until this, the venue has
+    // spent money and nobody has yet said the person got the thing (§31).
+    'POST /jubilee/delivered': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { awardId, by, what } = await readBody(req);
+      const row = db.prepare('SELECT * FROM jubilee_awards WHERE award_id=?').get(awardId);
+      if (!row) return json(res, 404, { error: 'no such award' });
+      const done = confirmDelivery({ ...row, status: row.status }, { by, what });
+      if (!done.ok) return json(res, 400, { error: done.reason });
+      db.prepare(`UPDATE jubilee_awards SET status=?, delivered_at=?, delivery_confirmed_by=?, delivered=? WHERE award_id=?`)
+        .run(done.award.status, done.award.deliveredAt, by, done.award.delivered, awardId);
+      record({ eventType: 'RESERVE_UPDATE', memberId: row.member_id, amount: usd(row.amount_units),
+               rail: 'BANK', authorizedBy: row.paid_by || c.sub,
+               delivered: done.award.delivered, reference: awardId, settled: true,
+               meta: { stage: 'delivered', provider: row.provider_name, confirmedBy: by } });
+      json(res, 200, { ok: true, status: done.award.status });
+    },
+    // Adopting the release policy, and the floors that protect the reserve.
+    //
+    // §36: do not hard-code permanent percentages, policy must be versioned.
+    // §34: actual governance policy must be explicitly adopted before
+    // activation. So this is the act of adoption, it names who adopted it, and
+    // until it happens nothing is released no matter how much money is sitting
+    // there.
+    'POST /world/policy': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const {
+        maxReleasePercent, maxSingleCents, operatingFloorCents, emergencyMinCents,
+        normalApprovals, emergencyApprovals, maxEmergencyCents, defaultVault,
+      } = await readBody(req);
+      const pct = Number(maxReleasePercent);
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 1) return json(res, 400, { error: 'maxReleasePercent must be 0..1' });
+      // NOTE, and it is a real limit rather than a preference: staff and host
+      // sign in with SHARED codes, so this venue currently has exactly two
+      // distinct house identities — 'staff' and 'host'. §55 wants a release to
+      // depend on more than one person and that much is satisfiable today; a
+      // three-approver policy is not, and adopting one would quietly make every
+      // release impossible. Named staff accounts are what unlocks three, and
+      // until they exist the honest maximum is two.
+      const distinctIdentities = 2;
+      const normal = Math.floor(Number(normalApprovals) || distinctIdentities);
+      if (normal > distinctIdentities) {
+        return json(res, 400, {
+          error: `this venue has ${distinctIdentities} distinct house sign-ins (staff and host), so a ${normal}-approver policy could never be satisfied — give staff their own named accounts first (§55)`,
+        });
+      }
+      if (normal < 2) {
+        // §55: the reserve must not depend on one person. Two is the smallest
+        // number that is not one person, and this refuses rather than clamps
+        // so nobody thinks they adopted something they did not.
+        return json(res, 400, { error: 'a normal release needs at least two approvers — the reserve must not depend on one person (§55)' });
+      }
+      if (defaultVault && !VAULTS.includes(defaultVault)) return json(res, 400, { error: `${defaultVault} is not a WORLD vault` });
+      putSetting('world_max_release_percent', String(pct));
+      // Stored only when it is a real cap. Writing "0" here would read back as
+      // a cap of nothing at all — see releaseLimit().
+      putSetting('world_max_single_cents', Math.floor(Number(maxSingleCents) || 0) > 0 ? String(Math.floor(Number(maxSingleCents))) : '');
+      putSetting('world_operating_floor_cents', String(Math.floor(Number(operatingFloorCents) || 0)));
+      putSetting('world_emergency_min_cents', String(Math.floor(Number(emergencyMinCents) || 0)));
+      putSetting('world_normal_approvals', String(normal));
+      putSetting('world_emergency_approvals', String(Math.max(2, Math.floor(Number(emergencyApprovals) || 2))));
+      putSetting('world_max_emergency_cents', String(Math.floor(Number(maxEmergencyCents) || 0)));
+      if (defaultVault) putSetting('bingo_world_vault', defaultVault);
+      putSetting('world_policy_adopted_by', c.sub);
+      putSetting('world_policy_adopted_at', String(Date.now()));
+      const { health } = reserveNow();
+      json(res, 200, { ok: true, adoptedBy: c.sub, capacityCents: health.availableJubileeCapacity.units });
+    },
+    // The approved vendor roster (§38).
+    'POST /jubilee/vendor': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { name, kind, contact, approved = true } = await readBody(req);
+      if (!name || !kind) return json(res, 400, { error: 'a provider needs a name and a kind' });
+      const id = `V-${randomBytes(4).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO jubilee_vendors(provider_id,name,kind,contact,approved,approved_by,approved_at,added_at)
+        VALUES (?,?,?,?,?,?,?,?)`)
+        .run(id, name, kind, contact || null, approved ? 1 : 0, approved ? c.sub : null, approved ? Date.now() : null, Date.now());
+      json(res, 200, { ok: true, providerId: id });
+    },
+
     // What the commons has actually received, and from what. Aggregate only —
     // §51 says show safe aggregate information and never expose private
     // beneficiary data.

@@ -116,6 +116,13 @@ ok(!canRelease(usdFromDollars(6000), health, live).ok, 'a release over the limit
 ok(canRelease(usdFromDollars(5000), health, live).ok, 'and one under it is allowed');
 ok(!canRelease(usdFromDollars(-100), health, live).ok, 'a negative release is refused');
 ok(!canRelease(hitk(100), health, live).ok, 'releases settle to a real provider in fiat, not in tokens (§31)');
+// The bug this line exists for: an ABSENT single-award cap once meant a cap of
+// ZERO, which blocked every release in a fully funded reserve while cheerfully
+// reporting the capacity it was refusing to spend.
+const noCap = adopt(draftAllocationPolicy({ transactionType: 'JUBILEE', paymentRail: 'BANK', maxJubileeReleasePercent: 0.25 }), { approver: 'Board' });
+eq(releaseLimit(health, noCap).allowed.units, 575000, 'with no single-award cap, the percentage governs — an absent cap is not a cap of zero');
+const withCap = adopt(draftAllocationPolicy({ transactionType: 'JUBILEE', paymentRail: 'BANK', maxJubileeReleasePercent: 0.25, maximumSingleProgramRelease: usdFromDollars(1000) }), { approver: 'Board' });
+eq(releaseLimit(health, withCap).allowed.units, 100000, 'and a real cap still binds when it is lower');
 const broke = reserveHealth({ actualReserve: usdFromDollars(1000), commitments: usdFromDollars(5000) });
 ok(broke.overCommitted && broke.availableJubileeCapacity.units === 0, 'an over-committed reserve has zero capacity, not negative capacity');
 ok(threw(() => adopt(draft, {})), 'a policy cannot be adopted by nobody (§47)');

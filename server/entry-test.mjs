@@ -186,11 +186,22 @@ console.log('\nYOU DO NOT GET A VOTE ON YOUR OWN SQUARE');
 // Not just any lip sync call — one that somebody in the room does NOT hold.
 // With three players and a deck this size they often all hold it, and a square
 // nobody can vote on exercises none of the rule this section exists for.
+// More players, because the hunt below needs a square that at least one of
+// them does NOT hold — and with only three cards drawn from one deck they
+// frequently all hold the same one. That made this section pass or fail on the
+// luck of the draw, which is how it took the gate down once.
+for (let i = 0; i < 6; i++) {
+  const extra = await mk(`850-70${String(i).padStart(4, '0')}`, `Extra${i}`);
+  await call('POST', '/bingo/join', {}, extra.token);
+}
 let mic = null, anyMic = null;
-for (let i = 0; i < 120 && !mic; i++) {
+for (let i = 0; i < 300 && !mic; i++) {
   await call('POST', '/bingo/call', {}, host);
   const s2 = await state();
   if (s2.mic) { anyMic = s2.mic; if (s2.mic.voters > 0) mic = s2.mic; }
+  // The deck runs out. Deal a fresh one and keep looking rather than reporting
+  // a working rule as broken because one shuffle happened to be unhelpful.
+  if (!mic && i % 60 === 59) { await call('POST', '/bingo/reset', {}, host); await call('POST', '/bingo/start', {}, host); }
 }
 ok(!!anyMic, 'a lip sync square gets called');
 ok(!!mic, `and one of them is a square somebody does not hold${mic ? '' : ' (never found one — the vote path went untested)'}`);

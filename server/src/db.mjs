@@ -486,6 +486,59 @@ export function openDb(path) {
   // the same fact stated twice, not two performances.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_perf_unique ON performance_rights(member_id, content_hash)`);
 
+  // ── Jubilee (§37, §68) ───────────────────────────────────────────────────
+  // A member's need, the approved providers who can be paid for it, and the
+  // award that only counts as delivered when the provider says so.
+  db.exec(`CREATE TABLE IF NOT EXISTS jubilee_vendors (
+    provider_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,                -- landlord | utility | food | lodging | ...
+    contact TEXT,
+    approved INTEGER NOT NULL DEFAULT 0,
+    approved_by TEXT,
+    approved_at INTEGER,
+    added_at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS jubilee_applications (
+    application_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    need_kind TEXT NOT NULL,
+    amount_units INTEGER NOT NULL,
+    detail TEXT,                       -- what is happening, in their own words
+    provider_hint TEXT,                -- who they say has to be paid
+    evidence_note TEXT,                -- what was checked; set by staff, never the member
+    evidence_verified INTEGER NOT NULL DEFAULT 0,
+    verified_by TEXT, verified_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'SUBMITTED',
+    at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_jub_member ON jubilee_applications(member_id, at)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS jubilee_awards (
+    award_id TEXT PRIMARY KEY,
+    application_id TEXT NOT NULL,
+    member_id TEXT NOT NULL,
+    need_kind TEXT NOT NULL,
+    program TEXT NOT NULL,
+    vault TEXT NOT NULL,
+    amount_units INTEGER NOT NULL,
+    provider_id TEXT NOT NULL,
+    provider_name TEXT NOT NULL,
+    emergency INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    paid_at INTEGER, paid_by TEXT, payment_reference TEXT,
+    delivered_at INTEGER, delivery_confirmed_by TEXT, delivered TEXT,
+    at INTEGER NOT NULL
+  )`);
+  // Approvals are their own rows so that no single row can be edited to say
+  // three people signed off when one did (§55).
+  db.exec(`CREATE TABLE IF NOT EXISTS jubilee_approvals (
+    award_ref TEXT NOT NULL,           -- the application id; an award is later
+    by TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    emergency INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (award_ref, by)
+  )`);
+
   // ── The room's vote on a called lip sync square ──────────────────────────
   // Who voted to make the holder perform, per called square. Kept per round and
   // wiped with it — a vote is about one square in one moment, and carrying it

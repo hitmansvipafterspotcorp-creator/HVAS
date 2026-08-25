@@ -121,8 +121,14 @@ export function releaseLimit(health, policy) {
   }
   const capacity = health.availableJubileeCapacity;
   const byPercent = share(capacity, policy.maxJubileeReleasePercent ?? 0);
-  const cap = policy.maximumSingleProgramRelease || byPercent;
-  const allowed = byPercent.units <= cap.units ? byPercent : cap;
+  // An ABSENT single-award cap means there is no single-award cap. It does not
+  // mean a cap of zero — which is what it used to mean, and a zero cap silently
+  // blocked every release in a fully funded reserve while reporting "$0.00 of
+  // $1350.00 available". A policy that genuinely intends to release nothing
+  // should not be adopted at all.
+  const cap = policy.maximumSingleProgramRelease;
+  const capped = cap && cap.units > 0 && cap.units < byPercent.units;
+  const allowed = capped ? cap : byPercent;
   return {
     allowed,
     reason: `${formatAmount(allowed)} of ${formatAmount(capacity)} available, under policy ${policy.policyId} v${policy.version}`,
