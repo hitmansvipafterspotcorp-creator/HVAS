@@ -1430,6 +1430,133 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // Who is on the team, and whether their phone has been anywhere near the
     // venue lately. `lastSeen` is the honest answer to "is this account still
     // in use or did they quit in March?".
+    // ── What needs a person right now ───────────────────────────────────────
+    //
+    // The app used to ask "who are you?" — member, door, host — and then hand
+    // over a map of every screen, equally available at all times. At 11pm the
+    // real question is not who you are. It is what is happening and what is
+    // waiting on you, and the answer changes every few minutes.
+    //
+    // The server already knows all of it: who is at the door, whether a round
+    // is running, who has yelled bingo, who has paid and is waiting to be let
+    // in, which support case has its approvals. Nobody was ever asking. This
+    // asks, in one call, and ranks the answer.
+    //
+    // Ordering is by who is STANDING THERE WAITING, not by importance in the
+    // abstract. A member holding a finished card in front of a room outranks a
+    // rent decision that has been fine for two days, and both outrank a quiet
+    // door. Every item carries where to go, so the screen never has to guess
+    // and the owner never has to know which console owns which job.
+    'GET /venue/pulse': (req, res) => {
+      const c = houseAuth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const now = Date.now();
+      const r = getBingoRound();
+      const b = board();
+      const items = [];
+
+      // 1. Somebody has called bingo and is waiting in front of a room.
+      const claims = db.prepare(`SELECT bc.*, m.name FROM bingo_claims bc
+        JOIN members m ON m.id=bc.member_id WHERE bc.status='pending' ORDER BY bc.at ASC`).all();
+      if (claims.length) {
+        items.push({
+          id: 'claims', urgency: 100, count: claims.length,
+          headline: claims.length === 1 ? `${claims[0].name} called BINGO` : `${claims.length} bingo claims waiting`,
+          detail: 'They are standing there. Check the card and call it.',
+          waitingMs: now - claims[0].at,
+          action: { label: 'Check the card', screen: 'host', tab: 'claims' },
+        });
+      }
+
+      // 2. Somebody paid to play and cannot be dealt in until it is confirmed.
+      const entry = db.prepare(`SELECT ec.*, m.name FROM bingo_entry_claims ec
+        JOIN members m ON m.id=ec.member_id WHERE ec.status='pending' ORDER BY ec.at ASC`).all();
+      if (entry.length) {
+        items.push({
+          id: 'entry', urgency: 90, count: entry.length,
+          headline: entry.length === 1 ? `${entry[0].name} paid to play` : `${entry.length} entry payments to confirm`,
+          detail: 'They are not in the game until somebody says the money arrived.',
+          waitingMs: now - entry[0].at,
+          action: { label: 'Confirm it', screen: 'host', tab: 'claims' },
+        });
+      }
+
+      // 3. A round that is running needs somebody calling it.
+      const players = db.prepare('SELECT ready, paid FROM bingo_cards').all();
+      if (r.status === 'live') {
+        items.push({
+          id: 'running', urgency: 60,
+          headline: `Round ${r.roundNo || 1} is live`,
+          detail: `${players.length} playing · ${(r.calls || []).length} called so far`,
+          action: { label: 'Call the next song', screen: 'host', tab: 'run' },
+        });
+      } else if (players.length >= 2) {
+        // 4. Enough people are sitting in the lobby to start.
+        items.push({
+          id: 'ready', urgency: 70, count: players.length,
+          headline: `${players.length} waiting in the lobby`,
+          detail: 'Enough to start. Nothing happens until somebody does.',
+          action: { label: 'Start the round', screen: 'host', tab: 'run' },
+        });
+      }
+
+      // 5. Money that is one approval away. Not time-critical the way a member
+      //    at the front of a room is, but it is somebody's rent.
+      const jubPolicy = jubileePolicy();
+      if (jubPolicy.adopted) {
+        const waiting = db.prepare(`SELECT ja.application_id, ja.amount_units, m.name FROM jubilee_applications ja
+          JOIN members m ON m.id=ja.member_id WHERE ja.status='VERIFIED' ORDER BY ja.at ASC`).all();
+        const ready = waiting.filter((a) => db.prepare(
+          'SELECT COUNT(*) n FROM jubilee_approvals WHERE award_ref=?').get(a.application_id).n
+          >= (jubPolicy.normalApprovals ?? 2));
+        if (ready.length) {
+          items.push({
+            id: 'support-ready', urgency: 50, count: ready.length,
+            headline: ready.length === 1 ? `${ready[0].name}\u2019s support is approved` : `${ready.length} support cases approved`,
+            detail: 'Approved and not paid. It only helps when the provider has the money.',
+            action: { label: 'Pay the provider', screen: 'host', tab: 'support' },
+          });
+        } else if (waiting.length) {
+          items.push({
+            id: 'support-waiting', urgency: 40, count: waiting.length,
+            headline: `${waiting.length} support ${waiting.length === 1 ? 'case needs' : 'cases need'} approving`,
+            detail: `Checked already. Takes ${jubPolicy.normalApprovals ?? 2} different people.`,
+            action: { label: 'Look at them', screen: 'host', tab: 'support' },
+          });
+        }
+      }
+
+      // 6. Somebody said they are on their way and has not arrived.
+      if (b.onTheWay?.length) {
+        items.push({
+          id: 'ontheway', urgency: 30, count: b.onTheWay.length,
+          headline: `${b.onTheWay.length} on the way`,
+          detail: 'Heading over now. They scan when they get here.',
+          action: { label: 'Open the door', screen: 'staff', tab: 'verification' },
+        });
+      }
+
+      // 7. And when nothing is waiting, the door IS the job — which is a real
+      //    answer, not an empty state. A screen that says "nothing to do" to
+      //    somebody standing at a door is lying to them.
+      items.push({
+        id: 'door', urgency: 10, count: b.inside?.length || 0,
+        headline: b.inside?.length ? `${b.inside.length} inside` : 'Nobody inside yet',
+        detail: b.inside?.length ? 'Scan anybody else who turns up.' : 'Scan the first member in when they arrive.',
+        action: { label: 'Scan a member in', screen: 'staff', tab: 'verification' },
+      });
+
+      items.sort((a, z) => z.urgency - a.urgency);
+      json(res, 200, {
+        at: now,
+        // The single thing to do. Everything else is context for it.
+        now: items[0],
+        then: items.slice(1),
+        round: { status: r.status, round: r.roundNo || 1, players: players.length },
+        inside: b.inside?.length || 0,
+        you: { name: c.name || 'Shared code', role: c.role, named: !!c.named },
+      });
+    },
+
     'GET /staff/roster': (req, res) => {
       const c = adminAuth(req, res); if (!c) return;
       const rows = db.prepare(`SELECT * FROM staff_accounts ORDER BY disabled_at IS NOT NULL, name`).all();

@@ -171,6 +171,8 @@ export function apiStaffSignOut() {
 }
 
 // ── The team ──────────────────────────────────────────────────────────────
+// What needs a person right now, ranked by who is standing there waiting.
+export function apiVenuePulse() { return call('GET', '/venue/pulse', null, apiStaffToken()); }
 export function apiStaffRoster() { return call('GET', '/staff/roster', null, apiStaffToken()); }
 export function apiStaffInvite(name, role) { return call('POST', '/staff/invite', { name, role }, apiStaffToken()); }
 export function apiStaffRemove(staffId) { return call('POST', '/staff/disable', { staffId }, apiStaffToken()); }

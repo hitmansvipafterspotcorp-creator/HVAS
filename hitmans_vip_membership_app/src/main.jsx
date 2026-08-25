@@ -30,6 +30,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiJubileeKinds, apiJubileeApply, apiJubileeMine, apiJubileeQueue, apiJubileeVerify,
   apiJubileeApprove, apiJubileeAward, apiJubileePay, apiJubileeDelivered, apiJubileeVendor,
   apiStaffRoster, apiStaffInvite, apiStaffRemove,
+  apiVenuePulse,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -2257,7 +2258,7 @@ function HomeScreen({ role, session, navigate }) {
 }
 
 const STAFF_TABS = [
-  { id: 'staffDashboard', label: 'Dashboard' },
+  { id: 'tonight', label: 'Tonight' },
   { id: 'verification', label: 'Verify' },
   { id: 'watchlist', label: 'Watchlist' },
   { id: 'payments', label: 'Payments' },
@@ -2273,7 +2274,16 @@ const STAFF_TABS = [
 // together, constantly, all night — the same reason My Pass is Pass/Loyalty/
 // Account tabs instead of three separate screens.
 function StaffHubScreen() {
-  const [tab, setTab] = useState('staffDashboard');
+  const [tab, setTab] = useState('tonight');
+  // Where in the host console to land. Tonight hands over a destination, not
+  // just a screen — arriving on the Run tab when somebody has called bingo
+  // would be the same fetch-quest with one fewer step.
+  const [hostTab, setHostTab] = useState('run');
+  const go = (action) => {
+    if (!action) return;
+    if (action.screen === 'host') { setHostTab(action.tab || 'run'); setTab('host'); return; }
+    setTab(action.tab || 'tonight');
+  };
   // Only the owner's phone gets a Team tab. A door person tapping it would get
   // a refusal, and a tab that exists to refuse you is worse than no tab: it
   // reads as something broken rather than as something that is not your job.
@@ -2288,7 +2298,11 @@ function StaffHubScreen() {
           <button key={t.id} type="button" className={`staff-hub-tab${tab === t.id ? ' on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      <ScreenBody activeScreen={tab} navigate={setTab} session={{}} />
+      {/* Host controls render INSIDE the hub, so the tab bar above stays put
+          and the way back is the same row of tabs you arrived through. */}
+      {tab === 'tonight' ? <TonightScreen onGo={go} />
+        : tab === 'host' ? <HostScreen initialTab={hostTab} />
+        : <ScreenBody activeScreen={tab} navigate={setTab} session={{}} />}
     </div>
   );
 }
@@ -5157,6 +5171,99 @@ function JubileeQueue() {
   );
 }
 
+// ── Tonight ────────────────────────────────────────────────────────────────
+//
+// The app used to ask "who are you?" and then hand over a map of every screen,
+// equally available at all times. That is fine for a member with two menu items
+// and useless for whoever is running the place, who had to hold the whole map
+// in their head and go fetch the thing that mattered — including going in as a
+// MEMBER, through the game menu, to reach their own host controls.
+//
+// The question at 11pm is not who you are. It is what is happening and what is
+// waiting on you, and that changes every few minutes. The server already knew
+// all of it and nobody was asking. This asks, and then does the navigating:
+// one thing to do, in the largest type on the screen, and tapping it lands on
+// the right console AND the right tab.
+//
+// Everything else is still exactly where it was. This is a front door, not a
+// replacement — the map did not shrink, it just stopped being your problem.
+function TonightScreen({ onGo }) {
+  const [p, setP] = useState(null);
+  const [err, setErr] = useState('');
+  const live = useRef(true);
+
+  useEffect(() => {
+    live.current = true;
+    const load = async () => {
+      try { const r = await apiVenuePulse(); if (live.current) { setP(r); setErr(''); } }
+      catch (e) { if (live.current) setErr(e.message || 'Could not reach the venue.'); }
+    };
+    load();
+    // Fast enough that a claim lands while somebody is still standing there.
+    const id = setInterval(load, 4000);
+    return () => { live.current = false; clearInterval(id); };
+  }, []);
+
+  if (!p && !err) return <AppPanel title="Tonight" subtitle="What needs you"><p className="dash-empty">Looking at the room…</p></AppPanel>;
+  if (!p) {
+    return (
+      <AppPanel title="Tonight" subtitle="What needs you">
+        <p className="k-nudge k-nudge--no">{err}</p>
+        <p className="mem-fineprint">This is the app failing to reach the venue, not a quiet night.</p>
+      </AppPanel>
+    );
+  }
+
+  const waited = (ms) => {
+    if (!(ms > 0)) return null;
+    const s = Math.floor(ms / 1000);
+    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+  };
+
+  return (
+    <>
+      {/* The one thing. Deliberately the only thing at this size — a dashboard
+          of six equally-weighted panels is the problem this replaces. */}
+      <button type="button" className={`tonight-now u-${p.now.id.split('-')[0]}`}
+              onClick={() => onGo(p.now.action)}>
+        <span className="tonight-eyebrow">
+          Now
+          {p.now.count > 1 && <b> · {p.now.count}</b>}
+          {waited(p.now.waitingMs) && <em>waiting {waited(p.now.waitingMs)}</em>}
+        </span>
+        <strong className="tonight-headline">{p.now.headline}</strong>
+        <span className="tonight-detail">{p.now.detail}</span>
+        <span className="tonight-go">{p.now.action.label} →</span>
+      </button>
+
+      {/* Everything else that is live, small, in the order it will matter. */}
+      {p.then.length > 0 && (
+        <div className="tonight-then">
+          {p.then.map((it) => (
+            <button type="button" key={it.id} className="tonight-row" onClick={() => onGo(it.action)}>
+              <span className="tonight-row-main">
+                <strong>{it.headline}</strong>
+                <em>{it.detail}</em>
+              </span>
+              <span className="tonight-row-go">→</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Running the night is two taps from the door, always — not four taps
+          through the member app, which is how it used to be reached. */}
+      <button type="button" className="tonight-host" onClick={() => onGo({ screen: 'host', tab: 'run' })}>
+        Run the night · Host controls →
+      </button>
+
+      {/* The old door dashboard, unchanged, underneath. It is the context for
+          everything above, which is exactly where context belongs. */}
+      <StaffDashboardScreen />
+    </>
+  );
+}
+
 // ── The team ───────────────────────────────────────────────────────────────
 //
 // The venue ran on two shared codes, which meant every door check and every
@@ -7661,9 +7768,9 @@ function HostBattleControl() {
   );
 }
 
-function HostScreen() {
+function HostScreen({ initialTab = 'run' }) {
   const [board, setBoard] = useState(null);
-  const [tab, setTab] = useState('run');
+  const [tab, setTab] = useState(initialTab);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const liveRef = useRef(true);

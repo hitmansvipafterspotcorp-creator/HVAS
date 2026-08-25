@@ -2648,3 +2648,74 @@
 .team-row { align-items: center; }
 .team-confirm { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .team-got-it { color: var(--k-go) !important; font-weight: 800 !important; }
+
+/* ── Tonight ──────────────────────────────────────────────────────────────
+   One thing, at a size nothing else on the screen competes with. The whole
+   point is that you do not compare six panels — you read one line and tap it.
+   Everything under it is deliberately small. */
+.tonight-now {
+  display: grid; gap: 6px; width: 100%; text-align: left;
+  padding: 18px 16px; margin-bottom: 10px;
+  border: 1px solid var(--k-line); border-radius: 18px;
+  background: linear-gradient(180deg, rgba(20, 18, 34, .93), rgba(11, 11, 20, .96));
+  color: var(--k-text); cursor: pointer;
+  transition: transform .12s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.tonight-now:active { transform: translateY(1px) scale(.995); }
+.tonight-eyebrow {
+  display: flex; align-items: baseline; gap: 8px;
+  font: 800 10px/1 var(--k-font); letter-spacing: .16em; text-transform: uppercase; color: var(--k-text-dim);
+}
+.tonight-eyebrow b { color: var(--k-gold); }
+.tonight-eyebrow em {
+  margin-left: auto; font-style: normal; letter-spacing: .06em;
+  font-variant-numeric: tabular-nums; color: var(--k-text-dim);
+}
+.tonight-headline { font: 900 clamp(20px, 5.6vw, 27px)/1.12 var(--k-font); color: var(--k-text); }
+.tonight-detail { font: 600 12px/1.45 var(--k-font); color: var(--k-text-dim); }
+.tonight-go {
+  justify-self: start; margin-top: 6px; padding: 9px 15px; border-radius: 999px;
+  font: 900 13px/1 var(--k-font); letter-spacing: .02em;
+  background: var(--k-gold); color: #1a1206;
+}
+/* Urgency reads as colour before it reads as words — a claim should not look
+   like a quiet door from across a dark room. */
+.tonight-now.u-claims,
+.tonight-now.u-entry {
+  border-color: var(--k-danger);
+  background:
+    radial-gradient(130% 100% at 50% 0%, rgba(255, 51, 85, .22), transparent 72%),
+    linear-gradient(180deg, rgba(24, 14, 22, .95), rgba(13, 9, 16, .97));
+  animation: tonight-pulse 2.4s ease-in-out infinite;
+}
+.tonight-now.u-running,
+.tonight-now.u-ready { border-color: var(--k-gold); box-shadow: var(--k-glow-gold); }
+.tonight-now.u-support { border-color: var(--k-cyan); }
+.tonight-now.u-support .tonight-go { background: var(--k-cyan); color: #04222a; }
+.tonight-now.u-ontheway,
+.tonight-now.u-door { border-color: var(--k-line); }
+.tonight-now.u-door .tonight-go { background: rgba(255, 255, 255, .10); color: var(--k-text); }
+@keyframes tonight-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 51, 85, .35); }
+  50%      { box-shadow: 0 0 26px 3px rgba(255, 51, 85, .28); }
+}
+@media (prefers-reduced-motion: reduce) { .tonight-now.u-claims, .tonight-now.u-entry { animation: none; } }
+
+.tonight-then { display: grid; gap: 5px; margin-bottom: 10px; }
+.tonight-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 13px; border: 1px solid var(--k-line); border-radius: 12px;
+  background: rgba(20, 18, 34, .93); color: var(--k-text); cursor: pointer;
+}
+.tonight-row:active { transform: translateY(1px); }
+.tonight-row-main { display: grid; gap: 2px; min-width: 0; }
+.tonight-row-main strong { font: 800 13px/1.25 var(--k-font); }
+.tonight-row-main em { font: 600 11px/1.35 var(--k-font); font-style: normal; color: var(--k-text-dim); }
+.tonight-row-go { margin-left: auto; color: var(--k-text-dim); font-weight: 900; }
+
+.tonight-host {
+  width: 100%; padding: 13px; margin-bottom: 14px;
+  border: 1px solid var(--k-gold); border-radius: 12px; background: rgba(20, 18, 34, .9);
+  font: 900 13px/1 var(--k-font); letter-spacing: .04em; color: var(--k-gold); cursor: pointer;
+}
+.tonight-host:active { transform: translateY(1px); }

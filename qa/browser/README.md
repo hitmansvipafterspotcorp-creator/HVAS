@@ -43,7 +43,8 @@ because its only entry point lived inside a widget that returns null, a whole
 house-side API sending the member's token, an approved award that fell off every
 screen with nobody able to record the payment, and a staff sign-in that
 white-screened the app whenever the server granted a role the picker had never
-heard of — none of which failed a build or a server test.
+heard of, and a host console you could only reach by going in as a MEMBER
+through the game menu — none of which failed a build or a server test.
 
 That last one now also has a source-level guard in the deploy gate
 (`server/render-safety-test.mjs`), because a white screen is too expensive to
