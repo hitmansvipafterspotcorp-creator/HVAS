@@ -82,10 +82,13 @@ console.log('\nBUT A MEMBER STANDING THERE OUTRANKS THE ROUND');
 // Nova's squares as they are called; the host calls until she has a line.
 await call('POST', '/bingo/autofill', { on: true }, nova.token);
 let claimed = null;
-for (let i = 0; i < 60; i++) {
-  await call('POST', '/bingo/call', {}, owner);
+for (let i = 0; i < 220 && !claimed; i++) {
+  const called = await call('POST', '/bingo/call', {}, owner);
   const c = await call('POST', '/bingo/claim', {}, nova.token);
   if (c.status === 200) { claimed = await pulse(); break; }
+  // Every square called and still no win means the deal cannot produce one —
+  // fail loudly rather than spin out the budget and blame the ranking.
+  if (called.status !== 200 && /all phrases called/i.test(called.body.error || '')) break;
 }
 ok(!!claimed, 'Nova can actually win a round the server believes in');
 claimed = claimed || await pulse();

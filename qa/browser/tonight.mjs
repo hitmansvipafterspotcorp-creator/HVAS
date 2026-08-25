@@ -110,8 +110,9 @@ console.log('\nA CLAIM PULLS THE WHOLE SCREEN TO IT');
 await call('POST','/bingo/start',{},owner);
 await call('POST','/bingo/autofill',{on:true},nova.token);
 let won=false;
-for(let i=0;i<60&&!won;i++){ await call('POST','/bingo/call',{},owner);
-  won=(await call('POST','/bingo/claim',{},nova.token)).status===200; }
+for(let i=0;i<220&&!won;i++){ const c=await call('POST','/bingo/call',{},owner);
+  won=(await call('POST','/bingo/claim',{},nova.token)).status===200;
+  if(!won&&c.status!==200&&/all phrases called/i.test(c.body.error||''))break; }
 ok(won,'Nova wins a round the server believes in');
 // Back to Tonight the way the owner would: tap the tab.
 await js(`const b=[...document.querySelectorAll('.staff-hub-tab')].find(b=>/tonight/i.test(b.innerText));if(b)b.click();return !!b;`);

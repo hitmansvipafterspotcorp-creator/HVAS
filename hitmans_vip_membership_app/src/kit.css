@@ -39,13 +39,14 @@
      the GLOW do the work; thick metal borders eat space on a phone and read
      as dated. */
   --k-edge:        rgba(169, 53, 255, .55);
-  --k-edge-soft:   rgba(140, 130, 190, .22);
+  --k-edge-soft:   rgba(178, 96, 255, .30);
 
   --k-r-sm: 7px;
   --k-r:    12px;
   --k-r-lg: 18px;
 
   --k-glow-violet: 0 0 20px rgba(169, 53, 255, .40);
+  --k-glow-edge:   0 0 10px rgba(169, 53, 255, .16);
   --k-glow-gold:   0 0 18px rgba(255, 207, 71, .35);
   --k-glow-neon:   0 0 22px rgba(255, 61, 240, .45);
   --k-glow-cyan:   0 0 18px rgba(34, 211, 238, .38);
@@ -456,7 +457,7 @@
   border: 1px solid var(--k-edge);
   border-radius: var(--k-r);
   background: linear-gradient(180deg, var(--k-ink-2), var(--k-ink));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 0 26px rgba(169, 53, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(226, 190, 255, .10), 0 0 26px rgba(169, 53, 255, .16);
 }
 .app-panel header {
   border-bottom: 1px solid var(--k-edge-soft);
@@ -1859,7 +1860,7 @@
 .solo-run > span {
   flex: 1 1 0; min-width: 0; display: grid; gap: 2px; justify-items: center;
   padding: 6px 8px; border-radius: 9px;
-  border: 1px solid var(--k-edge-soft, rgba(255,255,255,.12)); background: rgba(255, 255, 255, .03);
+  border: 1px solid var(--k-edge-soft); box-shadow: var(--k-glow-edge); background: rgba(255, 255, 255, .03);
 }
 .solo-run i {
   font: 800 9px/1 var(--k-font, inherit); letter-spacing: .16em; text-transform: uppercase;
@@ -1948,7 +1949,7 @@
 .hud-strip {
   display: flex; align-items: center; gap: 10px; min-width: 0;
   padding: 7px 11px; border-radius: 11px;
-  border: 1px solid var(--k-edge-soft, rgba(255,255,255,.12));
+  border: 1px solid var(--k-edge-soft); box-shadow: var(--k-glow-edge);
   background: rgba(255, 255, 255, .04);
 }
 .hud-strip-now {
@@ -1969,7 +1970,7 @@
 
 .hud-strip-round {
   flex: 0 0 auto; display: flex; align-items: baseline; gap: 6px;
-  padding-left: 10px; border-left: 1px solid var(--k-edge-soft, rgba(255,255,255,.12));
+  padding-left: 10px; border-left: 1px solid var(--k-edge-soft);
 }
 .hud-strip-round b { font: 900 12px/1 var(--k-font, inherit); color: var(--k-text-dim, #b6a8cf); }
 .hud-strip-round u { text-decoration: none; color: #ffd66b; font-size: 12px; letter-spacing: .04em; }
@@ -1995,7 +1996,7 @@
 .solo-cpu {
   flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px;
   padding: 5px 8px; border-radius: 9px;
-  border: 1px solid var(--k-edge-soft, rgba(255,255,255,.12)); background: rgba(255,255,255,.03);
+  border: 1px solid var(--k-edge-soft); box-shadow: var(--k-glow-edge); background: rgba(255,255,255,.03);
 }
 .solo-cpu .solo-cpu-meter { flex: 1 1 auto; min-width: 0; margin: 0; }
 .solo-cpu-prog { flex: 0 0 auto; font: 800 10px/1 var(--k-font, inherit); color: var(--k-text-faint, #8a7ba8); font-variant-numeric: tabular-nums; }
@@ -2198,7 +2199,7 @@
 .mic-yes:active { transform: scale(.97); }
 .mic-no {
   padding: 14px 22px; border-radius: 999px; cursor: pointer;
-  background: none; color: rgba(255, 255, 255, .62); border: 1px solid rgba(255, 255, 255, .28);
+  background: none; color: rgba(236, 222, 255, .72); border: 1px solid var(--k-edge-soft);
   font: 800 13px/1 var(--k-font, inherit); letter-spacing: .06em; text-transform: uppercase;
 }
 .mic-no:active { transform: translateY(1px); }
@@ -2334,7 +2335,7 @@
    is a deliberate, visible choice for the night. */
 .host-money {
   display: grid; gap: 6px; margin: 4px 0 10px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid var(--k-edge-soft, rgba(255,255,255,.12)); background: rgba(255,255,255,.03);
+  border: 1px solid var(--k-edge-soft); box-shadow: var(--k-glow-edge); background: rgba(255,255,255,.03);
 }
 .host-money.is-cash { border-color: rgba(255, 214, 107, .55); background: rgba(255, 214, 107, .07); }
 .host-money-toggle {
@@ -2375,7 +2376,7 @@
 .entry-rails { display: flex; flex-wrap: wrap; gap: 6px; }
 .entry-rail {
   padding: 7px 12px; border-radius: 999px; cursor: pointer;
-  background: none; border: 1px solid var(--k-edge-soft, rgba(255,255,255,.18));
+  background: none; border: 1px solid var(--k-edge-soft);
   color: var(--k-text-dim, #b6a8cf); font: 700 11px/1 var(--k-font, inherit);
 }
 .entry-rail.on { border-color: #ffd66b; color: #ffd66b; background: rgba(255, 214, 107, .14); }
@@ -2479,7 +2480,7 @@
 .entry-split .to-commons span, .entry-split .to-commons b { color: #8ef0c0; }
 .entry-split .all-players span, .entry-split .all-players b { color: #8ef0c0; }
 .entry-split-total {
-  margin-top: 2px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .14);
+  margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--k-edge-soft);
 }
 .entry-split-total span, .entry-split-total b { color: #ffd66b; }
 
