@@ -275,6 +275,7 @@ export function applyOp(db, op) {
       // table and have to be cleared explicitly or a member's vote on an old
       // square would still be counted against a brand new one.
       db.prepare(`DELETE FROM bingo_mic_votes`).run();
+      db.prepare(`DELETE FROM bingo_entry_claims`).run();
       db.prepare(`UPDATE bingo_round SET status='lobby', phrases='[]', calls='[]', started_at=NULL, winner_member_id=NULL,
         now_playing=NULL, deck_id=?, pattern=?, custom_pattern=?, round_no=1, round_wins='[]',
         podium='[]', podium_ends_at=NULL, podium_first=NULL WHERE id=1`)
@@ -309,6 +310,18 @@ export function applyOp(db, op) {
     case 'bingo.entry.void':
       db.prepare(`UPDATE bingo_cards SET paid=0, paid_at=NULL, paid_how=NULL WHERE member_id=?`).run(d.member_id);
       break;
+    // Paying the entry from your own phone. A claim is a request, not a
+    // payment — nothing about the pot changes here.
+    case 'bingo.entry.claim':
+      db.prepare(`INSERT OR REPLACE INTO bingo_entry_claims(id, member_id, rail, reference, at, status)
+        VALUES(?,?,?,?,?, 'pending')`)
+        .run(d.id, d.member_id, d.rail, (d.reference || '').slice(0, 120), d.at ?? ts);
+      break;
+    case 'bingo.entry.claim.resolve':
+      db.prepare(`UPDATE bingo_entry_claims SET status=?, resolved_by=?, resolved_at=? WHERE id=?`)
+        .run(d.status, d.by ?? null, d.at ?? ts, d.id);
+      break;
+
     // ── The room's vote on a called lip sync square ────────────────────────
     // Voting twice is still one vote. The primary key does the enforcing rather
     // than a read-then-write, which under two phones voting at once would count

@@ -186,6 +186,16 @@ export function apiBingoEntry(memberId, { paid = true, how = 'cash' } = {}) {
 }
 // Voting to make whoever holds the called lip sync square actually perform it.
 export function apiBingoMicVote() { return call('POST', '/bingo/micvote', {}, apiToken()); }
+
+// Paying the entry from a member's own phone. This CLAIMS — it does not pay.
+// Nothing about the pot moves until the house confirms it.
+export function apiBingoEntryClaim(rail, reference) {
+  return call('POST', '/bingo/entry/claim', { rail, reference }, apiToken());
+}
+// The house agreeing (or not). Staff/host only, server-enforced.
+export function apiBingoEntryResolve(id, confirm) {
+  return call('POST', '/bingo/entry/resolve', { id, confirm }, apiToken());
+}
 export function apiBingoJoin() { return call('POST', '/bingo/join', {}, apiToken()); }
 export function apiBingoReady(ready) { return call('POST', '/bingo/ready', { ready }, apiToken()); }
 export function apiBingoClaim() { return call('POST', '/bingo/claim', {}, apiToken()); }

@@ -1480,7 +1480,16 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (c) {
         const mine = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
         const myClaim = db.prepare(`SELECT 1 FROM bingo_claims WHERE member_id=? AND status='pending'`).get(c.sub);
-        me = mine ? { card: JSON.parse(mine.card), ready: !!mine.ready, covered: JSON.parse(mine.covered), autofill: !!mine.autofill, hasPendingClaim: !!myClaim } : null;
+        const myEntry = db.prepare(`SELECT id, rail, status FROM bingo_entry_claims WHERE member_id=? ORDER BY at DESC`).get(c.sub);
+        const myCard = db.prepare('SELECT paid FROM bingo_cards WHERE member_id=?').get(c.sub);
+        me = mine ? {
+          card: JSON.parse(mine.card), ready: !!mine.ready, covered: JSON.parse(mine.covered),
+          autofill: !!mine.autofill, hasPendingClaim: !!myClaim,
+          // Whether this member is actually in the pot, and where their own
+          // request stands if they have made one.
+          paid: !!myCard?.paid,
+          entryClaim: myEntry ? { id: myEntry.id, rail: myEntry.rail, status: myEntry.status } : null,
+        } : null;
       }
       json(res, 200, {
         status: r.status, calls: r.calls, startedAt: r.started_at,
@@ -2031,6 +2040,45 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         cash: bingoIsCashGame({ hosted, paidPlayers }),
       });
     },
+    // ── Paying the entry from your own phone ───────────────────────────────
+    // A member CLAIMS. A member never grants. This creates a request the house
+    // has to look at, and nothing about the pot moves until it does — if a
+    // phone could settle its own entry the pot would be a number a member
+    // typed, which is the one failure this whole feature exists to avoid.
+    'POST /bingo/entry/claim': async (req, res) => {
+      const cl = auth(req, 'member'); if (!cl) return json(res, 401, { error: 'unauthorized' });
+      const { rail, reference } = await readBody(req);
+      if (!['paypal', 'zelle', 'cashapp', 'cash'].includes(rail)) return json(res, 400, { error: 'bad rail' });
+      const r = getBingoRound();
+      if (r.mode !== 'cash') return json(res, 400, { error: 'tonight is free play — there is nothing to pay' });
+      const card = db.prepare('SELECT paid FROM bingo_cards WHERE member_id=?').get(cl.sub);
+      if (!card) return json(res, 400, { error: 'join the round first' });
+      if (card.paid) return json(res, 409, { error: 'you are already in' });
+      const open = db.prepare(`SELECT id FROM bingo_entry_claims WHERE member_id=? AND status='pending'`).get(cl.sub);
+      // One open request at a time, or a member tapping twice puts two rows in
+      // front of the host for the same fifteen dollars.
+      if (open) return json(res, 200, { id: open.id, status: 'pending', duplicate: true, amount: BINGO_ENTRY_FEE });
+      const id = `ENT-${randomBytes(4).toString('hex').toUpperCase()}`;
+      commit('bingo.entry.claim', { id, member_id: cl.sub, rail, reference: reference || '', at: Date.now() });
+      json(res, 200, { id, status: 'pending', amount: BINGO_ENTRY_FEE, rail });
+    },
+    // The house looking at it. Confirming is what actually takes the money into
+    // the pot — it commits the entry itself, so there is exactly one way for a
+    // player to become paid.
+    'POST /bingo/entry/resolve': async (req, res) => {
+      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const { id, confirm } = await readBody(req);
+      const row = db.prepare(`SELECT * FROM bingo_entry_claims WHERE id=? AND status='pending'`).get(id);
+      if (!row) return json(res, 404, { error: 'no pending entry claim' });
+      const now = Date.now();
+      commit('bingo.entry.claim.resolve', { id, status: confirm ? 'confirmed' : 'rejected', by: c.sub, at: now });
+      if (confirm) commit('bingo.entry', { member_id: row.member_id, how: row.rail, at: now });
+      const players = db.prepare('SELECT paid FROM bingo_cards').all();
+      const paidPlayers = players.filter((p) => p.paid).length;
+      const hosted = getBingoRound().status !== 'lobby';
+      json(res, 200, { ok: true, confirmed: !!confirm, paidPlayers, pot: bingoPot({ hosted, paidPlayers }) });
+    },
+
     // ── The room's vote on a called lip sync square ────────────────────────
     // You may only vote on a square you do NOT hold. Enforced here and not just
     // hidden in the UI: the rule is about who is allowed to make somebody else
@@ -2127,7 +2175,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const r = getBingoRound();
       const paidPlayers = players.filter((p) => p.paid).length;
       const hosted = r.status !== 'lobby';
-      json(res, 200, { status: r.status, calls: r.calls, players, claims, nowPlaying: r.nowPlaying,
+      // What members have said they paid, waiting on the house to agree.
+      const entryClaims = db.prepare(`SELECT ec.*, m.name, m.number FROM bingo_entry_claims ec
+        JOIN members m ON m.id=ec.member_id WHERE ec.status='pending' ORDER BY ec.at ASC`).all();
+      json(res, 200, { status: r.status, calls: r.calls, players, claims, entryClaims, nowPlaying: r.nowPlaying,
         deckId: r.deckId, deckName: deckById(r.deckId).name, pattern: r.pattern,
         // The money, as it actually stands, so the console never shows the host
         // a pot they have not collected.

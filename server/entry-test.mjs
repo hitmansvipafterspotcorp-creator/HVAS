@@ -89,6 +89,49 @@ eq(st.cash, false, 'whatever was collected');
 await call('POST', '/bingo/mode', { mode: 'cash' }, host);
 eq((await state()).pot, 30, 'and switching back finds the entries still there');
 
+console.log('\nPAYING FROM YOUR OWN PHONE IS A REQUEST, NOT A PAYMENT');
+// The invariant the whole pot rests on, tested from the member's side this
+// time: a phone can ASK to be in, and asking must move nothing.
+await call('POST', '/bingo/entry', { member_id: c3.member.id, paid: false }, host);   // start clean
+let potBefore = (await state()).pot;
+const claim = await call('POST', '/bingo/entry/claim', { rail: 'cashapp', reference: 'Cass 8891' }, c3.token);
+eq(claim.status, 200, 'a member can say they have paid');
+eq(claim.body.status, 'pending', 'and it lands as pending');
+eq(claim.body.amount, 15, 'for the entry fee');
+st = await state(c3.token);
+eq(st.pot, potBefore, 'the pot has not moved');
+eq(st.me.paid, false, 'and they are not in the game yet');
+eq(st.me.entryClaim.status, 'pending', 'their own screen says it is waiting on the house');
+
+// Tapping again must not queue a second fifteen dollars in front of the host.
+const again = await call('POST', '/bingo/entry/claim', { rail: 'cashapp' }, c3.token);
+eq(again.body.duplicate, true, 'asking twice is still one request');
+
+let board = (await call('GET', '/bingo/board', null, host)).body;
+eq(board.entryClaims.length, 1, 'the host sees exactly one request');
+eq(board.entryClaims[0].name, 'Cass', 'with the name of who made it');
+
+console.log('\nONLY THE HOUSE TURNS IT INTO MONEY');
+const resolved = await call('POST', '/bingo/entry/resolve', { id: claim.body.id, confirm: true }, host);
+eq(resolved.status, 200, 'the host confirms it');
+st = await state(c3.token);
+eq(st.me.paid, true, 'now they are in');
+eq(st.pot, potBefore + 15, 'and the pot went up by exactly the entry');
+eq((await call('GET', '/bingo/board', null, host)).body.entryClaims.length, 0, 'and the request is off the list');
+
+// A member must not be able to resolve one — including their own.
+await call('POST', '/bingo/entry', { member_id: c3.member.id, paid: false }, host);
+const c2 = await call('POST', '/bingo/entry/claim', { rail: 'zelle' }, c3.token);
+const sneaky = await call('POST', '/bingo/entry/resolve', { id: c2.body.id, confirm: true }, c3.token);
+ok(sneaky.status === 401 || sneaky.status === 403, `a member cannot confirm their own request (${sneaky.status})`);
+eq((await state(c3.token)).me.paid, false, 'and trying does not put them in the pot');
+
+console.log('\nAND THERE IS NOTHING TO PAY ON A FREE NIGHT');
+await call('POST', '/bingo/mode', { mode: 'free' }, host);
+const onFree = await call('POST', '/bingo/entry/claim', { rail: 'cash' }, a.token);
+eq(onFree.status, 400, 'a free round refuses to take an entry');
+await call('POST', '/bingo/mode', { mode: 'cash' }, host);
+
 console.log('\nYOU DO NOT GET A VOTE ON YOUR OWN SQUARE');
 // Call lip sync squares until one lands on a card we can reason about.
 // Not just any lip sync call — one that somebody in the room does NOT hold.

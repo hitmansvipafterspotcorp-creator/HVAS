@@ -26,6 +26,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiEventChallenge, apiEventEnd,
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoAuto, apiBingoAutofill, apiBingoMode, apiBingoEntry, apiBingoMicVote,
+  apiBingoEntryClaim, apiBingoEntryResolve,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -4526,6 +4527,141 @@ const TILE_ART = {
   lipsync: `${import.meta.env.BASE_URL}assets/ui/kit/mark_lipsync.png`,   // mic            — lsb sheet 03
 };
 
+// Paying your way into tonight's pot, from your own phone.
+//
+// This CLAIMS an entry — it does not pay one. The member says which way the
+// money went and the house confirms it, because a phone that could settle its
+// own entry would make every pot in the app a number a member typed. So the
+// honest thing to show is the truth: you have told them, and they have not
+// agreed yet.
+function EntryPay({ fee, pot, paidPlayers, claim, onClaim, busy }) {
+  const [rail, setRail] = useState('cashapp');
+  if (claim?.status === 'pending') {
+    return (
+      <div className="entry-pay is-waiting">
+        <strong>⏳ Waiting on the door</strong>
+        <p>You said you sent ${fee} by {RAIL_LABEL[claim.rail] || claim.rail}. You are in the moment they confirm it.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="entry-pay">
+      <strong>💵 ${fee} to play tonight</strong>
+      <p>
+        Pot is <b>${pot}</b> from {paidPlayers} {paidPlayers === 1 ? 'entry' : 'entries'} so far — it grows with the room.
+      </p>
+      <div className="entry-rails">
+        {['cashapp', 'zelle', 'paypal', 'cash'].map((r) => (
+          <button key={r} type="button" className={`entry-rail${rail === r ? ' on' : ''}`} onClick={() => setRail(r)}>
+            {RAIL_LABEL[r]}
+          </button>
+        ))}
+      </div>
+      <button type="button" className="entry-pay-go" disabled={busy} onClick={() => onClaim(rail)}>
+        I sent ${fee} by {RAIL_LABEL[rail]}
+      </button>
+      <span className="entry-pay-fine">The door confirms it before you are in the pot.</span>
+    </div>
+  );
+}
+const RAIL_LABEL = { cashapp: 'Cash App', zelle: 'Zelle', paypal: 'PayPal', cash: 'Cash at the door' };
+
+// The microphone, drawn rather than scaled.
+//
+// The tile marks are pixel art at 24px, which is exactly right for a corner of
+// a bingo square and exactly wrong blown up to 200px in somebody's face — the
+// grille turns to mush and the whole moment looks cheap. This is vector: one
+// ball grille, one body, real lighting, and it stays crisp on a phone or a TV.
+//
+// Lit from the upper left with a warm key and a neon rim on the right, which is
+// the room this thing lives in — every gradient below is that one lighting
+// setup, not decoration picked per shape.
+function MicArt({ className = '', progress = null }) {
+  const R = 47;                       // ring radius, just outside the grille
+  const C = 2 * Math.PI * R;
+  return (
+    <svg className={className} viewBox="0 0 120 200" fill="none" aria-hidden="true"
+         xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        {/* Grille: brushed metal, brightest where the key hits. */}
+        <radialGradient id="micHead" cx="34%" cy="26%" r="82%">
+          <stop offset="0%" stopColor="#fff3fb" />
+          <stop offset="26%" stopColor="#ff8ad6" />
+          <stop offset="62%" stopColor="#d4187f" />
+          <stop offset="100%" stopColor="#4a0329" />
+        </radialGradient>
+        {/* Body: a cylinder, so the shading runs across it, not down it. */}
+        <linearGradient id="micBody" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#3a0d24" />
+          <stop offset="18%" stopColor="#7d1a54" />
+          <stop offset="20%" stopColor="#ff6fc4" />
+          <stop offset="46%" stopColor="#ffd6ee" />
+          <stop offset="70%" stopColor="#e0359a" />
+          <stop offset="100%" stopColor="#42051f" />
+        </linearGradient>
+        <linearGradient id="micRing" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#a8741c" />
+          <stop offset="35%" stopColor="#ffe9a8" />
+          <stop offset="60%" stopColor="#e0a53a" />
+          <stop offset="100%" stopColor="#7a4d0c" />
+        </linearGradient>
+        <linearGradient id="micShaft" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#2a0518" />
+          <stop offset="30%" stopColor="#8e2160" />
+          <stop offset="52%" stopColor="#ffb8e2" />
+          <stop offset="78%" stopColor="#7d1a54" />
+          <stop offset="100%" stopColor="#1d0311" />
+        </linearGradient>
+        {/* The mesh, as a real repeating pattern rather than drawn dots. */}
+        <pattern id="micMesh" width="4.6" height="4.6" patternUnits="userSpaceOnUse" patternTransform="rotate(24)">
+          <circle cx="1.15" cy="1.15" r=".78" fill="rgba(24,0,14,.42)" />
+        </pattern>
+        <radialGradient id="micSpec" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity=".95" />
+          <stop offset="60%" stopColor="#ffffff" stopOpacity=".22" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* The song draining, drawn around the grille in the SAME coordinate
+          space as the mic — which is the only way the two can never drift
+          apart at a size nobody tested. */}
+      {progress !== null && (
+        <g transform="rotate(-90 60 52)">
+          <circle cx="60" cy="52" r={R} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="3.5" />
+          <circle cx="60" cy="52" r={R} fill="none" strokeWidth="3.5" strokeLinecap="round"
+                  stroke={progress <= 0.25 ? '#ff3cb4' : '#7dffb4'}
+                  strokeDasharray={C}
+                  strokeDashoffset={C - C * Math.max(0, Math.min(1, progress))}
+                  style={{ transition: 'stroke-dashoffset .12s linear, stroke .3s ease' }} />
+        </g>
+      )}
+
+      {/* Grille */}
+      <circle cx="60" cy="52" r="38" fill="url(#micHead)" />
+      <circle cx="60" cy="52" r="38" fill="url(#micMesh)" />
+      {/* Rim light down the right edge — the neon in the room. */}
+      <path d="M60 14a38 38 0 0 1 0 76" stroke="#ff3cb4" strokeWidth="2.6" strokeOpacity=".9" fill="none" />
+      {/* Key highlight, upper left. */}
+      <ellipse cx="46" cy="36" rx="15" ry="10" fill="url(#micSpec)" transform="rotate(-28 46 36)" />
+
+      {/* Collar */}
+      <rect x="35" y="85" width="50" height="12" rx="6" fill="url(#micRing)" />
+      <rect x="35" y="85" width="50" height="4.5" rx="2.2" fill="#fff6d8" fillOpacity=".6" />
+
+      {/* Body */}
+      <path d="M37 96h46l-5 50a18 18 0 0 1-36 0z" fill="url(#micBody)" />
+      <path d="M47 100l-3 45" stroke="#fff" strokeOpacity=".5" strokeWidth="3.4" strokeLinecap="round" />
+
+      {/* Shaft */}
+      <rect x="46" y="152" width="28" height="38" rx="11" fill="url(#micShaft)" />
+      <rect x="51" y="156" width="4.5" height="30" rx="2.2" fill="#fff" fillOpacity=".42" />
+      {/* Base cap */}
+      <rect x="43" y="185" width="34" height="11" rx="5.5" fill="url(#micRing)" />
+    </svg>
+  );
+}
+
 // Being handed the mic.
 //
 // A LIP SYNC square is the one thing on the card you cannot win by tapping, and
@@ -4571,14 +4707,7 @@ function MicOffer({ artist, song, endsAt, forced = false, votes = 0, voters = 0,
         {/* The ring is the song draining. It is drawn around the mic rather than
             put somewhere else on screen, so the thing running out and the thing
             being offered are one object. */}
-        {!!endsAt && (
-          <svg className="mic-ring" viewBox="0 0 100 100" aria-hidden="true">
-            <circle className="mic-ring-bg" cx="50" cy="50" r="46" />
-            <circle className="mic-ring-fill" cx="50" cy="50" r="46"
-                    style={{ strokeDashoffset: 289 - 289 * Math.max(0, Math.min(1, left / total)) }} />
-          </svg>
-        )}
-        <img className="mic-offer-mic" src={TILE_ART.lipsync} alt="" />
+        <MicArt className="mic-offer-mic" progress={endsAt ? Math.max(0, Math.min(1, left / total)) : null} />
         <i className="mic-spark s1" /><i className="mic-spark s2" /><i className="mic-spark s3" />
         <i className="mic-spark s4" /><i className="mic-spark s5" /><i className="mic-spark s6" />
       </div>
@@ -6431,6 +6560,15 @@ function PlayerCardScreen({ navigate }) {
   // — this only works out whether the square is MINE, and remembers that I have
   // already answered so the offer does not come back while the same square is
   // still the one being called.
+  // Paying in. The claim goes to the door; nothing here can make somebody paid.
+  const [entryBusy, setEntryBusy] = useState(false);
+  const claimEntry = async (rail) => {
+    setEntryBusy(true);
+    try { await apiBingoEntryClaim(rail); await refresh(); }
+    catch (e) { setMsg(e.message || 'Could not send that — try again.'); }
+    setEntryBusy(false);
+  };
+
   const [micAnswered, setMicAnswered] = useState(null);
   const rawMic = state?.mic || null;
   const mic = rawMic ? {
@@ -6625,6 +6763,20 @@ function PlayerCardScreen({ navigate }) {
           votes={mic.votes}
           voters={mic.voters}
           onAnswer={answerMic}
+        />
+      )}
+      {/* On a cash night, whether this member is actually in the pot. Shown
+          above the card because it is the one thing that changes what the
+          round is worth to them — and hidden entirely on a free night, which
+          is most nights. */}
+      {state?.mode === 'cash' && me && !me.paid && (
+        <EntryPay
+          fee={state.entryFee ?? 15}
+          pot={state.pot ?? 0}
+          paidPlayers={state.paidPlayers ?? 0}
+          claim={me.entryClaim}
+          onClaim={claimEntry}
+          busy={entryBusy}
         />
       )}
       <AppPanel title="Your Card" subtitle={state ? `${BINGO_STATUS_LABEL[state.status]} · ${state.deckName}` : 'Loading…'}>
@@ -6952,6 +7104,34 @@ function HostScreen() {
       )}
 
       {tab === 'claims' && (
+        <>
+        {/* Money first. A bingo claim ends a round; an entry claim is somebody
+            standing there having sent $15 and waiting to be let in, which is
+            the more urgent of the two and the one that costs the venue a
+            player if it is missed. */}
+        {board?.mode === 'cash' && (
+          <AppPanel title="Entries to confirm" subtitle={`$${board?.entryFee ?? 15} each · pot $${board?.pot ?? 0}`}>
+            {(!board?.entryClaims || board.entryClaims.length === 0) && (
+              <p className="dash-empty">Nobody is waiting to pay in.</p>
+            )}
+            {board?.entryClaims?.map((ec) => (
+              <div key={ec.id} className="entry-claim-row">
+                <div className="dash-info">
+                  <strong>{ec.name}</strong>
+                  <span className="dash-num">{ec.number} · says {RAIL_LABEL[ec.rail] || ec.rail}{ec.reference ? ` · ${ec.reference}` : ''}</span>
+                </div>
+                <button type="button" className="bingo-btn gold compact" disabled={busy}
+                        onClick={() => act(() => apiBingoEntryResolve(ec.id, true))}>
+                  ✓ Got it — ${board?.entryFee ?? 15}
+                </button>
+                <button type="button" className="bingo-btn ghost compact" disabled={busy}
+                        onClick={() => act(() => apiBingoEntryResolve(ec.id, false))}>
+                  Not received
+                </button>
+              </div>
+            ))}
+          </AppPanel>
+        )}
         <AppPanel title="Pending claims" subtitle="Approve to end the round">
           {board && board.claims.length === 0 && <p className="dash-empty">No claims yet.</p>}
           {board?.claims.map((c) => (
@@ -6964,6 +7144,7 @@ function HostScreen() {
             </div>
           ))}
         </AppPanel>
+        </>
       )}
 
       {tab === 'players' && (

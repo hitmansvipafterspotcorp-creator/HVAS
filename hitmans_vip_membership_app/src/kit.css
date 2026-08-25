@@ -2114,25 +2114,33 @@
 /* The stage the mic flies through. Real perspective, so it arrives rather than
    just getting bigger. */
 .mic-offer-scene {
-  position: relative; width: min(46vw, 190px); aspect-ratio: 1;
+  position: relative; width: min(42vw, 170px); aspect-ratio: 3 / 5;
   perspective: 420px; perspective-origin: 50% 55%;
   display: grid; place-items: center;
 }
 .mic-offer-mic {
-  width: 100%; height: 100%; object-fit: contain;
-  transform-origin: 50% 70%;
+  width: 100%; height: 100%; display: block;
+  transform-origin: 50% 72%;
+  /* Contact shadow first, then the room's glow. Ordered deliberately: the tight
+     dark shadow is what makes it read as an OBJECT held in front of you rather
+     than a glowing sticker, and it has to sit under the neon, not over it. */
   filter:
-    drop-shadow(0 14px 22px rgba(0, 0, 0, .8))
-    drop-shadow(0 0 18px rgba(255, 60, 180, .85))
-    drop-shadow(0 0 40px rgba(255, 60, 180, .45));
+    drop-shadow(0 10px 14px rgba(0, 0, 0, .85))
+    drop-shadow(0 22px 30px rgba(0, 0, 0, .5))
+    drop-shadow(0 0 16px rgba(255, 60, 180, .7))
+    drop-shadow(0 0 44px rgba(255, 60, 180, .35));
   /* Up out of the card, over, and into their face — then a slow hover so it is
      being HELD OUT rather than sitting there. */
-  animation: mic-fly 1.05s cubic-bezier(.16, .9, .3, 1.08) both, mic-hover 3.1s ease-in-out 1.05s infinite;
+  animation: mic-fly 1.15s cubic-bezier(.19, 1, .28, 1) both, mic-hover 3.4s ease-in-out 1.15s infinite;
 }
+/* Up out of the card, over, and held out. Five stops rather than three because
+   an object with weight overshoots and settles — gliding smoothly to a stop is
+   what makes CSS look like CSS. */
 @keyframes mic-fly {
-  0%   { transform: translate3d(0, 130%, -340px) rotateX(58deg) rotateZ(-34deg) scale(.42); opacity: 0; }
-  35%  { opacity: 1; }
-  72%  { transform: translate3d(0, -6%, 46px) rotateX(-12deg) rotateZ(9deg) scale(1.12); }
+  0%   { transform: translate3d(0, 128%, -420px) rotateX(62deg) rotateZ(-38deg) scale(.4); opacity: 0; }
+  28%  { opacity: 1; }
+  58%  { transform: translate3d(0, -9%, 70px) rotateX(-16deg) rotateZ(11deg) scale(1.16); }
+  80%  { transform: translate3d(0, 2%, 8px) rotateX(4deg) rotateZ(-8deg) scale(.985); }
   100% { transform: translate3d(0, 0, 0) rotateX(0deg) rotateZ(-5deg) scale(1); opacity: 1; }
 }
 @keyframes mic-hover {
@@ -2198,7 +2206,7 @@
 /* Landscape, and short screens: the mic gets smaller rather than the buttons
    going off the bottom — the answer has to stay reachable. */
 @media (max-height: 560px) {
-  .mic-offer-scene { width: min(24vh, 120px); }
+  .mic-offer-scene { width: min(16vh, 92px); }
   .mic-offer-title { font-size: clamp(20px, 5vh, 30px); }
   .mic-offer-fine { display: none; }
 }
@@ -2348,3 +2356,98 @@
 .entry-btn.on { background: rgba(76, 224, 122, .16); border-color: #4ce07a; color: #8ef0c0; }
 .entry-btn:active { transform: translateY(1px); }
 .dash-row.is-paid { border-left: 3px solid #4ce07a; }
+
+/* ── Paying in from your own phone ─────────────────────────────────────────
+   The member says how the money went; the door confirms it. The waiting state
+   is shown honestly rather than pretending the payment landed — being told you
+   are in when you are not is worse at the door than waiting thirty seconds. */
+.entry-pay {
+  display: grid; gap: 8px; margin: 0 0 12px; padding: 13px 15px; border-radius: 13px;
+  border: 2px solid rgba(255, 214, 107, .55); background: rgba(255, 214, 107, .08);
+  box-shadow: 0 0 20px rgba(255, 214, 107, .16);
+}
+.entry-pay > strong { font: 900 15px/1.15 var(--k-font, inherit); color: #ffd66b; }
+.entry-pay p { margin: 0; font: 700 12px/1.4 var(--k-font, inherit); color: var(--k-text-dim, #b6a8cf); }
+.entry-pay p b { color: #ffd66b; font-size: 14px; }
+.entry-pay.is-waiting { border-color: rgba(125, 255, 180, .5); background: rgba(125, 255, 180, .08); box-shadow: none; }
+.entry-pay.is-waiting > strong { color: #8ef0c0; }
+
+.entry-rails { display: flex; flex-wrap: wrap; gap: 6px; }
+.entry-rail {
+  padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  background: none; border: 1px solid var(--k-edge-soft, rgba(255,255,255,.18));
+  color: var(--k-text-dim, #b6a8cf); font: 700 11px/1 var(--k-font, inherit);
+}
+.entry-rail.on { border-color: #ffd66b; color: #ffd66b; background: rgba(255, 214, 107, .14); }
+.entry-pay-go {
+  width: 100%; padding: 13px 18px; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, #2a0b3d, #14061f);
+  color: #ffd66b; border: 2px solid #ff3cb4;
+  font: 900 14px/1 var(--k-font, inherit); letter-spacing: .05em; text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(255, 60, 180, .4);
+}
+.entry-pay-go:active { transform: translateY(1px); }
+.entry-pay-fine { font: 600 10px/1.3 var(--k-font, inherit); color: rgba(255,255,255,.5); text-align: center; }
+
+/* The host's queue of people waiting to be let into the pot. */
+.entry-claim-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 10px; border-radius: 10px; margin-bottom: 8px;
+  border: 1px solid rgba(255, 214, 107, .35); background: rgba(255, 214, 107, .06);
+}
+.entry-claim-row .dash-info { flex: 1 1 140px; min-width: 0; }
+.bingo-btn.compact { width: auto; padding: 8px 13px; font-size: 12px; margin: 0; }
+
+/* ── Polish on the handoff ─────────────────────────────────────────────────
+   The mic is vector now, so these can be lighting rather than cover-ups. */
+
+/* A pool of light on the floor under it. Without a contact point the mic reads
+   as pasted onto the screen; with one it reads as standing in a room. */
+.mic-offer-scene::after {
+  content: ''; position: absolute; left: 50%; bottom: -3%;
+  width: 78%; height: 7%; transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(255, 60, 180, .55) 0%, rgba(255, 60, 180, 0) 70%);
+  filter: blur(4px); pointer-events: none;
+  animation: mic-pool 3.4s ease-in-out 1.15s infinite;
+}
+@keyframes mic-pool {
+  0%, 100% { opacity: .55; transform: translateX(-50%) scaleX(1); }
+  50%      { opacity: .3;  transform: translateX(-50%) scaleX(.86); }
+}
+
+/* Light coming off it, behind everything. Slow, wide and low-contrast — this is
+   atmosphere, and the moment it is legible as a shape it stops working. */
+.mic-offer-scene::before {
+  content: ''; position: absolute; inset: -30%;
+  background: conic-gradient(from 0deg,
+    rgba(255, 60, 180, 0) 0deg, rgba(255, 60, 180, .07) 26deg, rgba(255, 60, 180, 0) 54deg,
+    rgba(255, 214, 107, 0) 120deg, rgba(255, 214, 107, .055) 152deg, rgba(255, 214, 107, 0) 184deg,
+    rgba(255, 60, 180, 0) 250deg, rgba(255, 60, 180, .06) 280deg, rgba(255, 60, 180, 0) 308deg);
+  filter: blur(9px);
+  animation: mic-rays 22s linear infinite;
+  pointer-events: none; z-index: 0;
+}
+@keyframes mic-rays { to { transform: rotate(360deg); } }
+.mic-offer-scene > .mic-offer-mic { position: relative; z-index: 1; }
+.mic-spark { z-index: 2; }
+
+/* Sparks: varied sizes and a soft core, drifting rather than blinking in place.
+   Three sizes across six sparks is what stops it reading as one repeated dot. */
+.mic-spark { filter: blur(.3px); }
+.mic-spark.s1 { animation-name: mic-spark-drift-a; }
+.mic-spark.s3 { animation-name: mic-spark-drift-b; }
+.mic-spark.s5 { animation-name: mic-spark-drift-a; }
+@keyframes mic-spark-drift-a {
+  0%, 66%, 100% { opacity: 0; transform: translate(0, 0) scale(.3); }
+  76%           { opacity: 1; transform: translate(-6px, -9px) scale(1.2); }
+  88%           { opacity: .4; transform: translate(-11px, -18px) scale(.55); }
+}
+@keyframes mic-spark-drift-b {
+  0%, 70%, 100% { opacity: 0; transform: translate(0, 0) scale(.3); }
+  80%           { opacity: 1; transform: translate(7px, -8px) scale(1.15); }
+  92%           { opacity: .35; transform: translate(13px, -17px) scale(.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-offer-scene::after, .mic-offer-scene::before { animation: none; }
+}

@@ -172,9 +172,17 @@ ok(await js(`return !!document.querySelector('.solo-callclock')`),'there is a co
 // reading — so this waits for a change rather than sampling twice 700ms apart
 // and hoping the two landed in different seconds.
 const readClock=()=>js(`const e=document.querySelector('.hud-strip-clock');return e?e.innerText.trim():''`);
-const t1=await readClock();
-let t2=t1; const clockBy=Date.now()+4000;
-while(t2===t1 && Date.now()<clockBy){ await settle(200); t2=await readClock(); }
+// The clock legitimately STOPS while the round is held — being handed the mic
+// holds it, and so does performing. Sampling blind reported a correctly frozen
+// clock as a broken one, so this waits through a hold rather than failing on it.
+const held=()=>js(`return !!document.querySelector('.mic-offer') || /⏸/.test((document.querySelector('.hud-strip-clock')||{}).innerText||'')`);
+let t1=await readClock(), t2=t1;
+const clockBy=Date.now()+30000;
+while(t2===t1 && Date.now()<clockBy){
+  await settle(250);
+  if(await held()){ await settle(1200); t1=await readClock(); t2=t1; continue; }
+  t2=await readClock();
+}
 console.log('   [clock]',t1,'→',t2);
 ok(t1!==t2,'and it is actually moving, not a painted number');
 

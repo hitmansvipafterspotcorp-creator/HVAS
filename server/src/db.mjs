@@ -391,6 +391,24 @@ export function openDb(path) {
     db.exec(`ALTER TABLE bingo_cards ADD COLUMN paid_how TEXT`);
   }
 
+  // Paying the entry from your own phone.
+  //
+  // A member CLAIMS an entry; a member never grants one. The claim is a request
+  // sitting in front of the host — it does not make anybody paid, and the pot
+  // does not move until the house confirms it. That ordering is the whole
+  // safety property: if a phone could settle its own entry, every pot in the
+  // app becomes a number a member typed.
+  db.exec(`CREATE TABLE IF NOT EXISTS bingo_entry_claims (
+    id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL,
+    rail TEXT NOT NULL,              -- paypal | zelle | cashapp | cash
+    reference TEXT,                  -- what the member says to look for
+    at INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',   -- pending | confirmed | rejected
+    resolved_by TEXT,
+    resolved_at INTEGER
+  )`);
+
   // ── The room's vote on a called lip sync square ──────────────────────────
   // Who voted to make the holder perform, per called square. Kept per round and
   // wiped with it — a vote is about one square in one moment, and carrying it
