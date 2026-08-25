@@ -2482,3 +2482,132 @@
   margin-top: 2px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, .14);
 }
 .entry-split-total span, .entry-split-total b { color: #ffd66b; }
+
+/* ══ Community support ══════════════════════════════════════════════════════
+   This is somebody's rent. It is not a game screen and it is not a charity
+   brochure — plain rows, real numbers, no celebration. The one visual rule
+   carried through: green means SETTLED, and nothing is green until a provider
+   has confirmed they delivered. */
+
+/* The way in, from the member's card. Quiet on purpose. */
+.jub-entry {
+  display: grid; gap: 3px; width: 100%; margin: 14px 0 2px; padding: 11px 14px;
+  border-radius: 11px; cursor: pointer; text-align: left;
+  border: 1px dashed rgba(34, 211, 238, .38); background: rgba(34, 211, 238, .06);
+}
+.jub-entry strong { font: 800 13px/1.25 var(--k-font); color: var(--k-cyan-lt); }
+.jub-entry span { font: 600 11px/1.35 var(--k-font); color: var(--k-text-dim); }
+.jub-entry:active { transform: translateY(1px); }
+
+/* §38, said plainly rather than buried in terms. */
+.jub-notice {
+  margin: 0 0 10px; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+  font: 600 11px/1.45 var(--k-font); color: var(--k-text-dim);
+}
+.jub-how { margin: 0 0 12px; font: 700 12px/1.45 var(--k-font); color: var(--k-text); }
+.jub-how b { color: var(--k-cyan-lt); }
+
+.jub-form { display: grid; gap: 8px; }
+.jub-label {
+  font: 800 10px/1 var(--k-font); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--k-text-faint); margin-top: 4px;
+}
+.jub-input {
+  width: 100%; padding: 11px 12px; border-radius: 9px; box-sizing: border-box;
+  border: 1px solid var(--k-edge-soft); background: rgba(0, 0, 0, .35);
+  color: var(--k-text); font: 700 13px/1.3 var(--k-font);
+}
+.jub-input:focus { outline: none; border-color: var(--k-violet); box-shadow: var(--k-glow-violet); }
+.jub-textarea { resize: vertical; min-height: 74px; }
+
+.jub-kinds { display: flex; flex-wrap: wrap; gap: 6px; }
+.jub-kind {
+  padding: 9px 13px; border-radius: 999px; cursor: pointer; min-height: 40px;
+  border: 1px solid var(--k-edge-soft); background: none;
+  color: var(--k-text-dim); font: 700 12px/1 var(--k-font);
+}
+.jub-kind.on { border-color: var(--k-violet); color: var(--k-text); background: rgba(169, 53, 255, .16); }
+
+/* One open application at a time, and what is happening to it. */
+.jub-open {
+  display: grid; gap: 4px; padding: 12px 14px; border-radius: 11px;
+  border: 1px solid rgba(34, 211, 238, .4); background: rgba(34, 211, 238, .07);
+}
+.jub-open strong { font: 900 14px/1.2 var(--k-font); color: var(--k-cyan-lt); }
+.jub-open span { font: 700 12px/1.3 var(--k-font); color: var(--k-text); }
+.jub-open small { font: 600 11px/1.4 var(--k-font); color: var(--k-text-dim); }
+
+.jub-awards { margin-top: 16px; }
+.jub-awards h3 {
+  margin: 0 0 8px; font: 800 11px/1 var(--k-font); letter-spacing: .14em;
+  text-transform: uppercase; color: var(--k-text-faint);
+}
+.jub-award {
+  display: grid; gap: 3px; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+/* Green ONLY here — after a provider has confirmed. */
+.jub-award.done { border-color: rgba(57, 255, 136, .45); background: rgba(57, 255, 136, .07); }
+.jub-award.done strong { color: var(--k-go); }
+.jub-delivered { font: 600 11px/1.4 var(--k-font); color: var(--k-go); }
+/* The exact server wording, never softened into "processing". */
+.jub-pending {
+  font: 700 9px/1.3 var(--k-font); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--k-gold);
+}
+
+/* ── The house's side ────────────────────────────────────────────────────── */
+.jub-reserve { display: flex; gap: 8px; margin-bottom: 10px; }
+.jub-reserve span {
+  flex: 1 1 0; display: grid; gap: 2px; justify-items: center; padding: 8px 6px;
+  border-radius: 9px; border: 1px solid var(--k-edge-soft); background: rgba(255,255,255,.03);
+}
+.jub-reserve i {
+  font-style: normal; font: 800 9px/1 var(--k-font); letter-spacing: .1em;
+  text-transform: uppercase; color: var(--k-text-faint);
+}
+.jub-reserve b { font: 900 14px/1 var(--k-font); color: var(--k-gold); font-variant-numeric: tabular-nums; }
+.jub-reserve .low b { color: var(--k-danger); }
+
+.jub-case {
+  display: grid; gap: 8px; padding: 12px; border-radius: 11px; margin-bottom: 10px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+.jub-case-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.jub-case-detail {
+  margin: 0; padding: 8px 10px; border-radius: 8px; background: rgba(0, 0, 0, .3);
+  font: 600 12px/1.45 var(--k-font); color: var(--k-text-dim);
+}
+.jub-note { margin: 0; font: 600 11px/1.4 var(--k-font); color: var(--k-cyan-lt); }
+.jub-chip {
+  flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--k-edge-soft); color: var(--k-text-faint);
+  font: 800 9px/1.4 var(--k-font); letter-spacing: .06em; text-transform: uppercase;
+}
+.jub-chip.ok { border-color: rgba(57, 255, 136, .5); color: var(--k-go); }
+
+/* Who approved, by name. A count with no names is not accountability. */
+.jub-approvals { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.jub-approvals > span {
+  font: 800 10px/1 var(--k-font); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--k-gold);
+}
+.jub-approvals > span.ok { color: var(--k-go); }
+.jub-approvals em {
+  font-style: normal; padding: 3px 8px; border-radius: 999px;
+  border: 1px solid rgba(57, 255, 136, .4); color: var(--k-go);
+  font: 700 10px/1.3 var(--k-font);
+}
+
+.jub-step { display: flex; gap: 6px; align-items: stretch; }
+.jub-step .jub-input { flex: 1 1 auto; min-width: 0; }
+.jub-step--wrap { flex-wrap: wrap; }
+.jub-step--wrap .jub-input { flex: 1 1 120px; }
+
+/* A phone in a dark room: one column, and every control still reachable. */
+@media (max-width: 460px) {
+  .jub-step { flex-direction: column; }
+  .jub-reserve { flex-wrap: wrap; }
+  .jub-reserve span { flex: 1 1 45%; }
+}

@@ -2399,6 +2399,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, {
         applications: rows.map((r) => ({ ...appRow(r), name: r.name, number: r.number,
           approvals: db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(r.application_id) })),
+        // An awarded case leaves the application queue, which left the money
+        // approved and nobody holding it: no way to record the payment, and no
+        // way for the provider to confirm delivery. Unfinished awards belong on
+        // this screen until somebody has actually received something (§31).
+        awards: db.prepare(`SELECT jaw.*, m.name, m.number FROM jubilee_awards jaw
+          JOIN members m ON m.id=jaw.member_id WHERE jaw.status <> 'DELIVERED' ORDER BY jaw.at ASC`)
+          .all().map((r) => ({
+            awardId: r.award_id, name: r.name, number: r.number, status: r.status,
+            amountCents: r.amount_units, provider: r.provider_name, needKind: r.need_kind,
+            vault: r.vault, at: r.at, paidAt: r.paid_at || null, reference: r.payment_reference || null,
+          })),
         vendors: db.prepare('SELECT * FROM jubilee_vendors ORDER BY name').all().map(vendorRow),
         capacityCents: health.availableJubileeCapacity.units,
         reserveCents: health.actualReserve.units,

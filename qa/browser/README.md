@@ -36,10 +36,13 @@ machine. On a box with Playwright installed that is usually somewhere under
 Why they earned their place: between them these caught a menu tile that
 navigated nowhere, a champion banner colliding with the venue crest, placement
 plates rendered as unreadable mush, a service worker serving a stale bundle, a
-QR scanner whose camera was mounted invisible at zero height, and a hook
-declared below an early return that white-screened the entire app the moment a
-member opened Lip Sync Bingo without a venue — none of which failed a build or
-a server test.
+QR scanner whose camera was mounted invisible at zero height, a hook declared
+below an early return that white-screened the entire app the moment a member
+opened Lip Sync Bingo without a venue, a support screen no member could reach
+because its only entry point lived inside a widget that returns null, a whole
+house-side API sending the member's token, and an approved award that fell off
+every screen with nobody able to record the payment — none of which failed a
+build or a server test.
 
 That last one now also has a source-level guard in the deploy gate
 (`server/render-safety-test.mjs`), because a white screen is too expensive to

@@ -201,6 +201,27 @@ export function apiRegisterPerformance({ contentHash, artist, song, durationMs, 
 export function apiMyPerformances() { return call('GET', '/ip/mine', null, apiToken()); }
 export function apiVerifyPerformance(contentHash) { return call('POST', '/ip/verify', { contentHash }, apiToken()); }
 
+// ── Jubilee: community support ────────────────────────────────────────────
+// A member submits a NEED. Everything that turns a need into money — verifying
+// the evidence, approving it, awarding it, paying it — belongs to the house and
+// is refused server-side if a member's token asks.
+export function apiJubileeKinds() { return call('GET', '/jubilee/kinds', null, apiToken()); }
+export function apiJubileeApply(body) { return call('POST', '/jubilee/apply', body, apiToken()); }
+export function apiJubileeMine() { return call('GET', '/jubilee/mine', null, apiToken()); }
+export function apiJubileeQueue() { return call('GET', '/jubilee/queue', null, apiStaffToken()); }
+export function apiJubileeVerify(applicationId, note, verified = true) {
+  return call('POST', '/jubilee/verify', { applicationId, note, verified }, apiStaffToken());
+}
+export function apiJubileeApprove(applicationId, emergency = false) {
+  return call('POST', '/jubilee/approve', { applicationId, emergency }, apiStaffToken());
+}
+export function apiJubileeAward(applicationId, providerId, emergency = false) {
+  return call('POST', '/jubilee/award', { applicationId, providerId, emergency }, apiStaffToken());
+}
+export function apiJubileePay(awardId, reference) { return call('POST', '/jubilee/pay', { awardId, reference }, apiStaffToken()); }
+export function apiJubileeDelivered(awardId, by, what) { return call('POST', '/jubilee/delivered', { awardId, by, what }, apiStaffToken()); }
+export function apiJubileeVendor(body) { return call('POST', '/jubilee/vendor', body, apiStaffToken()); }
+
 export function apiBingoEntryResolve(id, confirm) {
   return call('POST', '/bingo/entry/resolve', { id, confirm }, apiToken());
 }

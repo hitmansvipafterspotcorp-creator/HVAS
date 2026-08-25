@@ -27,6 +27,8 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiBingoState, apiBingoJoin, apiBingoReady, apiBingoClaim, apiBingoMark, apiBingoStart, apiBingoCall, apiBingoResolve,
   apiBingoAuto, apiBingoAutofill, apiBingoMode, apiBingoEntry, apiBingoMicVote,
   apiBingoEntryClaim, apiBingoEntryResolve, apiRegisterPerformance,
+  apiJubileeKinds, apiJubileeApply, apiJubileeMine, apiJubileeQueue, apiJubileeVerify,
+  apiJubileeApprove, apiJubileeAward, apiJubileePay, apiJubileeDelivered, apiJubileeVendor,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -843,6 +845,13 @@ const screens = [
     detail: 'Check-ins, entries, and activity history.',
   },
   {
+    id: 'support',
+    label: 'Get help',
+    eyebrow: 'Community Support',
+    title: 'Get help',
+    detail: 'Rent, a utility, food, or getting a creator back to work.',
+  },
+  {
     id: 'staffDashboard',
     label: 'Dashboard',
     eyebrow: 'Staff Check-In',
@@ -1063,7 +1072,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support'],
   },
   {
     id: 'staff',
@@ -1686,6 +1695,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   // the individual screens below.
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} navigate={navigate} />;
   if (activeScreen === 'history') return <HistoryScreen />;
+  if (activeScreen === 'support') return <JubileeApply onDone={() => navigate('myPass')} />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -3246,6 +3256,19 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
       </>
       )}
 
+      {/* The way in, on the tab where a member already deals with their
+          membership. Deliberately quiet: somebody who needs this will look for
+          it, and somebody who does not should not be asked about it every time
+          they open their card. It sits above the history rather than under it,
+          because a member in trouble should not have to scroll past a year of
+          check-ins to find the one thing on this screen that helps them. */}
+      {tab === 'account' && navigate && apiEnabled() && (
+        <button type="button" className="jub-entry" onClick={() => navigate('support')}>
+          <strong>Need help with rent, a bill or food?</strong>
+          <span>The venue pays the provider directly. Ask the door.</span>
+        </button>
+      )}
+
       {tab === 'account' && <HistoryScreen />}
 
       <ScanAlert result={verifyResult} onDismiss={() => setVerifyResult(null)} />
@@ -3293,6 +3316,7 @@ function HitKoinWidget() {
           )}
         </>
       )}
+
       {/* Which build this phone is running. The app keeps itself current on its
           own, but "am I actually on the new one?" had no answer before — for a
           member, for the door, or for me trying to reproduce a bug over text. */}
@@ -4733,6 +4757,363 @@ function MicArt({ className = '', progress = null }) {
       {/* Base cap */}
       <rect x="43" y="185" width="34" height="11" rx="5.5" fill="url(#micRing)" />
     </svg>
+  );
+}
+
+// ── Asking for help ────────────────────────────────────────────────────────
+//
+// A member submits a NEED. Nothing on this screen verifies, approves, awards or
+// pays — not greyed out, absent — because every one of those belongs to the
+// house and the server refuses a member's token that asks.
+//
+// The tone matters as much as the fields. This is somebody's rent. It is not a
+// game screen and it is not a charity brochure, and it must never imply that a
+// member receives money: the venue pays the landlord, the utility, the supplier,
+// and the member gets the thing.
+const MONEY = (cents) => `$${(Math.max(0, cents || 0) / 100).toFixed(2)}`;
+
+const JUB_STATUS_COPY = {
+  SUBMITTED: 'Waiting for the door to check it',
+  VERIFIED: 'Checked — waiting on approval',
+  AWARDED: 'Approved',
+  'APPROVED — NOT YET PAID': 'Approved — the money has not gone out yet',
+  'PAID — AWAITING DELIVERY': 'Paid to the provider — waiting for them to confirm',
+  DELIVERED: 'Done',
+};
+
+function JubileeApply({ onDone }) {
+  const [kinds, setKinds] = useState(null);
+  const [mine, setMine] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ needKind: '', amount: '', detail: '', providerHint: '' });
+
+  const load = async () => {
+    try {
+      const [k, m] = await Promise.all([apiJubileeKinds(), apiJubileeMine()]);
+      setKinds(k); setMine(m); setErr('');
+    } catch (e) {
+      // The venue runs on a laptop in the room and its internet does drop.
+      setErr(e.message || 'Could not reach the venue. Try again when you have signal.');
+    }
+  };
+  useEffect(() => { load(); }, []);
+
+  const open = mine?.applications?.find((a) => a.status === 'SUBMITTED' || a.status === 'VERIFIED');
+  const submit = async () => {
+    setBusy(true); setErr('');
+    try {
+      const cents = Math.round(Number(form.amount) * 100);
+      await apiJubileeApply({
+        needKind: form.needKind, amountCents: cents,
+        detail: form.detail, providerHint: form.providerHint,
+      });
+      setForm({ needKind: '', amount: '', detail: '', providerHint: '' });
+      await load();
+    } catch (e) { setErr(e.message || 'That did not send. Nothing was submitted.'); }
+    setBusy(false);
+  };
+
+  if (!kinds && !err) return <AppPanel title="Ask the door" subtitle="Community reserve"><p className="dash-empty">Loading…</p></AppPanel>;
+
+  return (
+    <AppPanel title="Ask the door" subtitle="Community reserve">
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+      {/* §38, in the venue's own words rather than buried in terms. */}
+      {kinds?.notice && <p className="jub-notice">{kinds.notice}</p>}
+
+      <p className="jub-how">
+        The venue pays your landlord, your utility or the supplier <b>directly</b>.
+        You never handle the money.
+      </p>
+
+      {open ? (
+        <div className="jub-open">
+          <strong>{JUB_STATUS_COPY[open.status] || open.status}</strong>
+          <span>{kinds?.kinds?.find((k) => k.id === open.needKind)?.label || open.needKind} · {MONEY(open.amount?.units ?? open.amount)}</span>
+          {open.detail && <small>&ldquo;{open.detail}&rdquo;</small>}
+          <p className="mem-fineprint">One at a time. This one has to finish first.</p>
+        </div>
+      ) : (
+        <div className="jub-form">
+          <label className="jub-label">What do you need?</label>
+          <div className="jub-kinds">
+            {kinds?.kinds?.map((k) => (
+              <button type="button" key={k.id}
+                      className={`jub-kind${form.needKind === k.id ? ' on' : ''}`}
+                      onClick={() => setForm((f) => ({ ...f, needKind: k.id }))}>
+                {k.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="jub-label" htmlFor="jub-amt">How much is owed?</label>
+          <input id="jub-amt" className="jub-input" inputMode="decimal" placeholder="0.00"
+                 value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+
+          <label className="jub-label" htmlFor="jub-detail">What&rsquo;s happening?</label>
+          <textarea id="jub-detail" className="jub-input jub-textarea" rows={3}
+                    placeholder="In your own words — what happened and by when it has to be sorted."
+                    value={form.detail} onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))} />
+
+          <label className="jub-label" htmlFor="jub-prov">Who has to be paid?</label>
+          <input id="jub-prov" className="jub-input" placeholder="Landlord, utility or shop — name if you know it"
+                 value={form.providerHint} onChange={(e) => setForm((f) => ({ ...f, providerHint: e.target.value }))} />
+
+          <button type="button" className="bingo-btn gold" disabled={busy || !form.needKind || !(Number(form.amount) > 0)}
+                  onClick={submit}>
+            {busy ? 'Sending…' : 'Send this to the door'}
+          </button>
+          <p className="mem-fineprint">
+            The door checks it, two people have to approve it, and then the provider is paid.
+            Nothing is promised.
+          </p>
+        </div>
+      )}
+
+      {/* What already happened. Three award states, never collapsed into "done" —
+          the gap between approved, paid and delivered is the whole point. */}
+      {mine?.awards?.length > 0 && (
+        <div className="jub-awards">
+          <h3>Your support</h3>
+          {mine.awards.map((a) => (
+            <div key={a.awardId} className={`jub-award${a.status === 'DELIVERED' ? ' done' : ''}`}>
+              <div className="dash-info">
+                <strong>{JUB_STATUS_COPY[a.status] || a.status}</strong>
+                <span className="dash-num">{MONEY(a.amountCents)} → {a.provider}</span>
+              </div>
+              {a.delivered && <small className="jub-delivered">{a.provider} confirmed: {a.delivered}</small>}
+              {a.status !== 'DELIVERED' && <small className="jub-pending">{a.status}</small>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
+  );
+}
+
+// ── The support queue ──────────────────────────────────────────────────────
+//
+// Where a need becomes a payment, and where §68's gate is visible as a gate:
+// verify with a note somebody can review, approve as a named person, award
+// against a provider from the roster, pay with a reference that reconciles, and
+// then the PROVIDER says what they delivered. Every refusal names the stage it
+// stopped at, because "failed" tells a host nothing at 11pm.
+function JubileeQueue() {
+  const [q, setQ] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState({});
+  const [refs, setRefs] = useState({});
+  const [deliv, setDeliv] = useState({});
+  const [picked, setPicked] = useState({});
+  const [vendor, setVendor] = useState({ name: '', kind: 'landlord', contact: '' });
+
+  const load = async () => {
+    try { setQ(await apiJubileeQueue()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load the queue.'); }
+  };
+  useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
+
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); }
+    catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!q && !err) return <AppPanel title="Support" subtitle="Community reserve"><p className="dash-empty">Loading…</p></AppPanel>;
+  // A queue that did not load is not a queue with nothing in it. Rendering the
+  // strip from an absent `q` drew a $0.00 reserve and announced that no policy
+  // had been adopted — two confident claims about money, made from a failed
+  // request. When the load fails, say that and stop.
+  if (!q) {
+    return (
+      <AppPanel title="Support" subtitle="Community reserve">
+        <p className="k-nudge k-nudge--no">{err}</p>
+        <p className="mem-fineprint">
+          This is the queue failing to load, not an empty reserve — nothing here is a reading of the money.
+        </p>
+        <button type="button" className="bingo-btn compact ghost" onClick={load}>Try again</button>
+      </AppPanel>
+    );
+  }
+
+  const short = (q?.capacityCents ?? 0) <= 0;
+  return (
+    <>
+      <AppPanel title="Support" subtitle="Community reserve">
+        {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+        {/* What is actually there to spend, and what is already spoken for. */}
+        <div className="jub-reserve">
+          <span><i>Reserve</i><b>{MONEY(q?.reserveCents)}</b></span>
+          <span><i>Committed</i><b>{MONEY(q?.committedCents)}</b></span>
+          <span className={short ? 'low' : ''}><i>Can release</i><b>{MONEY(q?.capacityCents)}</b></span>
+        </div>
+        {!q?.policyAdopted && (
+          <p className="k-nudge k-nudge--no">
+            No release policy has been adopted, so nothing can be paid out yet — writing one down is not adopting it.
+          </p>
+        )}
+        {q?.policyAdopted && (
+          <p className="mem-fineprint">Takes {q.normalApprovals} different people to approve a release.</p>
+        )}
+
+        {q?.applications?.length === 0 && <p className="dash-empty">Nobody has asked for help.</p>}
+
+        {q?.applications?.map((a) => {
+          const approvals = a.approvals || [];
+          const enough = approvals.length >= (q.normalApprovals ?? 2);
+          const cents = a.amount?.units ?? 0;
+          return (
+            <div key={a.applicationId} className="jub-case">
+              <div className="jub-case-head">
+                <div className="dash-info">
+                  <strong>{a.name}</strong>
+                  <span className="dash-num">{a.number} · {MONEY(cents)}</span>
+                </div>
+                <span className={`jub-chip${a.evidenceVerified ? ' ok' : ''}`}>
+                  {a.evidenceVerified ? '✓ Checked' : 'Not checked'}
+                </span>
+              </div>
+              {a.detail && <p className="jub-case-detail">&ldquo;{a.detail}&rdquo;</p>}
+              {a.providerHint && <p className="mem-fineprint">They say to pay: {a.providerHint}</p>}
+
+              {/* 1. Verify — with a note. A verification nobody can review is not one. */}
+              {!a.evidenceVerified ? (
+                <div className="jub-step">
+                  <input className="jub-input" placeholder="What did you check? (required)"
+                         value={notes[a.applicationId] || ''}
+                         onChange={(e) => setNotes((n) => ({ ...n, [a.applicationId]: e.target.value }))} />
+                  <button type="button" className="bingo-btn compact" disabled={busy || !(notes[a.applicationId] || '').trim()}
+                          onClick={() => act(() => apiJubileeVerify(a.applicationId, notes[a.applicationId]))}>
+                    Mark checked
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {a.evidenceNote && <p className="jub-note">Checked: {a.evidenceNote}</p>}
+
+                  {/* 2. Approve — one tap is ONE named approval. */}
+                  <div className="jub-approvals">
+                    <span className={enough ? 'ok' : ''}>{approvals.length} of {q.normalApprovals} approvals</span>
+                    {approvals.map((ap) => <em key={ap.by}>{ap.by}</em>)}
+                    {!enough && (
+                      <button type="button" className="bingo-btn compact ghost" disabled={busy}
+                              onClick={() => act(() => apiJubileeApprove(a.applicationId))}>
+                        Approve as me
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 3. Award against a provider from the roster. */}
+                  {enough && (
+                    <div className="jub-step">
+                      <select className="jub-input" value={picked[a.applicationId] || ''}
+                              onChange={(e) => setPicked((p) => ({ ...p, [a.applicationId]: e.target.value }))}>
+                        <option value="">Who gets paid…</option>
+                        {q.vendors?.filter((v) => v.approved).map((v) => (
+                          <option key={v.providerId} value={v.providerId}>{v.name} ({v.kind})</option>
+                        ))}
+                      </select>
+                      <button type="button" className="bingo-btn compact gold" disabled={busy || !picked[a.applicationId]}
+                              onClick={() => act(() => apiJubileeAward(a.applicationId, picked[a.applicationId]))}>
+                        Award
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
+      </AppPanel>
+
+      {/* Money that has been approved and is not finished yet.
+          §41's distinction, made operable: APPROVED is not PAID, and PAID is not
+          DELIVERED. Each of the three is a separate act by a named person, and
+          an award stays on this screen until a PROVIDER says what they actually
+          handed over — otherwise "we helped them" means "we filled in a form". */}
+      {q.awards?.length > 0 && (
+        <AppPanel title="Owed and owing" subtitle="Approved, not finished">
+          {q.awards.map((a) => (
+            <div key={a.awardId} className="jub-case">
+              <div className="jub-case-head">
+                <div className="dash-info">
+                  <strong>{a.name}</strong>
+                  <span className="dash-num">{MONEY(a.amountCents)} → {a.provider}</span>
+                </div>
+                <span className="jub-chip">{JUB_STATUS_COPY[a.status] || a.status}</span>
+              </div>
+
+              {!a.paidAt ? (
+                <div className="jub-step">
+                  <input className="jub-input" placeholder="Payment reference (check no., transfer id)"
+                         value={refs[a.awardId] || ''}
+                         onChange={(e) => setRefs((r) => ({ ...r, [a.awardId]: e.target.value }))} />
+                  <button type="button" className="bingo-btn compact gold"
+                          disabled={busy || !(refs[a.awardId] || '').trim()}
+                          onClick={() => act(() => apiJubileePay(a.awardId, refs[a.awardId].trim()))}>
+                    Mark paid
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="jub-note">Paid · reference {a.reference}</p>
+                  {/* Deliberately two fields: WHO at the provider is saying it,
+                      and WHAT they gave. "Delivered ✓" with neither is the
+                      easiest thing in this whole flow to fake. */}
+                  <div className="jub-step jub-step--wrap">
+                    <input className="jub-input" placeholder="Who at the provider is confirming"
+                           value={deliv[a.awardId]?.by || ''}
+                           onChange={(e) => setDeliv((d) => ({ ...d, [a.awardId]: { ...d[a.awardId], by: e.target.value } }))} />
+                    <input className="jub-input" placeholder="What they delivered"
+                           value={deliv[a.awardId]?.what || ''}
+                           onChange={(e) => setDeliv((d) => ({ ...d, [a.awardId]: { ...d[a.awardId], what: e.target.value } }))} />
+                    <button type="button" className="bingo-btn compact"
+                            disabled={busy || !(deliv[a.awardId]?.by || '').trim() || !(deliv[a.awardId]?.what || '').trim()}
+                            onClick={() => act(() => apiJubileeDelivered(a.awardId, deliv[a.awardId].by.trim(), deliv[a.awardId].what.trim()))}>
+                      Provider confirms
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </AppPanel>
+      )}
+
+      {/* The approved vendor roster (§38). Support is paid to a provider on
+          this list, never handed over as cash. */}
+      <AppPanel title="Providers" subtitle="Who can be paid">
+        {q?.vendors?.length === 0 && <p className="dash-empty">No providers yet — add the ones you actually use.</p>}
+        {q?.vendors?.map((v) => (
+          <div key={v.providerId} className="dash-row">
+            <div className="dash-info"><strong>{v.name}</strong><span className="dash-num">{v.kind}{v.contact ? ` · ${v.contact}` : ''}</span></div>
+            <span className={`jub-chip${v.approved ? ' ok' : ''}`}>{v.approved ? 'Approved' : 'Not approved'}</span>
+          </div>
+        ))}
+        <div className="jub-step jub-step--wrap">
+          <input className="jub-input" placeholder="Name" value={vendor.name}
+                 onChange={(e) => setVendor((v) => ({ ...v, name: e.target.value }))} />
+          <select className="jub-input" value={vendor.kind} onChange={(e) => setVendor((v) => ({ ...v, kind: e.target.value }))}>
+            {['landlord', 'utility', 'lodging', 'food', 'transport', 'admin', 'equipment', 'training'].map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+          <input className="jub-input" placeholder="Phone or email" value={vendor.contact}
+                 onChange={(e) => setVendor((v) => ({ ...v, contact: e.target.value }))} />
+          <button type="button" className="bingo-btn compact" disabled={busy || !vendor.name.trim()}
+                  onClick={() => act(async () => { await apiJubileeVendor(vendor); setVendor({ name: '', kind: 'landlord', contact: '' }); })}>
+            Add
+          </button>
+        </div>
+      </AppPanel>
+    </>
   );
 }
 
@@ -7094,6 +7475,7 @@ function HostScreen() {
           ['run', 'Run'],
           ['claims', `Claims${board?.claims.length ? ` (${board.claims.length})` : ''}`],
           ['players', `Players${board?.players.length ? ` (${board.players.length})` : ''}`],
+          ['support', 'Support'],
           ['media', 'TV'],
         ].map(([id, label]) => (
           <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}${id === 'claims' && board?.claims.length ? ' alert' : ''}`}
@@ -7248,6 +7630,8 @@ function HostScreen() {
           </div>
         </AppPanel>
       )}
+
+      {tab === 'support' && <JubileeQueue />}
 
       {tab === 'media' && (
         <>
