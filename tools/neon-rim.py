@@ -57,10 +57,13 @@ def analyse(path):
     px = rgb[col]
     norm = px / np.maximum(px.max(1, keepdims=True), 1)
     hue = norm.mean(0); hue = hue / max(hue.max(), 1e-6)
-    R, G, B = hue
-    # Only the PINK/VIOLET family. A gold plate with a white edge is a different
-    # complaint and not the one that was made.
-    if not (R > 0.55 and B > 0.55 and G < min(R, B) - 0.18): return None
+    # EVERY hue, not just the pink ones. An earlier pass restricted this to the
+    # violet family, on the reading that "the pink UI" named a subset of the
+    # art. It does not — it names how the app looks. The tier cards are green,
+    # blue, violet and magenta, and the grey keyline is equally wrong on all
+    # four; skipping three of them left the exact thing that was complained
+    # about still on screen. Each sprite still glows in ITS OWN colour, which is
+    # what stops this becoming a recolour.
     return im, arr, a, white, hue, int(white.sum()), float(white.sum()) / float(ring.sum())
 
 def neonise(arr, a, white, hue):
@@ -85,7 +88,12 @@ def onblack(im, pad=8):
     bg = Image.new('RGBA', (im.width + pad * 2, im.height + pad * 2), (10, 9, 18, 255))
     bg.alpha_composite(im, (pad, pad)); return bg
 
+# The logos are finished art and are not to be touched. They are also the one
+# place a "rim" is a deliberate neon outline rather than a leftover keyline.
+SKIP = ('hvas_logo', 'logo_badge', 'mm_logo', 'HITKOIN_LOGO', 'logo_lipsync')
+
 used = [l.strip().lstrip('/') for l in open('/tmp/used.txt') if l.strip()]
+used = [u for u in used if not any(k.lower() in u.lower() for k in SKIP)]
 if PREVIEW: os.makedirs(SHOTS, exist_ok=True)
 rows = []
 for rel in used:
