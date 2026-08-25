@@ -149,18 +149,31 @@ export function apiWallet() { return call('GET', '/wallet', null, apiToken()); }
 // shows up for staff on a completely different device.
 export const apiStaffToken = () => ls('hvas_api_staff_token');
 export const apiStaffRole = () => ls('hvas_api_staff_role');
+export const apiStaffName = () => ls('hvas_api_staff_name');
+export const apiStaffNamed = () => ls('hvas_api_staff_named') === '1';
+// One box takes both: the venue's shared code, and a personal invite handed to
+// somebody joining the team. Nobody being handed a code knows or cares which
+// kind it is, and asking them would be a step that exists only because of how
+// we happen to store them. The server tells them apart.
 export async function apiStaffLogin(code) {
   const r = await call('POST', '/auth/staff', { code });
   if (r?.token) {
     localStorage.setItem('hvas_api_staff_token', r.token);
     localStorage.setItem('hvas_api_staff_role', r.role);
+    localStorage.setItem('hvas_api_staff_name', r.name || '');
+    localStorage.setItem('hvas_api_staff_named', r.named ? '1' : '0');
   }
   return r;
 }
 export function apiStaffSignOut() {
-  localStorage.removeItem('hvas_api_staff_token');
-  localStorage.removeItem('hvas_api_staff_role');
+  ['hvas_api_staff_token', 'hvas_api_staff_role', 'hvas_api_staff_name', 'hvas_api_staff_named']
+    .forEach((k) => localStorage.removeItem(k));
 }
+
+// ── The team ──────────────────────────────────────────────────────────────
+export function apiStaffRoster() { return call('GET', '/staff/roster', null, apiStaffToken()); }
+export function apiStaffInvite(name, role) { return call('POST', '/staff/invite', { name, role }, apiStaffToken()); }
+export function apiStaffRemove(staffId) { return call('POST', '/staff/disable', { staffId }, apiStaffToken()); }
 export function apiDoorVerify(payload) { return call('POST', '/door/verify', payload, apiStaffToken()); }
 export function apiDoorBoard() { return call('GET', '/door/board', null, apiStaffToken()); }
 export function apiDoorCheckout(number) { return call('POST', '/door/checkout', { number }, apiStaffToken()); }

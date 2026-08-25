@@ -2611,3 +2611,40 @@
   .jub-reserve { flex-wrap: wrap; }
   .jub-reserve span { flex: 1 1 45%; }
 }
+
+/* ── The team ─────────────────────────────────────────────────────────────
+   Who works here, and the one screen that hands somebody their own sign-in.
+   The invite code is the only thing on it that is time-critical, so it is the
+   only thing that gets size. */
+.team-you {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 10px;
+  border: 1px solid var(--k-line); border-radius: 12px; background: rgba(255, 255, 255, .03);
+}
+.team-you span { font: 700 10px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase; color: var(--k-text-dim); }
+.team-you strong { font: 900 15px/1.1 var(--k-font); color: var(--k-gold); }
+.team-you em {
+  font: 800 10px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; font-style: normal;
+  color: var(--k-cyan-lt); border: 1px solid rgba(0, 229, 255, .35); border-radius: 999px; padding: 4px 8px;
+}
+.team-add { margin: 12px 0 4px; }
+.team-invite {
+  display: grid; justify-items: center; gap: 8px; text-align: center;
+  padding: 16px 12px; margin: 12px 0;
+  border: 1px solid var(--k-gold); border-radius: 16px;
+  background: radial-gradient(120% 90% at 50% 0%, rgba(255, 207, 71, .12), transparent 70%);
+}
+.team-invite strong { font: 900 15px/1.2 var(--k-font); color: var(--k-text); }
+.team-invite small { font: 600 11px/1.45 var(--k-font); color: var(--k-text-dim); max-width: 30ch; }
+.team-invite small b { color: var(--k-text); }
+.team-qr { width: min(62vw, 240px); height: auto; border-radius: 12px; background: #fff; padding: 8px; }
+/* Read aloud across a loud room at least as often as it is scanned, so it is
+   spaced and tabular rather than merely monospaced. */
+.team-code {
+  font: 900 26px/1 var(--k-mono, var(--k-font)); letter-spacing: .28em; text-indent: .28em;
+  color: var(--k-gold); font-variant-numeric: tabular-nums;
+}
+.team-dead { color: var(--k-danger) !important; }
+.team-row { align-items: center; }
+.team-confirm { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.team-got-it { color: var(--k-go) !important; font-weight: 800 !important; }

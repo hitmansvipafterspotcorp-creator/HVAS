@@ -40,10 +40,19 @@ QR scanner whose camera was mounted invisible at zero height, a hook declared
 below an early return that white-screened the entire app the moment a member
 opened Lip Sync Bingo without a venue, a support screen no member could reach
 because its only entry point lived inside a widget that returns null, a whole
-house-side API sending the member's token, and an approved award that fell off
-every screen with nobody able to record the payment — none of which failed a
-build or a server test.
+house-side API sending the member's token, an approved award that fell off every
+screen with nobody able to record the payment, and a staff sign-in that
+white-screened the app whenever the server granted a role the picker had never
+heard of — none of which failed a build or a server test.
 
 That last one now also has a source-level guard in the deploy gate
 (`server/render-safety-test.mjs`), because a white screen is too expensive to
 rely on someone remembering to run a browser suite.
+
+
+One warning for anyone adding a suite that needs two devices: give each one its
+own static server, and therefore its own origin. Two pages served from the same
+host and port share one `localStorage`, so the second "phone" signing in
+silently overwrites the first one's session token. In `team.mjs` that looked
+exactly like the owner losing their admin rights halfway through the suite, and
+the bug was in the harness rather than in anything it was testing.

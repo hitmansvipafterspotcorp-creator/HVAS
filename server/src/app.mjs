@@ -45,6 +45,9 @@ const TIERS = {
 };
 const STAFF_CODES = { staff: process.env.HVAS_STAFF_CODE || 'DOOR850', host: process.env.HVAS_HOST_CODE || 'HOST850' };
 const SESSION_TTL = 12 * 3600 * 1000;
+// Long enough to hand somebody a phone across a bar, short enough that a photo
+// of the QR is worthless by the end of the shift.
+const STAFF_INVITE_TTL = 15 * 60 * 1000;
 
 // YouTube auto-media: search is a server-held API key (never shipped to the
 // client — a leaked key gets used up by anyone), playback itself needs no
@@ -1134,12 +1137,80 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return { onTheWay, inside, lastDecision: recentDecisions[0] || null, recentDecisions, allMembers };
   };
 
+  // ── Who is asking ────────────────────────────────────────────────────────
+  //
+  // A signed token says who you were when it was minted. For a named staff
+  // account that is not enough: "Remove Trey" has to mean Trey's phone stops
+  // working NOW, not whenever his 12-hour session happens to lapse. So a named
+  // session is re-checked against the account on every single request, and a
+  // disabled account fails the next tap.
+  //
+  // The cost is one indexed primary-key lookup per staff request. The thing it
+  // buys is that removing somebody is a real act rather than a note in a table.
+  const staffAccount = db.prepare('SELECT * FROM staff_accounts WHERE staff_id=?');
+  const touchStaff = db.prepare('UPDATE staff_accounts SET last_seen_at=? WHERE staff_id=?');
   const auth = (req, role) => {
     const h = req.headers.authorization || '';
     const claims = readSession(secret, h.replace(/^Bearer /, ''));
     if (!claims) return null;
     if (role && claims.role !== role) return null;
+    if (claims.named) {
+      const acct = staffAccount.get(claims.sub);
+      if (!acct || acct.disabled_at) return null;
+      // The role lives on the account, not on the token — a token minted when
+      // somebody was a host must not outlive their being one.
+      if (acct.role !== claims.role) return null;
+      touchStaff.run(Date.now(), claims.sub);
+      return { ...claims, name: acct.name };
+    }
     return claims;
+  };
+  // Running the night and releasing money are different powers. A shared code
+  // still opens the door, checks members in and runs the game — the owner can
+  // never be locked out of their own venue by a lost phone. What it cannot do
+  // is be one of the people who approve a payment, because "staff-device"
+  // approving twice is one person approving twice, and §55 exists to stop
+  // exactly that. Nothing here refuses a shared code until a money action asks.
+  const houseAuth = (req) => {
+    const c = auth(req);
+    if (!c || (c.role !== 'staff' && c.role !== 'host')) return null;
+    return c;
+  };
+  // Who runs the team. Exactly one account does, and it is the owner's.
+  //
+  // The bootstrap is the only interesting case: on a brand-new venue nobody has
+  // a named account yet, so the shared host code is allowed to create the FIRST
+  // one — that is the owner giving themselves an identity, and it is the only
+  // thing the shared code can do here. The moment an admin exists, the shared
+  // code stops being able to add anyone, and so does every other host.
+  const adminAccount = () => db.prepare(
+    `SELECT * FROM staff_accounts WHERE admin=1 AND disabled_at IS NULL`).get() || null;
+  const adminAuth = (req, res) => {
+    const c = auth(req);
+    if (!c || (c.role !== 'staff' && c.role !== 'host')) { json(res, 401, { error: 'unauthorized' }); return null; }
+    const admin = adminAccount();
+    if (!admin) {
+      // Nothing to protect yet. Only the host code can open the venue's first
+      // account — a door code must not be able to make itself the owner.
+      if (c.role === 'host') return { ...c, bootstrap: true };
+      json(res, 403, { error: 'Only the owner sets up the team. Sign in with the venue host code first.' });
+      return null;
+    }
+    if (c.named && c.sub === admin.staff_id) return c;
+    json(res, 403, { error: `Only ${admin.name} manages the team.` });
+    return null;
+  };
+  // Money needs a person, not a role. Returns the claims, or writes the refusal
+  // and returns null — and the refusal says how to fix it, because "403" to a
+  // host at 1am is a support call rather than a security control.
+  const moneyAuth = (req, res) => {
+    const c = houseAuth(req);
+    if (!c) { json(res, 401, { error: 'unauthorized' }); return null; }
+    if (!c.named) {
+      json(res, 403, { error: 'A shared venue code can run the night but cannot approve money. Sign in as yourself — the host can add you on the Team screen in about ten seconds.' });
+      return null;
+    }
+    return c;
   };
 
   // ── Jubilee ──────────────────────────────────────────────────────────────
@@ -1198,6 +1269,39 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   });
 
   // ── routes ──
+  // Spending an invite. Single-use is enforced here and nowhere else, so this
+  // is the only place that can get it wrong: the row is claimed by a
+  // conditional UPDATE, and a second phone racing the first loses because its
+  // UPDATE matches no rows rather than because it read a flag a moment later.
+  const claimInvite = (req, res, code) => {
+    const inv = db.prepare('SELECT * FROM staff_invites WHERE code=?').get(code);
+    if (!inv) return json(res, 401, { error: 'bad code' });
+    if (inv.used_at) return json(res, 401, { error: 'That code has already been used. Ask for a new one.' });
+    if (Date.now() > inv.expires_at) return json(res, 401, { error: 'That code has expired. Ask for a new one.' });
+    const acct = db.prepare('SELECT * FROM staff_accounts WHERE staff_id=?').get(inv.staff_id);
+    if (!acct || acct.disabled_at) return json(res, 401, { error: 'That account is no longer on the team.' });
+    const device = (req.headers['user-agent'] || '').slice(0, 120);
+    const spent = db.prepare('UPDATE staff_invites SET used_at=?, used_device=? WHERE code=? AND used_at IS NULL')
+      .run(Date.now(), device, code);
+    if (!spent.changes) return json(res, 401, { error: 'That code has already been used. Ask for a new one.' });
+    db.prepare('UPDATE staff_accounts SET last_seen_at=? WHERE staff_id=?').run(Date.now(), acct.staff_id);
+    json(res, 200, {
+      token: signSession(secret, { sub: acct.staff_id, role: acct.role, named: true, name: acct.name }, SESSION_TTL),
+      role: acct.role, name: acct.name, named: true, staffId: acct.staff_id,
+    });
+  };
+  // How many DIFFERENT people could sign off on a release. This is what makes
+  // §55 a number instead of a wish: a policy asking for more approvers than
+  // the venue has real people is one nobody can ever satisfy.
+  // Only accounts somebody has actually claimed count. An invite that was made
+  // and never scanned is a name in a table, not a second person in the room.
+  // An approval is KEYED by the account id — names can be reused after somebody
+  // leaves, and two different Chrises must not collapse into one approver. But
+  // an id is unreadable on a rota, so it is resolved to a name on the way out.
+  const staffNameOf = (id) => db.prepare('SELECT name FROM staff_accounts WHERE staff_id=?').get(id)?.name || id;
+  const countNamedApprovers = () => db.prepare(
+    `SELECT COUNT(*) n FROM staff_accounts WHERE disabled_at IS NULL AND last_seen_at IS NOT NULL`).get().n;
+
   const routes = {
     'GET /health': (req, res) => json(res, 200, { ok: true, service: 'hvas', time: Date.now() }),
 
@@ -1261,11 +1365,113 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { token: signSession(secret, { sub: m.id, role: 'member' }, SESSION_TTL), member: publicMember(m) });
     },
     // Staff / Host code login.
+    // The venue code. Opens the door and runs the night; see namedActor above
+    // for what it deliberately cannot do.
     'POST /auth/staff': async (req, res) => {
       const { code } = await readBody(req);
-      const role = Object.keys(STAFF_CODES).find((r) => STAFF_CODES[r] === String(code || '').toUpperCase());
+      const entered = String(code || '').trim().toUpperCase();
+      // A staff invite is redeemable from the same box the venue code goes in.
+      // Somebody handed a code does not know or care which kind it is, and a
+      // second "which sort of code is this?" question is a step that only
+      // exists because of how we store them.
+      if (db.prepare('SELECT code FROM staff_invites WHERE code=?').get(entered)) {
+        return claimInvite(req, res, entered);
+      }
+      const role = Object.keys(STAFF_CODES).find((r) => STAFF_CODES[r] === entered);
       if (!role) return json(res, 401, { error: 'bad code' });
-      json(res, 200, { token: signSession(secret, { sub: `${role}-device`, role }, SESSION_TTL), role });
+      json(res, 200, {
+        token: signSession(secret, { sub: `${role}-device`, role, named: false }, SESSION_TTL),
+        role, named: false, name: 'Shared code',
+      });
+    },
+
+    // ── The team ─────────────────────────────────────────────────────────────
+    //
+    // Onboarding, in full: the owner types a name and taps Add. The app shows a
+    // QR. The other person scans it. That is the entire flow — no email, no
+    // password, no account to recover, nothing for either of them to remember.
+    //
+    // What the QR carries is a single-use code that expires in fifteen minutes,
+    // so the screenshot of it in somebody's camera roll is worthless by the
+    // time it could be misused.
+    'POST /staff/invite': async (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const body = await readBody(req);
+      const name = String(body.name || '').trim().slice(0, 40);
+      const role = body.role === 'host' ? 'host' : 'staff';
+      if (name.length < 2) return json(res, 400, { error: 'give them a name people would recognise on a shift' });
+      const clash = db.prepare('SELECT staff_id FROM staff_accounts WHERE name=? AND disabled_at IS NULL').get(name);
+      if (clash) return json(res, 409, { error: `${name} is already on the team — use something that tells them apart on a rota` });
+      const now = Date.now();
+      const staffId = `ST-${randomBytes(6).toString('hex').toUpperCase()}`;
+      // Crockford-ish: no I, O, 0 or 1, because this gets read aloud across a
+      // loud room at least as often as it gets scanned.
+      const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const code = Array.from(randomBytes(8)).map((b) => A[b % A.length]).join('');
+      // The venue's first host account is the owner's own. After that nobody is
+      // made admin by being added — the owner stays the owner.
+      const isFirstAdmin = role === 'host' && !adminAccount();
+      db.prepare(`INSERT INTO staff_accounts(staff_id,name,role,created_at,created_by,admin) VALUES(?,?,?,?,?,?)`)
+        .run(staffId, name, role, now, c.name || c.sub, isFirstAdmin ? 1 : 0);
+      db.prepare(`INSERT INTO staff_invites(code,staff_id,name,role,created_by,created_at,expires_at)
+                  VALUES(?,?,?,?,?,?,?)`)
+        .run(code, staffId, name, role, c.name || c.sub, now, now + STAFF_INVITE_TTL);
+      json(res, 200, { code, staffId, name, role, admin: isFirstAdmin,
+                       expiresAt: now + STAFF_INVITE_TTL, ttlMs: STAFF_INVITE_TTL });
+    },
+
+    // Redeeming one. Also reachable through POST /auth/staff above, which is
+    // where a person handed a code will actually type it.
+    'POST /auth/staff/claim': async (req, res) => {
+      const { code } = await readBody(req);
+      return claimInvite(req, res, String(code || '').trim().toUpperCase());
+    },
+
+    // Who is on the team, and whether their phone has been anywhere near the
+    // venue lately. `lastSeen` is the honest answer to "is this account still
+    // in use or did they quit in March?".
+    'GET /staff/roster': (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const rows = db.prepare(`SELECT * FROM staff_accounts ORDER BY disabled_at IS NOT NULL, name`).all();
+      const pending = new Set(db.prepare(
+        `SELECT staff_id FROM staff_invites WHERE used_at IS NULL AND expires_at > ?`).all(Date.now())
+        .map((r) => r.staff_id));
+      json(res, 200, {
+        you: { id: c.sub, name: c.name || 'Shared code', role: c.role, named: !!c.named,
+               admin: !!c.named && c.sub === adminAccount()?.staff_id, bootstrap: !!c.bootstrap },
+        owner: adminAccount()?.name || null,
+        team: rows.map((r) => ({
+          staffId: r.staff_id, name: r.name, role: r.role,
+          addedBy: r.created_by, addedAt: r.created_at,
+          lastSeen: r.last_seen_at || null,
+          claimed: !!r.last_seen_at,
+          inviteOpen: pending.has(r.staff_id),
+          disabled: !!r.disabled_at,
+          admin: !!r.admin,
+        })),
+        namedApprovers: countNamedApprovers(),
+      });
+    },
+
+    // Removing somebody. Their next tap fails — see auth() above.
+    'POST /staff/disable': async (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const { staffId } = await readBody(req);
+      const row = db.prepare('SELECT * FROM staff_accounts WHERE staff_id=?').get(staffId);
+      if (!row) return json(res, 404, { error: 'no such person' });
+      if (row.disabled_at) return json(res, 200, { ok: true, alreadyOff: true });
+      // Removing the owner's own account leaves a venue with no owner and no way
+      // to make one — the shared code only bootstraps when there is no admin at
+      // all, and a disabled admin is still an admin row.
+      if (row.admin) return json(res, 400, { error: 'You cannot remove your own owner account.' });
+      // Taking the last host off the team leaves a venue nobody can add anyone
+      // back to. The shared code would still open the door, but it cannot make
+      // staff accounts, so the team would be frozen where it stands.
+      db.prepare('UPDATE staff_accounts SET disabled_at=?, disabled_by=? WHERE staff_id=?')
+        .run(Date.now(), c.name || c.sub, staffId);
+      // An unspent invite for somebody who has been removed must not still work.
+      db.prepare('DELETE FROM staff_invites WHERE staff_id=? AND used_at IS NULL').run(staffId);
+      json(res, 200, { ok: true, name: row.name });
     },
 
     'GET /me': (req, res) => {
@@ -2398,7 +2604,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const policy = jubileePolicy();
       json(res, 200, {
         applications: rows.map((r) => ({ ...appRow(r), name: r.name, number: r.number,
-          approvals: db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(r.application_id) })),
+          verifiedBy: r.verified_by ? staffNameOf(r.verified_by) : null,
+          approvals: db.prepare('SELECT by, at FROM jubilee_approvals WHERE award_ref=?').all(r.application_id)
+            .map((a) => ({ ...a, by: staffNameOf(a.by) })) })),
         // An awarded case leaves the application queue, which left the money
         // approved and nobody holding it: no way to record the payment, and no
         // way for the provider to confirm delivery. Unfinished awards belong on
@@ -2422,7 +2630,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // Evidence is verified BY THE HOUSE. A member cannot verify their own need,
     // for the same reason they cannot confirm their own payment.
     'POST /jubilee/verify': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { applicationId, note, verified = true } = await readBody(req);
       const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
       if (!row) return json(res, 404, { error: 'no such application' });
@@ -2433,7 +2641,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     // One approval, from one person. Three of these make a release (§55).
     'POST /jubilee/approve': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { applicationId, emergency = false } = await readBody(req);
       const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
       if (!row) return json(res, 404, { error: 'no such application' });
@@ -2450,7 +2658,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // Turning an approved, verified, funded need into an award against a real
     // provider. This is where §68's gate actually runs.
     'POST /jubilee/award': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { applicationId, providerId, emergency = false } = await readBody(req);
       const row = db.prepare('SELECT * FROM jubilee_applications WHERE application_id=?').get(applicationId);
       if (!row) return json(res, 404, { error: 'no such application' });
@@ -2494,7 +2702,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     // The money leaving, to the provider.
     'POST /jubilee/pay': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { awardId, reference } = await readBody(req);
       const row = db.prepare('SELECT * FROM jubilee_awards WHERE award_id=?').get(awardId);
       if (!row) return json(res, 404, { error: 'no such award' });
@@ -2507,7 +2715,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // The provider confirming what they delivered. Until this, the venue has
     // spent money and nobody has yet said the person got the thing (§31).
     'POST /jubilee/delivered': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { awardId, by, what } = await readBody(req);
       const row = db.prepare('SELECT * FROM jubilee_awards WHERE award_id=?').get(awardId);
       if (!row) return json(res, 404, { error: 'no such award' });
@@ -2529,25 +2737,27 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // until it happens nothing is released no matter how much money is sitting
     // there.
     'POST /world/policy': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const {
         maxReleasePercent, maxSingleCents, operatingFloorCents, emergencyMinCents,
         normalApprovals, emergencyApprovals, maxEmergencyCents, defaultVault,
       } = await readBody(req);
       const pct = Number(maxReleasePercent);
       if (!Number.isFinite(pct) || pct <= 0 || pct > 1) return json(res, 400, { error: 'maxReleasePercent must be 0..1' });
-      // NOTE, and it is a real limit rather than a preference: staff and host
-      // sign in with SHARED codes, so this venue currently has exactly two
-      // distinct house identities — 'staff' and 'host'. §55 wants a release to
-      // depend on more than one person and that much is satisfiable today; a
-      // three-approver policy is not, and adopting one would quietly make every
-      // release impossible. Named staff accounts are what unlocks three, and
-      // until they exist the honest maximum is two.
-      const distinctIdentities = 2;
-      const normal = Math.floor(Number(normalApprovals) || distinctIdentities);
+      // §55 wants a release to depend on more than one person, and how many
+      // people this venue HAS is a fact about the team, not a constant. It used
+      // to be hard-coded to two, because staff and host shared codes and the
+      // venue only had two distinct house identities to draw on. Now it counts
+      // claimed staff accounts, so adding somebody to the team is what raises
+      // the ceiling — and a policy nobody could ever satisfy is still refused,
+      // because adopting one would quietly make every release impossible.
+      const distinctIdentities = countNamedApprovers();
+      const normal = Math.floor(Number(normalApprovals) || Math.max(2, Math.min(3, distinctIdentities)));
       if (normal > distinctIdentities) {
         return json(res, 400, {
-          error: `this venue has ${distinctIdentities} distinct house sign-ins (staff and host), so a ${normal}-approver policy could never be satisfied — give staff their own named accounts first (§55)`,
+          error: distinctIdentities < 2
+            ? `only ${distinctIdentities} ${distinctIdentities === 1 ? 'person has' : 'people have'} a named account here, so a ${normal}-approver policy could never be satisfied — add your team on the Team screen first (§55)`
+            : `this venue has ${distinctIdentities} people with named accounts, so a ${normal}-approver policy could never be satisfied — add ${normal - distinctIdentities} more before adopting it (§55)`,
         });
       }
       if (normal < 2) {
@@ -2574,7 +2784,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
     // The approved vendor roster (§38).
     'POST /jubilee/vendor': async (req, res) => {
-      const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
+      const c = moneyAuth(req, res); if (!c) return;
       const { name, kind, contact, approved = true } = await readBody(req);
       if (!name || !kind) return json(res, 400, { error: 'a provider needs a name and a kind' });
       const id = `V-${randomBytes(4).toString('hex').toUpperCase()}`;

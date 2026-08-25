@@ -30,8 +30,19 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };
 const eq = (a, b, m) => ok(a === b, `${m}${a === b ? '' : ` — got ${JSON.stringify(a)}, wanted ${JSON.stringify(b)}`}`);
 
-const host = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
-const door = (await call('POST', '/auth/staff', { code: 'DOOR850' })).body.token;
+// Two real people, added the way the venue adds them. A shared code can run the
+// night but cannot approve money, so a suite about money has to onboard humans —
+// which is the same three calls the owner's phone makes.
+const venueCode = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
+const hire = async (name, role, by) => {
+  const inv = await call('POST', '/staff/invite', { name, role }, by);
+  if (!inv.body.code) throw new Error(`could not hire ${name}: ${JSON.stringify(inv.body)}`);
+  return (await call('POST', '/auth/staff/claim', { code: inv.body.code })).body.token;
+};
+// The venue code opens exactly one account — the owner's. Everybody after that
+// is added BY the owner, which is why the second hire is signed by Marisol.
+const host = await hire('Marisol', 'host', venueCode);
+const door = await hire('Trey', 'staff', host);
 const nova = await mk('850-900-0001', 'Nova');
 
 console.log('THE FORM SAYS WHAT THIS IS (§38)');

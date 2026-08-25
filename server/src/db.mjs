@@ -539,6 +539,56 @@ export function openDb(path) {
     PRIMARY KEY (award_ref, by)
   )`);
 
+  // ── Who the staff actually are ───────────────────────────────────────────
+  //
+  // The venue ran on two shared codes. That is one secret per ROLE, not per
+  // person, and it has three consequences that only look small until money
+  // moves: every door check and every approval was signed "staff-device";
+  // removing one person meant changing the code for everybody; and §55's "no
+  // single person releases the reserve" was unsatisfiable, because the venue
+  // only had two distinct identities to draw approvers from.
+  //
+  // A staff account is a name and a role. Nobody types a password and nobody
+  // has an email here — the owner adds a person on their own phone, hands them
+  // a QR, and that phone is that person from then on.
+  db.exec(`CREATE TABLE IF NOT EXISTS staff_accounts (
+    staff_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,                -- staff | host
+    created_at INTEGER NOT NULL,
+    created_by TEXT,
+    last_seen_at INTEGER,
+    disabled_at INTEGER,
+    disabled_by TEXT,
+    -- Exactly one person runs the team, and it is the owner. Running the night
+    -- and hiring for it are different jobs: a host brought in for a Saturday
+    -- should be able to call the game without also being able to add people to
+    -- the payroll or remove the owner from their own venue.
+    admin INTEGER NOT NULL DEFAULT 0
+  )`);
+  {
+    const cols = db.prepare(`PRAGMA table_info(staff_accounts)`).all().map((c) => c.name);
+    if (!cols.includes('admin')) db.exec(`ALTER TABLE staff_accounts ADD COLUMN admin INTEGER NOT NULL DEFAULT 0`);
+  }
+  // Two people with the same first name on the same door is a real Saturday,
+  // and an approval log that says "Chris" twice is worse than useless.
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_name
+           ON staff_accounts(name) WHERE disabled_at IS NULL`);
+  // An invite is a single-use, short-lived claim on ONE name. It is not a
+  // password: it is spent the moment a phone uses it, so a code read over
+  // somebody's shoulder an hour later is worth nothing.
+  db.exec(`CREATE TABLE IF NOT EXISTS staff_invites (
+    code TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    created_by TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER,
+    used_device TEXT
+  )`);
+
   // ── The room's vote on a called lip sync square ──────────────────────────
   // Who voted to make the holder perform, per called square. Kept per round and
   // wiped with it — a vote is about one square in one moment, and carrying it

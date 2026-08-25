@@ -32,8 +32,19 @@ const call = async (m, p, b, t) => {
   return { status: r.status, body: await r.json().catch(() => ({})) };
 };
 const mk = async (ph, nm) => { const s = await call('POST','/auth/member/start',{contact:ph}); return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body; };
-const host = (await call('POST','/auth/staff',{code:'HOST850'})).body.token;
-const door = (await call('POST','/auth/staff',{code:'DOOR850'})).body.token;
+// A shared code can run the night but cannot approve money, so the two people
+// who sign off here have to be real accounts — onboarded exactly the way the
+// owner onboards them on a Saturday. Note the second hire goes through KENYA,
+// not through the venue code: once the venue has an owner, the shared code
+// cannot add anybody, which is the whole point of the owner existing.
+const venueCode = (await call('POST','/auth/staff',{code:'HOST850'})).body.token;
+const hire = async (name, role, by) => {
+  const inv = await call('POST','/staff/invite',{ name, role }, by);
+  if (!inv.body.code) throw new Error(`could not hire ${name}: ${JSON.stringify(inv.body)}`);
+  return (await call('POST','/auth/staff/claim',{ code: inv.body.code })).body.token;
+};
+const host = await hire('Kenya','host', venueCode);   // the owner, made once
+const door = await hire('Trey','staff', host);
 
 // A funded reserve and an adopted policy, so the queue has something real.
 await call('POST','/world/policy',{ maxReleasePercent:0.4, defaultVault:'HOUSING_STABILITY', normalApprovals:2 }, host);
@@ -131,7 +142,13 @@ ok(/pending|checking|door|review|waiting/i.test(after),'and it comes back as pen
 await shot('jub-3-member-sent.png');
 
 console.log('\nHOST — THE QUEUE');
-await jsA(`const r=await fetch(${JSON.stringify(API)}+'/auth/staff',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:'HOST850'})});const j=await r.json();localStorage.setItem('hvas_api_staff_token',j.token);localStorage.setItem('hvas_api_staff_role',j.role);return j.role;`);
+// The host phone signs in as a PERSON. A shared venue code runs the night but
+// cannot approve money, so a suite about approving money on a host's phone has
+// to be a host who exists. qa/browser/team.mjs covers the claim flow itself.
+await js(`localStorage.setItem('hvas_api_staff_token',${JSON.stringify(host)});
+  localStorage.setItem('hvas_api_staff_role','host');
+  localStorage.setItem('hvas_api_staff_name','Kenya');
+  localStorage.setItem('hvas_api_staff_named','1');return 1;`);
 await cdp('Page.navigate',{url:appUrl});await settle(8000);
 await tap('Enter');await settle(3000);
 ok(await tap('PLAY LIP SYNC BINGO'),'the lobby opens');
@@ -153,12 +170,15 @@ await shot('jub-4-host-queue.png');
 console.log('\nHOST — VERIFY, APPROVE, AWARD');
 await caseType('Nova','Called the landlord, balance confirmed.');
 await settle(300);
-ok(await caseTap('Nova','Mark checked'),'it can be verified with a note');
+await caseTap('Nova','Mark checked');
 await settle(2500);
+ok(/checked/i.test(await caseText('Nova')) && !/not checked/i.test(await caseText('Nova')),
+   'it can be verified with a note');
 await shot('jub-5-host-checked.png');
-ok(await caseTap('Nova','Approve as me'),'and approved by a named person');
+await caseTap('Nova','Approve as me');
 await settle(2500);
 const one=await caseText('Nova');
+ok(/Kenya/.test(one),'and the approval carries a person\u2019s name, not "staff-device"');
 console.log('   [after 1 approval]',one.slice(0,600));
 ok(/1 of 2/i.test(one),'one approval is not two');
 ok(!/Award/i.test(await caseButtons('Nova')),'and cannot be awarded on one approval');

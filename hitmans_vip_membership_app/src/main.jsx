@@ -29,6 +29,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiBingoEntryClaim, apiBingoEntryResolve, apiRegisterPerformance,
   apiJubileeKinds, apiJubileeApply, apiJubileeMine, apiJubileeQueue, apiJubileeVerify,
   apiJubileeApprove, apiJubileeAward, apiJubileePay, apiJubileeDelivered, apiJubileeVendor,
+  apiStaffRoster, apiStaffInvite, apiStaffRemove,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -1362,7 +1363,14 @@ function App() {
   // 'checkedIn' (menu gate + pass indicator) means admitted/inside — driven by
   // the door verification, not the on-the-way toggle.
   const session = { role, onTheWay, checkedIn: inside };
-  function chooseRole(id) { setRole(id); setActiveScreen('home'); setTargetScreen('home'); setGate(null); }
+  // Every screen below reads roleById(role).something. An id that is not in
+  // ROLES therefore does not render a wrong screen — it unmounts the entire
+  // app, on a device somebody is standing at a door with. Refusing an unknown
+  // id here costs one comparison.
+  function chooseRole(id) {
+    if (!roleById(id)) return;
+    setRole(id); setActiveScreen('home'); setTargetScreen('home'); setGate(null);
+  }
   // Members only have My Pass + History — skip the menu and land straight on
   // My Pass instead of showing a 2-item picker for something with no picking
   // to do. Staff/Host still land on 'home' (their menus have real choices).
@@ -1416,7 +1424,17 @@ function App() {
         ) : gate ? (
           // staff/host code gate — back returns to the hidden Team Access, not the public door
           <CodeGateScreen role={gate} onBack={() => { setGate(null); setTeam(true); }}
-            onDone={() => { setUnlocked((u) => ({ ...u, [gate]: true })); chooseRole(gate); }} />
+            onDone={(grantedRole) => {
+              // The server's role and the app's ROLES are not the same list:
+              // 'host' is a power a token carries, not a door on the picker —
+              // hosts come in through Staff Check-In and open host controls from
+              // the game. So a granted role is only followed when it is actually
+              // a role somebody can be; otherwise they land where they knocked,
+              // with whatever their token lets them do.
+              const landed = roleById(grantedRole) ? grantedRole : gate;
+              setUnlocked((u) => ({ ...u, [landed]: true }));
+              chooseRole(landed);
+            }} />
         ) : team ? (
           <TeamAccessScreen onPick={(id) => { setTeam(false); setGate(id); }} onBack={() => setTeam(false)} />
         ) : (
@@ -1696,6 +1714,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'myPass' || activeScreen === 'membership' || activeScreen === 'profile') return <MembershipScreen checkedIn={!!session?.checkedIn} navigate={navigate} />;
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'support') return <JubileeApply onDone={() => navigate('myPass')} />;
+  if (activeScreen === 'team') return <TeamScreen />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -2128,33 +2147,43 @@ function MemberAuthScreen({ onBack, onDone }) {
 function CodeGateScreen({ role, onBack, onDone }) {
   const r = roleById(role);
   const [code, setCode] = useState('');
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const backend = apiEnabled();
   const submit = async () => {
     if (backend) {
-      setBusy(true); setErr(false);
-      try { await apiStaffLogin(code.trim()); onDone(); }
-      catch { setErr(true); }
-      finally { setBusy(false); }
+      setBusy(true); setErr('');
+      try {
+        // The same box takes the venue's shared code and a personal invite. A
+        // personal invite carries its own role, and it wins: somebody handed a
+        // door invite who happened to tap the Host card belongs on the door.
+        const r = await apiStaffLogin(code.trim());
+        onDone(r?.role);
+      } catch (e) {
+        // "Wrong code" is the least useful thing to say to somebody holding a
+        // code that used to work. Expired and already-used are different
+        // problems with the same fix, and the server knows which it is.
+        setErr(e?.message || 'Wrong code — check with the venue.');
+      } finally { setBusy(false); }
       return;
     }
-    if (checkRoleCode(role, code)) onDone(); else setErr(true);
+    if (checkRoleCode(role, code)) onDone(role); else setErr('Wrong code — check with the venue.');
   };
   return (
     <section className="screen screen-landing">
       <div className="home-dashboard auth-screen">
         <section className="sheet-title-banner"><div><span>{r.eyebrow} ACCESS</span><h1>{r.label}</h1></div></section>
         <div className="auth-card">
-          <p className="gate-lead">🔒 This role can verify entries and run the night. Enter the venue access code to continue.</p>
-          <label>Access code<input type="text" value={code} onChange={(e) => { setCode(e.target.value); setErr(false); }}
-            placeholder="Venue code" autoComplete="off" onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
-          {err && <p className="gate-err">Wrong code — check with the venue.</p>}
+          <p className="gate-lead">🔒 This role can verify entries and run the night. Enter the venue code — or the personal code someone on the team gave you.</p>
+          <label>Access code<input type="text" value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); setErr(''); }}
+            placeholder="Venue or invite code" autoComplete="off" autoCapitalize="characters" spellCheck={false}
+            onKeyDown={(e) => e.key === 'Enter' && submit()} /></label>
+          {err && <p className="gate-err">{err}</p>}
           <button type="button" className="auth-continue" disabled={!code.trim() || busy} onClick={submit}>
             {busy ? 'Checking…' : `Unlock ${r.label} →`}
           </button>
           <p className="auth-fine">{backend
-            ? `Connected to ${venueConfig().venue || 'this venue'} — the code is checked by the venue backend.`
+            ? `Connected to ${venueConfig().venue || 'this venue'}. A personal code signs you in as you — every door check and approval carries your name. The shared venue code runs the night but cannot approve money.`
             : <>Demo code for <b>{r.label}</b>: <code>{ROLE_CODES[role]}</code>. In production this is issued per staff member and verified on a server.</>}</p>
           <button type="button" className="auth-back" onClick={onBack}>← Back</button>
         </div>
@@ -2233,6 +2262,10 @@ const STAFF_TABS = [
   { id: 'watchlist', label: 'Watchlist' },
   { id: 'payments', label: 'Payments' },
   { id: 'bookingBoard', label: 'Bookings' },
+  // Adding somebody to the team is a door job, done at the door, by the person
+  // already standing there. It sat six taps deep inside the bingo host console,
+  // which is a good way to guarantee the venue keeps using the shared code.
+  { id: 'team', label: 'Team' },
 ];
 
 // Staff Check-In as one tab flow: Dashboard / Verify / Watchlist / Payments /
@@ -2241,10 +2274,17 @@ const STAFF_TABS = [
 // Account tabs instead of three separate screens.
 function StaffHubScreen() {
   const [tab, setTab] = useState('staffDashboard');
+  // Only the owner's phone gets a Team tab. A door person tapping it would get
+  // a refusal, and a tab that exists to refuse you is worse than no tab: it
+  // reads as something broken rather than as something that is not your job.
+  // The venue host code keeps it while the venue has no owner account yet,
+  // because that is the tap that creates one.
+  const mayManageTeam = apiEnabled() && apiStaffRole() === 'host';
+  const tabs = STAFF_TABS.filter((t) => t.id !== 'team' || mayManageTeam);
   return (
     <div className="staff-hub">
       <div className="staff-hub-tabs">
-        {STAFF_TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.id} type="button" className={`staff-hub-tab${tab === t.id ? ' on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
@@ -5115,6 +5155,194 @@ function JubileeQueue() {
       </AppPanel>
     </>
   );
+}
+
+// ── The team ───────────────────────────────────────────────────────────────
+//
+// The venue ran on two shared codes, which meant every door check and every
+// approval was signed "staff-device", removing one person meant changing the
+// code for everybody, and a release could never depend on three people because
+// the venue only had two identities to draw on.
+//
+// The whole replacement is: type a name, tap Add, show them the QR. No email,
+// no password, no account for either of you to recover. What the QR carries is
+// a single-use code that dies in fifteen minutes, so a photo of it in somebody's
+// camera roll is worth nothing by the end of the shift.
+function TeamScreen() {
+  const [q, setQ] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('staff');
+  const [invite, setInvite] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  const load = async () => {
+    try { setQ(await apiStaffRoster()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load the team.'); }
+  };
+  useEffect(() => { load(); }, []);
+  // While a code is on screen two things have to move: the countdown, and the
+  // roster. The owner is holding this phone up to somebody else's — without a
+  // refresh they have no way to know the scan worked, and the natural thing to
+  // do about that is generate a second code, which invalidates nothing and
+  // helps nobody. Polling stops the moment the code is put away.
+  useEffect(() => {
+    if (!invite) return undefined;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    const poll = setInterval(load, 3000);
+    return () => { clearInterval(tick); clearInterval(poll); };
+  }, [invite]);
+
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { const r = await fn(); await load(); return r; }
+    catch (e) { setErr(e.message || 'That did not go through.'); return null; }
+    finally { setBusy(false); }
+  };
+
+  if (!q && !err) return <AppPanel title="Team" subtitle="Who works here"><p className="dash-empty">Loading…</p></AppPanel>;
+  if (!q) {
+    return (
+      <AppPanel title="Team" subtitle="Who works here">
+        <p className="k-nudge k-nudge--no">{err}</p>
+        <button type="button" className="bingo-btn compact ghost" onClick={load}>Try again</button>
+      </AppPanel>
+    );
+  }
+
+  // The owner runs the team. A second host runs the night — the server refuses
+  // them either way, so the screen simply does not offer what they cannot do.
+  const mine = !!q.you?.admin || !!q.you?.bootstrap;
+  const left = invite ? Math.max(0, invite.expiresAt - now) : 0;
+  const mmss = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+  const live = q.team.filter((t) => !t.disabled);
+
+  return (
+    <>
+      <AppPanel title="Team" subtitle="Who works here">
+        {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+        {/* Who this phone is. The distinction is not cosmetic — see the nudge. */}
+        <div className="team-you">
+          <span>Signed in as</span>
+          <strong>{q.you?.named ? q.you.name : 'Shared venue code'}</strong>
+          <em>{q.you?.role === 'host' ? 'Host' : 'Door'}</em>
+        </div>
+        {/* The venue's very first tap. Nobody has an account yet, so this is the
+            owner giving themselves one — and it is the only thing the shared
+            code can do on this screen. */}
+        {q.you?.bootstrap && (
+          <p className="k-nudge">
+            <b>Start here.</b> Add yourself as <b>Host</b>, scan the code with this same phone,
+            and you are the owner of this venue. After that only you can add or remove anybody.
+          </p>
+        )}
+        {!q.you?.named && !q.you?.bootstrap && (
+          <p className="k-nudge">
+            A shared code runs the night — door, check-ins, the game. It cannot approve money,
+            because &ldquo;the venue code&rdquo; approving twice is one person approving twice.
+            {q.owner ? ` Ask ${q.owner} for your own code.` : ''}
+          </p>
+        )}
+
+        {/* How many different people could sign off on a release. This number is
+            the whole reason the screen exists, so it is stated rather than
+            implied by counting rows. */}
+        <p className="mem-fineprint">
+          {q.namedApprovers === 0
+            ? 'Nobody has their own sign-in yet. A release from the community reserve needs at least two different people, so it cannot happen until you add some.'
+            : q.namedApprovers === 1
+              ? 'One person has their own sign-in. A release needs at least two different people, so add one more.'
+              : `${q.namedApprovers} people have their own sign-in, so a release can be set to need up to ${q.namedApprovers} of them.`}
+        </p>
+
+        {mine && !invite && (
+          <div className="team-add">
+            <label className="jub-label" htmlFor="team-name">Add somebody</label>
+            <div className="jub-step jub-step--wrap">
+              <input id="team-name" className="jub-input" placeholder="Their name" value={name}
+                     maxLength={40} onChange={(e) => setName(e.target.value)} />
+              <select className="jub-input" value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="staff">Door</option>
+                <option value="host">Host</option>
+              </select>
+              <button type="button" className="bingo-btn compact gold" disabled={busy || name.trim().length < 2}
+                      onClick={async () => {
+                        const r = await act(() => apiStaffInvite(name.trim(), role));
+                        if (r?.code) { setInvite(r); setNow(Date.now()); setName(''); }
+                      }}>
+                {busy ? 'Adding…' : 'Add'}
+              </button>
+            </div>
+            <p className="mem-fineprint">
+              Use the name people would say on a shift. It is what shows up next to every
+              approval they make.
+            </p>
+          </div>
+        )}
+
+        {/* The handover. One screen, held up to another phone. */}
+        {invite && (
+          <div className="team-invite">
+            <strong>
+              {invite.admin
+                ? `${invite.name} becomes the owner of this venue`
+                : `${invite.name} joins as ${invite.role === 'host' ? 'Host' : 'Door'}`}
+            </strong>
+            <TeamInviteQr code={invite.code} />
+            <span className="team-code">{invite.code}</span>
+            {q.team.find((t) => t.staffId === invite.staffId)?.claimed ? (
+              <small className="team-got-it">✓ {invite.name} is in. You can put this away.</small>
+            ) : left > 0 ? (
+              <small>Scan it, or type it into <b>Team Access</b> on their phone. Expires in {mmss}.</small>
+            ) : (
+              <small className="team-dead">This code has expired — add them again for a fresh one.</small>
+            )}
+            <button type="button" className="bingo-btn compact ghost" onClick={() => { setInvite(null); load(); }}>Done</button>
+          </div>
+        )}
+
+        {live.map((t) => (
+          <div key={t.staffId} className="dash-row team-row">
+            <div className="dash-info">
+              <strong>{t.name}</strong>
+              <span className="dash-num">
+                {t.admin ? 'Owner' : t.role === 'host' ? 'Host' : 'Door'}
+                {t.claimed ? ` · last on ${fmtDateTime(t.lastSeen)}` : t.inviteOpen ? ' · code not used yet' : ' · never signed in'}
+              </span>
+            </div>
+            {/* Two taps, and the second one says what happens. Removing somebody
+                takes effect on their very next tap, not when their session
+                lapses — so it is not a thing to do by brushing the screen. */}
+            {mine && !t.admin && t.staffId !== q.you?.id && (
+              confirm === t.staffId ? (
+                <div className="team-confirm">
+                  <button type="button" className="mem-cancel" disabled={busy}
+                          onClick={() => act(() => apiStaffRemove(t.staffId)).then(() => setConfirm(null))}>
+                    Remove {t.name} now
+                  </button>
+                  <button type="button" className="bingo-btn compact ghost" onClick={() => setConfirm(null)}>Keep</button>
+                </div>
+              ) : (
+                <button type="button" className="bingo-btn compact ghost" onClick={() => setConfirm(t.staffId)}>Remove</button>
+              )
+            )}
+          </div>
+        ))}
+      </AppPanel>
+    </>
+  );
+}
+
+// The invite QR. `HVAS-STAFF:` prefixed so the venue scanner can tell a staff
+// invite from a member pass without guessing at the payload.
+function TeamInviteQr({ code }) {
+  const qr = useQrDataUrl(`HVAS-STAFF:${code}`, ui.fullLogoClear);
+  return qr
+    ? <img className="team-qr" src={qr} alt={`Invite code ${code}`} />
+    : <div className="qr-load">QR…</div>;
 }
 
 // Being handed the mic.
