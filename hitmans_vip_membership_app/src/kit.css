@@ -2812,3 +2812,61 @@
 }
 .give-row.done { border-color: rgba(57, 255, 136, .45); background: rgba(57, 255, 136, .06); }
 .give-row .jub-chip { margin-left: auto; }
+
+/* ── Getting in ───────────────────────────────────────────────────────────
+   One thing at a time, in words. This is the only screen in the app where
+   reading is the task, so it gets the line length and the leading for it. */
+.onb { padding: 20px 0 60px; }
+.onb-wrap { max-width: 34rem; margin: 0 auto; padding: 0 16px; display: grid; gap: 14px; }
+.onb-rail { display: flex; gap: 6px; list-style: none; margin: 0 0 6px; padding: 0; }
+.onb-rail li {
+  display: flex; align-items: center; gap: 6px; flex: 1 1 0; min-width: 0;
+  padding: 8px 10px; border: 1px solid var(--k-edge-soft); border-radius: 999px;
+  font: 700 10px/1.2 var(--k-font); color: var(--k-text-dim);
+}
+.onb-rail li b {
+  flex: none; width: 17px; height: 17px; border-radius: 50%;
+  display: grid; place-items: center; font: 900 10px/1 var(--k-font);
+  background: rgba(255, 255, 255, .08); color: var(--k-text-dim);
+}
+.onb-rail li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onb-rail li.on { border-color: var(--k-gold); color: var(--k-text); }
+.onb-rail li.on b { background: var(--k-gold); color: #1a1206; }
+.onb-rail li.done b { background: var(--k-go); color: #04220f; }
+.onb-rail li.done { border-color: rgba(57, 255, 136, .4); }
+
+.onb-title { margin: 6px 0 0; font: 900 clamp(22px, 6vw, 30px)/1.15 var(--k-font); color: var(--k-text); text-wrap: balance; }
+.onb-lead { margin: 0; font: 600 13.5px/1.55 var(--k-font); color: var(--k-text-dim); }
+.onb-clauses { display: grid; gap: 9px; margin: 4px 0; }
+.onb-clause {
+  padding: 13px 14px; border: 1px solid var(--k-edge-soft); border-radius: 13px;
+  background: rgba(255, 255, 255, .03);
+}
+.onb-clause strong { display: block; font: 900 13.5px/1.25 var(--k-font); color: var(--k-cyan-lt); margin-bottom: 4px; }
+.onb-clause p { margin: 0; font: 500 12.5px/1.6 var(--k-font); color: var(--k-text); }
+.onb-accept {
+  margin: 4px 0; padding: 13px 14px; border-left: 2px solid var(--k-gold);
+  background: rgba(255, 207, 71, .06); border-radius: 0 11px 11px 0;
+  font: 800 13.5px/1.5 var(--k-font); color: var(--k-gold);
+}
+
+.onb-groups { display: grid; gap: 7px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.onb-group, .onb-role {
+  display: grid; gap: 3px; text-align: left; cursor: pointer; padding: 13px 14px;
+  border: 1px solid var(--k-edge-soft); border-radius: 13px;
+  background: rgba(255, 255, 255, .03); color: var(--k-text);
+}
+.onb-group:active, .onb-role:active { transform: translateY(1px); }
+.onb-group strong, .onb-role strong { font: 800 13px/1.25 var(--k-font); }
+.onb-group span { font: 600 11px/1.3 var(--k-font); color: var(--k-text-dim); }
+.onb-roles { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.onb-tag {
+  justify-self: start; font: 800 9px/1 var(--k-font); letter-spacing: .09em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 999px; margin-top: 3px;
+  color: var(--k-cyan-lt); border: 1px solid rgba(34, 211, 238, .35);
+}
+.onb-tag.alt { color: var(--k-gold); border-color: rgba(255, 207, 71, .35); }
+.onb-back {
+  justify-self: start; background: none; border: none; cursor: pointer; padding: 4px 0;
+  font: 800 11px/1 var(--k-font); letter-spacing: .08em; text-transform: uppercase; color: var(--k-text-dim);
+}

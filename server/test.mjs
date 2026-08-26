@@ -1,6 +1,7 @@
 // End-to-end integration test — boots the app on a random port and drives the
 // full night through the real HTTP API + crypto. No external deps.
 import { createApp } from './src/app.mjs';
+import { onboard } from './test-helpers.mjs';
 import { verifyPass } from './src/crypto.mjs';
 import { sign } from 'node:crypto';
 import { rmSync } from 'node:fs';
@@ -39,6 +40,9 @@ const start = await call('POST', '/auth/member/start', { contact: '850-555-1234'
 ok(start.body.devCode, 'OTP issued');
 const verify = await call('POST', '/auth/member/verify', { contact: '850-555-1234', code: start.body.devCode, name: 'Tasha' });
 ok(verify.status === 200 && verify.body.token, 'member signed in');
+// Signing in is not membership — the venue refuses everything below until a
+// member has agreed to the covenant, said what they do, and chosen a programme.
+await onboard(call, verify.body.token, { role: 'NAILS' });
 const mtok = verify.body.token;
 ok(/^HV-\d{4}-\d{4}$/.test(verify.body.member.number), 'member number minted');
 
@@ -136,6 +140,7 @@ console.log('MANUAL STAFF ACTIONS (profile buttons — no scan needed)');
 const s3 = await call('POST', '/auth/member/start', { contact: '850-555-4321' });
 const v3 = await call('POST', '/auth/member/verify', { contact: '850-555-4321', code: s3.body.devCode, name: 'Marcus' });
 const mtok3 = v3.body.token;
+await onboard(call, mtok3, { role: 'DRIVER' });
 await call('POST', '/membership/purchase', { tier: 'Daily', payment: 'Cash' }, mtok3);
 const marcus = (await call('GET', '/me', null, mtok3)).body.member;
 
@@ -180,6 +185,7 @@ console.log('LIP SYNC BINGO');
 const s2 = await call('POST', '/auth/member/start', { contact: '850-555-9999' });
 const v2 = await call('POST', '/auth/member/verify', { contact: '850-555-9999', code: s2.body.devCode, name: 'Rell' });
 const mtok2 = v2.body.token;
+await onboard(call, mtok2, { role: 'BARBER' });
 
 let state = await call('GET', '/bingo/state');
 ok(state.body.status === 'lobby', 'round starts in lobby');
@@ -705,6 +711,7 @@ const crowd = [];
 for (let i = 0; i < 4; i++) {
   const st1 = await call('POST', '/auth/member/start', { contact: `850-555-90${i}` });
   const v1 = await call('POST', '/auth/member/verify', { contact: `850-555-90${i}`, code: st1.body.devCode, name: `Battler${i}` });
+  await onboard(call, v1.body.token, { role: 'DJ' });
   const j = await call('POST', '/bingo/join', {}, v1.body.token);
   crowd.push({ tok: v1.body.token, id: v1.body.member.id, name: `Battler${i}`, card: j.body.card });
 }
@@ -815,6 +822,7 @@ const pod = [];
 for (let i = 0; i < 3; i++) {
   const st2 = await call('POST', '/auth/member/start', { contact: `850-555-96${i}` });
   const v2 = await call('POST', '/auth/member/verify', { contact: `850-555-96${i}`, code: st2.body.devCode, name: `Podium${i}` });
+  await onboard(call, v2.body.token, { role: 'PATRON' });
   const j2 = await call('POST', '/bingo/join', {}, v2.body.token);
   pod.push({ tok: v2.body.token, id: v2.body.member.id, card: j2.body.card, name: `Podium${i}` });
 }
@@ -899,6 +907,7 @@ ok(st0.next ? st0.next.need > 0 : st0.title === 'After Spot Legend',
   `the next title is visible with what it takes, or they are already at the top (${st0.title} / ${st0.next?.title ?? 'maxed'})`);
 const rookieStart = await call('POST', '/auth/member/start', { contact: '850-555-9500' });
 const rookieV = await call('POST', '/auth/member/verify', { contact: '850-555-9500', code: rookieStart.body.devCode, name: 'Rookie' });
+await onboard(call, rookieV.body.token, { role: 'TUTOR' });
 const rookie = (await call('GET', '/me/stats', null, rookieV.body.token)).body.stats;
 ok(rookie.nights === 0 && rookie.title === 'First Timer', 'someone who has never played reads as a First Timer with a clean sheet');
 ok(rookie.next && rookie.next.need > 0, `and can see exactly what the next title costs (${rookie.next?.title} in ${rookie.next?.need})`);

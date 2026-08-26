@@ -11,6 +11,7 @@ process.env.HVAS_HOST_CODE = 'HOST850';
 process.env.HVAS_STAFF_CODE = 'DOOR850';
 process.env.BINGO_SONG_SECONDS = '3';
 const { createApp } = await import('./src/app.mjs');
+const { onboard } = await import('./test-helpers.mjs');
 const { server } = createApp({ dataDir: `/tmp/hvas-pulse-${Date.now()}` });
 await new Promise((r) => server.listen(0, r));
 const api = `http://127.0.0.1:${server.address().port}`;
@@ -35,7 +36,9 @@ const owner = await hire('Kenya', 'host', venue);
 const door = await hire('Trey', 'staff', owner);
 const mk = async (ph, nm) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
-  return (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await onboard(call, v.token);
+  return v;
 };
 const pulse = async (t = owner) => (await call('GET', '/venue/pulse', null, t)).body;
 

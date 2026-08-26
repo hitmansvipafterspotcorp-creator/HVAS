@@ -22,6 +22,7 @@ const appUrl = `http://127.0.0.1:${web.address().port}/HVAS/`;
 
 process.env.HVAS_HOST_CODE = 'HOST850';
 const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
 const { server } = createApp({ dataDir: `/tmp/hvas-ui-${Date.now()}` });
 await new Promise((r) => server.listen(0, r));
 const api = `http://127.0.0.1:${server.address().port}`;
@@ -133,6 +134,21 @@ if (/6-digit code|enter code/i.test(await text())) {
 let body = await text();
 ok(!/Member Sign In/i.test(body), 'signed in — the door screen is behind us');
 
+// Signing in is not membership. A new member now meets the covenant, the trade
+// list and the programmes before the app opens, so this suite walks that the
+// same way somebody actually would — three taps, on screen, not through the API.
+if (/Community Covenant/i.test(body)) {
+  await tap('I agree'); await settle(1800);
+  await js(`const b=[...document.querySelectorAll('.onb-group')].find(b=>/Here for the room/.test(b.innerText));if(b)b.click();return !!b;`);
+  await settle(900);
+  await js(`const b=[...document.querySelectorAll('.onb-role')].find(b=>/Just here for the night/.test(b.innerText));if(b)b.click();return !!b;`);
+  await settle(1800);
+  await js(`const b=document.querySelector('.prog-card');if(b)b.click();return !!b;`);
+  await settle(2500);
+  body = await text();
+  ok(!/Community Covenant/i.test(body), 'and through sign-up — the app is open');
+}
+
 // The host opens an event server-side; the member's screen must reflect it.
 const created = await call('POST', '/lipsync/create', { format: 'bracket', title: 'Smoke Bracket', size: 8 }, hostTok);
 ok(!!created.event, 'backend accepted the event the member screen will show');
@@ -191,7 +207,10 @@ ok(st.event?.roster?.some((p) => p.name === 'Rico'), 'the join reached the backe
 console.log('\nMEMBER — a live bout takes over the screen');
 const other = await (async () => {
   const s = await call('POST', '/auth/member/start', { contact: '850-900-0888' });
-  return call('POST', '/auth/member/verify', { contact: '850-900-0888', code: s.devCode, name: 'Nova' });
+  const v = await call('POST', '/auth/member/verify', { contact: '850-900-0888', code: s.devCode, name: 'Nova' });
+  // Signing in is not membership — the venue refuses a join until they are in.
+  await onboard(call, v.token);
+  return v;
 })();
 await call('POST', '/lipsync/join', {}, other.token);
 await call('POST', '/lipsync/start', {}, hostTok);

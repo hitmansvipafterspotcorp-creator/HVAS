@@ -1,3 +1,4 @@
+const { onboard } = await import('./test-helpers.mjs');
 // Verse-and-hook clips, and a host who controls the clock but never its length.
 //
 // A performance plays one segment — the tail of verse one into the first hook —
@@ -20,7 +21,9 @@ const call = async (m, p, b, t) => {
 };
 const mk = async (ph, nm) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
-  return (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await onboard(call, v.token);
+  return v;
 };
 const host = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

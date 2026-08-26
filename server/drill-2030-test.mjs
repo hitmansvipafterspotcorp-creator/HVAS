@@ -13,6 +13,7 @@
 process.env.HVAS_HOST_CODE = 'HOST850';
 process.env.HVAS_STAFF_CODE = 'DOOR850';
 const { createApp } = await import('./src/app.mjs');
+const { onboard } = await import('./test-helpers.mjs');
 const dataDir = `/tmp/hvas-drill-${Date.now()}`;
 let { server } = createApp({ dataDir });
 await new Promise((r) => server.listen(0, r));
@@ -31,7 +32,9 @@ const eq = (a, b, m) => ok(a === b, `${m}${a === b ? '' : ` — got ${JSON.strin
 
 const mk = async (ph, nm) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
-  return (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await onboard(call, v.token);
+  return v;
 };
 
 // ── A venue mid-night, before anything goes wrong ──────────────────────────

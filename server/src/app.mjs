@@ -12,6 +12,8 @@ import { resolve as pathResolve, join as pathJoin, normalize as pathNormalize, e
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
+import { COVENANT, COVENANT_VERSION, onboardingState } from './economy/covenant.mjs';
+import { MEMBER_ROLE, rolesByGroup, roleGrants } from './economy/roles.mjs';
 // The SAME rules the phones run. Imported rather than restated: a prize table
 // or a vote threshold that exists twice is a prize table that will eventually
 // disagree with itself, and the disagreement would be about money in a room.
@@ -1205,6 +1207,48 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     json(res, 403, { error: `Only ${admin.name} manages the team.` });
     return null;
   };
+  // Where somebody is in becoming a member here.
+  const onboardingOf = (memberId) => {
+    const m = db.prepare('SELECT member_role, program FROM members WHERE id=?').get(memberId);
+    const a = db.prepare(
+      `SELECT version FROM member_agreements WHERE member_id=? AND document='COVENANT' ORDER BY at DESC LIMIT 1`)
+      .get(memberId);
+    return onboardingState({
+      agreedVersion: a?.version || null,
+      memberRole: m?.member_role || null,
+      program: m?.program || null,
+      knownRole: (r) => !!MEMBER_ROLE[r],
+    });
+  };
+  // Acceptance is a moment worth having a date on — it is when somebody became
+  // a member of this place rather than an account that had signed in.
+  const markAcceptedIfDone = (memberId) => {
+    if (!onboardingOf(memberId).accepted) return false;
+    const row = db.prepare('SELECT accepted_at FROM members WHERE id=?').get(memberId);
+    if (row?.accepted_at) return true;
+    db.prepare('UPDATE members SET accepted_at=? WHERE id=?').run(Date.now(), memberId);
+    return true;
+  };
+  // Using the place requires having been accepted into it. This gates the doing
+  // — playing, asking for support, giving, the marketplace — and never the
+  // steps themselves, or somebody could not finish what they started.
+  //
+  // It refuses with the step they are on, because "not accepted" tells a person
+  // standing there nothing they can act on.
+  const acceptedMember = (req, res) => {
+    const c = auth(req, 'member');
+    if (!c) { json(res, 401, { error: 'unauthorized' }); return null; }
+    const st = onboardingOf(c.sub);
+    if (!st.accepted) {
+      json(res, 403, {
+        error: st.next ? `Finish signing up first: ${st.next.label.toLowerCase()}.` : 'Finish signing up first.',
+        onboarding: st,
+      });
+      return null;
+    }
+    return c;
+  };
+
   // Money needs a person, not a role. Returns the claims, or writes the refusal
   // and returns null — and the refusal says how to fix it, because "403" to a
   // host at 1am is a support call rather than a security control.
@@ -1637,6 +1681,71 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { ok: true, name: row.name });
     },
 
+    // ── Getting in ───────────────────────────────────────────────────────────
+    //
+    // Signing in is not membership. Before anybody uses this place they agree to
+    // the Community Covenant, say what they do, and choose a programme to stand
+    // behind. All three are the member's own act; none of them can be done for
+    // them by the house.
+    'GET /onboarding': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const m = db.prepare('SELECT member_role, role_other, program FROM members WHERE id=?').get(c.sub);
+      const agreed = db.prepare(
+        `SELECT version, at FROM member_agreements WHERE member_id=? AND document='COVENANT' ORDER BY at DESC LIMIT 1`)
+        .get(c.sub);
+      json(res, 200, {
+        ...onboardingOf(c.sub),
+        covenant: COVENANT,
+        agreed: agreed ? { version: agreed.version, at: agreed.at } : null,
+        groups: rolesByGroup(),
+        role: m?.member_role || null,
+        roleOther: m?.role_other || null,
+        grants: m?.member_role ? roleGrants(m.member_role) : null,
+        programs: programBoard(),
+        program: m?.program || null,
+      });
+    },
+
+    // Agreeing. The VERSION is stored with it, so when the terms change what
+    // somebody actually accepted does not change with them — they are asked
+    // again, and the old record still says what they signed.
+    'POST /me/agree': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { document = 'COVENANT', version, agree } = await readBody(req);
+      if (document !== 'COVENANT') return json(res, 400, { error: `there is no document called "${document}"` });
+      if (agree !== true) return json(res, 400, { error: 'Agreement has to be a yes. Nothing was recorded.' });
+      // Agreeing to a version you were not shown is not agreement.
+      if (version !== COVENANT_VERSION) {
+        return json(res, 409, {
+          error: 'The covenant has changed since this screen loaded. Read it again — it is short.',
+          version: COVENANT_VERSION,
+        });
+      }
+      db.prepare(`INSERT INTO member_agreements(member_id, document, version, at, device) VALUES(?,?,?,?,?)`)
+        .run(c.sub, 'COVENANT', COVENANT_VERSION, Date.now(), (req.headers['user-agent'] || '').slice(0, 120));
+      markAcceptedIfDone(c.sub);
+      json(res, 200, { ok: true, version: COVENANT_VERSION, ...onboardingOf(c.sub) });
+    },
+
+    // What they do. Sixty-odd trades, and OTHER for the ones the list does not
+    // have yet — what somebody types there is kept, because that is how the list
+    // grows from the room rather than from a guess.
+    'POST /me/role': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { role, other } = await readBody(req);
+      const id = String(role || '').trim().toUpperCase();
+      if (!MEMBER_ROLE[id]) return json(res, 400, { error: `"${role}" is not on the list`, groups: rolesByGroup() });
+      const said = String(other || '').trim().slice(0, 60);
+      if (id === 'OTHER' && said.length < 2) {
+        return json(res, 400, { error: 'Say what you do — a couple of words is plenty.' });
+      }
+      db.prepare('UPDATE members SET member_role=?, role_other=?, updated_at=? WHERE id=?')
+        .run(id, id === 'OTHER' ? said : null, Date.now(), c.sub);
+      markAcceptedIfDone(c.sub);
+      json(res, 200, { ok: true, role: id, other: id === 'OTHER' ? said : null,
+                       grants: roleGrants(id), ...onboardingOf(c.sub) });
+    },
+
     // ── Programmes ───────────────────────────────────────────────────────────
     //
     // Open to anybody signed in, including a member who has not joined one yet —
@@ -1656,7 +1765,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // actually arrived. A member confirming their own donation would make the
     // programme's total a number anybody could type.
     'POST /programs/donate': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       const { program, amountCents, rail, note } = await readBody(req);
       const id = String(program || '').trim().toUpperCase();
       if (!PROGRAMS[id]) return json(res, 400, { error: `"${program}" is not one of the programmes` });
@@ -1756,7 +1865,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     },
 
     'POST /board/apply': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       const { program, position, brings } = await readBody(req);
       const pid = String(program || '').trim().toUpperCase();
       const seat = String(position || '').trim().toUpperCase();
@@ -1841,11 +1950,14 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       }
       const now = Date.now();
       const prev = db.prepare('SELECT program FROM members WHERE id=?').get(c.sub)?.program || null;
-      if (prev === id) return json(res, 200, { ok: true, program: id, unchanged: true });
+      if (prev === id) {
+        return json(res, 200, { ok: true, program: id, unchanged: true, label: PROGRAMS[id].label });
+      }
       db.prepare('UPDATE members SET program=?, program_at=?, updated_at=? WHERE id=?')
         .run(id, now, now, c.sub);
       db.prepare('INSERT INTO member_program_history(member_id, program, at) VALUES(?,?,?)')
         .run(c.sub, id, now);
+      markAcceptedIfDone(c.sub);
       // Contributions already made stay where they landed. Moving programme
       // changes where the NEXT share goes; it does not reach back and move money
       // that has already been recorded as belonging somewhere.
@@ -1921,7 +2033,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { enabled: hitkoinEnabled(), ...walletSummary(db, c.sub) });
     },
     'POST /membership/purchase': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       const { tier, payment } = await readBody(req);
       const t = TIERS[tier]; if (!t) return json(res, 400, { error: 'bad tier' });
       const now = Date.now();
@@ -2275,7 +2387,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { decks: deckList(), patterns: BINGO_PATTERN_IDS, defaultDeckId: DEFAULT_DECK_ID });
     },
     'POST /bingo/join': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       const existing = db.prepare('SELECT * FROM bingo_cards WHERE member_id=?').get(c.sub);
       if (existing) return json(res, 200, { card: JSON.parse(existing.card), ready: !!existing.ready, covered: JSON.parse(existing.covered) });
       const r = getBingoRound();
@@ -2818,7 +2930,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // phone could settle its own entry the pot would be a number a member
     // typed, which is the one failure this whole feature exists to avoid.
     'POST /bingo/entry/claim': async (req, res) => {
-      const cl = auth(req, 'member'); if (!cl) return json(res, 401, { error: 'unauthorized' });
+      const cl = acceptedMember(req, res); if (!cl) return;
       const { rail, reference } = await readBody(req);
       if (!['paypal', 'zelle', 'cashapp', 'cash'].includes(rail)) return json(res, 400, { error: 'bad rail' });
       const r = getBingoRound();
@@ -2899,7 +3011,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // and is stated on the record itself — this registers authorship of a
     // performance, it does not transfer or create copyright in the song.
     'POST /ip/performance': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       if (!economyFlags().HITK_IP_REGISTRY) return json(res, 503, { error: 'ip registry is off' });
       const { contentHash, artist, song, durationMs, performedAt } = await readBody(req);
       // A hash is the whole submission, so it has to actually be one.
@@ -2967,7 +3079,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       });
     },
     'POST /jubilee/apply': async (req, res) => {
-      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const c = acceptedMember(req, res); if (!c) return;
       if (!economyFlags().WORLD_JUBILEE_PROGRAMS) return json(res, 503, { error: 'jubilee programmes are not running' });
       const { needKind, amountCents, detail, providerHint } = await readBody(req);
       const cls = classify(needKind);

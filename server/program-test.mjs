@@ -11,6 +11,8 @@
 //
 process.env.HVAS_HOST_CODE = 'HOST850';
 const { createApp } = await import('./src/app.mjs');
+const { onboard } = await import('./test-helpers.mjs');
+const { COVENANT_VERSION } = await import('./src/economy/covenant.mjs');
 const { server } = createApp({ dataDir: `/tmp/hvas-prog-${Date.now()}` });
 await new Promise((r) => server.listen(0, r));
 const api = `http://127.0.0.1:${server.address().port}`;
@@ -31,11 +33,23 @@ const inv = await call('POST', '/staff/invite', { name: 'Kenya', role: 'host' },
 const owner = (await call('POST', '/auth/staff/claim', { code: inv.body.code })).body.token;
 const mk = async (ph, nm) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
-  return (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await onboard(call, v.token);
+  return v;
+};
+// Somebody part-way through signing up: agreed, said what they do, and not yet
+// standing behind anything. Since onboarding requires a programme, this is the
+// only state in which "in none of them" is real.
+const mkMidSignup = async (ph, nm) => {
+  const s = await call('POST', '/auth/member/start', { contact: ph });
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await call('POST', '/me/agree', { version: COVENANT_VERSION, agree: true }, v.token);
+  await call('POST', '/me/role', { role: 'NAILS' }, v.token);
+  return v;   // agreed, said what she does, standing behind nothing yet
 };
 
 console.log('\nTHE CHOICES ARE VISIBLE BEFORE YOU CHOOSE');
-const nova = await mk('850-940-0001', 'Nova');
+const nova = await mkMidSignup('850-940-0001', 'Nova');
 const list = await call('GET', '/programs', null, nova.token);
 eq(list.status, 200, 'a member who has joined nothing can still see the programmes');
 eq(list.body.programs.length, 6, 'all six are offered');

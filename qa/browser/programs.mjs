@@ -16,6 +16,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 process.env.HVAS_HOST_CODE='HOST850';
 const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
 const { server: api } = createApp({ dataDir: `/tmp/hvas-prog-${Date.now()}` });
 await new Promise(r=>api.listen(0,r));
 const API=`http://127.0.0.1:${api.address().port}`;
@@ -23,7 +24,9 @@ const call=async(m,p,b,t)=>{const r=await fetch(API+p,{method:m,headers:{'Conten
 const venue=(await call('POST','/auth/staff',{code:'HOST850'})).body.token;
 const inv=await call('POST','/staff/invite',{name:'Kenya',role:'host'},venue);
 const owner=(await call('POST','/auth/staff/claim',{code:inv.body.code})).body.token;
-const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;};
+// Deliberately NOT onboarded — this suite drives the real sign-up.
+const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});
+  return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;};
 await call('POST','/bingo/mode',{mode:'cash'},owner);
 await call('POST','/bingo/split',{housePercent:1,worldPercent:1},owner);
 const nova=await mk('850-950-0001','Nova');
@@ -70,28 +73,58 @@ await js(`localStorage.setItem('hvas_hub_off','1');localStorage.setItem('hvas_ap
 await cdp('Page.navigate',{url:appUrl});await settle(8000);
 await tap('Enter');await settle(4000);
 
-console.log('A MEMBER WHO HAS JOINED NOTHING IS ASKED, NOT LEFT ALONE');
+console.log('SIGNING IN IS NOT MEMBERSHIP');
 const t0=await text();
-console.log('   [pass]', t0.slice(0,420));
-ok(/choose your programme/i.test(t0),'the card asks them to choose');
-ok(await js(`return !!document.querySelector('.prog--needed')`),'and it is the loud thing until they do');
-const cards=await js(`return [...document.querySelectorAll('.prog-card strong')].map(e=>e.innerText.trim()).join(' | ')`);
-console.log('   [programmes]', cards);
-ok(cards.split('|').length===6,'all six are on offer');
-ok(/Housing stability/.test(cards)&&/Food & water/.test(cards)&&/Youth & education/.test(cards),
-   'named in words a person would use, not vault ids');
-await shot('prog-1-choose.png');
+console.log('   [step 1]', t0.slice(0,300));
+ok(/community covenant/i.test(t0),'the first thing is the covenant, not a menu');
+ok(/support the mission/i.test(t0),'it says supporting the mission is part of being here');
+ok(/nobody owns it|owns it/i.test(t0),'and that the reserve belongs to nobody');
+ok(await js(`return document.querySelectorAll('.onb-clause').length>=5`),'the whole thing is on screen, not behind a link');
+await shot('onb-1-covenant.png');
 
-console.log('\nJOINING ONE IS ONE TAP');
-ok(await js(`const b=[...document.querySelectorAll('.prog-card')].find(b=>/Housing stability/.test(b.innerText));if(!b)return false;b.click();return true;`),
-   'tapping a programme joins it');
-await settle(3000);
+console.log('\nAGREEING MOVES YOU ON');
+ok(await tap('I agree'),'there is one button');
+await settle(2500);
 const t1=await text();
-console.log('   [after]', t1.slice(0,300));
-ok(/your programme/i.test(t1),'the card now shows which one is theirs');
-ok(/Housing stability/.test(t1),'by name');
-ok(!(await js(`return !!document.querySelector('.prog--needed')`)),'and stops asking');
-ok((await call('GET','/me',null,nova.token)).body.program==='HOUSING','the server has it too, not just the screen');
+console.log('   [step 2]', t1.slice(0,260));
+ok(/what do you do/i.test(t1),'next is what you do for a living');
+const groups=await js(`return [...document.querySelectorAll('.onb-group strong')].map(e=>e.innerText.trim()).join(' | ')`);
+console.log('   [groups]', groups);
+ok(/Beauty & grooming/.test(groups)&&/Music & performance/.test(groups)&&/Trades/.test(groups),
+   'grouped the way people would group themselves');
+await shot('onb-2-work.png');
+
+console.log('\nTHE WHOLE WORKING ECONOMY, NOT THREE BOXES');
+ok(await js(`const b=[...document.querySelectorAll('.onb-group')].find(b=>/Beauty/.test(b.innerText));if(!b)return false;b.click();return true;`),
+   'a group opens');
+await settle(1200);
+const roles=await js(`return [...document.querySelectorAll('.onb-role strong')].map(e=>e.innerText.trim()).join(' | ')`);
+console.log('   [beauty]', roles);
+ok(/Nail tech/.test(roles)&&/Barber/.test(roles)&&/Braider/.test(roles),'nail tech, barber and braider are all on it');
+await shot('onb-3-roles.png');
+ok(await js(`const b=[...document.querySelectorAll('.onb-role')].find(b=>/Nail tech/.test(b.innerText));if(!b)return false;b.click();return true;`),
+   'picking one moves on');
+await settle(2500);
+const t2=await text();
+console.log('   [step 3]', t2.slice(0,260));
+ok(/which cause do you stand behind/i.test(t2),'last step is the programme');
+await shot('onb-4-cause.png');
+
+console.log('\nAND ONLY THEN ARE THEY IN');
+ok(await js(`const b=[...document.querySelectorAll('.prog-card')].find(b=>/Housing stability/.test(b.innerText));if(!b)return false;b.click();return true;`),
+   'they stand behind one');
+await settle(4000);
+const t3=await text();
+console.log('   [in]', t3.slice(0,260));
+ok(/my pass|my card/i.test(t3),'and the app opens');
+ok((await call('GET','/onboarding',null,nova.token)).body.accepted===true,'the server agrees they are accepted');
+await shot('onb-5-in.png');
+
+console.log('\nWHAT THEY JOINED IS ON THE CARD');
+const card=await text();
+console.log('   [pass]', card.slice(0,420));
+ok(/your programme/i.test(card),'the card shows which one is theirs');
+ok(/Housing stability/.test(card),'by name');
 await shot('prog-2-joined.png');
 
 console.log('\nPLAYING IS NOT GIVING');

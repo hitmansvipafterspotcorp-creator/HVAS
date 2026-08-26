@@ -15,6 +15,7 @@ import { extname, join, normalize } from 'node:path';
 process.env.HVAS_HOST_CODE = 'HOST850'; process.env.HVAS_STAFF_CODE = 'DOOR850';
 process.env.BINGO_SONG_SECONDS = '3';
 const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
 const { server: api } = createApp({ dataDir: `/tmp/hvas-tonight-${Date.now()}` });
 await new Promise((r) => api.listen(0, r));
 const API = `http://127.0.0.1:${api.address().port}`;
@@ -28,8 +29,12 @@ const hire = async (name, role, by) => {
   return (await call('POST','/auth/staff/claim',{ code: inv.body.code })).body.token;
 };
 const owner = await hire('Kenya','host', venue);
-const mk = async (ph, nm) => { const s = await call('POST','/auth/member/start',{contact:ph});
-  return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body; };
+const mk = async (ph, nm) => {
+  const s = await call('POST','/auth/member/start',{contact:ph});
+  const v = (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;
+  await onboard(call, v.token);   // signing in is not membership
+  return v;
+};
 
 const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
 const SHOT=process.env.HVAS_SHOTS||'';

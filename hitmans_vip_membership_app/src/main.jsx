@@ -32,6 +32,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiStaffRoster, apiStaffInvite, apiStaffRemove,
   apiVenuePulse, apiPrograms, apiJoinProgram,
   apiDonate, apiMyDonations, apiBoard, apiBoardApply,
+  apiOnboarding, apiAgree, apiSetRole,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -1257,6 +1258,17 @@ function App() {
   const [unlocked, setUnlocked] = useState({ staff: false, host: false }); // per-session code unlock
   const [gate, setGate] = useState(null);        // role awaiting auth: 'member' | 'staff' | 'host'
   const [team, setTeam] = useState(false);       // hidden Team Access screen (reached by holding the crest)
+  // Whether this member has been accepted: agreed to the covenant, said what
+  // they do, and chosen a programme. Starts optimistic so a returning member
+  // does not see the sign-up flash on every load — Onboarding asks the server
+  // immediately and puts itself back up if they are not actually through.
+  const [accepted, setAccepted] = useState(true);
+  useEffect(() => {
+    if (!apiEnabled() || !apiToken()) return;
+    let live = true;
+    apiOnboarding().then((r) => { if (live) setAccepted(!!r.accepted); }).catch(() => {});
+    return () => { live = false; };
+  }, [auth?.member?.contact]);
   const member = useMember();                    // subscribe: door verification updates this
   const onTheWay = isOnTheWay(member);           // shared signal: member heading to the venue
   const inside = isInsideTonight(member);        // set when verified at the door — unlocks access
@@ -1406,6 +1418,14 @@ function App() {
 
   if (connecting) {
     return <ConnectingScreen />;
+  }
+
+  // Signing in is not membership. A member who has not agreed to the covenant,
+  // said what they do and chosen a programme sees only that — the server would
+  // refuse everything else anyway, and a menu full of things that all fail is
+  // worse than one screen that says what is left.
+  if (role === 'member' && apiEnabled() && !accepted) {
+    return <Onboarding onDone={() => setAccepted(true)} />;
   }
 
   if (connectError) {
@@ -5294,6 +5314,162 @@ function TonightScreen({ onGo }) {
           everything above, which is exactly where context belongs. */}
       <StaffDashboardScreen />
     </>
+  );
+}
+
+// ── Getting in ─────────────────────────────────────────────────────────────
+//
+// Signing in is not membership. Before anybody uses this place they read the
+// Community Covenant and agree to it, say what they do for a living, and choose
+// a programme to stand behind.
+//
+// The server refuses everything until all three are done, so this screen is not
+// the rule — it is how the rule looks to somebody standing at the door with a
+// drink in their hand. Which means: one thing at a time, in words, with the
+// covenant actually readable rather than a checkbox next to a link nobody opens.
+function Onboarding({ onDone }) {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [group, setGroup] = useState(null);
+  const [other, setOther] = useState('');
+
+  const load = async () => {
+    try {
+      const r = await apiOnboarding();
+      setD(r);
+      if (r.accepted) onDone?.();
+    } catch (e) { setErr(e.message || 'Could not reach the venue.'); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); }
+    catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!d && !err) return <section className="screen onb"><p className="dash-empty">One moment…</p></section>;
+  if (!d) {
+    return (
+      <section className="screen onb">
+        <p className="k-nudge k-nudge--no">{err}</p>
+        <button type="button" className="bingo-btn compact ghost" onClick={load}>Try again</button>
+      </section>
+    );
+  }
+
+  const step = d.next?.id;
+  const stepNo = d.steps.findIndex((s2) => !s2.done) + 1;
+
+  return (
+    <section className="screen onb">
+      <div className="onb-wrap">
+        {/* Where they are, so three steps do not feel like an unknown number. */}
+        <ol className="onb-rail">
+          {d.steps.map((s2, i) => (
+            <li key={s2.id} className={s2.done ? 'done' : (i + 1 === stepNo ? 'on' : '')}>
+              <b>{i + 1}</b><span>{s2.label}</span>
+            </li>
+          ))}
+        </ol>
+        {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+        {step === 'AGREE' && (
+          <>
+            <h1 className="onb-title">{d.covenant.title}</h1>
+            <p className="onb-lead">{d.covenant.lead}</p>
+            {/* The whole thing, on the screen. A covenant behind a link is a
+                checkbox, and a checkbox is not an agreement. */}
+            <div className="onb-clauses">
+              {d.covenant.clauses.map((c) => (
+                <div key={c.id} className="onb-clause">
+                  <strong>{c.heading}</strong>
+                  <p>{c.body}</p>
+                </div>
+              ))}
+            </div>
+            <p className="onb-accept">{d.covenant.accept}</p>
+            <button type="button" className="bingo-btn gold" disabled={busy}
+                    onClick={() => act(() => apiAgree(d.covenant.version))}>
+              {busy ? 'One moment…' : 'I agree'}
+            </button>
+            <p className="mem-fineprint">Version {d.covenant.version}. If this ever changes you will be asked again.</p>
+          </>
+        )}
+
+        {step === 'ROLE' && (
+          <>
+            <h1 className="onb-title">What do you do?</h1>
+            <p className="onb-lead">
+              This room runs on the people in it — artists, nail techs, barbers, drivers, cooks.
+              What you pick decides what opens up for you.
+            </p>
+            {!group ? (
+              <div className="onb-groups">
+                {d.groups.map((g) => (
+                  <button type="button" key={g.id} className="onb-group" onClick={() => setGroup(g.id)}>
+                    <strong>{g.label}</strong>
+                    <span>{g.roles.length} to choose from</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                <button type="button" className="onb-back" onClick={() => setGroup(null)}>‹ All kinds of work</button>
+                <div className="onb-roles">
+                  {d.groups.find((g) => g.id === group)?.roles.map((r) => (
+                    <button type="button" key={r.id} className="onb-role" disabled={busy}
+                            onClick={() => (r.id === 'OTHER' ? null : act(() => apiSetRole(r.id)))}>
+                      <strong>{r.label}</strong>
+                      {r.creative && <span className="onb-tag">Register your work</span>}
+                      {r.sells && <span className="onb-tag alt">Sell in the marketplace</span>}
+                    </button>
+                  ))}
+                </div>
+                {/* The list is not the economy. Somebody not on it says so, and
+                    what they type is kept. */}
+                {d.groups.find((g) => g.id === group)?.roles.some((r) => r.id === 'OTHER') && (
+                  <div className="jub-step jub-step--wrap">
+                    <input className="jub-input" placeholder="Or type what you do" value={other}
+                           maxLength={60} onChange={(e) => setOther(e.target.value)} />
+                    <button type="button" className="bingo-btn compact" disabled={busy || other.trim().length < 2}
+                            onClick={() => act(() => apiSetRole('OTHER', other.trim()))}>
+                      That&rsquo;s me
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {step === 'PROGRAM' && (
+          <>
+            <h1 className="onb-title">Which cause do you stand behind?</h1>
+            <p className="onb-lead">
+              A share of what this venue takes goes to a community reserve, and these are what it
+              pays for. Standing behind one costs you nothing — it is what you are here for as
+              well as the night.
+            </p>
+            <div className="prog-grid">
+              {d.programs.map((p) => (
+                <button type="button" key={p.id} className="prog-card" disabled={busy}
+                        onClick={() => act(() => apiJoinProgram(p.id))}>
+                  <strong>{p.label}</strong>
+                  <span className="prog-num">{MONEY(p.donatedCents)}</span>
+                  <span className="prog-members">
+                    {p.members} {p.members === 1 ? 'member' : 'members'} · {p.openSeats} open
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="mem-fineprint">You can move to another one later, any time.</p>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 

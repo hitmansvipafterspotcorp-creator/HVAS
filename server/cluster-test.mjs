@@ -4,6 +4,7 @@
 // mesh are one system: state created on one node is usable on another with no
 // shared database and no cloud.
 import { createApp } from './src/app.mjs';
+import { onboard } from './test-helpers.mjs';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 
@@ -41,6 +42,7 @@ await wait(150); // let the mesh link establish
 console.log('MEMBER SIGNS UP + BUYS ON NODE A');
 const s = await call(urlA, 'POST', '/auth/member/start', { contact: '850-555-0000' });
 const v = await call(urlA, 'POST', '/auth/member/verify', { contact: '850-555-0000', code: s.body.devCode, name: 'Mesh' });
+await onboard(call, v.body.token);
 const mtok = v.body.token; const number = v.body.member.number;
 await call(urlA, 'POST', '/membership/purchase', { tier: 'Monthly', payment: 'Cash App' }, mtok);
 ok(number, `member ${number} created on A`);

@@ -563,6 +563,35 @@ export function openDb(path) {
     at INTEGER NOT NULL
   )`);
 
+  // ── Being accepted in the first place ───────────────────────────────────
+  //
+  // Signing in is not membership. Before somebody uses this place they agree to
+  // the Community Covenant, say what kind of member they are, and choose a
+  // programme to stand behind. The agreement carries the VERSION they saw: when
+  // the terms change, what they actually accepted does not silently change with
+  // them.
+  {
+    const cols = db.prepare(`PRAGMA table_info(members)`).all().map((c) => c.name);
+    // What they do, from the trade list — and, when they picked OTHER, the words
+    // they used. Keeping what somebody typed is how the list grows from the room
+    // rather than from us guessing at it.
+    if (!cols.includes('member_role')) db.exec(`ALTER TABLE members ADD COLUMN member_role TEXT`);
+    if (!cols.includes('role_other')) db.exec(`ALTER TABLE members ADD COLUMN role_other TEXT`);
+    if (!cols.includes('accepted_at')) db.exec(`ALTER TABLE members ADD COLUMN accepted_at INTEGER`);
+  }
+  // Every agreement is its own row, never an update. What somebody signed, and
+  // when, is the sort of thing that has to survive somebody changing their mind
+  // — and the sort of thing a member is entitled to see for themselves.
+  db.exec(`CREATE TABLE IF NOT EXISTS member_agreements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    document TEXT NOT NULL,              -- COVENANT
+    version TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    device TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agreements_member ON member_agreements(member_id, at DESC)`);
+
   // ── Giving to a programme, and sitting on its board ─────────────────────
   //
   // Belonging to a programme is an affiliation, not a payment. Playing bingo is

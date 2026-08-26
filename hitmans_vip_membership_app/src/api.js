@@ -171,6 +171,16 @@ export function apiStaffSignOut() {
 }
 
 // ── The team ──────────────────────────────────────────────────────────────
+// ── Getting in ────────────────────────────────────────────────────────────
+// Signing in is not membership. A member agrees to the covenant, says what they
+// do, and chooses a programme before the venue lets them do anything — and the
+// SERVER enforces that, so this is a screen for a rule rather than the rule.
+export function apiOnboarding() { return call('GET', '/onboarding', null, apiToken()); }
+export function apiAgree(version) {
+  return call('POST', '/me/agree', { document: 'COVENANT', version, agree: true }, apiToken());
+}
+export function apiSetRole(role, other) { return call('POST', '/me/role', { role, other }, apiToken()); }
+
 // ── Programmes ────────────────────────────────────────────────────────────
 // Every member belongs to one. It decides which vault their share of the house
 // fee lands in, so "a percentage goes to the community" becomes a named pot

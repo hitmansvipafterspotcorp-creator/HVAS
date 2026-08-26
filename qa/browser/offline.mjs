@@ -18,11 +18,15 @@ const appUrl=`http://127.0.0.1:${appPort}/HVAS/`;
 
 process.env.HVAS_HOST_CODE='HOST850';
 const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
 const venue = createApp({ dataDir:`/tmp/hvas-off-${Date.now()}` });
 await new Promise(r=>venue.server.listen(0,r));
 const api=`http://127.0.0.1:${venue.server.address().port}`;
 const call=async(m,p,b,t)=>{const r=await fetch(api+p,{method:m,headers:{'Content-Type':'application/json',...(t?{Authorization:`Bearer ${t}`}:{})},body:b?JSON.stringify(b):undefined});return{status:r.status,body:await r.json().catch(()=>({}))};};
-const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;};
+const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});
+  const v=(await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;
+  await onboard(call, v.token);   // signing in is not membership
+  return v;};
 const host=(await call('POST','/auth/staff',{code:'HOST850'})).body.token;
 const A=await mk('850-980-0001','Ayo'); await call('POST','/bingo/join',{},A.token); await call('POST','/bingo/ready',{ready:true},A.token);
 const B=await mk('850-980-0002','Bree'); await call('POST','/bingo/join',{},B.token); await call('POST','/bingo/ready',{ready:true},B.token);

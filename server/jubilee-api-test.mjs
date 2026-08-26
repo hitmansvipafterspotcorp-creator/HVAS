@@ -12,6 +12,7 @@
 process.env.HVAS_HOST_CODE = 'HOST850';
 process.env.HVAS_STAFF_CODE = 'DOOR850';
 const { createApp } = await import('./src/app.mjs');
+const { onboard } = await import('./test-helpers.mjs');
 const { server } = createApp({ dataDir: `/tmp/hvas-jub-${Date.now()}` });
 await new Promise((r) => server.listen(0, r));
 const api = `http://127.0.0.1:${server.address().port}`;
@@ -24,7 +25,9 @@ const call = async (m, p, b, t) => {
 };
 const mk = async (ph, nm) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
-  return (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  const v = (await call('POST', '/auth/member/verify', { contact: ph, code: s.body.devCode, name: nm })).body;
+  await onboard(call, v.token);
+  return v;
 };
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++; console.log('  ✗', m); } };

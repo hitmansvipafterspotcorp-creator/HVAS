@@ -24,6 +24,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 process.env.HVAS_HOST_CODE = 'HOST850'; process.env.HVAS_STAFF_CODE = 'DOOR850';
 const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
 const { server: api } = createApp({ dataDir: `/tmp/hvas-jubui-${Date.now()}` });
 await new Promise((r) => api.listen(0, r));
 const API = `http://127.0.0.1:${api.address().port}`;
@@ -31,7 +32,12 @@ const call = async (m, p, b, t) => {
   const r = await fetch(API + p, { method: m, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) }, body: b ? JSON.stringify(b) : undefined });
   return { status: r.status, body: await r.json().catch(() => ({})) };
 };
-const mk = async (ph, nm) => { const s = await call('POST','/auth/member/start',{contact:ph}); return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body; };
+const mk = async (ph, nm) => {
+  const s = await call('POST','/auth/member/start',{contact:ph});
+  const v = (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;
+  await onboard(call, v.token);   // signing in is not membership
+  return v;
+};
 // A shared code can run the night but cannot approve money, so the two people
 // who sign off here have to be real accounts — onboarded exactly the way the
 // owner onboards them on a Saturday. Note the second hire goes through KENYA,

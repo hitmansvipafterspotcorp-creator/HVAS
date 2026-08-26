@@ -2,6 +2,7 @@
 // in a top-down venue, plus live delivery (RTC signaling / snaps). Proves the
 // member-to-member social features work peer-to-peer over the encrypted mesh.
 import { createApp } from './src/app.mjs';
+import { onboard } from './test-helpers.mjs';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 

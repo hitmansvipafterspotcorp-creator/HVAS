@@ -2,6 +2,7 @@
 // Drives every format to a champion through the real HTTP API, including the
 // bye path a 3-player bracket takes and a king who defends the floor twice.
 import { createApp } from './src/app.mjs';
+import { onboard } from './test-helpers.mjs';
 import { rmSync } from 'node:fs';
 
 const dataDir = `/tmp/hvas-lipsync-${Date.now()}`;
@@ -23,6 +24,7 @@ const ok = (cond, msg) => { if (cond) { pass++; console.log('  ✓', msg); } els
 const member = async (phone, name) => {
   const s = await call('POST', '/auth/member/start', { contact: phone });
   const v = await call('POST', '/auth/member/verify', { contact: phone, code: s.body.devCode, name });
+  await onboard(call, v.body.token);
   return { token: v.body.token, id: v.body.member.id, name };
 };
 const host = (await call('POST', '/auth/staff', { code: process.env.HVAS_HOST_CODE || 'HOST850' })).body.token

@@ -10,11 +10,15 @@ process.env.BINGO_SONG_SECONDS='3';           // so auto-advance is observable
 // failed the deploy gate exactly once that way before this line existed.
 process.env.BINGO_LIPSYNC_SECONDS='3';
 const { createApp } = await import('./src/app.mjs');
+const { onboard } = await import('./test-helpers.mjs');
 const { server } = createApp({ dataDir: `/tmp/hvas-tog-${Date.now()}` });
 await new Promise(r=>server.listen(0,r));
 const api=`http://127.0.0.1:${server.address().port}`;
 const call=async(m,p,b,t)=>{const r=await fetch(api+p,{method:m,headers:{'Content-Type':'application/json',...(t?{Authorization:`Bearer ${t}`}:{})},body:b?JSON.stringify(b):undefined});return{status:r.status,body:await r.json().catch(()=>({}))};};
-const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});return (await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;};
+const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:ph});
+  const v=(await call('POST','/auth/member/verify',{contact:ph,code:s.body.devCode,name:nm})).body;
+  await onboard(call, v.token);   // signing in is not membership
+  return v;};
 const host=(await call('POST','/auth/staff',{code:'HOST850'})).body.token;
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 // This gate runs on the venue's own laptop, while that laptop is also serving

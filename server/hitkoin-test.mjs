@@ -9,6 +9,7 @@
 // HITKOIN_CONTRACT_ADDRESS / HITKOIN_MINTER_PRIVATE_KEY / HITKOIN_RPC_URL,
 // and a `npx hardhat node` running in that same directory.
 import { createApp } from './src/app.mjs';
+import { onboard } from './test-helpers.mjs';
 import { rmSync } from 'node:fs';
 import { JsonRpcProvider, Contract, formatUnits } from 'ethers';
 
@@ -32,6 +33,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('  ✓', m); } else { fail++
 console.log('SETUP: member signs up, staff logs in');
 const start = await call('POST', '/auth/member/start', { contact: '850-555-8100' });
 const verify = await call('POST', '/auth/member/verify', { contact: '850-555-8100', code: start.body.devCode, name: 'Draya' });
+await onboard(call, verify.body.token);
 const mtok = verify.body.token;
 const staff = await call('POST', '/auth/staff', { code: 'DOOR850' });
 const stok = staff.body.token;
