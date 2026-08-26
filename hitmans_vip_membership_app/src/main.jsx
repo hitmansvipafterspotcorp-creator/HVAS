@@ -2598,7 +2598,12 @@ function ScanAlert({ result, onDismiss, onRescan, onGrant, onDeny }) {
         ) : (
           <p className="scan-alert-sub">{result.reason}</p>
         )}
-        <p className={`scan-alert-verdict ${result.ok ? 'go' : 'no'}`}>{result.ok ? 'GRANT ENTRY' : 'DO NOT ADMIT'}</p>
+        {/* A scan that read nothing is not a person to refuse. Saying DO NOT
+            ADMIT to a blank frame teaches the door to distrust the screen, and
+            it accuses whoever happens to be standing there. */}
+        <p className={`scan-alert-verdict ${result.ok ? 'go' : result.status === 'unreadable' ? 'again' : 'no'}`}>
+          {result.ok ? 'GRANT ENTRY' : result.status === 'unreadable' ? 'SCAN AGAIN' : 'DO NOT ADMIT'}
+        </p>
         {/* Door action buttons (real style-kit assets) — shown for staff scans */}
         {(onGrant || onDeny || onRescan) && (
           <div className="scan-actions">
@@ -3990,7 +3995,7 @@ const TIMELINE_LABEL = {
   checkout: '🚪 Left',
   decision: '⚠️ Staff decision',
 };
-const DECISION_LABEL = { trespass: 'Trespassed', banned: 'Banned', suspended: 'Suspended', denied: 'Denied', expired: 'Expired', valid: 'Granted', 'expired-qr': 'QR expired' };
+const DECISION_LABEL = { trespass: 'Trespassed', banned: 'Banned', suspended: 'Suspended', denied: 'Denied', expired: 'Expired', valid: 'Granted', 'expired-qr': 'QR expired', unreadable: 'Unreadable scan' };
 
 // Tap a member on the door dashboard's roster → this. Real, shared-backend
 // version of the grant/deny/trespass/ban controls (see PenaltyControls below

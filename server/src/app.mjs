@@ -3075,14 +3075,29 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // per night. Returns the outcome the door UI shows.
     'POST /door/verify': async (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
-      const { pass, number, searched } = await readBody(req);
+      const body = await readBody(req);
+      const { searched } = body;
+      // A door gets fed rubbish all night: a scanner firing on a blank frame, a
+      // Snapchat QR, a double-tap on an empty search box. Every one of those
+      // used to reach SQLite as a non-string and come back a 500 — which reads
+      // to the person on the door as "the system is down", not as "this is not
+      // a member". Coerce first, refuse cleanly, never crash.
+      const str = (v) => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
+      const pass = str(body.pass);
+      const number = str(body.number);
       let num = number, checked = { ok: !!number };
-      if (pass) { checked = verifyPass(keys.publicKey, pass); num = checked.number; }
+      if (pass) { checked = verifyPass(keys.publicKey, pass); num = str(checked.number); }
       const decide = (status, member) => {
         commit('decision', { member_id: member?.id || null, number: num || null, status, at: Date.now(), by_staff: c.sub });
         return json(res, 200, { ok: status === 'granted', status, member: member ? publicMember(member) : null, reason: REASONS[status] });
       };
       if (pass && !checked.ok) return decide(checked.reason === 'expired-qr' ? 'expired-qr' : 'trespass', null);
+      // Nothing readable came in. This is an answer, not an error — the scanner
+      // caught a blank frame or somebody's Snapchat code. It goes back as a 200
+      // so the door screen renders it like any other verdict, and NO decision is
+      // recorded, because no person was identified to record one about.
+      if (!num) return json(res, 200, { ok: false, status: 'unreadable', member: null,
+        reason: 'Nothing readable in that scan. Try again, or look them up by number.' });
       const m = memberByNumber(num);
       if (!m) return decide('trespass', null);
       const flag = db.prepare('SELECT * FROM member_flags WHERE member_id=?').get(m.id);

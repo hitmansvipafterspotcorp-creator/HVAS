@@ -3553,6 +3553,9 @@ button {
 .scan-alert-verdict { margin: 4px 0 0; font-weight: 900; letter-spacing: .12em; font-size: 15px; }
 .scan-alert-verdict.go { color: #7dffb0; }
 .scan-alert-verdict.no { color: #ff8aa0; }
+/* Neither granted nor refused: the scanner read nothing. Amber, because it is
+   an instruction to the door person and not a verdict about a member. */
+.scan-alert-verdict.again { color: #ffcf47; }
 
 /* ── Combined Membership + Profile hub ────────────────────────────── */
 .renews-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
