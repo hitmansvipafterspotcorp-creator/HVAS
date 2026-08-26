@@ -526,7 +526,18 @@ function useMember() {
 // backend before it protects anything. Members' real accounts would likewise
 // be verified server-side (SMS/email code).
 const AUTH_KEY = 'hvas_auth_v1';
-const ROLE_CODES = { staff: 'DOOR850', host: 'HOST850' }; // demo venue codes
+// There is deliberately no venue code in this file.
+//
+// It used to hold ROLE_CODES = { staff: 'DOOR850', host: 'HOST850' } so the app
+// could check a code with no backend. Two things were wrong with that, and
+// neither is theoretical: the codes shipped inside the JavaScript bundle, where
+// anybody who opened the file could read them; and the gate PRINTED the code on
+// screen as a "demo" hint whenever no venue was connected — so five taps on a
+// disconnected phone showed you the door code in plain text.
+//
+// Staff powers are venue powers. A phone that cannot reach the venue does not
+// get them, and the code lives on the server where it can be changed without a
+// deploy and rotated without every old build still accepting it.
 function loadAuth() { try { return JSON.parse(localStorage.getItem(AUTH_KEY)) || {}; } catch { return {}; } }
 const authListeners = new Set();
 let authState = loadAuth();
@@ -537,7 +548,7 @@ function commitAuth(a) {
 }
 export function memberSignIn(name, contact) { commitAuth({ ...authState, member: { name: name.trim(), contact: contact.trim(), since: Date.now() } }); }
 export function memberSignOut() { commitAuth({ ...authState, member: null }); apiSignOut(); }
-export function checkRoleCode(role, code) { return (ROLE_CODES[role] || '').toUpperCase() === (code || '').trim().toUpperCase(); }
+
 function useAuth() {
   const [, force] = useState(0);
   useEffect(() => { const fn = () => force((n) => n + 1); authListeners.add(fn); return () => authListeners.delete(fn); }, []);
@@ -2177,7 +2188,9 @@ function CodeGateScreen({ role, onBack, onDone }) {
       } finally { setBusy(false); }
       return;
     }
-    if (checkRoleCode(role, code)) onDone(role); else setErr('Wrong code — check with the venue.');
+    // No venue, no staff access. The client has nothing to check a code against
+    // and must not pretend otherwise.
+    setErr('Connect to the venue first — staff access is checked by the venue, not by this phone.');
   };
   return (
     <section className="screen screen-landing">
@@ -2194,7 +2207,7 @@ function CodeGateScreen({ role, onBack, onDone }) {
           </button>
           <p className="auth-fine">{backend
             ? `Connected to ${venueConfig().venue || 'this venue'}. A personal code signs you in as you — every door check and approval carries your name. The shared venue code runs the night but cannot approve money.`
-            : <>Demo code for <b>{r.label}</b>: <code>{ROLE_CODES[role]}</code>. In production this is issued per staff member and verified on a server.</>}</p>
+            : 'This phone is not connected to a venue. Staff access is checked by the venue, so there is nothing to unlock here until it is.'}</p>
           <button type="button" className="auth-back" onClick={onBack}>← Back</button>
         </div>
       </div>

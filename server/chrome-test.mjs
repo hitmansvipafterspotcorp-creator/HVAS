@@ -8,7 +8,7 @@
 //
 // None of that stays fixed on its own. A white hairline is the most natural
 // thing in the world to type, so this fails the deploy if one comes back.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +55,40 @@ ok(!!edgeGlow, 'a panel-edge glow token exists');
 // It sits on every panel at once. A glow on everything is a glow on nothing.
 ok(edgeGlow && violet && Number(edgeGlow[1]) < Number(violet[1]),
    `and is weaker than the accent glow (${edgeGlow?.[1]} < ${violet?.[1]})`);
+
+console.log('\nNO SECRETS IN THE SHIPPED BUNDLE');
+// The venue codes used to be compiled into the JavaScript, where anybody who
+// opened the file could read them — and the gate PRINTED one on screen as a
+// "demo" hint whenever no venue was connected. Five taps on a disconnected
+// phone showed you the door code in plain text.
+//
+// This checks the built output, not the source, because the source is not what
+// gets served. It needs a build to have run; if dist is missing it says so
+// rather than passing on an absence.
+const dist = resolve(here, '../hitmans_vip_membership_app/dist/assets');
+let bundles = [];
+try { bundles = readdirSync(dist).filter((f) => f.endsWith('.js')); } catch { /* no build */ }
+ok(bundles.length > 0, `the built bundle exists to check (${bundles.length} files)`);
+const js = bundles.map((f) => readFileSync(resolve(dist, f), 'utf8')).join('\n');
+
+// The venue's own codes, whatever they are set to — not just the defaults.
+const codes = [process.env.HVAS_STAFF_CODE, process.env.HVAS_HOST_CODE, 'DOOR850', 'HOST850']
+  .filter(Boolean);
+for (const code of [...new Set(codes)]) {
+  ok(!js.includes(code), `the venue code ${code} is not compiled into the client`);
+}
+// Nothing should be teaching a code on screen either.
+ok(!/demo code/i.test(js), 'and no screen offers a "demo code" hint');
+
+// Credentials of every shape anybody might paste into a config by accident.
+const SECRETS = [
+  [/AIza[A-Za-z0-9_-]{20,}/, 'Google API key'],
+  [/sk_live_[A-Za-z0-9]{10,}/, 'live Stripe secret'],
+  [/xox[baprs]-[A-Za-z0-9-]{10,}/, 'Slack token'],
+  [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, 'private key'],
+  [/ghp_[A-Za-z0-9]{20,}/, 'GitHub token'],
+];
+for (const [re, what] of SECRETS) ok(!re.test(js), `no ${what} in the client`);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

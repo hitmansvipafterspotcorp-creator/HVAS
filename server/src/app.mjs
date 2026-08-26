@@ -1890,10 +1890,23 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         ORDER BY (s.rounds_won * 5 + s.seconds * 3 + s.thirds * 2 + s.battles_won * 2 + s.nights) DESC,
                  s.rounds_won DESC, s.battles_won DESC, m.name ASC
         LIMIT 20`).all();
+      // A member NUMBER is not a stat, and it does not belong on a leaderboard
+      // every member can read. It is what the pass QR encodes and what the door
+      // accepts when somebody's phone is dead — so publishing it to the room
+      // hands anybody the one string they would need to be admitted as somebody
+      // else. Names and scores are the point; the number never leaves the house
+      // side or the member it belongs to.
+      const safe = ({ number, memberId, ...rest }, i) => ({
+        ...rest, place: i + 1, score: playerScore({ ...rest, number, memberId }),
+        title: playerTitle({ ...rest, number, memberId }),
+        isMe: memberId === c?.sub,
+        // Their own number is theirs to see; nobody else's is.
+        ...(memberId === c?.sub ? { number, memberId } : {}),
+      });
       json(res, 200, {
         // `score` is published rather than left to each screen to recompute —
         // one formula, in one place, or the board and the card disagree.
-        top: rows.map((r, i) => ({ ...r, place: i + 1, score: playerScore(r), title: playerTitle(r), isMe: r.memberId === c?.sub })),
+        top: rows.map(safe),
         // Longest current run in the venue — a streak is worth chasing only if
         // somebody can see it.
         streaks: db.prepare(`
