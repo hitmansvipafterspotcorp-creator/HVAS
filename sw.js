@@ -21,7 +21,7 @@
 // change, and while this was the constant 'hvas-v1' the worker never
 // reinstalled — so it never re-primed its cache with the new bundle, and a
 // member who went offline kept running whatever build first reached them.
-const VERSION = 'hvas-7ec4333f';
+const VERSION = 'hvas-2ea86d85';
 const SHELL = [
   './',
   './index.html',
