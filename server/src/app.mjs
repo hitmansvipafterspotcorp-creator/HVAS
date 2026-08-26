@@ -24,6 +24,7 @@ import {
   marketSplit, partnershipSplit, referralCommission, referralCodeFor,
   bookingCanAdvance, bookingOutcome, stakeFor,
 } from './economy/earning.mjs';
+import { deliveryConfig, sendCode, contactKind, maskContact } from './notify.mjs';
 // The SAME rules the phones run. Imported rather than restated: a prize table
 // or a vote threshold that exists twice is a prize table that will eventually
 // disagree with itself, and the disagreement would be about money in a room.
@@ -435,6 +436,41 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // ── Lip Sync Bingo helpers ──
   // ── Host's Google / YouTube account ──
   const setting = (k) => db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value || '';
+
+  // ── Asking for a code, and not being able to abuse it ────────────────────
+  //
+  // Two separate limits, because they stop two different things. The short one
+  // stops a stuck retry loop and a person mashing the button. The long one
+  // stops somebody deciding to make a stranger's phone buzz for an evening, or
+  // burning the venue's sending quota on the night it is needed.
+  //
+  // In memory on purpose: a restart forgiving everybody is the right failure,
+  // and nothing here is worth a table.
+  const otpHits = new Map();
+  const OTP_MIN_GAP_MS = 20 * 1000;
+  const OTP_WINDOW_MS = 60 * 60 * 1000;
+  const OTP_PER_WINDOW = 5;
+  const otpRate = (contact, now) => {
+    const key = String(contact).toLowerCase();
+    const h = otpHits.get(key) || { at: [], last: 0 };
+    if (now - h.last < OTP_MIN_GAP_MS) {
+      return { ok: false, retryInMs: OTP_MIN_GAP_MS - (now - h.last),
+               error: 'A code was just sent. Give it a few seconds before asking for another.' };
+    }
+    const recent = h.at.filter((t) => now - t < OTP_WINDOW_MS);
+    if (recent.length >= OTP_PER_WINDOW) {
+      return { ok: false, retryInMs: OTP_WINDOW_MS - (now - recent[0]),
+               error: 'Too many codes for that contact in the last hour. Try later, or ask a member of staff to sign you in.' };
+    }
+    recent.push(now);
+    otpHits.set(key, { at: recent, last: now });
+    // Keep the map from growing all night on a busy door.
+    if (otpHits.size > 5000) {
+      for (const [k, v] of otpHits) { if (now - v.last > OTP_WINDOW_MS) otpHits.delete(k); }
+    }
+    return { ok: true };
+  };
+
   const putSetting = (k, v) => {
     if (!v) return db.prepare('DELETE FROM settings WHERE key=?').run(k);
     return db.prepare(`INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
@@ -1518,13 +1554,123 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
 
     // Member self-serve auth (mock OTP — dev code returned; wire a real SMS
     // provider here in production).
+    // Asking for a code.
+    //
+    // This used to hand the code straight back in its own response, which is
+    // fine on a laptop in a locked room and indefensible on the open internet:
+    // it means anybody can sign up as anybody's number, and the verification
+    // step verifies nothing but that you can type.
+    //
+    // Now: if the venue has a way to send, it sends, and the code never
+    // touches the response. If it has no way to send — a laptop serving its
+    // own room with no internet — it echoes as before, because a member
+    // standing in the venue must not be locked out by a mail provider.
+    // ── Can this venue actually reach a member? ──────────────────────────────
+    //
+    // The owner needs to know this BEFORE the night, not from a member standing
+    // at the door saying nothing arrived. So: what is configured, what it can
+    // send, and a button that sends a real one to prove it.
+    'GET /notify/status': (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const cfg = deliveryConfig(setting);
+      json(res, 200, {
+        canSend: cfg.canSend,
+        email: cfg.emailProvider,
+        sms: cfg.smsProvider,
+        from: cfg.emailProvider ? (cfg[cfg.emailProvider]?.from || null) : null,
+        smsFrom: cfg.smsProvider ? cfg.twilio.from : null,
+        venueName: cfg.venueName,
+        // Said plainly, because the difference decides whether sign-ups are
+        // real verification or a formality.
+        meaning: cfg.canSend
+          ? 'Codes are sent. A member has to receive one to sign up.'
+          : 'No sender configured, so the code is shown on screen instead. Anybody can sign up as any contact until this is set.',
+        // SMS in the US cannot simply be switched on, and finding that out the
+        // day before a launch is how a launch slips.
+        smsNote: cfg.smsProvider
+          ? null
+          : 'Texting needs A2P 10DLC carrier registration, which takes days to weeks. Email works immediately.',
+        providers: ['resend', 'postmark', 'sendgrid', 'mailgun', 'twilio'],
+      });
+    },
+
+    // Setting it up from the venue's own screen, so nobody has to edit a file
+    // and restart a server on the afternoon of a launch.
+    'POST /notify/config': async (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const body = await readBody(req);
+      const ALLOWED = ['resend_api_key', 'postmark_token', 'sendgrid_api_key', 'mailgun_api_key',
+                       'mailgun_domain', 'mail_from', 'twilio_account_sid', 'twilio_auth_token',
+                       'twilio_from', 'venue_display_name'];
+      const wrote = [];
+      for (const k of ALLOWED) {
+        if (!(k in body)) continue;
+        putSetting(k, String(body[k] ?? '').trim());
+        wrote.push(k);
+      }
+      if (!wrote.length) return json(res, 400, { error: 'nothing to set', allowed: ALLOWED });
+      const cfg = deliveryConfig(setting);
+      // Never echo a key back. The screen that set it does not need to read it.
+      json(res, 200, { ok: true, set: wrote, canSend: cfg.canSend, email: cfg.emailProvider, sms: cfg.smsProvider });
+    },
+
+    // A real send, to the owner, on demand. The only honest way to know this
+    // works is to have it work once.
+    'POST /notify/test': async (req, res) => {
+      const c = adminAuth(req, res); if (!c) return;
+      const { contact } = await readBody(req);
+      const who = String(contact || '').trim();
+      if (contactKind(who) === 'unknown') return json(res, 400, { error: 'Enter a phone number or an email address.' });
+      const cfg = deliveryConfig(setting);
+      if (!cfg.canSend) return json(res, 400, { error: 'Nothing is configured to send with yet.' });
+      const out = await sendCode({ contact: who, code: '000000', cfg });
+      if (!out.ok) return json(res, 502, { error: out.error, kind: out.kind, via: out.via || null });
+      json(res, 200, { ok: true, via: out.via, kind: out.kind, id: out.id || null,
+                       note: 'Sent. If it does not arrive, the provider accepted it and the problem is downstream — check spam, then the provider dashboard.' });
+    },
+
     'POST /auth/member/start': async (req, res) => {
       const { contact } = await readBody(req);
-      if (!contact || contact.length < 5) return json(res, 400, { error: 'contact required' });
+      const who = String(contact || '').trim();
+      if (who.length < 5) return json(res, 400, { error: 'contact required' });
+      const cfg = deliveryConfig(setting);
+      // A contact only has to be REACHABLE if this venue is going to reach it.
+      // With no sender configured the contact is just the name a member is
+      // known by on this laptop, and demanding a valid mobile number would
+      // lock out somebody standing in the room for no benefit at all.
+      if (cfg.canSend && contactKind(who) === 'unknown') {
+        return json(res, 400, { error: 'Enter a phone number or an email address.' });
+      }
+      const now = Date.now();
+
+      // A code sender with no limit on it is two things: a way to burn the
+      // venue's sending quota, and a way to make somebody's phone buzz all
+      // night. Both are somebody else's problem to endure and this venue's
+      // reputation to lose.
+      const gate = otpRate(who, now);
+      if (!gate.ok) return json(res, 429, { error: gate.error, retryInMs: gate.retryInMs });
+
       const code = String(100000 + Math.floor(Math.random() * 900000));
       db.prepare('INSERT INTO otps(contact,code,expires_at) VALUES(?,?,?) ON CONFLICT(contact) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at')
-        .run(contact, code, Date.now() + 5 * 60000);
-      json(res, 200, { sent: true, devCode: code }); // devCode only in demo
+        .run(who, code, now + 5 * 60000);
+
+      if (!cfg.canSend) {
+        // No provider configured. The venue is its own room; say so plainly
+        // rather than pretending something was sent.
+        return json(res, 200, { sent: false, echoed: true, devCode: code,
+          note: 'This venue is not set up to send codes, so it is shown here instead.' });
+      }
+      const out = await sendCode({ contact: who, code, cfg });
+      if (!out.ok) {
+        // The code stays valid — a member who retries in ten seconds should not
+        // be starting over. What must never happen is falling back to echoing
+        // it, which would hand anybody a way to turn delivery off by breaking it.
+        const why = out.error === 'no-email-provider' ? 'This venue cannot send email codes yet.'
+          : out.error === 'no-sms-provider' ? 'This venue cannot text codes yet — use an email address.'
+          : 'The code could not be sent. Try again, or ask a member of staff.';
+        return json(res, 502, { error: why, kind: out.kind });
+      }
+      json(res, 200, { sent: true, via: out.kind, to: maskContact(who) });
     },
     'POST /auth/member/verify': async (req, res) => {
       const { contact, code, name, referral } = await readBody(req);

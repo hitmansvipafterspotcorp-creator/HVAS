@@ -38,6 +38,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiReferral, apiLicenseTerms, apiLicenseMine, apiLicenseMarket, apiLicenseHeld,
   apiLicenseOffer, apiLicenseWithdraw, apiLicenseBuy, apiRegisterWork,
   apiHouseMoney, apiMarketSettle, apiGigSecure, apiGigSettle, apiLicenseSettle, apiReferralPay,
+  apiNotifyStatus, apiNotifyConfig, apiNotifyTest,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -2106,6 +2107,7 @@ function MemberAuthScreen({ onBack, onDone }) {
   const [stage, setStage] = useState('id');   // 'id' | 'code'
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState('');
+  const [sentTo, setSentTo] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const backend = apiEnabled();
@@ -2135,8 +2137,18 @@ function MemberAuthScreen({ onBack, onDone }) {
         return;
       }
       setDevCode('');
+      // Where it went, so nobody sits watching the wrong inbox. Masked by the
+      // venue — enough to recognise your own, not enough to read somebody
+      // else's off a screen they are holding up in a crowded room.
+      setSentTo(r.to || '');
       setStage('code');
-    } catch (e) { setErr('Could not sign you in — check the connection.'); }
+    } catch (e) {
+      // The venue tells us WHY when it is something the member can act on —
+      // asked too soon, a contact it cannot reach, mail that would not send.
+      // "Check the connection" for all of those sends somebody to reboot a
+      // router over a twenty-second wait.
+      setErr(e.message && !/^HTTP /.test(e.message) ? e.message : 'Could not reach the venue — check your connection.');
+    }
     finally { setBusy(false); }
   };
   const verify = async () => {
@@ -2178,6 +2190,7 @@ function MemberAuthScreen({ onBack, onDone }) {
               {/* The venue can be configured to echo the code back instead of paying
                   for SMS. When it does, show it plainly — a member staring at an
                   empty code box with nothing arriving is stuck at the door. */}
+              {sentTo && <p className="auth-fine">Sent to <b>{sentTo}</b>. It expires in 5 minutes.</p>}
               {devCode && <p className="auth-fine">Your code: <code>{devCode}</code></p>}
               {err && <p className="gate-err">{err}</p>}
               <button type="button" className="auth-continue" disabled={code.trim().length < 4 || busy} onClick={verify}>
@@ -6574,6 +6587,11 @@ function TeamScreen() {
           </div>
         ))}
       </AppPanel>
+
+      {/* Whether a member can be reached at all. It lives here because it is
+          the same job as the roster — who is allowed in, and how the venue
+          knows they are who they say. Only the owner sees this screen. */}
+      <SignInSetupPanel />
     </>
   );
 }
@@ -8912,6 +8930,99 @@ function HostBattleControl() {
 // A shared venue code can read this and cannot move any of it. That is not a
 // UI choice — the server refuses it — but the screen says so rather than
 // letting somebody find out by tapping.
+// ── Can this venue actually reach a member? ────────────────────────────────
+//
+// The question this screen exists to answer is not "is a key saved". It is
+// "will a code arrive", and the only honest way to know that is to have one
+// arrive. So the last control here sends a real message to a real inbox.
+//
+// Until a sender is configured the venue shows the code on screen instead,
+// which means anybody can sign up as any contact. That is fine for a laptop
+// serving its own room and it is not fine on the open internet, so this says
+// so in words rather than leaving it to a green tick nobody reads.
+function SignInSetupPanel() {
+  const [st, setSt] = useState(null);
+  const [form, setForm] = useState({ resend_api_key: '', mail_from: '', venue_display_name: '' });
+  const [test, setTest] = useState('');
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try { setSt(await apiNotifyStatus()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr(''); setMsg('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+  if (!st) return <AppPanel title="Sign-ups" subtitle="How members get their code"><p className="dash-empty">{err || 'Loading…'}</p></AppPanel>;
+
+  return (
+    <AppPanel title="Sign-ups" subtitle="How members get their code">
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      {msg && <p className="k-nudge">{msg}</p>}
+
+      <div className={`sign-state ${st.canSend ? 'on' : 'off'}`}>
+        <strong>{st.canSend ? 'Codes are being sent' : 'Codes are shown on screen'}</strong>
+        <span>{st.meaning}</span>
+        {st.email && <span className="dash-num">Email · {st.email} · from {st.from}</span>}
+        {st.sms && <span className="dash-num">Text · {st.smsFrom}</span>}
+      </div>
+
+      {st.smsNote && <p className="earn-note">{st.smsNote}</p>}
+
+      <div className="jub-form">
+        <label className="jub-label">Set up email codes</label>
+        {/* One provider, named, rather than a list of five the owner has to
+            choose between at midnight. The server accepts the others; this
+            screen recommends the one that opens fastest. */}
+        <p className="jub-note">
+          Make a free account at resend.com, add your domain (or use their test
+          address to start), and paste the API key here.
+        </p>
+        <input className="jub-input" placeholder="Resend API key (re_…)" value={form.resend_api_key}
+               onChange={(e) => setForm((f) => ({ ...f, resend_api_key: e.target.value }))} />
+        <input className="jub-input" placeholder="Send from — door@yourdomain.com" value={form.mail_from}
+               onChange={(e) => setForm((f) => ({ ...f, mail_from: e.target.value }))} />
+        <input className="jub-input" placeholder="Name on the message — HITMANS VIP After Spot"
+               value={form.venue_display_name}
+               onChange={(e) => setForm((f) => ({ ...f, venue_display_name: e.target.value }))} />
+        <button type="button" className="bingo-btn gold"
+                disabled={busy || !(form.resend_api_key.trim() && form.mail_from.trim())}
+                onClick={() => act(async () => {
+                  await apiNotifyConfig({
+                    resend_api_key: form.resend_api_key.trim(),
+                    mail_from: form.mail_from.trim(),
+                    ...(form.venue_display_name.trim() ? { venue_display_name: form.venue_display_name.trim() } : {}),
+                  });
+                  setForm((f) => ({ ...f, resend_api_key: '' }));
+                  setMsg('Saved. Now send yourself a test.');
+                })}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+
+      {/* The only control on this screen that proves anything. */}
+      <div className="jub-form">
+        <label className="jub-label">Prove it works</label>
+        <p className="jub-note">Send a real message to yourself. Do this before the night, not during it.</p>
+        <input className="jub-input" placeholder="your@email.com" value={test}
+               onChange={(e) => setTest(e.target.value)} />
+        <button type="button" className="bingo-btn" disabled={busy || !st.canSend || test.trim().length < 5}
+                onClick={() => act(async () => {
+                  const r = await apiNotifyTest(test.trim());
+                  setMsg(`Sent via ${r.via}. ${r.note}`);
+                })}>
+          {busy ? 'Sending…' : 'Send me a test'}
+        </button>
+      </div>
+    </AppPanel>
+  );
+}
+
 function HouseMoneyPanel() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);

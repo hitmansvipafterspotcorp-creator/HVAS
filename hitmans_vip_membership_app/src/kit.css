@@ -2955,3 +2955,18 @@
    they read as two different offers rather than two versions of the same one. */
 .earn-do { border-color: rgba(57, 255, 136, .55); background: rgba(57, 255, 136, .06); }
 .earn-do strong { color: var(--k-go); }
+
+/* ── Can this venue reach a member? ───────────────────────────────────────
+   The state comes first and in words, because the honest answer changes what
+   sign-ups MEAN: sending codes is verification, showing them on screen is a
+   formality. A green tick could not carry that. */
+.sign-state {
+  display: grid; gap: 3px; padding: 13px 14px; border-radius: 13px; margin-bottom: 12px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+.sign-state.on { border-color: rgba(57, 255, 136, .5); background: rgba(57, 255, 136, .07); }
+.sign-state.off { border-color: rgba(255, 207, 71, .55); background: rgba(255, 207, 71, .07); }
+.sign-state strong { font: 900 14px/1.2 var(--k-font); }
+.sign-state.on strong { color: var(--k-go); }
+.sign-state.off strong { color: var(--k-gold); }
+.sign-state span { font: 600 12px/1.5 var(--k-font); color: var(--k-text-dim); }

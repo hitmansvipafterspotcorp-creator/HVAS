@@ -183,6 +183,11 @@ export function apiMarketList(body) { return call('POST', '/market/list', body, 
 export function apiMarketClose(listingId) { return call('POST', '/market/close', { listingId }, apiToken()); }
 export function apiMarketOrder(listingId, note) { return call('POST', '/market/order', { listingId, note }, apiToken()); }
 export function apiMarketReceived(orderId, note) { return call('POST', '/market/received', { orderId, note }, apiToken()); }
+// Whether this venue can actually reach a member, and setting it up so it can.
+export function apiNotifyStatus() { return call('GET', '/notify/status', null, apiStaffToken()); }
+export function apiNotifyConfig(body) { return call('POST', '/notify/config', body, apiStaffToken()); }
+export function apiNotifyTest(contact) { return call('POST', '/notify/test', { contact }, apiStaffToken()); }
+
 export function apiHouseMoney() { return call('GET', '/house/money', null, apiStaffToken()); }
 export function apiMarketSettle(orderId, received, rail) {
   return call('POST', '/market/settle', { orderId, received, rail }, apiStaffToken());
