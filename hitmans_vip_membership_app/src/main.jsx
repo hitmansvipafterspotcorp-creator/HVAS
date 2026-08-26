@@ -39,6 +39,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiLicenseOffer, apiLicenseWithdraw, apiLicenseBuy, apiRegisterWork,
   apiHouseMoney, apiMarketSettle, apiGigSecure, apiGigSettle, apiLicenseSettle, apiReferralPay,
   apiNotifyStatus, apiNotifyConfig, apiNotifyTest,
+  apiMyCovenant, apiMyRecord, apiResign, apiRejoin,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -873,6 +874,13 @@ const screens = [
     detail: 'Give to a cause, or apply for a seat on its board.',
   },
   {
+    id: 'standing',
+    label: 'Membership',
+    eyebrow: 'The Association',
+    title: 'Your membership',
+    detail: 'What you signed, what we hold about you, and how to leave.',
+  },
+  {
     id: 'earn',
     label: 'Earn',
     eyebrow: 'Members Market',
@@ -1107,7 +1115,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs', 'earn'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs', 'earn', 'standing'],
   },
   {
     id: 'staff',
@@ -1770,6 +1778,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'team') return <TeamScreen />;
   if (activeScreen === 'programs') return <ProgramActions onDone={() => navigate('myPass')} />;
   if (activeScreen === 'earn') return <EarnScreen onDone={() => navigate('myPass')} />;
+  if (activeScreen === 'standing') return <StandingScreen onDone={() => navigate('myPass')} />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -3204,6 +3213,16 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
         <button type="button" className="prog-do earn-do" onClick={() => navigate('earn')}>
           <strong>Get paid here</strong>
           <span>Sell what you do, take bookings, license what you made, or earn on who you bring.</span>
+        </button>
+      )}
+      {/* The relationship itself, rather than anything done inside it. A member
+          of a private association is owed the document they signed, the record
+          held about them, and the way out — and none of those should be
+          something they have to ask a person for. */}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do stand-do" onClick={() => navigate('standing')}>
+          <strong>Your membership</strong>
+          <span>What you signed, what we hold about you, and how to leave.</span>
         </button>
       )}
 
@@ -5592,6 +5611,219 @@ function ProgramPicker({ compact, onDone }) {
       </div>
       {mine && <button type="button" className="bingo-btn compact ghost" onClick={() => setOpen(false)}>Keep {mine.label}</button>}
     </section>
+  );
+}
+
+// ── Your standing with the association ─────────────────────────────────────
+//
+// The three things a member of a private association is owed, and which no
+// amount of features elsewhere substitutes for:
+//
+//   what you signed, in the words you signed it;
+//   what is held about you;
+//   the way out.
+//
+// It is one screen because they are one subject — the relationship itself,
+// rather than anything you do inside it. And the way out is on it, plainly,
+// rather than buried where leaving becomes something you have to ask for.
+function StandingScreen({ onDone }) {
+  const [tab, setTab] = useState('covenant');
+  const [cov, setCov] = useState(null);
+  const [rec, setRec] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [why, setWhy] = useState('');
+  const [saved, setSaved] = useState('');
+
+  const load = async () => {
+    try {
+      const [a, b] = await Promise.all([apiMyCovenant(), apiMyRecord()]);
+      setCov(a); setRec(b); setErr('');
+    } catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  // A copy they keep. The point of a record you cannot take away is limited,
+  // so this writes the whole thing to a file on their own phone.
+  const download = () => {
+    try {
+      const blob = new Blob([JSON.stringify({ covenant: cov, record: rec }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `hvas-record-${rec?.member?.number || 'member'}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setSaved('Saved to your phone.');
+      setTimeout(() => setSaved(''), 3000);
+    } catch { setErr('Could not save the file.'); }
+  };
+
+  if (!cov || !rec) {
+    return <AppPanel title="Your membership" subtitle="Where you stand"><p className="dash-empty">{err || 'Loading…'}</p></AppPanel>;
+  }
+  const resigned = rec.standing?.state === 'RESIGNED';
+  const doc = cov.signed?.document || cov.current.document;
+
+  return (
+    <AppPanel title="Your membership" subtitle="Where you stand">
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      {saved && <p className="k-nudge">{saved}</p>}
+
+      {resigned && (
+        <div className="stand-state out">
+          <strong>You have resigned</strong>
+          <span>
+            Your record is unchanged — what happened here happened. You are not being
+            admitted at the door until you come back.
+          </span>
+          <button type="button" className="bingo-btn compact gold" disabled={busy}
+                  onClick={() => act(() => apiRejoin())}>Rejoin</button>
+        </div>
+      )}
+
+      <div className="staff-hub-tabs prog-tabs">
+        {[['covenant', 'What you signed'], ['record', 'What we hold'], ['leave', resigned ? 'Rejoining' : 'Leaving']]
+          .map(([id, label]) => (
+            <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}`}
+                    onClick={() => setTab(id)}>{label}</button>
+          ))}
+      </div>
+
+      {tab === 'covenant' && (
+        <>
+          {cov.signed ? (
+            <p className="earn-note">
+              You agreed to version <b>{cov.signed.version}</b> on {fmtDate(cov.signed.at)}.
+              {cov.outOfDate
+                ? ' The association has published a newer one since — this is still what you agreed to.'
+                : ' This is the current version.'}
+            </p>
+          ) : (
+            <p className="k-nudge k-nudge--no">You have not agreed to the covenant yet.</p>
+          )}
+          <div className="onb-clauses">
+            {doc.clauses.map((cl) => (
+              <div key={cl.id} className="onb-clause">
+                <strong>{cl.heading}</strong>
+                <p>{cl.body}</p>
+              </div>
+            ))}
+          </div>
+          <p className="onb-accept">{doc.accept}</p>
+          {/* Not decoration. A member holding this number and the association
+              holding the same number are demonstrably talking about the same
+              document, without either having to trust the other's copy. */}
+          {cov.signed?.fingerprint && (
+            <p className="lic-hash">Document fingerprint · {cov.signed.fingerprint}</p>
+          )}
+        </>
+      )}
+
+      {tab === 'record' && (
+        <>
+          <div className="rec-grid">
+            <span><i>Member since</i><b>{fmtDate(rec.member.joined)}</b></span>
+            <span><i>Number</i><b>{rec.member.number}</b></span>
+            <span><i>What you do</i><b>{rec.member.tradeLabel || '—'}</b></span>
+            <span><i>Nights here</i><b>{rec.nightsAttended}</b></span>
+          </div>
+          {rec.membership && (
+            <div className="give-row">
+              <div className="dash-info">
+                <strong>{rec.membership.tier}{rec.membership.vip ? ' VIP' : ''}</strong>
+                <span className="dash-num">Until {fmtDate(rec.membership.until)}</span>
+              </div>
+              <span className={`jub-chip${rec.membership.status === 'active' ? ' ok' : ''}`}>{rec.membership.status}</span>
+            </div>
+          )}
+          <div className="give-list">
+            <h4>What you have agreed to</h4>
+            {rec.agreements.map((a, i) => (
+              <div key={i} className="give-row">
+                <div className="dash-info">
+                  <strong>{a.document === 'COVENANT' ? 'The Community Covenant' : a.document}</strong>
+                  <span className="dash-num">Version {a.version} · {fmtDate(a.at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {rec.standingHistory.length > 0 && (
+            <div className="give-list">
+              <h4>Your standing over time</h4>
+              {rec.standingHistory.map((h, i) => (
+                <div key={i} className="give-row">
+                  <div className="dash-info">
+                    <strong>{h.state === 'RESIGNED' ? 'You resigned' : h.state === 'REJOINED' ? 'You rejoined' : h.state}</strong>
+                    <span className="dash-num">{fmtDate(h.at)}{h.reason ? ` · ${h.reason}` : ''}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="earn-note">{rec.note}</p>
+          <button type="button" className="bingo-btn" onClick={download}>Save a copy to my phone</button>
+        </>
+      )}
+
+      {tab === 'leave' && (
+        resigned ? (
+          <>
+            <p className="earn-note">
+              You resigned on {fmtDate(rec.standing.at)}. Nothing was deleted, and you can come back
+              whenever you want to.
+            </p>
+            <button type="button" className="bingo-btn gold" disabled={busy}
+                    onClick={() => act(() => apiRejoin())}>{busy ? 'Coming back…' : 'Rejoin'}</button>
+          </>
+        ) : (
+          <>
+            {/* Said honestly, including the part that is in the association's
+                interest to leave vague. Somebody deciding whether to leave is
+                owed the real consequences, not a warning designed to keep them. */}
+            <p className="earn-note">
+              You can leave whenever you want. If you do:
+            </p>
+            <div className="onb-clauses">
+              <div className="onb-clause">
+                <strong>The door stops</strong>
+                <p>Your pass will not be admitted. That is what leaving means.</p>
+              </div>
+              <div className="onb-clause">
+                <strong>Your record stays as it is</strong>
+                <p>What happened here happened — the nights, the agreements, anything you were paid.
+                   It is not erased, and it is still yours to read.</p>
+              </div>
+              <div className="onb-clause">
+                <strong>You can come back</strong>
+                <p>Any time, from this screen. If your membership still has time left on it, it starts again where it was.</p>
+              </div>
+            </div>
+            {!leaving ? (
+              <button type="button" className="bingo-btn ghost" onClick={() => setLeaving(true)}>I want to leave</button>
+            ) : (
+              <div className="jub-form">
+                <label className="jub-label">Anything you want to say? (optional)</label>
+                <textarea className="jub-input jub-textarea" rows={2} value={why} maxLength={400}
+                          onChange={(e) => setWhy(e.target.value)} />
+                <button type="button" className="bingo-btn danger" disabled={busy}
+                        onClick={() => act(async () => { await apiResign(why.trim()); setLeaving(false); setWhy(''); setTab('record'); })}>
+                  {busy ? 'Resigning…' : 'Resign my membership'}
+                </button>
+                <button type="button" className="bingo-btn compact ghost" onClick={() => setLeaving(false)}>Stay</button>
+              </div>
+            )}
+          </>
+        )
+      )}
+
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
   );
 }
 

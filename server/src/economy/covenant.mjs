@@ -64,6 +64,53 @@ export const COVENANT = Object.freeze({
   accept: 'I have read this, I agree to it, and I want to support the mission.',
 });
 
+// ── Every version, kept ───────────────────────────────────────────────────
+//
+// A covenant that can be edited after the fact is not an agreement, it is a
+// notice. When the terms change, the member is asked again — and the record of
+// what they accepted has to still be readable, in the words they accepted, or
+// the record proves nothing.
+//
+// So versions are archived here rather than replaced. When 2026.1 is superseded
+// it does not get deleted: it moves down this list and stays retrievable by
+// everyone who signed it. Adding a version means adding an entry, never editing
+// one, and there is a test that fails if a published version's text changes.
+const ARCHIVE = Object.freeze({ [COVENANT_VERSION]: COVENANT });
+
+/** The covenant as it read at a given version — what somebody actually signed. */
+export function covenantAt(version) {
+  return ARCHIVE[String(version || '')] || null;
+}
+
+/** Every version this association has ever published, newest first. */
+export function covenantVersions() {
+  return Object.keys(ARCHIVE).sort().reverse();
+}
+
+/**
+ * A stable fingerprint of a covenant's text.
+ *
+ * The point is not secrecy. It is that a member holding this number, and the
+ * association holding the same number, are demonstrably talking about the same
+ * document — without either having to trust the other's copy.
+ */
+export function covenantFingerprint(doc) {
+  const d = doc || COVENANT;
+  const canonical = [
+    d.version, d.title, d.lead,
+    ...d.clauses.map((c) => `${c.id}|${c.heading}|${c.body}`),
+    d.accept,
+  ].join('\n');
+  // FNV-1a, 32-bit, rendered as eight hex characters. Short enough to read out
+  // over a phone, which is the only place a member would ever need to.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i++) {
+    h ^= canonical.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 /**
  * What is still missing before somebody is a member of this place.
  *

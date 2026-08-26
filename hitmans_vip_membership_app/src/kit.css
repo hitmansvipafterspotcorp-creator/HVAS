@@ -2970,3 +2970,33 @@
 .sign-state.on strong { color: var(--k-go); }
 .sign-state.off strong { color: var(--k-gold); }
 .sign-state span { font: 600 12px/1.5 var(--k-font); color: var(--k-text-dim); }
+
+/* ── Your standing with the association ───────────────────────────────────
+   Cool rather than gold: this is not an offer. It is the relationship, and
+   the way out is on it deliberately. */
+.stand-do { border-color: rgba(34, 211, 238, .5); background: rgba(34, 211, 238, .05); }
+.stand-do strong { color: var(--k-cyan-lt); }
+
+.stand-state {
+  display: grid; gap: 6px; justify-items: start; padding: 13px 14px; border-radius: 13px; margin-bottom: 12px;
+  border: 1px solid rgba(255, 207, 71, .5); background: rgba(255, 207, 71, .07);
+}
+.stand-state strong { font: 900 14px/1.2 var(--k-font); color: var(--k-gold); }
+.stand-state span { font: 600 12px/1.5 var(--k-font); color: var(--k-text-dim); }
+
+.rec-grid { display: grid; gap: 7px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-bottom: 12px; }
+.rec-grid span {
+  display: grid; gap: 3px; padding: 11px 13px; border-radius: 12px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+.rec-grid i {
+  font-style: normal; font: 800 9px/1 var(--k-font); letter-spacing: .11em;
+  text-transform: uppercase; color: var(--k-text-faint);
+}
+.rec-grid b { font: 900 14px/1.2 var(--k-font); color: var(--k-text); }
+
+/* Leaving is a real button, not a hidden link. It is also not the loudest
+   thing on its own screen — honest, not encouraged. */
+.bingo-btn.danger {
+  border-color: rgba(255, 138, 160, .55); color: #ff8aa0; background: rgba(255, 138, 160, .07);
+}

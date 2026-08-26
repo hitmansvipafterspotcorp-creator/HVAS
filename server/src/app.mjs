@@ -12,7 +12,8 @@ import { resolve as pathResolve, join as pathJoin, normalize as pathNormalize, e
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
-import { COVENANT, COVENANT_VERSION, onboardingState } from './economy/covenant.mjs';
+import { COVENANT, COVENANT_VERSION, onboardingState, covenantAt, covenantVersions,
+         covenantFingerprint } from './economy/covenant.mjs';
 import { MEMBER_ROLE, rolesByGroup, roleGrants } from './economy/roles.mjs';
 import {
   LICENSE_TYPES, LICENSE_TYPE_LIST, LICENSE_SCOPES, LICENSE_TERMS, WORK_KIND_LIST, WORK_KINDS,
@@ -1337,6 +1338,20 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     terms: (() => { try { return JSON.parse(g.terms_json); } catch { return null; } })(),
     termsHash: g.terms_hash,
   });
+
+  // Where a member stands with the association: in, gone, or put out.
+  //
+  // Derived from the history rather than stored as a flag, so that leaving and
+  // coming back twice reads as two departures and two returns — which is what
+  // it was — instead of one boolean that has been flipped four times and
+  // remembers none of it.
+  const standingOf = (memberId) => {
+    const last = db.prepare(
+      `SELECT state, reason, at, by_name FROM member_standing WHERE member_id=? ORDER BY at DESC, id DESC LIMIT 1`)
+      .get(memberId);
+    if (!last || last.state === 'REJOINED') return { state: 'MEMBER', since: last?.at || null };
+    return { state: last.state, at: last.at, reason: last.reason || null, by: last.by_name || null };
+  };
 
   // Where somebody is in becoming a member here.
   const onboardingOf = (memberId) => {
@@ -2709,6 +2724,175 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // the Community Covenant, say what they do, and choose a programme to stand
     // behind. All three are the member's own act; none of them can be done for
     // them by the house.
+    // ── What a member can ask of the association about themselves ────────────
+    //
+    // A private membership association rests on one thing being true: that the
+    // member affirmatively agreed to join, and that the agreement can still be
+    // produced afterwards. Three things follow from that, and none of them was
+    // possible here until now.
+    //
+    //   You can re-read what YOU signed, at the version you signed it — not
+    //   whatever the text happens to say today.
+    //
+    //   You can see everything the association holds about you, in one place,
+    //   and take a copy away.
+    //
+    //   You can leave.
+    //
+    // Each of these is the member's own right and none of them needs the
+    // house's permission, which is why every one is authorised by the member's
+    // own session and nobody else's.
+    'GET /me/covenant': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const mine = db.prepare(
+        `SELECT version, at FROM member_agreements WHERE member_id=? AND document='COVENANT' ORDER BY at DESC LIMIT 1`)
+        .get(c.sub);
+      const signedDoc = mine ? covenantAt(mine.version) : null;
+      json(res, 200, {
+        // What they signed, in the words they signed. If the association has
+        // moved on, this does not move with it.
+        signed: mine ? {
+          version: mine.version, at: mine.at,
+          document: signedDoc,
+          fingerprint: signedDoc ? covenantFingerprint(signedDoc) : null,
+          // A version so old its text is no longer carried is a gap the member
+          // is told about rather than one they discover.
+          textAvailable: !!signedDoc,
+        } : null,
+        current: { version: COVENANT_VERSION, document: COVENANT, fingerprint: covenantFingerprint(COVENANT) },
+        // The one question a member actually has: is what I agreed to still
+        // what is being asked of me?
+        outOfDate: !!mine && mine.version !== COVENANT_VERSION,
+        versions: covenantVersions(),
+      });
+    },
+
+    // Everything this association holds about one member, to that member.
+    //
+    // Not a summary and not a dashboard — the record. Somebody who wants to
+    // know what a private association knows about them should not have to ask
+    // a person, and should not get an answer that was curated for them.
+    'GET /me/record': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const m = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
+      if (!m) return json(res, 404, { error: 'no such member' });
+      const ms = membershipOf(c.sub);
+      const agreements = db.prepare(
+        `SELECT document, version, at FROM member_agreements WHERE member_id=? ORDER BY at DESC`).all(c.sub);
+      const standing = db.prepare(
+        `SELECT state, reason, at, by_name FROM member_standing WHERE member_id=? ORDER BY at DESC`).all(c.sub);
+      const nights = db.prepare(
+        `SELECT night, at FROM entries WHERE member_id=? ORDER BY at DESC LIMIT 200`).all(c.sub);
+      const broughtBy = m.referred_by
+        ? db.prepare('SELECT name FROM members WHERE id=?').get(m.referred_by)?.name || null
+        : null;
+      json(res, 200, {
+        member: {
+          name: m.name, contact: m.contact, number: m.number,
+          joined: m.created_at,
+          trade: m.member_role || null,
+          tradeLabel: m.member_role ? MEMBER_ROLE[m.member_role]?.label : null,
+          programme: m.program || null,
+          broughtBy,
+          referralCode: codeFor(c.sub),
+        },
+        membership: ms ? {
+          tier: ms.tier, vip: !!ms.vip, status: ms.status,
+          since: ms.purchased_at, until: ms.expires_at,
+        } : null,
+        standing: standingOf(c.sub),
+        // The agreements are the spine of the whole thing, so they come with
+        // their date and their version and are never collapsed into "accepted".
+        agreements,
+        standingHistory: standing,
+        nightsAttended: nights.length,
+        nights: nights.map((n) => n.night),
+        // What they have done here that involved money. Named individually
+        // rather than as one number, because "you have spent $340" is not an
+        // answer to "what do you hold about me".
+        activity: {
+          donations: db.prepare(
+            `SELECT program, amount_units, status, at FROM program_donations WHERE member_id=? ORDER BY at DESC`).all(c.sub),
+          listings: db.prepare(
+            `SELECT listing_id, title, price_units, status, at FROM market_listings WHERE member_id=? ORDER BY at DESC`).all(c.sub),
+          bookings: db.prepare(
+            `SELECT booking_id, title, stage, price_units, at FROM bookings WHERE provider_id=? OR client_id=? ORDER BY at DESC`)
+            .all(c.sub, c.sub),
+          works: db.prepare(
+            `SELECT asset_id, title, content_hash, registered_at FROM performance_rights WHERE member_id=? ORDER BY registered_at DESC`)
+            .all(c.sub),
+          licencesHeld: db.prepare(
+            `SELECT grant_id, type, price_units, status, at FROM ip_license_grants WHERE buyer_id=? ORDER BY at DESC`).all(c.sub),
+          supportCases: db.prepare(
+            `SELECT application_id, need_kind, amount_units, status, at FROM jubilee_applications WHERE member_id=? ORDER BY at DESC`)
+            .all(c.sub),
+        },
+        // Said out loud, because an association that holds a person's data owes
+        // them the shape of it and not only the contents.
+        note: 'This is everything HITMANS VIP holds about you. Your six-digit sign-in codes are not kept after they are used, '
+            + 'and your door pass is generated fresh each time rather than stored.',
+        producedAt: Date.now(),
+      });
+    },
+
+    // Leaving. The member's own act, needing nobody's approval.
+    //
+    // It does NOT delete the record. What happened here happened, the reserve's
+    // books have to still add up, and somebody who was admitted on a night was
+    // admitted on that night. What it does is end the membership and stop the
+    // door — which is what leaving actually means.
+    'POST /me/resign': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { reason, confirm } = await readBody(req);
+      // Asked for deliberately, because this is not a thing to do by mis-tap on
+      // a screen in a dark room.
+      if (confirm !== true) {
+        return json(res, 400, { error: 'Resigning has to be confirmed.', confirmWith: { confirm: true } });
+      }
+      const cur = standingOf(c.sub);
+      if (cur.state === 'RESIGNED') return json(res, 409, { error: 'You have already resigned.', since: cur.at });
+      if (cur.state === 'EXPELLED') return json(res, 409, { error: 'Your membership was ended by the board.' });
+      const now = Date.now();
+      const m = db.prepare('SELECT name FROM members WHERE id=?').get(c.sub);
+      db.prepare(`INSERT INTO member_standing(member_id, state, reason, at, by_id, by_name) VALUES(?,?,?,?,?,?)`)
+        .run(c.sub, 'RESIGNED', String(reason || '').slice(0, 400) || null, now, c.sub, m?.name || 'member');
+      // The door is the thing that actually changes. Suspending the membership
+      // rather than deleting it keeps every past night true.
+      db.prepare(`UPDATE memberships SET status='suspended', updated_at=? WHERE member_id=?`).run(now, c.sub);
+      json(res, 200, {
+        ok: true, state: 'RESIGNED', at: now,
+        note: 'You have resigned. Your pass will no longer be admitted. '
+            + 'Your record stays as it was — what happened here happened — and you can rejoin at any time.',
+      });
+    },
+
+    // And coming back. A door that only swings one way makes leaving a threat
+    // rather than a choice.
+    'POST /me/rejoin': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const cur = standingOf(c.sub);
+      if (cur.state === 'EXPELLED') {
+        return json(res, 403, { error: 'A membership ended by the board is not rejoined from this screen.' });
+      }
+      if (cur.state !== 'RESIGNED') return json(res, 409, { error: 'You have not resigned.' });
+      const now = Date.now();
+      const m = db.prepare('SELECT name FROM members WHERE id=?').get(c.sub);
+      db.prepare(`INSERT INTO member_standing(member_id, state, reason, at, by_id, by_name) VALUES(?,?,?,?,?,?)`)
+        .run(c.sub, 'REJOINED', null, now, c.sub, m?.name || 'member');
+      // A membership that lapsed while they were away is not silently restored
+      // — they are back in the association, and they buy a membership again if
+      // theirs ran out. Anything else would hand out free time for leaving.
+      const ms = membershipOf(c.sub);
+      if (ms && ms.expires_at > now) {
+        db.prepare(`UPDATE memberships SET status='active', updated_at=? WHERE member_id=?`).run(now, c.sub);
+      }
+      json(res, 200, { ok: true, state: 'MEMBER', at: now,
+        membershipRestored: !!(ms && ms.expires_at > now),
+        note: ms && ms.expires_at > now
+          ? 'Welcome back. Your membership had time left on it and is active again.'
+          : 'Welcome back. Your membership had run out while you were away, so you will need to take one again.' });
+    },
+
     'GET /onboarding': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const m = db.prepare('SELECT member_role, role_other, program FROM members WHERE id=?').get(c.sub);
@@ -3248,6 +3432,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       if (!m) return decide('trespass', null);
       const flag = db.prepare('SELECT * FROM member_flags WHERE member_id=?').get(m.id);
       if (flag) return decide(flag.kind, m);   // manual staff flag always wins, regardless of membership state
+      // Somebody who resigned is not a member tonight, and the door should say
+      // that rather than the generic "suspended" — a person who left of their
+      // own accord has not been penalised and should not be told they were.
+      const stand = standingOf(m.id);
+      if (stand.state === 'RESIGNED') return decide('resigned', m);
+      if (stand.state === 'EXPELLED') return decide('banned', m);
       const ms = membershipOf(m.id);
       if (!ms) return decide('trespass', m);
       if (ms.status === 'suspended') return decide('suspended', m);
@@ -4646,6 +4836,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     trespass: 'No matching member — unauthorized. Do not admit.',
     banned: 'Banned from the venue — do not admit.',
     denied: 'Denied by staff — do not admit.',
+    // A person who left is not a person who was thrown out, and the door should
+    // not treat them the same way or say the same thing to them.
+    resigned: 'Resigned their membership — not a member tonight. They can rejoin in the app.',
   };
 
   const server = createServer(async (req, res) => {

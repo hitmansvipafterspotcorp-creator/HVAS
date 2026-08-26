@@ -802,6 +802,27 @@ export function openDb(path) {
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_agreements_member ON member_agreements(member_id, at DESC)`);
 
+  // ── Leaving ──────────────────────────────────────────────────────────────
+  //
+  // An association somebody cannot leave is not an association. A member who
+  // walks away must be able to say so, have it recorded with a date, and stop
+  // being admitted — and the record of their membership stays, because it
+  // happened. Resigning is not deletion; it is the end of a period that was
+  // real and is now over.
+  //
+  // Kept as its own table rather than a column on members, so that leaving and
+  // coming back later is a history rather than one flag being flipped twice.
+  db.exec(`CREATE TABLE IF NOT EXISTS member_standing (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    state TEXT NOT NULL,                 -- RESIGNED | REJOINED | EXPELLED
+    reason TEXT,
+    at INTEGER NOT NULL,
+    by_id TEXT,                          -- the member themselves, or the board
+    by_name TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_standing_member ON member_standing(member_id, at DESC)`);
+
   // ── Giving to a programme, and sitting on its board ─────────────────────
   //
   // Belonging to a programme is an affiliation, not a payment. Playing bingo is

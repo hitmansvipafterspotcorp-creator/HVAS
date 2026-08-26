@@ -184,6 +184,13 @@ export function apiMarketClose(listingId) { return call('POST', '/market/close',
 export function apiMarketOrder(listingId, note) { return call('POST', '/market/order', { listingId, note }, apiToken()); }
 export function apiMarketReceived(orderId, note) { return call('POST', '/market/received', { orderId, note }, apiToken()); }
 // Whether this venue can actually reach a member, and setting it up so it can.
+// ── What a member can ask of the association about themselves ────────────
+// Their own rights, so every one of these is authorised by their own session.
+export function apiMyCovenant() { return call('GET', '/me/covenant', null, apiToken()); }
+export function apiMyRecord() { return call('GET', '/me/record', null, apiToken()); }
+export function apiResign(reason) { return call('POST', '/me/resign', { confirm: true, reason }, apiToken()); }
+export function apiRejoin() { return call('POST', '/me/rejoin', {}, apiToken()); }
+
 export function apiNotifyStatus() { return call('GET', '/notify/status', null, apiStaffToken()); }
 export function apiNotifyConfig(body) { return call('POST', '/notify/config', body, apiStaffToken()); }
 export function apiNotifyTest(contact) { return call('POST', '/notify/test', { contact }, apiStaffToken()); }
