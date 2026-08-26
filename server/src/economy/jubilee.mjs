@@ -29,6 +29,28 @@ export const PROGRAMS = Object.freeze({
   SMALL_BUSINESS: { vault: 'WORKFORCE_SMALL_BUSINESS', label: 'Small business recovery' },
 });
 
+/**
+ * Board positions, the same five on every programme.
+ *
+ * The same shape everywhere on purpose: a member who understands one board
+ * understands all six, and a venue that invents a different structure per
+ * programme ends up with six things nobody can compare or hold to account.
+ *
+ * Each says what the seat is actually FOR, because "Secretary" tells somebody
+ * deciding whether to apply almost nothing about what they would be doing.
+ */
+export const BOARD_POSITIONS = Object.freeze([
+  { id: 'CHAIR', label: 'Chair', duty: 'Runs the meetings and speaks for the programme.' },
+  { id: 'TREASURER', label: 'Treasurer', duty: 'Watches the money in and the money out, and says so out loud.' },
+  { id: 'SECRETARY', label: 'Secretary', duty: 'Keeps the record of what was decided and who decided it.' },
+  { id: 'OUTREACH', label: 'Outreach', duty: 'Finds the people who need this and brings them in.' },
+  { id: 'AT_LARGE', label: 'Member at large', duty: 'A seat with no portfolio and a full vote.' },
+]);
+
+export const BOARD_POSITION = Object.freeze(
+  Object.fromEntries(BOARD_POSITIONS.map((p) => [p.id, p])),
+);
+
 /** §31's examples of what support actually IS. Each names a kind of provider. */
 export const NEED_KINDS = Object.freeze({
   UTILITY: { program: 'EMERGENCY_FAMILY', providerKind: 'utility', label: 'Utility about to be cut off' },

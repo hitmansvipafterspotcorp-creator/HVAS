@@ -30,7 +30,8 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiJubileeKinds, apiJubileeApply, apiJubileeMine, apiJubileeQueue, apiJubileeVerify,
   apiJubileeApprove, apiJubileeAward, apiJubileePay, apiJubileeDelivered, apiJubileeVendor,
   apiStaffRoster, apiStaffInvite, apiStaffRemove,
-  apiVenuePulse,
+  apiVenuePulse, apiPrograms, apiJoinProgram,
+  apiDonate, apiMyDonations, apiBoard, apiBoardApply,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -847,6 +848,13 @@ const screens = [
     detail: 'Check-ins, entries, and activity history.',
   },
   {
+    id: 'programs',
+    label: 'Programmes',
+    eyebrow: 'Community Programs',
+    title: 'Programmes',
+    detail: 'Give to a cause, or apply for a seat on its board.',
+  },
+  {
     id: 'support',
     label: 'Get help',
     eyebrow: 'Community Support',
@@ -1074,7 +1082,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs'],
   },
   {
     id: 'staff',
@@ -1716,6 +1724,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'history') return <HistoryScreen />;
   if (activeScreen === 'support') return <JubileeApply onDone={() => navigate('myPass')} />;
   if (activeScreen === 'team') return <TeamScreen />;
+  if (activeScreen === 'programs') return <ProgramActions onDone={() => navigate('myPass')} />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -3113,6 +3122,17 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
         <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>My Card</button>
         <button type="button" className={`mem-tab${tab === 'account' ? ' on' : ''}`} onClick={() => setTab('account')}>Account</button>
       </div>
+      {/* Which programme they stand behind. Required — and shown at the top of
+          the card rather than buried in Account, because a member who has not
+          chosen one has a decision to make, not a setting to find. */}
+      {apiEnabled() && <ProgramPicker compact />}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do" onClick={() => navigate('programs')}>
+          <strong>Give to a cause, or serve on a board</strong>
+          <span>Playing gives a programme nothing. This is how you actually put something in.</span>
+        </button>
+      )}
+
       {tab === 'pass' && (
       <>
       {/* The road in was Continue, pick a tier, join, and then a member is
@@ -5261,6 +5281,286 @@ function TonightScreen({ onGo }) {
           everything above, which is exactly where context belongs. */}
       <StaffDashboardScreen />
     </>
+  );
+}
+
+// ── Your programme ─────────────────────────────────────────────────────────
+//
+// The six programmes already existed as things the RESERVE pays for, which made
+// them a spending category. "A percentage goes to the community" is true and
+// unverifiable by the person who paid it.
+//
+// Every member joins one, and it decides which vault their share of the house
+// fee lands in. That is the whole difference: not a badge on a card, but a
+// named pot with their money in it and a number they can watch move.
+//
+// Switching is allowed. Money already contributed stays where it landed —
+// changing programme changes where the NEXT share goes, and saying so plainly
+// is better than letting somebody assume their history follows them.
+function ProgramPicker({ compact, onDone }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(!compact);
+
+  const load = async () => {
+    try { setData(await apiPrograms()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load the programmes.'); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const join = async (id) => {
+    setBusy(true); setErr('');
+    try { await apiJoinProgram(id); await load(); setOpen(false); onDone?.(id); }
+    catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!data && !err) return null;
+  if (!data) return <p className="k-nudge k-nudge--no">{err}</p>;
+
+  const mine = data.programs.find((p) => p.id === data.mine) || null;
+
+  // Joined, and not asking to change: one quiet line with the number that
+  // makes it real.
+  if (mine && compact && !open) {
+    return (
+      <button type="button" className="prog-mine" onClick={() => setOpen(true)}>
+        <span className="prog-mine-eyebrow">Your programme</span>
+        <strong>{mine.label}</strong>
+        <span className="prog-mine-num">
+          {mine.members} {mine.members === 1 ? 'member' : 'members'} · {MONEY(mine.donatedCents)} given
+          {mine.openSeats > 0 && <i> · {mine.openSeats} {mine.openSeats === 1 ? 'seat' : 'seats'} open</i>}
+        </span>
+        <span className="prog-mine-go">Change ›</span>
+      </button>
+    );
+  }
+
+  return (
+    <section className={`prog${mine ? '' : ' prog--needed'}`}>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <h3>{mine ? 'Move to another programme' : 'Choose your programme'}</h3>
+      <p className="prog-lead">
+        {mine
+          ? 'Anything you have already given stays with the programme you gave it to.'
+          : 'Every member stands behind one. Playing does not cost the programme anything and does not give it anything — what you can do for it is give to it, or sit on its board.'}
+      </p>
+      <div className="prog-grid">
+        {data.programs.map((p) => (
+          <button type="button" key={p.id} disabled={busy}
+                  className={`prog-card${p.id === data.mine ? ' on' : ''}`}
+                  onClick={() => join(p.id)}>
+            <strong>{p.label}</strong>
+            <span className="prog-num">{MONEY(p.donatedCents)}</span>
+            <span className="prog-members">
+              {p.members} {p.members === 1 ? 'member' : 'members'} · {p.openSeats} open
+            </span>
+            {p.id === data.mine && <span className="prog-tick">✓ Yours</span>}
+          </button>
+        ))}
+      </div>
+      {mine && <button type="button" className="bingo-btn compact ghost" onClick={() => setOpen(false)}>Keep {mine.label}</button>}
+    </section>
+  );
+}
+
+// ── Giving, and asking for a seat ──────────────────────────────────────────
+//
+// The two things a member can actually do about a programme. Neither happens to
+// them: playing bingo is not a donation, and nobody is put on a board for
+// turning up. Both are asked for and both are answered by a named person.
+//
+// They sit on one screen because they are the same decision seen from two
+// sides — what can I give this, in money or in work.
+function ProgramActions({ onDone }) {
+  const [tab, setTab] = useState('give');
+  const [b, setB] = useState(null);
+  const [mineGifts, setMineGifts] = useState([]);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [gift, setGift] = useState({ program: '', amount: '', rail: 'cash', note: '' });
+  const [seat, setSeat] = useState({ program: '', position: '', brings: '' });
+
+  const load = async () => {
+    try {
+      const [board, mine] = await Promise.all([apiBoard(), apiMyDonations()]);
+      setB(board); setMineGifts(mine.donations || []); setErr('');
+    } catch (e) { setErr(e.message || 'Could not load the programmes.'); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); }
+    catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!b && !err) return <AppPanel title="Programmes" subtitle="Give or serve"><p className="dash-empty">Loading…</p></AppPanel>;
+  if (!b) {
+    return (
+      <AppPanel title="Programmes" subtitle="Give or serve">
+        <p className="k-nudge k-nudge--no">{err}</p>
+        <button type="button" className="bingo-btn compact ghost" onClick={load}>Try again</button>
+      </AppPanel>
+    );
+  }
+
+  const cents = Math.round(Number(gift.amount) * 100);
+  const chosen = b.programs.find((p) => p.id === seat.program);
+  const open = b.openApplication;
+
+  return (
+    <AppPanel title="Programmes" subtitle="Give or serve">
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+      <p className="prog-lead">
+        Playing here gives a programme nothing and costs it nothing. These are the two ways to
+        actually put something in.
+      </p>
+
+      {/* What they already hold. A seat is the strongest thing on this screen. */}
+      {b.seats?.length > 0 && (
+        <div className="seat-mine">
+          {b.seats.map((s2) => (
+            <div key={`${s2.program}-${s2.position}`}>
+              <strong>{s2.positionLabel}</strong>
+              <span>{s2.programLabel} · since {fmtDate(s2.since)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="staff-hub-tabs prog-tabs">
+        <button type="button" className={`staff-hub-tab${tab === 'give' ? ' on' : ''}`} onClick={() => setTab('give')}>Give</button>
+        <button type="button" className={`staff-hub-tab${tab === 'serve' ? ' on' : ''}`} onClick={() => setTab('serve')}>Serve on a board</button>
+      </div>
+
+      {tab === 'give' && (
+        <div className="jub-form">
+          <label className="jub-label">Which cause?</label>
+          <div className="jub-kinds">
+            {b.programs.map((p) => (
+              <button type="button" key={p.id}
+                      className={`jub-kind${gift.program === p.id ? ' on' : ''}`}
+                      onClick={() => setGift((g) => ({ ...g, program: p.id }))}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="jub-label" htmlFor="give-amt">How much?</label>
+          <input id="give-amt" className="jub-input" inputMode="decimal" placeholder="0.00"
+                 value={gift.amount} onChange={(e) => setGift((g) => ({ ...g, amount: e.target.value }))} />
+
+          <label className="jub-label" htmlFor="give-rail">How are you paying?</label>
+          <select id="give-rail" className="jub-input" value={gift.rail}
+                  onChange={(e) => setGift((g) => ({ ...g, rail: e.target.value }))}>
+            <option value="cash">Cash at the door</option>
+            <option value="zelle">Zelle</option>
+            <option value="card">Card</option>
+          </select>
+
+          <label className="jub-label" htmlFor="give-note">Anything to say with it? (optional)</label>
+          <input id="give-note" className="jub-input" placeholder="In memory of, for the pantry run…"
+                 value={gift.note} onChange={(e) => setGift((g) => ({ ...g, note: e.target.value }))} />
+
+          <button type="button" className="bingo-btn gold"
+                  disabled={busy || !gift.program || !(cents > 0)}
+                  onClick={() => act(async () => {
+                    await apiDonate(gift.program, cents, gift.rail, gift.note);
+                    setGift({ program: '', amount: '', rail: 'cash', note: '' });
+                  })}>
+            {busy ? 'Sending…' : 'Give to this cause'}
+          </button>
+          {/* §41 in the member's own words. A pledge is a promise, not money. */}
+          <p className="mem-fineprint">
+            Nothing moves until somebody at the door confirms the money arrived. You will see it
+            change from pledged to received here.
+          </p>
+
+          {mineGifts.length > 0 && (
+            <div className="give-list">
+              <h4>What you have given</h4>
+              {mineGifts.map((g) => (
+                <div key={g.donationId} className={`give-row${g.status === 'RECEIVED' ? ' done' : ''}`}>
+                  <div className="dash-info">
+                    <strong>{g.label}</strong>
+                    <span className="dash-num">{MONEY(g.amountCents)} · {g.rail}</span>
+                  </div>
+                  <span className={`jub-chip${g.status === 'RECEIVED' ? ' ok' : ''}`}>
+                    {g.status === 'RECEIVED' ? '✓ Received' : g.status === 'DECLINED' ? 'Declined' : 'Pledged'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'serve' && (open ? (
+        <div className="jub-open">
+          <strong>Waiting on the board</strong>
+          <span>
+            {b.programs.find((p) => p.id === open.program)?.label} ·{' '}
+            {b.positions.find((p) => p.id === open.position)?.label}
+          </span>
+          <small>&ldquo;{open.brings}&rdquo;</small>
+          <p className="mem-fineprint">One at a time. This one has to be answered first.</p>
+        </div>
+      ) : (
+        <div className="jub-form">
+          <label className="jub-label">Which programme?</label>
+          <div className="jub-kinds">
+            {b.programs.map((p) => (
+              <button type="button" key={p.id}
+                      className={`jub-kind${seat.program === p.id ? ' on' : ''}`}
+                      onClick={() => setSeat((v) => ({ ...v, program: p.id, position: '' }))}>
+                {p.label} <i>{p.openSeats} open</i>
+              </button>
+            ))}
+          </div>
+
+          {chosen && (
+            <>
+              <label className="jub-label">Which seat?</label>
+              <div className="seat-grid">
+                {chosen.board.map((pos) => (
+                  <button type="button" key={pos.id} disabled={!!pos.heldBy}
+                          className={`seat-card${seat.position === pos.id ? ' on' : ''}${pos.heldBy ? ' taken' : ''}`}
+                          onClick={() => setSeat((v) => ({ ...v, position: pos.id }))}>
+                    <strong>{pos.label}</strong>
+                    <span className="seat-duty">{pos.duty}</span>
+                    {/* Who holds it, by name — a board nobody can see is not one. */}
+                    <span className="seat-who">{pos.heldBy ? `Held by ${pos.heldBy}` : 'Open'}</span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="jub-label" htmlFor="seat-brings">What do you bring to the table?</label>
+              <textarea id="seat-brings" className="jub-input jub-textarea" rows={4}
+                        placeholder="The work you would actually do, and why you can do it. This is what the board decides on."
+                        value={seat.brings} onChange={(e) => setSeat((v) => ({ ...v, brings: e.target.value }))} />
+
+              <button type="button" className="bingo-btn gold"
+                      disabled={busy || !seat.position || seat.brings.trim().length < 20}
+                      onClick={() => act(async () => {
+                        await apiBoardApply(seat.program, seat.position, seat.brings.trim());
+                        setSeat({ program: '', position: '', brings: '' });
+                      })}>
+                {busy ? 'Sending…' : 'Apply for this seat'}
+              </button>
+              <p className="mem-fineprint">
+                The board reads what you wrote and answers by name. Nothing is promised.
+              </p>
+            </>
+          )}
+        </div>
+      ))}
+
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
   );
 }
 

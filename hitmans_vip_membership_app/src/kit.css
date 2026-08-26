@@ -2720,3 +2720,95 @@
   font: 900 13px/1 var(--k-font); letter-spacing: .04em; color: var(--k-gold); cursor: pointer;
 }
 .tonight-host:active { transform: translateY(1px); }
+
+/* ── Your programme ───────────────────────────────────────────────────────
+   Two states: a quiet line once you have joined, and a real choice before.
+   The number is the point — a member watching their own pot move is the
+   difference between belonging to something and being told about it. */
+.prog-mine {
+  display: grid; gap: 3px; width: 100%; text-align: left; cursor: pointer;
+  padding: 12px 14px; margin-bottom: 12px;
+  border: 1px solid var(--k-edge-soft); border-radius: 13px;
+  background: rgba(20, 18, 34, .9); box-shadow: var(--k-glow-edge); color: var(--k-text);
+}
+.prog-mine:active { transform: translateY(1px); }
+.prog-mine-eyebrow {
+  font: 800 9.5px/1 var(--k-font); letter-spacing: .16em; text-transform: uppercase; color: var(--k-text-dim);
+}
+.prog-mine strong { font: 900 15px/1.15 var(--k-font); color: var(--k-cyan-lt); }
+.prog-mine-num {
+  font: 700 11.5px/1.35 var(--k-font); color: var(--k-gold); font-variant-numeric: tabular-nums;
+}
+.prog-mine-go { font: 800 10px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; color: var(--k-text-dim); }
+
+.prog { display: grid; gap: 10px; margin-bottom: 14px; padding: 15px 14px;
+  border: 1px solid var(--k-edge-soft); border-radius: 15px; background: rgba(20, 18, 34, .9); }
+/* Not yet joined: this is a decision the member has to make, so it is allowed
+   to be the loudest thing on the card until it is made. */
+.prog--needed { border-color: var(--k-gold); box-shadow: var(--k-glow-gold); }
+.prog h3 { margin: 0; font: 900 15px/1.2 var(--k-font); color: var(--k-text); }
+.prog-lead { margin: 0; font: 600 11.5px/1.5 var(--k-font); color: var(--k-text-dim); }
+.prog-grid { display: grid; gap: 7px; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+.prog-card {
+  display: grid; gap: 3px; text-align: left; cursor: pointer; padding: 11px 12px;
+  border: 1px solid var(--k-edge-soft); border-radius: 12px;
+  background: rgba(255, 255, 255, .03); color: var(--k-text);
+}
+.prog-card:active { transform: translateY(1px); }
+.prog-card.on { border-color: var(--k-cyan); background: rgba(34, 211, 238, .10); }
+.prog-card strong { font: 800 12.5px/1.25 var(--k-font); }
+.prog-num { font: 900 15px/1.1 var(--k-font); color: var(--k-gold); font-variant-numeric: tabular-nums; }
+.prog-members { font: 600 10.5px/1.3 var(--k-font); color: var(--k-text-dim); }
+.prog-tick { font: 800 9.5px/1 var(--k-font); letter-spacing: .1em; text-transform: uppercase; color: var(--k-cyan-lt); }
+
+/* ── Give or serve ────────────────────────────────────────────────────────
+   Playing is not giving. This is the way in to the two things that are. */
+.prog-do {
+  display: grid; gap: 3px; width: 100%; text-align: left; cursor: pointer;
+  padding: 12px 14px; margin-bottom: 12px;
+  border: 1px solid var(--k-gold); border-radius: 13px;
+  background: rgba(255, 207, 71, .06); color: var(--k-text);
+}
+.prog-do:active { transform: translateY(1px); }
+.prog-do strong { font: 800 13px/1.25 var(--k-font); color: var(--k-gold); }
+.prog-do span { font: 600 11px/1.4 var(--k-font); color: var(--k-text-dim); }
+.prog-mine-num i { font-style: normal; color: var(--k-cyan-lt); }
+.prog-tabs { margin: 12px 0 14px; }
+.jub-kind i { font-style: normal; opacity: .65; font-size: .9em; }
+
+/* A seat somebody already holds. The strongest thing on the screen, because
+   it is the one that came with a decision attached. */
+.seat-mine { display: grid; gap: 6px; margin-bottom: 12px; }
+.seat-mine > div {
+  display: grid; gap: 2px; padding: 11px 13px;
+  border: 1px solid var(--k-go); border-radius: 12px; background: rgba(57, 255, 136, .07);
+}
+.seat-mine strong { font: 900 14px/1.15 var(--k-font); color: var(--k-go); }
+.seat-mine span { font: 600 11px/1.35 var(--k-font); color: var(--k-text-dim); }
+
+.seat-grid { display: grid; gap: 7px; }
+.seat-card {
+  display: grid; gap: 3px; text-align: left; cursor: pointer; padding: 11px 13px;
+  border: 1px solid var(--k-edge-soft); border-radius: 12px;
+  background: rgba(255, 255, 255, .03); color: var(--k-text);
+}
+.seat-card.on { border-color: var(--k-gold); background: rgba(255, 207, 71, .10); }
+/* Taken seats stay visible and stay unclickable — hiding them makes a board
+   look emptier than it is, and hides who is answerable for what. */
+.seat-card.taken { opacity: .55; cursor: not-allowed; }
+.seat-card strong { font: 800 13px/1.2 var(--k-font); }
+.seat-duty { font: 600 11px/1.4 var(--k-font); color: var(--k-text-dim); }
+.seat-who { font: 800 10px/1 var(--k-font); letter-spacing: .09em; text-transform: uppercase; color: var(--k-cyan-lt); }
+.seat-card.taken .seat-who { color: var(--k-text-dim); }
+
+.give-list { margin-top: 16px; }
+.give-list h4 {
+  margin: 0 0 8px; font: 800 10px/1 var(--k-font); letter-spacing: .14em;
+  text-transform: uppercase; color: var(--k-text-dim);
+}
+.give-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px;
+  border: 1px solid var(--k-edge-soft); border-radius: 11px; background: rgba(255, 255, 255, .025);
+}
+.give-row.done { border-color: rgba(57, 255, 136, .45); background: rgba(57, 255, 136, .06); }
+.give-row .jub-chip { margin-left: auto; }

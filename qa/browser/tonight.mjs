@@ -109,10 +109,20 @@ await shot('tonight-3-host.png');
 console.log('\nA CLAIM PULLS THE WHOLE SCREEN TO IT');
 await call('POST','/bingo/start',{},owner);
 await call('POST','/bingo/autofill',{on:true},nova.token);
+// LIP SYNC squares are never autofilled — they are earned by performing — so
+// some deals contain no line Nova can complete this way. Correct game rule,
+// and it made this suite flaky. Deal again rather than blame the screen.
 let won=false;
-for(let i=0;i<220&&!won;i++){ const c=await call('POST','/bingo/call',{},owner);
-  won=(await call('POST','/bingo/claim',{},nova.token)).status===200;
-  if(!won&&c.status!==200&&/all phrases called/i.test(c.body.error||''))break; }
+for(let deal=0;deal<8&&!won;deal++){
+  if(deal>0){ await call('POST','/bingo/reset',{},owner);
+    await call('POST','/bingo/join',{},nova.token);
+    await call('POST','/bingo/start',{},owner);
+    await call('POST','/bingo/autofill',{on:true},nova.token); }
+  for(let i=0;i<220;i++){ const c=await call('POST','/bingo/call',{},owner);
+    won=(await call('POST','/bingo/claim',{},nova.token)).status===200;
+    if(won)break;
+    if(c.status!==200&&/all phrases called/i.test(c.body.error||''))break; }
+}
 ok(won,'Nova wins a round the server believes in');
 // Back to Tonight the way the owner would: tap the tab.
 await js(`const b=[...document.querySelectorAll('.staff-hub-tab')].find(b=>/tonight/i.test(b.innerText));if(b)b.click();return !!b;`);

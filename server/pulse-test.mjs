@@ -81,14 +81,27 @@ console.log('\nBUT A MEMBER STANDING THERE OUTRANKS THE ROUND');
 // is exactly right and means the test has to actually win. Autofill covers
 // Nova's squares as they are called; the host calls until she has a line.
 await call('POST', '/bingo/autofill', { on: true }, nova.token);
+// Autofill covers called squares, but LIP SYNC squares are never filled in —
+// those are earned by performing. So on some deals every line through Nova's
+// card contains one, and she cannot win no matter how many songs are called.
+// That is correct game behaviour and it made this suite flaky: it looked like
+// the RANKING was wrong when the deal simply had no win in it.
+//
+// Deal again rather than assert against a card that cannot win.
 let claimed = null;
-for (let i = 0; i < 220 && !claimed; i++) {
-  const called = await call('POST', '/bingo/call', {}, owner);
-  const c = await call('POST', '/bingo/claim', {}, nova.token);
-  if (c.status === 200) { claimed = await pulse(); break; }
-  // Every square called and still no win means the deal cannot produce one —
-  // fail loudly rather than spin out the budget and blame the ranking.
-  if (called.status !== 200 && /all phrases called/i.test(called.body.error || '')) break;
+for (let deal = 0; deal < 8 && !claimed; deal++) {
+  if (deal > 0) {
+    await call('POST', '/bingo/reset', {}, owner);
+    for (const m of [nova, rio]) await call('POST', '/bingo/join', {}, m.token);
+    await call('POST', '/bingo/start', {}, owner);
+    await call('POST', '/bingo/autofill', { on: true }, nova.token);
+  }
+  for (let i = 0; i < 220; i++) {
+    const called = await call('POST', '/bingo/call', {}, owner);
+    const c = await call('POST', '/bingo/claim', {}, nova.token);
+    if (c.status === 200) { claimed = await pulse(); break; }
+    if (called.status !== 200 && /all phrases called/i.test(called.body.error || '')) break;
+  }
 }
 ok(!!claimed, 'Nova can actually win a round the server believes in');
 claimed = claimed || await pulse();

@@ -171,6 +171,31 @@ export function apiStaffSignOut() {
 }
 
 // ── The team ──────────────────────────────────────────────────────────────
+// ── Programmes ────────────────────────────────────────────────────────────
+// Every member belongs to one. It decides which vault their share of the house
+// fee lands in, so "a percentage goes to the community" becomes a named pot
+// they picked and can look at.
+export function apiPrograms() { return call('GET', '/programs', null, apiToken()); }
+export function apiJoinProgram(program) { return call('POST', '/me/program', { program }, apiToken()); }
+// Giving is voluntary and is never taken automatically — playing is not
+// donating. A pledge is not money until somebody at the house confirms it.
+export function apiDonate(program, amountCents, rail, note) {
+  return call('POST', '/programs/donate', { program, amountCents, rail, note }, apiToken());
+}
+export function apiMyDonations() { return call('GET', '/programs/donations', null, apiToken()); }
+export function apiSettleDonation(donationId, received) {
+  return call('POST', '/programs/donation/settle', { donationId, received }, apiStaffToken());
+}
+// The board: five seats on every programme, and what a member brings to one.
+export function apiBoard() { return call('GET', '/board', null, apiToken()); }
+export function apiBoardApply(program, position, brings) {
+  return call('POST', '/board/apply', { program, position, brings }, apiToken());
+}
+export function apiBoardQueue() { return call('GET', '/board/queue', null, apiStaffToken()); }
+export function apiBoardDecide(applicationId, approve, note) {
+  return call('POST', '/board/decide', { applicationId, approve, note }, apiStaffToken());
+}
+
 // What needs a person right now, ranked by who is standing there waiting.
 export function apiVenuePulse() { return call('GET', '/venue/pulse', null, apiStaffToken()); }
 export function apiStaffRoster() { return call('GET', '/staff/roster', null, apiStaffToken()); }

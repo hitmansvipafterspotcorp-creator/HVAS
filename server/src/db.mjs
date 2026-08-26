@@ -539,6 +539,75 @@ export function openDb(path) {
     PRIMARY KEY (award_ref, by)
   )`);
 
+  // ── Which programme a member belongs to ─────────────────────────────────
+  //
+  // The six programmes already existed as things the RESERVE pays for. Nobody
+  // belonged to one, which made them a spending category rather than something
+  // a member could point at and say that is mine.
+  //
+  // Every member joins one. It decides which vault their share of the house fee
+  // lands in, so a member can see their own money sitting in a named pot rather
+  // than being told a percentage goes somewhere good.
+  {
+    const cols = db.prepare(`PRAGMA table_info(members)`).all().map((c) => c.name);
+    if (!cols.includes('program')) db.exec(`ALTER TABLE members ADD COLUMN program TEXT`);
+    if (!cols.includes('program_at')) db.exec(`ALTER TABLE members ADD COLUMN program_at INTEGER`);
+  }
+  // Switching is allowed and is not quietly overwritten — a member who has
+  // moved between programmes has a history, and the reserve's own records point
+  // at whichever programme was current when each contribution was made.
+  db.exec(`CREATE TABLE IF NOT EXISTS member_program_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    program TEXT NOT NULL,
+    at INTEGER NOT NULL
+  )`);
+
+  // ── Giving to a programme, and sitting on its board ─────────────────────
+  //
+  // Belonging to a programme is an affiliation, not a payment. Playing bingo is
+  // not a donation and must never be recorded as one. There are exactly two
+  // ways a member acts on a programme, and both are their own choice:
+  //
+  //   DONATE — a voluntary amount, to a cause they picked. Like every other
+  //   payment in this venue, the member never confirms their own money.
+  //
+  //   APPLY TO THE BOARD — for a named position, saying what they bring. The
+  //   house approves or declines, by name, and a seat is held by one person.
+  db.exec(`CREATE TABLE IF NOT EXISTS program_donations (
+    donation_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    program TEXT NOT NULL,
+    amount_units INTEGER NOT NULL,       -- cents, integer only
+    rail TEXT NOT NULL,                  -- cash | zelle | card
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'PLEDGED',  -- PLEDGED | RECEIVED | DECLINED
+    at INTEGER NOT NULL,
+    settled_at INTEGER,
+    settled_by TEXT,
+    contribution_id TEXT                 -- the reserve row it became, once received
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS board_seats (
+    program TEXT NOT NULL,
+    position TEXT NOT NULL,
+    member_id TEXT REFERENCES members(id),
+    seated_at INTEGER,
+    seated_by TEXT,
+    PRIMARY KEY (program, position)
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS board_applications (
+    application_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    program TEXT NOT NULL,
+    position TEXT NOT NULL,
+    brings TEXT NOT NULL,                -- what they bring to the table
+    status TEXT NOT NULL DEFAULT 'SUBMITTED',  -- SUBMITTED | APPROVED | DECLINED | WITHDRAWN
+    at INTEGER NOT NULL,
+    decided_at INTEGER,
+    decided_by TEXT,
+    decision_note TEXT
+  )`);
+
   // ── Who the staff actually are ───────────────────────────────────────────
   //
   // The venue ran on two shared codes. That is one secret per ROLE, not per

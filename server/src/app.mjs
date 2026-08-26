@@ -25,7 +25,7 @@ import { usd } from './economy/money.mjs';
 import { makeContribution, reserveHealth, VAULTS } from './economy/world-reserve.mjs';
 import { draftAllocationPolicy, adopt } from './economy/policy.mjs';
 import {
-  NEED_KINDS, PROGRAMS, classify, assess, approvalsSatisfied,
+  NEED_KINDS, PROGRAMS, BOARD_POSITIONS, BOARD_POSITION, classify, assess, approvalsSatisfied,
   makeAward, markPaid, confirmDelivery,
 } from './economy/jubilee.mjs';
 import {
@@ -528,6 +528,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       sourceEntity: process.env.HVAS_VENUE_NAME || 'HITMANS VIP AFTER SPOT',
       sourceTransaction: entryId,
       amount: usd(cents),
+      // The venue's own reserve vault. An entry fee is NOT a donation to a
+      // member's programme — they are not paying into anything by playing, and
+      // routing their entry money by affiliation would have quietly turned a
+      // game entry into a contribution nobody chose to make. What a member can
+      // do for a programme is donate to it, or sit on its board.
       vault: setting('bingo_world_vault') || 'CORE_RESILIENCE',
       legalCustodian: setting('world_custodian') || 'HITMANS VIP AFTER SPOT CORP',
       beneficialPurpose: 'Community reserve share of a Lip Sync Bingo entry',
@@ -1273,6 +1278,37 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   // is the only place that can get it wrong: the row is claimed by a
   // conditional UPDATE, and a second phone racing the first loses because its
   // UPDATE matches no rows rather than because it read a flag a moment later.
+  // Every programme, with the two numbers that make joining mean something:
+  // how many members stand behind it, and what is actually in its vault.
+  const programBoard = () => {
+    const counts = Object.fromEntries(db.prepare(
+      `SELECT program, COUNT(*) n FROM members WHERE program IS NOT NULL GROUP BY program`)
+      .all().map((r) => [r.program, r.n]));
+    // What members have GIVEN, which is the only member money a programme ever
+    // holds. An entry fee is not a donation and is not counted here.
+    const given = Object.fromEntries(db.prepare(
+      `SELECT program, SUM(amount_units) c FROM program_donations WHERE status='RECEIVED' GROUP BY program`)
+      .all().map((r) => [r.program, r.c || 0]));
+    const seats = db.prepare(
+      `SELECT bs.program, bs.position, bs.seated_at, m.name FROM board_seats bs
+       LEFT JOIN members m ON m.id = bs.member_id WHERE bs.member_id IS NOT NULL`).all();
+    const { byVault } = reserveNow();
+    return Object.entries(PROGRAMS).map(([id, p]) => {
+      const held = seats.filter((s) => s.program === id);
+      return {
+        id, label: p.label, vault: p.vault,
+        members: counts[id] || 0,
+        donatedCents: given[id] || 0,
+        vaultCents: byVault?.[p.vault] || 0,
+        board: BOARD_POSITIONS.map((pos) => {
+          const seat = held.find((h) => h.position === pos.id);
+          return { ...pos, heldBy: seat?.name || null, since: seat?.seated_at || null };
+        }),
+        openSeats: BOARD_POSITIONS.length - held.length,
+      };
+    });
+  };
+
   const claimInvite = (req, res, code) => {
     const inv = db.prepare('SELECT * FROM staff_invites WHERE code=?').get(code);
     if (!inv) return json(res, 401, { error: 'bad code' });
@@ -1601,9 +1637,229 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { ok: true, name: row.name });
     },
 
+    // ── Programmes ───────────────────────────────────────────────────────────
+    //
+    // Open to anybody signed in, including a member who has not joined one yet —
+    // they cannot choose without seeing the choices.
+    'GET /programs': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const mine = c.role === 'member'
+        ? db.prepare('SELECT program FROM members WHERE id=?').get(c.sub)?.program || null
+        : null;
+      json(res, 200, { programs: programBoard(), mine });
+    },
+
+    // ── Donating to a cause ─────────────────────────────────────────────────
+    //
+    // Voluntary, member-chosen, and never taken automatically. The member says
+    // what they are giving and how; somebody at the house confirms the money
+    // actually arrived. A member confirming their own donation would make the
+    // programme's total a number anybody could type.
+    'POST /programs/donate': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { program, amountCents, rail, note } = await readBody(req);
+      const id = String(program || '').trim().toUpperCase();
+      if (!PROGRAMS[id]) return json(res, 400, { error: `"${program}" is not one of the programmes` });
+      const cents = Math.floor(Number(amountCents) || 0);
+      if (!(cents > 0)) return json(res, 400, { error: 'Say how much you want to give.' });
+      const r = ['cash', 'zelle', 'card'].includes(String(rail || '').toLowerCase())
+        ? String(rail).toLowerCase() : null;
+      if (!r) return json(res, 400, { error: 'Say how you are paying: cash, Zelle or card.' });
+      const donationId = `DON-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO program_donations(donation_id, member_id, program, amount_units, rail, note, status, at)
+                  VALUES(?,?,?,?,?,?, 'PLEDGED', ?)`)
+        .run(donationId, c.sub, id, cents, r, String(note || '').slice(0, 300), Date.now());
+      // PLEDGED, not RECEIVED. §41: nothing is settled until somebody says it is.
+      json(res, 200, { ok: true, donationId, status: 'PLEDGED', amountCents: cents, program: id });
+    },
+
+    // What a member has given, and what is still outstanding.
+    'GET /programs/donations': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, {
+        donations: db.prepare('SELECT * FROM program_donations WHERE member_id=? ORDER BY at DESC LIMIT 30')
+          .all(c.sub).map((d) => ({
+            donationId: d.donation_id, program: d.program, label: PROGRAMS[d.program]?.label || d.program,
+            amountCents: d.amount_units, rail: d.rail, status: d.status, at: d.at, note: d.note || null,
+          })),
+      });
+    },
+
+    // The house confirming the money turned up — and only then does it become a
+    // contribution the programme can count.
+    'POST /programs/donation/settle': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { donationId, received } = await readBody(req);
+      const row = db.prepare('SELECT * FROM program_donations WHERE donation_id=?').get(donationId);
+      if (!row) return json(res, 404, { error: 'no such donation' });
+      if (row.status !== 'PLEDGED') return json(res, 409, { error: `that donation is already ${row.status}` });
+      if (row.member_id === c.sub) return json(res, 403, { error: 'You cannot confirm your own donation.' });
+      if (!received) {
+        db.prepare(`UPDATE program_donations SET status='DECLINED', settled_at=?, settled_by=? WHERE donation_id=?`)
+          .run(Date.now(), c.name || c.sub, donationId);
+        return json(res, 200, { ok: true, status: 'DECLINED' });
+      }
+      const made = makeContribution({
+        sourceType: 'unrestricted_donation',
+        sourceEntity: db.prepare('SELECT name FROM members WHERE id=?').get(row.member_id)?.name || 'member',
+        sourceTransaction: donationId,
+        amount: usd(row.amount_units),
+        vault: PROGRAMS[row.program]?.vault || 'CORE_RESILIENCE',
+        legalCustodian: setting('world_custodian') || 'HITMANS VIP AFTER SPOT CORP',
+        beneficialPurpose: `Member donation to ${PROGRAMS[row.program]?.label || row.program}`,
+      });
+      if (!made.ok) {
+        return json(res, 400, { error: made.refusal?.reason || 'that donation cannot be accepted' });
+      }
+      const cont = made.contribution;
+      db.prepare(`INSERT OR IGNORE INTO world_contributions
+        (contribution_id, source_type, source_entity, source_transaction, amount_units, currency,
+         asset_type, restriction_status, authorization_id, vault, legal_custodian,
+         beneficial_purpose, refused, reason, timestamp, proof_hash)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(cont.contributionId, cont.sourceType, cont.sourceEntity, cont.sourceTransaction,
+             cont.amount.units, cont.currency, cont.assetType, cont.restrictionStatus,
+             cont.authorizationId || null, cont.vault, cont.legalCustodian,
+             cont.beneficialPurpose, 0, null, cont.timestamp, cont.proofHash || null);
+      db.prepare(`UPDATE program_donations SET status='RECEIVED', settled_at=?, settled_by=?, contribution_id=? WHERE donation_id=?`)
+        .run(Date.now(), c.name || c.sub, cont.contributionId, donationId);
+      json(res, 200, { ok: true, status: 'RECEIVED', contributionId: cont.contributionId });
+    },
+
+    // ── The board ───────────────────────────────────────────────────────────
+    //
+    // Every programme has the same five seats. A member applies for one and has
+    // to say what they bring — a board application with nothing in it is a name
+    // on a list, and the whole point of the seat is that somebody is answerable
+    // for the work.
+    'GET /board': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const mine = c.role === 'member'
+        ? db.prepare(`SELECT * FROM board_applications WHERE member_id=? AND status='SUBMITTED'`).get(c.sub)
+        : null;
+      const held = c.role === 'member'
+        ? db.prepare('SELECT program, position, seated_at FROM board_seats WHERE member_id=?').all(c.sub)
+        : [];
+      json(res, 200, {
+        positions: BOARD_POSITIONS,
+        programs: programBoard(),
+        openApplication: mine ? {
+          applicationId: mine.application_id, program: mine.program, position: mine.position,
+          brings: mine.brings, at: mine.at,
+        } : null,
+        seats: held.map((h) => ({
+          program: h.program, programLabel: PROGRAMS[h.program]?.label || h.program,
+          position: h.position, positionLabel: BOARD_POSITION[h.position]?.label || h.position,
+          since: h.seated_at,
+        })),
+      });
+    },
+
+    'POST /board/apply': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { program, position, brings } = await readBody(req);
+      const pid = String(program || '').trim().toUpperCase();
+      const seat = String(position || '').trim().toUpperCase();
+      if (!PROGRAMS[pid]) return json(res, 400, { error: `"${program}" is not one of the programmes` });
+      if (!BOARD_POSITION[seat]) return json(res, 400, { error: `"${position}" is not a board seat` });
+      const said = String(brings || '').trim();
+      if (said.length < 20) {
+        return json(res, 400, {
+          error: 'Say what you bring to the table — a sentence or two. This is what the board is deciding on.',
+        });
+      }
+      const taken = db.prepare('SELECT member_id FROM board_seats WHERE program=? AND position=?').get(pid, seat);
+      if (taken?.member_id) {
+        const who = db.prepare('SELECT name FROM members WHERE id=?').get(taken.member_id)?.name || 'somebody';
+        return json(res, 409, { error: `${who} already holds that seat. Try another one, or another programme.` });
+      }
+      const open = db.prepare(`SELECT application_id FROM board_applications WHERE member_id=? AND status='SUBMITTED'`).get(c.sub);
+      if (open) return json(res, 409, { error: 'You already have an application waiting. One at a time.' });
+      const applicationId = `BRD-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO board_applications(application_id, member_id, program, position, brings, status, at)
+                  VALUES(?,?,?,?,?, 'SUBMITTED', ?)`)
+        .run(applicationId, c.sub, pid, seat, said.slice(0, 1200), Date.now());
+      json(res, 200, { ok: true, applicationId, status: 'SUBMITTED' });
+    },
+
+    'GET /board/queue': (req, res) => {
+      const c = houseAuth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT ba.*, m.name, m.number FROM board_applications ba
+        JOIN members m ON m.id=ba.member_id WHERE ba.status='SUBMITTED' ORDER BY ba.at ASC`).all();
+      json(res, 200, {
+        applications: rows.map((r) => ({
+          applicationId: r.application_id, name: r.name, number: r.number,
+          program: r.program, programLabel: PROGRAMS[r.program]?.label || r.program,
+          position: r.position, positionLabel: BOARD_POSITION[r.position]?.label || r.position,
+          brings: r.brings, at: r.at,
+        })),
+        programs: programBoard(),
+      });
+    },
+
+    // Approving seats somebody. Declining says why — a member turned down with
+    // no reason has nothing to act on and will simply apply again.
+    'POST /board/decide': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { applicationId, approve, note } = await readBody(req);
+      const row = db.prepare('SELECT * FROM board_applications WHERE application_id=?').get(applicationId);
+      if (!row) return json(res, 404, { error: 'no such application' });
+      if (row.status !== 'SUBMITTED') return json(res, 409, { error: `that application is already ${row.status}` });
+      if (row.member_id === c.sub) return json(res, 403, { error: 'You cannot decide your own application.' });
+      const now = Date.now();
+      if (!approve) {
+        const why = String(note || '').trim();
+        if (why.length < 5) return json(res, 400, { error: 'Say why. A refusal with no reason is not one.' });
+        db.prepare(`UPDATE board_applications SET status='DECLINED', decided_at=?, decided_by=?, decision_note=? WHERE application_id=?`)
+          .run(now, c.name || c.sub, why.slice(0, 600), applicationId);
+        return json(res, 200, { ok: true, status: 'DECLINED' });
+      }
+      const taken = db.prepare('SELECT member_id FROM board_seats WHERE program=? AND position=?')
+        .get(row.program, row.position);
+      if (taken?.member_id) return json(res, 409, { error: 'Somebody was seated there while this was waiting.' });
+      db.prepare(`INSERT INTO board_seats(program, position, member_id, seated_at, seated_by)
+                  VALUES(?,?,?,?,?)
+                  ON CONFLICT(program, position) DO UPDATE SET member_id=excluded.member_id,
+                    seated_at=excluded.seated_at, seated_by=excluded.seated_by`)
+        .run(row.program, row.position, row.member_id, now, c.name || c.sub);
+      db.prepare(`UPDATE board_applications SET status='APPROVED', decided_at=?, decided_by=?, decision_note=? WHERE application_id=?`)
+        .run(now, c.name || c.sub, String(note || '').slice(0, 600), applicationId);
+      json(res, 200, { ok: true, status: 'APPROVED', seatedBy: c.name || c.sub });
+    },
+
+    // Joining one, or moving to another. A member's own choice — the house does
+    // not assign it, and nobody else can change it for them.
+    'POST /me/program': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { program } = await readBody(req);
+      const id = String(program || '').trim().toUpperCase();
+      if (!PROGRAMS[id]) {
+        return json(res, 400, {
+          error: `"${program}" is not one of the programmes`,
+          programs: Object.keys(PROGRAMS),
+        });
+      }
+      const now = Date.now();
+      const prev = db.prepare('SELECT program FROM members WHERE id=?').get(c.sub)?.program || null;
+      if (prev === id) return json(res, 200, { ok: true, program: id, unchanged: true });
+      db.prepare('UPDATE members SET program=?, program_at=?, updated_at=? WHERE id=?')
+        .run(id, now, now, c.sub);
+      db.prepare('INSERT INTO member_program_history(member_id, program, at) VALUES(?,?,?)')
+        .run(c.sub, id, now);
+      // Contributions already made stay where they landed. Moving programme
+      // changes where the NEXT share goes; it does not reach back and move money
+      // that has already been recorded as belonging somewhere.
+      json(res, 200, { ok: true, program: id, previous: prev, label: PROGRAMS[id].label });
+    },
+
     'GET /me': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
-      json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
+      const row = db.prepare('SELECT * FROM members WHERE id=?').get(c.sub);
+      json(res, 200, {
+        member: publicMember(row),
+        program: row?.program || null,
+        programLabel: row?.program ? PROGRAMS[row.program]?.label || null : null,
+      });
     },
     // A member's own full timeline — same event set staff see on the door
     // dashboard, so "everything tracked and timestamped" is true on both
