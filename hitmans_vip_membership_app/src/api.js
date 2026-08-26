@@ -171,6 +171,65 @@ export function apiStaffSignOut() {
 }
 
 // ── The team ──────────────────────────────────────────────────────────────
+// ── Ways to earn ──────────────────────────────────────────────────────────
+// Licensing covers creative work. These cover everybody else: selling to the
+// room, taking a booking with a stake on it, partnering with the venue, and
+// being paid for who you bring.
+export function apiEarn() { return call('GET', '/earn', null, apiToken()); }
+
+export function apiMarket() { return call('GET', '/market', null, apiToken()); }
+export function apiMarketMine() { return call('GET', '/market/mine', null, apiToken()); }
+export function apiMarketList(body) { return call('POST', '/market/list', body, apiToken()); }
+export function apiMarketClose(listingId) { return call('POST', '/market/close', { listingId }, apiToken()); }
+export function apiMarketOrder(listingId, note) { return call('POST', '/market/order', { listingId, note }, apiToken()); }
+export function apiMarketReceived(orderId, note) { return call('POST', '/market/received', { orderId, note }, apiToken()); }
+export function apiHouseMoney() { return call('GET', '/house/money', null, apiStaffToken()); }
+export function apiMarketSettle(orderId, received, rail) {
+  return call('POST', '/market/settle', { orderId, received, rail }, apiStaffToken());
+}
+
+// A gig is a booking with a stake on it — §18's chain, and the reason a
+// no-show costs somebody something.
+export function apiGigs() { return call('GET', '/gig/mine', null, apiToken()); }
+export function apiGigRequest(body) { return call('POST', '/gig/request', body, apiToken()); }
+export function apiGigAgree(bookingId) { return call('POST', '/gig/agree', { bookingId }, apiToken()); }
+export function apiGigWorked(bookingId, note) { return call('POST', '/gig/worked', { bookingId, note }, apiToken()); }
+export function apiGigVerify(bookingId, note) { return call('POST', '/gig/verify', { bookingId, note }, apiToken()); }
+export function apiGigSecure(bookingId) { return call('POST', '/gig/secure', { bookingId }, apiStaffToken()); }
+export function apiGigSettle(bookingId, failure) {
+  return call('POST', '/gig/settle', { bookingId, failure }, apiStaffToken());
+}
+
+export function apiPartnerships() { return call('GET', '/partnership/mine', null, apiToken()); }
+export function apiPartnershipsHouse() { return call('GET', '/partnership/mine', null, apiStaffToken()); }
+export function apiPartnershipPropose(body, asHouse) {
+  return call('POST', '/partnership/propose', body, asHouse ? apiStaffToken() : apiToken());
+}
+export function apiPartnershipAccept(partnershipId, asHouse) {
+  return call('POST', '/partnership/accept', { partnershipId }, asHouse ? apiStaffToken() : apiToken());
+}
+export function apiPartnershipNight(partnershipId, grossCents, note) {
+  return call('POST', '/partnership/night', { partnershipId, grossCents, note }, apiStaffToken());
+}
+
+export function apiReferral() { return call('GET', '/referral/mine', null, apiToken()); }
+export function apiReferralPay(creditIds, reference) {
+  return call('POST', '/referral/pay', { creditIds, reference }, apiStaffToken());
+}
+
+// ── Licensing ─────────────────────────────────────────────────────────────
+export function apiLicenseTerms() { return call('GET', '/license/terms', null, apiToken()); }
+export function apiLicenseMine() { return call('GET', '/license/mine', null, apiToken()); }
+export function apiLicenseMarket() { return call('GET', '/license/market', null, apiToken()); }
+export function apiLicenseHeld() { return call('GET', '/license/held', null, apiToken()); }
+export function apiLicenseOffer(body) { return call('POST', '/license/offer', body, apiToken()); }
+export function apiLicenseWithdraw(offerId) { return call('POST', '/license/withdraw', { offerId }, apiToken()); }
+export function apiLicenseBuy(offerId, rail) { return call('POST', '/license/buy', { offerId, rail }, apiToken()); }
+export function apiLicenseSettle(grantId, received) {
+  return call('POST', '/license/settle', { grantId, received }, apiStaffToken());
+}
+export function apiRegisterWork(body) { return call('POST', '/ip/performance', body, apiToken()); }
+
 // ── Getting in ────────────────────────────────────────────────────────────
 // Signing in is not membership. A member agrees to the covenant, says what they
 // do, and chooses a programme before the venue lets them do anything — and the

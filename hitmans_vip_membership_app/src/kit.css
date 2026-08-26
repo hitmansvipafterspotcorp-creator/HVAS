@@ -2870,3 +2870,88 @@
   justify-self: start; background: none; border: none; cursor: pointer; padding: 4px 0;
   font: 800 11px/1 var(--k-font); letter-spacing: .08em; text-transform: uppercase; color: var(--k-text-dim);
 }
+
+/* ── Making money here ────────────────────────────────────────────────────
+   Four ways on one screen. The rule running through all of it: what the
+   venue takes is on screen BEFORE anybody commits to anything, never after
+   somebody has already been paid (§46). So the fee line and the "you keep"
+   line get real weight, and nothing else on the screen outshouts them. */
+.earn-fee {
+  margin: 0 0 12px; padding: 10px 12px; border-radius: 11px;
+  border-left: 2px solid var(--k-gold); background: rgba(255, 207, 71, .07);
+  font: 700 12px/1.5 var(--k-font); color: var(--k-gold);
+}
+.earn-note {
+  margin: 12px 0; font: 600 12px/1.55 var(--k-font); color: var(--k-text-dim);
+}
+.earn-note b { color: var(--k-text); }
+.earn-total {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; margin-bottom: 12px; border-radius: 12px;
+  border: 1px solid rgba(57, 255, 136, .35); background: rgba(57, 255, 136, .06);
+}
+.earn-total span {
+  font: 800 10px/1 var(--k-font); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--k-text-dim);
+}
+.earn-total b { font: 900 22px/1 var(--k-font); color: var(--k-go); font-variant-numeric: tabular-nums; }
+/* Said before they list, not after somebody buys. */
+.earn-keep {
+  margin: 2px 0 0; padding: 9px 11px; border-radius: 9px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--k-edge-soft);
+  font: 600 12px/1.5 var(--k-font); color: var(--k-text-dim);
+}
+.earn-keep b { font-weight: 900; color: var(--k-gold); font-variant-numeric: tabular-nums; }
+
+.jub-check {
+  display: flex; align-items: flex-start; gap: 9px; cursor: pointer; padding: 4px 0;
+  font: 600 12px/1.45 var(--k-font); color: var(--k-text-dim);
+}
+.jub-check input { flex: none; width: 17px; height: 17px; margin-top: 1px; accent-color: var(--k-gold); }
+
+/* The move that is actually yours to make, picked out of a list of stages
+   nobody wants to read. */
+.give-row.mine { border-color: rgba(255, 207, 71, .5); background: rgba(255, 207, 71, .07); }
+
+/* ── A licence on a card ──────────────────────────────────────────────────
+   What it lets you do comes first and in plain words; the type, the scope
+   and the term are tags under it. A buyer should be able to tell what they
+   are getting without opening anything. */
+.lic-card {
+  display: grid; gap: 8px; padding: 13px 14px; margin-bottom: 8px;
+  border: 1px solid var(--k-edge-soft); border-radius: 13px;
+  background: rgba(255, 255, 255, .03);
+}
+.lic-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.lic-price { flex: none; font: 900 17px/1 var(--k-font); color: var(--k-gold); font-variant-numeric: tabular-nums; }
+.lic-grants { margin: 0; font: 600 12.5px/1.55 var(--k-font); color: var(--k-text); }
+.lic-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.lic-tags .onb-tag { margin-top: 0; }
+/* The hash of the terms. Small, but present — it is what makes the terms
+   the ones that were agreed rather than the ones remembered later. */
+.lic-hash {
+  margin: 0; overflow-wrap: anywhere;
+  font: 600 9px/1.4 var(--k-mono, ui-monospace, monospace); color: var(--k-text-faint);
+}
+
+/* ── Your code ───────────────────────────────────────────────────────────
+   A promoter needs one thing off this screen in a dark room: the code. */
+.ref-code {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 14px; border-radius: 13px; margin-bottom: 4px;
+  border: 1px solid rgba(34, 211, 238, .35); background: rgba(34, 211, 238, .06);
+}
+.ref-code i {
+  flex: 1 1 100%; font-style: normal; font: 800 9px/1 var(--k-font);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--k-text-dim);
+}
+.ref-code b {
+  font: 900 clamp(22px, 7vw, 30px)/1 var(--k-font); letter-spacing: .06em;
+  color: var(--k-cyan-lt); font-variant-numeric: tabular-nums;
+}
+.ref-code .bingo-btn { margin-left: auto; }
+
+/* Giving and earning sit next to each other. Green for the one that pays, so
+   they read as two different offers rather than two versions of the same one. */
+.earn-do { border-color: rgba(57, 255, 136, .55); background: rgba(57, 255, 136, .06); }
+.earn-do strong { color: var(--k-go); }

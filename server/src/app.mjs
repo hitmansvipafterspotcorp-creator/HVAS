@@ -1712,6 +1712,31 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         }
       }
 
+      // 5b. Members' money waiting on somebody here. A seller who delivered and
+      //     has not been paid out, a booking that is not really booked, a
+      //     creator whose licence is still PENDING, a promoter owed commission.
+      //     One line, because four would push the door off the screen — the
+      //     count is what makes it worth walking over for.
+      const moneyWaiting =
+        db.prepare(`SELECT COUNT(*) n FROM market_orders WHERE status='PLACED'`).get().n
+        + db.prepare(`SELECT COUNT(*) n FROM bookings WHERE stage IN ('AGREED','VERIFIED') AND settled_at IS NULL`).get().n
+        + db.prepare(`SELECT COUNT(*) n FROM ip_license_grants WHERE status='PENDING'`).get().n
+        + db.prepare(`SELECT COUNT(*) n FROM referral_credits WHERE status='EARNED'`).get().n;
+      if (moneyWaiting > 0) {
+        const oldest = db.prepare(`SELECT MIN(at) a FROM (
+          SELECT at FROM market_orders WHERE status='PLACED'
+          UNION ALL SELECT at FROM bookings WHERE stage IN ('AGREED','VERIFIED') AND settled_at IS NULL
+          UNION ALL SELECT at FROM ip_license_grants WHERE status='PENDING'
+          UNION ALL SELECT at FROM referral_credits WHERE status='EARNED')`).get().a;
+        items.push({
+          id: 'members-money', urgency: 45, count: moneyWaiting,
+          headline: moneyWaiting === 1 ? 'A member is waiting to be paid' : `${moneyWaiting} members waiting on money`,
+          detail: 'Sales, bookings, licences and commissions. None of it moves until somebody here confirms it.',
+          waitingMs: oldest ? now - oldest : 0,
+          action: { label: 'Settle them', screen: 'host', tab: 'money' },
+        });
+      }
+
       // 6. Somebody said they are on their way and has not arrived.
       if (b.onTheWay?.length) {
         items.push({
@@ -1894,6 +1919,74 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, {
         ok: true, orderId, status: 'PLACED — NOT PAID',
         priceCents: split.priceCents, venueFee: split.feeCents, sellerGets: split.sellerCents,
+      });
+    },
+
+    // ── The house's side of everybody else's money ──────────────────────────
+    //
+    // Four separate queues in the tables, one screen in the venue. Every one of
+    // them is somebody waiting on a person here to say the money arrived — a
+    // seller who has not been paid out, a booking that is not really booked
+    // until a deposit is in, a creator whose licence is still PENDING, a
+    // promoter owed commission. They are gathered in one call because the
+    // alternative is four tabs and three of them never getting opened.
+    'GET /house/money': (req, res) => {
+      const c = houseAuth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const named = !!c.named;
+      const feePct = marketFeePercent();
+      const orders = db.prepare(`SELECT o.*, s.name AS seller, b.name AS buyer, l.title
+        FROM market_orders o JOIN members s ON s.id=o.seller_id JOIN members b ON b.id=o.buyer_id
+        JOIN market_listings l ON l.listing_id=o.listing_id
+        WHERE o.status='PLACED' ORDER BY o.at ASC LIMIT 60`).all();
+      const toSecure = db.prepare(`SELECT bk.*, p.name AS provider, cl.name AS client
+        FROM bookings bk JOIN members p ON p.id=bk.provider_id JOIN members cl ON cl.id=bk.client_id
+        WHERE bk.stage='AGREED' AND bk.settled_at IS NULL ORDER BY bk.at ASC LIMIT 60`).all();
+      const toPayOut = db.prepare(`SELECT bk.*, p.name AS provider, cl.name AS client
+        FROM bookings bk JOIN members p ON p.id=bk.provider_id JOIN members cl ON cl.id=bk.client_id
+        WHERE bk.stage='VERIFIED' AND bk.settled_at IS NULL ORDER BY bk.at ASC LIMIT 60`).all();
+      const grants = db.prepare(`SELECT g.*, cr.name AS creator, pr.title, pr.song
+        FROM ip_license_grants g JOIN members cr ON cr.id=g.creator_id
+        JOIN performance_rights pr ON pr.asset_id=g.asset_id
+        WHERE g.status='PENDING' ORDER BY g.at ASC LIMIT 60`).all();
+      const credits = db.prepare(`SELECT k.*, m.name AS referrer
+        FROM referral_credits k JOIN members m ON m.id=k.referrer_id
+        WHERE k.status='EARNED' ORDER BY k.at ASC LIMIT 60`).all();
+      json(res, 200, {
+        // A shared venue code can see the queue so the room knows what is
+        // outstanding; it cannot move any of it (§55, and moneyAuth).
+        canSettle: named,
+        feePercent: feePct,
+        orders: orders.map((o) => ({
+          orderId: o.order_id, title: o.title, seller: o.seller, buyer: o.buyer,
+          priceCents: o.price_units, feeCents: o.fee_units,
+          toSellerCents: o.price_units - o.fee_units, at: o.at,
+        })),
+        toSecure: toSecure.map((b) => ({
+          bookingId: b.booking_id, title: b.title, provider: b.provider, client: b.client,
+          priceCents: b.price_units, depositCents: b.deposit_units, stakeCents: b.stake_units,
+          startsAt: b.starts_at || null, at: b.at,
+        })),
+        toPayOut: toPayOut.map((b) => {
+          const out = bookingOutcome({ priceCents: b.price_units, depositCents: b.deposit_units,
+                                       stakeCents: b.stake_units, feePercent: b.fee_percent });
+          return {
+            bookingId: b.booking_id, title: b.title, provider: b.provider, client: b.client,
+            priceCents: b.price_units, stakeCents: b.stake_units,
+            // What settling actually does, worked out before anybody presses it.
+            toProviderCents: out.ok ? out.toProvider : null,
+            toVenueCents: out.ok ? out.toVenue : null, at: b.at,
+          };
+        }),
+        licenses: grants.map((g) => ({
+          grantId: g.grant_id, work: g.title || g.song || 'Untitled', creator: g.creator,
+          buyer: g.buyer_name, type: g.type, typeLabel: LICENSE_TYPES[g.type]?.label,
+          priceCents: g.price_units, rail: g.rail, at: g.at,
+        })),
+        credits: credits.map((k) => ({
+          creditId: k.credit_id, referrer: k.referrer, event: k.event,
+          eventLabel: REFERRAL_EVENTS[k.event]?.label,
+          grossCents: k.gross_units, commissionCents: k.commission_units, at: k.at,
+        })),
       });
     },
 

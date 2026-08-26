@@ -200,6 +200,32 @@ ok(paid.body.totalCents > 0, `and pays what was owed (${paid.body.totalCents})`)
 eq((await call('GET', '/referral/mine', null, promo.token)).body.earnedCents, 0, 'nothing is left owed');
 ok((await call('GET', '/referral/mine', null, promo.token)).body.paidCents > 0, 'and it shows as paid');
 
+console.log('\nONE QUEUE FOR EVERY KIND OF MONEY WAITING ON THE HOUSE');
+// Four tables, four kinds of waiting, and one screen in the venue. If this
+// endpoint misses a queue, somebody's money quietly sits there forever.
+const q = await call('GET', '/house/money', null, owner);
+eq(q.status, 200, 'the house can read what is outstanding');
+ok(Array.isArray(q.body.orders) && Array.isArray(q.body.toSecure) && Array.isArray(q.body.toPayOut)
+   && Array.isArray(q.body.licenses) && Array.isArray(q.body.credits),
+   'sales, bookings to secure, bookings to pay out, licences and commissions are all in it');
+eq(q.body.canSettle, true, 'a named sign-in may move it');
+const qShared = await call('GET', '/house/money', null, venue);
+eq(qShared.status, 200, 'the shared venue code may READ it');
+eq(qShared.body.canSettle, false, 'and is told plainly it may not move any of it');
+// A settled payout is worked out before anybody presses the button, so the
+// screen can never promise a number the settlement then contradicts.
+const pend = await call('POST', '/market/list',
+  { kind: 'SERVICE', title: 'Silk press', priceCents: 8000 }, dana.token);
+await call('POST', '/market/order', { listingId: pend.body.listingId }, promo.token);
+const qq = (await call('GET', '/house/money', null, owner)).body;
+const row = qq.orders.find((o) => o.title === 'Silk press');
+ok(!!row, 'a placed order shows up waiting');
+eq(row.priceCents - row.feeCents, row.toSellerCents, 'and the queue states what the seller actually gets');
+eq(row.toSellerCents, 7200, 'which is the price less the fee, not the price');
+// A member must never see this queue: it is every other member's money.
+eq((await call('GET', '/house/money', null, dana.token)).status, 401,
+   'and a member cannot read the house queue at all');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 server.close();
 process.exit(fail ? 1 : 0);

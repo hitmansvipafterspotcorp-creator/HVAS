@@ -33,6 +33,11 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiVenuePulse, apiPrograms, apiJoinProgram,
   apiDonate, apiMyDonations, apiBoard, apiBoardApply,
   apiOnboarding, apiAgree, apiSetRole,
+  apiEarn, apiMarket, apiMarketMine, apiMarketList, apiMarketClose, apiMarketOrder, apiMarketReceived,
+  apiGigs, apiGigRequest, apiGigAgree, apiGigWorked, apiGigVerify,
+  apiReferral, apiLicenseTerms, apiLicenseMine, apiLicenseMarket, apiLicenseHeld,
+  apiLicenseOffer, apiLicenseWithdraw, apiLicenseBuy, apiRegisterWork,
+  apiHouseMoney, apiMarketSettle, apiGigSecure, apiGigSettle, apiLicenseSettle, apiReferralPay,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -867,6 +872,13 @@ const screens = [
     detail: 'Give to a cause, or apply for a seat on its board.',
   },
   {
+    id: 'earn',
+    label: 'Earn',
+    eyebrow: 'Members Market',
+    title: 'Earn',
+    detail: 'Sell what you do, take bookings, license what you made, or earn on who you bring.',
+  },
+  {
     id: 'support',
     label: 'Get help',
     eyebrow: 'Community Support',
@@ -1094,7 +1106,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs', 'earn'],
   },
   {
     id: 'staff',
@@ -1756,6 +1768,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'support') return <JubileeApply onDone={() => navigate('myPass')} />;
   if (activeScreen === 'team') return <TeamScreen />;
   if (activeScreen === 'programs') return <ProgramActions onDone={() => navigate('myPass')} />;
+  if (activeScreen === 'earn') return <EarnScreen onDone={() => navigate('myPass')} />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -3163,6 +3176,16 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
         <button type="button" className="prog-do" onClick={() => navigate('programs')}>
           <strong>Give to a cause, or serve on a board</strong>
           <span>Playing gives a programme nothing. This is how you actually put something in.</span>
+        </button>
+      )}
+      {/* And the other direction: what this place can pay YOU. It sits beside
+          giving on purpose — a member should meet both on the same screen, on
+          the day they join, rather than finding out months later that the room
+          was a market the whole time. */}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do earn-do" onClick={() => navigate('earn')}>
+          <strong>Get paid here</strong>
+          <span>Sell what you do, take bookings, license what you made, or earn on who you bring.</span>
         </button>
       )}
 
@@ -5554,6 +5577,614 @@ function ProgramPicker({ compact, onDone }) {
   );
 }
 
+// ── Making money here ──────────────────────────────────────────────────────
+//
+// Four ways, on one screen, because they are the same question asked four ways:
+// what have I got that this room wants.
+//
+//   SELL     — a service or goods, member to member.
+//   GIGS     — the same, but both sides put something down first (§18).
+//   LICENSE  — creative work, sold many times over and still owned.
+//   BRING    — paid for the people you bring, on money that actually arrived.
+//
+// They are tabs rather than four menu items because a nail tech who also DJs
+// should not have to know which part of the app her second trade lives in.
+function EarnScreen({ onDone }) {
+  const [tab, setTab] = useState('sell');
+  const [meta, setMeta] = useState(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    apiEarn().then(setMeta).catch((e) => setErr(e.message || 'Could not load.'));
+  }, []);
+
+  if (!meta && !err) return <AppPanel title="Earn" subtitle="Ways to make money here"><p className="dash-empty">Loading…</p></AppPanel>;
+  if (!meta) {
+    return (
+      <AppPanel title="Earn" subtitle="Ways to make money here">
+        <p className="k-nudge k-nudge--no">{err}</p>
+      </AppPanel>
+    );
+  }
+
+  const TABS = [
+    ['sell', 'Sell'],
+    ['gigs', 'Gigs'],
+    ['license', 'License'],
+    ['bring', 'Bring people'],
+  ];
+
+  return (
+    <AppPanel title="Earn" subtitle="Ways to make money here">
+      {/* Said once, at the top, before anybody lists anything (§46). */}
+      <p className="earn-fee">{meta.feeSaid}</p>
+      <div className="staff-hub-tabs prog-tabs">
+        {TABS.map(([id, label]) => (
+          <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}`}
+                  onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'sell' && <SellTab meta={meta} />}
+      {tab === 'gigs' && <GigsTab />}
+      {tab === 'license' && <LicenseTab />}
+      {tab === 'bring' && <BringTab />}
+
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
+  );
+}
+
+// Selling a service or goods to the room.
+function SellTab({ meta }) {
+  const [mine, setMine] = useState(null);
+  const [shop, setShop] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [form, setForm] = useState({ kind: 'SERVICE', title: '', detail: '', amount: '', priceMode: 'FIXED', delivery: 'AT_VENUE' });
+
+  const load = async () => {
+    try { const [a, b] = await Promise.all([apiMarketMine(), apiMarket()]); setMine(a); setShop(b); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+  if (!mine) return <p className="dash-empty">{err || 'Loading…'}</p>;
+
+  const cents = Math.round(Number(form.amount) * 100);
+  const keep = cents > 0 ? Math.round(cents * (1 - meta.feePercent)) : 0;
+
+  return (
+    <>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      {mine.earnedCents > 0 && (
+        <div className="earn-total"><span>Earned selling</span><b>{MONEY(mine.earnedCents)}</b></div>
+      )}
+
+      <div className="jub-form">
+        <label className="jub-label">What are you offering?</label>
+        <div className="jub-kinds">
+          {meta.kinds.map((k) => (
+            <button type="button" key={k.id} className={`jub-kind${form.kind === k.id ? ' on' : ''}`}
+                    onClick={() => setForm((f) => ({ ...f, kind: k.id }))}>{k.label}</button>
+          ))}
+        </div>
+        <input className="jub-input" placeholder="Full set, gel · Friday catering · Two-hour DJ set"
+               value={form.title} maxLength={80} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+        <textarea className="jub-input jub-textarea" rows={2} placeholder="What they get, and how long it takes."
+                  value={form.detail} onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))} />
+        <div className="jub-step jub-step--wrap">
+          <input className="jub-input" inputMode="decimal" placeholder="0.00" value={form.amount}
+                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+          <select className="jub-input" value={form.priceMode}
+                  onChange={(e) => setForm((f) => ({ ...f, priceMode: e.target.value }))}>
+            {meta.priceModes.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+          <select className="jub-input" value={form.delivery}
+                  onChange={(e) => setForm((f) => ({ ...f, delivery: e.target.value }))}>
+            {meta.delivery.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+        </div>
+        {/* What they keep, before they list — not after somebody buys. */}
+        {cents > 0 && (
+          <p className="earn-keep">You keep <b>{MONEY(keep)}</b> of {MONEY(cents)}.</p>
+        )}
+        <button type="button" className="bingo-btn gold" disabled={busy || form.title.trim().length < 3 || !(cents >= 0 && form.amount !== '')}
+                onClick={() => act(async () => {
+                  await apiMarketList({ kind: form.kind, title: form.title.trim(), detail: form.detail,
+                                        priceCents: cents, priceMode: form.priceMode, delivery: form.delivery });
+                  setForm((f) => ({ ...f, title: '', detail: '', amount: '' }));
+                })}>
+          {busy ? 'Listing…' : 'Put it up'}
+        </button>
+      </div>
+
+      {mine.listings.filter((l) => l.status === 'OPEN').length > 0 && (
+        <div className="give-list">
+          <h4>You are selling</h4>
+          {mine.listings.filter((l) => l.status === 'OPEN').map((l) => (
+            <div key={l.listingId} className="give-row">
+              <div className="dash-info">
+                <strong>{l.title}</strong>
+                <span className="dash-num">{MONEY(l.priceCents)} · {l.priceModeLabel} · {l.deliveryLabel}</span>
+              </div>
+              <button type="button" className="bingo-btn compact ghost" disabled={busy}
+                      onClick={() => act(() => apiMarketClose(l.listingId))}>Close</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {mine.sold.length > 0 && (
+        <div className="give-list">
+          <h4>Sold</h4>
+          {mine.sold.map((o) => (
+            <div key={o.orderId} className={`give-row${o.status === 'DELIVERED' ? ' done' : ''}`}>
+              <div className="dash-info">
+                <strong>{o.buyer}</strong>
+                <span className="dash-num">You get {MONEY(o.youGet)} · venue {MONEY(o.venueFee)}</span>
+              </div>
+              <span className={`jub-chip${o.status === 'DELIVERED' ? ' ok' : ''}`}>{o.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="give-list">
+        <h4>What the room is selling</h4>
+        {shop?.listings.filter((l) => !l.mine).length === 0 && <p className="dash-empty">Nobody else is selling yet.</p>}
+        {shop?.listings.filter((l) => !l.mine).map((l) => (
+          <div key={l.listingId} className="give-row">
+            <div className="dash-info">
+              <strong>{l.title}</strong>
+              {/* What they actually do, so a buyer knows a nail tech from a mechanic. */}
+              <span className="dash-num">{l.seller}{l.trade ? ` · ${l.trade}` : ''} · {MONEY(l.priceCents)}</span>
+            </div>
+            <button type="button" className="bingo-btn compact" disabled={busy}
+                    onClick={() => act(() => apiMarketOrder(l.listingId))}>Buy</button>
+          </div>
+        ))}
+      </div>
+
+      {mine.bought.filter((o) => o.status === 'PAID').length > 0 && (
+        <div className="give-list">
+          <h4>Say you got it</h4>
+          {mine.bought.filter((o) => o.status === 'PAID').map((o) => (
+            <div key={o.orderId} className="give-row">
+              <div className="dash-info"><strong>{MONEY(o.priceCents)}</strong><span className="dash-num">Paid — did you get it?</span></div>
+              <button type="button" className="bingo-btn compact gold" disabled={busy}
+                      onClick={() => act(() => apiMarketReceived(o.orderId))}>I got it</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// Booking work, which in this app means both sides put something down first.
+//
+// §18: a stake here is a performance bond, not a yield product. The provider
+// posts it because a booking somebody can walk away from for free is not a
+// booking. It comes back the moment the work is confirmed — it is not the
+// venue's money and it never earns the venue anything.
+function GigsTab() {
+  const [data, setData] = useState(null);
+  const [shop, setShop] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [book, setBook] = useState(null);   // the listing being booked
+  const [when, setWhen] = useState('');
+
+  const load = async () => {
+    try { const [a, b] = await Promise.all([apiGigs(), apiMarket()]); setData(a); setShop(b); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+  if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
+
+  // The one button that is actually yours to press, by stage and by side.
+  const move = (b) => {
+    if (b.stage === 'REQUESTED' && b.role === 'provider') return ['Take it', () => apiGigAgree(b.bookingId)];
+    if (b.stage === 'SECURED' && b.role === 'provider') return ['Done — I worked it', () => apiGigWorked(b.bookingId)];
+    if (b.stage === 'WORKED' && b.role === 'client') return ['They did it', () => apiGigVerify(b.bookingId)];
+    return null;
+  };
+  const waiting = (b) => {
+    if (b.stage === 'REQUESTED') return b.role === 'client' ? 'Waiting on them' : null;
+    if (b.stage === 'AGREED') return 'Waiting on the venue to secure it';
+    if (b.stage === 'SECURED') return b.role === 'client' ? 'Booked — waiting on the work' : null;
+    if (b.stage === 'WORKED') return b.role === 'provider' ? 'Waiting on them to confirm' : null;
+    if (b.stage === 'VERIFIED') return 'Confirmed — waiting on the payout';
+    return null;
+  };
+
+  const open = (shop?.listings || []).filter((l) => !l.mine);
+
+  return (
+    <>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <p className="earn-note">
+        A booking holds a slot. Whoever is doing the work puts down a stake, and it
+        comes straight back when the job is confirmed. It is not an investment and
+        it does not earn anybody anything — it is there so a booking means something.
+      </p>
+
+      <div className="give-list">
+        <h4>Book somebody</h4>
+        {open.length === 0 && <p className="dash-empty">Nobody is offering work yet.</p>}
+        {open.map((l) => (
+          <div key={l.listingId} className="give-row">
+            <div className="dash-info">
+              <strong>{l.title}</strong>
+              <span className="dash-num">{l.seller}{l.trade ? ` · ${l.trade}` : ''} · {MONEY(l.priceCents)}</span>
+            </div>
+            <button type="button" className="bingo-btn compact" disabled={busy}
+                    onClick={() => { setBook(book?.listingId === l.listingId ? null : l); setWhen(''); }}>
+              {book?.listingId === l.listingId ? 'Cancel' : 'Book'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {book && (
+        <div className="jub-form">
+          <label className="jub-label">When do you need {book.title.toLowerCase()}?</label>
+          <input className="jub-input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+          <p className="earn-keep">
+            {MONEY(book.priceCents)} · you put down {MONEY(Math.round(book.priceCents * 0.25))} to hold it,
+            and it counts toward the price rather than sitting on top of it.
+          </p>
+          <button type="button" className="bingo-btn gold" disabled={busy || !when}
+                  onClick={() => act(async () => {
+                    await apiGigRequest({ listingId: book.listingId, startsAt: new Date(when).getTime() });
+                    setBook(null); setWhen('');
+                  })}>
+            {busy ? 'Asking…' : 'Ask for it'}
+          </button>
+        </div>
+      )}
+
+      <div className="give-list">
+        <h4>Your bookings</h4>
+        {data.bookings.length === 0 && <p className="dash-empty">Nothing booked either way yet.</p>}
+        {data.bookings.map((b) => {
+          const m = move(b);
+          const w = waiting(b);
+          return (
+            <div key={b.bookingId} className={`give-row${b.stage === 'SETTLED' ? ' done' : ''}${b.yourMove ? ' mine' : ''}`}>
+              <div className="dash-info">
+                <strong>{b.title}</strong>
+                <span className="dash-num">
+                  {b.role === 'provider' ? 'You are doing it' : 'You booked it'} · {MONEY(b.priceCents)}
+                  {b.role === 'provider' && b.stakeCents > 0 && ` · stake ${MONEY(b.stakeCents)}`}
+                </span>
+                {/* What actually happened to the money, once it has. */}
+                {b.settlement && (
+                  <span className="dash-num">
+                    {b.role === 'provider' ? `You got ${MONEY(b.settlement.toProvider)}` : `Back to you ${MONEY(b.settlement.toClient)}`}
+                    {b.settlement.stakeForfeited > 0 && ' · stake lost'}
+                  </span>
+                )}
+                {b.failureLabel && <span className="dash-num">{b.failureLabel}</span>}
+                {w && !m && <span className="dash-num">{w}</span>}
+              </div>
+              {m
+                ? <button type="button" className="bingo-btn compact gold" disabled={busy}
+                          onClick={() => act(m[1])}>{m[0]}</button>
+                : <span className={`jub-chip${b.stage === 'SETTLED' ? ' ok' : ''}`}>{b.stageLabel}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// A creator's desk, and the shop it sells into.
+//
+// The rule this whole tab exists to make obvious: a licence is a grant of use,
+// not a sale of the work. The same recording can be licensed a hundred times
+// and the person who made it still owns it at the end. That is stated on the
+// screen and not just in the terms, because the buyout is what most people in
+// this room have been offered before and it is the thing worth refusing.
+function LicenseTab() {
+  const [view, setView] = useState('shop');
+  const [terms, setTerms] = useState(null);
+  const [mine, setMine] = useState(null);
+  const [market, setMarket] = useState(null);
+  const [held, setHeld] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [work, setWork] = useState(null);       // which of my works I am offering on
+  const [offer, setOffer] = useState({ type: 'SYNC', scope: 'LOCAL', term: 'ONE_YEAR', exclusive: false, amount: '', credit: true });
+  const [reg, setReg] = useState({ title: '', kind: 'PERFORMANCE', hash: '', file: '' });
+
+  const load = async () => {
+    try {
+      const [t, m, k, h] = await Promise.all([apiLicenseTerms(), apiLicenseMine(), apiLicenseMarket(), apiLicenseHeld()]);
+      setTerms(t); setMine(m); setMarket(k); setHeld(h); setErr('');
+    } catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  // The file is hashed here, on the phone. It is never uploaded — what the
+  // registry holds is a fingerprint, so registering a track does not hand
+  // anybody the track.
+  const hashFile = async (file) => {
+    if (!file) return;
+    setErr('');
+    try {
+      const buf = await file.arrayBuffer();
+      const d = await crypto.subtle.digest('SHA-256', buf);
+      const hex = Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, '0')).join('');
+      setReg((r) => ({ ...r, hash: `sha256:${hex}`, file: file.name, title: r.title || file.name.replace(/\.[^.]+$/, '') }));
+    } catch { setErr('Could not read that file.'); }
+  };
+
+  if (!terms || !mine) return <p className="dash-empty">{err || 'Loading…'}</p>;
+
+  const cents = Math.round(Number(offer.amount) * 100);
+  const VIEWS = [['shop', 'Shop'], ['desk', 'Your works'], ['held', 'You hold']];
+
+  return (
+    <>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <p className="earn-note">
+        A licence sells the <b>use</b> of something you made. You still own it afterwards,
+        and you can license it again to somebody else. Nobody buys it out from under you here.
+      </p>
+      <div className="staff-hub-tabs">
+        {VIEWS.map(([id, label]) => (
+          <button type="button" key={id} className={`staff-hub-tab${view === id ? ' on' : ''}`}
+                  onClick={() => setView(id)}>{label}</button>
+        ))}
+      </div>
+
+      {view === 'shop' && (
+        <div className="give-list">
+          <h4>Licences for sale</h4>
+          {(market?.offers || []).filter((o) => !o.mine).length === 0 && (
+            <p className="dash-empty">Nothing on offer yet.</p>
+          )}
+          {(market?.offers || []).filter((o) => !o.mine).map((o) => (
+            <div key={o.offerId} className="lic-card">
+              <div className="lic-head">
+                <div className="dash-info">
+                  <strong>{o.work.title}</strong>
+                  <span className="dash-num">{o.creator} · {o.work.kindLabel}</span>
+                </div>
+                <b className="lic-price">{MONEY(o.priceCents)}</b>
+              </div>
+              <p className="lic-grants">{o.grants}</p>
+              <div className="lic-tags">
+                <span className="onb-tag">{o.typeLabel}</span>
+                <span className="onb-tag alt">{o.scopeLabel}</span>
+                <span className="onb-tag alt">{o.termLabel}</span>
+                {o.exclusive && <span className="onb-tag">Exclusive</span>}
+              </div>
+              {o.note && <p className="jub-note">{o.note}</p>}
+              <button type="button" className="bingo-btn compact gold" disabled={busy}
+                      onClick={() => act(() => apiLicenseBuy(o.offerId))}>Buy this licence</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === 'desk' && (
+        <>
+          {mine.earnedCents > 0 && (
+            <div className="earn-total"><span>Earned licensing</span><b>{MONEY(mine.earnedCents)}</b></div>
+          )}
+
+          <div className="jub-form">
+            <label className="jub-label">Register something you made</label>
+            <input className="jub-input" type="file" onChange={(e) => hashFile(e.target.files?.[0])} />
+            {reg.hash && <p className="jub-note">{reg.file} · fingerprinted on this phone. The file itself does not leave it.</p>}
+            <input className="jub-input" placeholder="What is it called?" maxLength={80} value={reg.title}
+                   onChange={(e) => setReg((r) => ({ ...r, title: e.target.value }))} />
+            <select className="jub-input" value={reg.kind} onChange={(e) => setReg((r) => ({ ...r, kind: e.target.value }))}>
+              {terms.workKinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            </select>
+            <button type="button" className="bingo-btn" disabled={busy || !reg.hash || reg.title.trim().length < 2}
+                    onClick={() => act(async () => {
+                      await apiRegisterWork({ contentHash: reg.hash, kind: reg.kind, title: reg.title.trim(),
+                                              song: reg.title.trim(), performedAt: Date.now() });
+                      setReg({ title: '', kind: 'PERFORMANCE', hash: '', file: '' });
+                    })}>
+              {busy ? 'Registering…' : 'Register it'}
+            </button>
+          </div>
+
+          <div className="give-list">
+            <h4>Your works</h4>
+            {mine.works.length === 0 && <p className="dash-empty">Register something and you can start licensing it.</p>}
+            {mine.works.map((w) => (
+              <div key={w.assetId} className="lic-card">
+                <div className="lic-head">
+                  <div className="dash-info">
+                    <strong>{w.title}</strong>
+                    <span className="dash-num">{w.kindLabel} · {w.granted.length} licensed</span>
+                  </div>
+                  <button type="button" className="bingo-btn compact" disabled={busy}
+                          onClick={() => setWork(work === w.assetId ? null : w.assetId)}>
+                    {work === w.assetId ? 'Close' : 'License it'}
+                  </button>
+                </div>
+
+                {w.offers.map((o) => (
+                  <div key={o.offerId} className="give-row">
+                    <div className="dash-info">
+                      <strong>{o.typeLabel} · {MONEY(o.priceCents)}</strong>
+                      <span className="dash-num">{o.scopeLabel} · {o.termLabel}{o.exclusive ? ' · exclusive' : ''}</span>
+                    </div>
+                    <button type="button" className="bingo-btn compact ghost" disabled={busy}
+                            onClick={() => act(() => apiLicenseWithdraw(o.offerId))}>Withdraw</button>
+                  </div>
+                ))}
+                {w.granted.map((g) => (
+                  <div key={g.grantId} className={`give-row${g.status === 'GRANTED' ? ' done' : ''}`}>
+                    <div className="dash-info">
+                      <strong>{g.buyer}</strong>
+                      <span className="dash-num">{g.typeLabel} · {MONEY(g.priceCents)}</span>
+                    </div>
+                    <span className={`jub-chip${g.status === 'GRANTED' ? ' ok' : ''}`}>
+                      {g.status === 'PENDING' ? 'Pending — not settled' : g.status}
+                    </span>
+                  </div>
+                ))}
+
+                {work === w.assetId && (
+                  <div className="jub-form">
+                    <select className="jub-input" value={offer.type}
+                            onChange={(e) => setOffer((o) => ({ ...o, type: e.target.value }))}>
+                      {terms.types.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
+                    {/* What this particular licence actually lets somebody do, in
+                        words, before the creator prices it. */}
+                    <p className="jub-note">{terms.types.find((t) => t.id === offer.type)?.grants}</p>
+                    {terms.types.find((t) => t.id === offer.type)?.neverImplied && (
+                      <p className="k-nudge k-nudge--no">
+                        This one has to be chosen on purpose. It is never included in any other licence.
+                      </p>
+                    )}
+                    <div className="jub-step jub-step--wrap">
+                      <select className="jub-input" value={offer.scope}
+                              onChange={(e) => setOffer((o) => ({ ...o, scope: e.target.value }))}>
+                        {terms.scopes.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                      <select className="jub-input" value={offer.term}
+                              onChange={(e) => setOffer((o) => ({ ...o, term: e.target.value }))}>
+                        {terms.terms.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                      </select>
+                      <input className="jub-input" inputMode="decimal" placeholder="0.00" value={offer.amount}
+                             onChange={(e) => setOffer((o) => ({ ...o, amount: e.target.value }))} />
+                    </div>
+                    <label className="jub-check">
+                      <input type="checkbox" checked={offer.exclusive}
+                             onChange={(e) => setOffer((o) => ({ ...o, exclusive: e.target.checked }))} />
+                      <span>Only them — nobody else gets this licence while it runs</span>
+                    </label>
+                    <label className="jub-check">
+                      <input type="checkbox" checked={offer.credit}
+                             onChange={(e) => setOffer((o) => ({ ...o, credit: e.target.checked }))} />
+                      <span>They have to credit you</span>
+                    </label>
+                    <button type="button" className="bingo-btn gold" disabled={busy || !(cents > 0)}
+                            onClick={() => act(async () => {
+                              await apiLicenseOffer({ assetId: w.assetId, type: offer.type, scope: offer.scope,
+                                                      term: offer.term, exclusive: offer.exclusive,
+                                                      priceCents: cents, credit: offer.credit });
+                              setOffer((o) => ({ ...o, amount: '' })); setWork(null);
+                            })}>
+                      {busy ? 'Putting it up…' : 'Put it up'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {view === 'held' && (
+        <div className="give-list">
+          <h4>Licences you hold</h4>
+          {(held?.licenses || []).length === 0 && <p className="dash-empty">You have not licensed anything yet.</p>}
+          {(held?.licenses || []).map((g) => (
+            <div key={g.grantId} className="lic-card">
+              <div className="lic-head">
+                <div className="dash-info">
+                  <strong>{g.work.title}</strong>
+                  <span className="dash-num">by {g.creator} · {MONEY(g.priceCents)}</span>
+                </div>
+                <span className={`jub-chip${g.active ? ' ok' : ''}`}>
+                  {g.status === 'PENDING' ? 'Pending — not settled' : g.active ? 'Live' : 'Expired'}
+                </span>
+              </div>
+              <div className="lic-tags">
+                <span className="onb-tag">{g.typeLabel}</span>
+                {g.exclusive && <span className="onb-tag alt">Exclusive</span>}
+              </div>
+              {/* The terms, verbatim, in the buyer's hands. A licence nobody can
+                  read is a licence nobody can rely on. */}
+              {g.terms?.youMay && <p className="lic-grants">{g.terms.youMay}</p>}
+              {g.terms?.youMayNot && <p className="jub-note">{g.terms.youMayNot}</p>}
+              <p className="lic-hash">{g.termsHash}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// Getting paid for who you bring.
+//
+// Pays on money that actually arrived, never on a signup — otherwise the way to
+// win is to produce accounts rather than people, and this room fills with names
+// that never walk through the door.
+function BringTab() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    apiReferral().then(setData).catch((e) => setErr(e.message || 'Could not load.'));
+  }, []);
+  if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
+
+  const link = `${location.origin}${import.meta.env.BASE_URL}?ref=${data.code}`;
+
+  return (
+    <>
+      <div className="ref-code">
+        <i>Your code</i>
+        <b>{data.code}</b>
+        <button type="button" className="bingo-btn compact"
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+                  catch { setCopied(false); }
+                }}>{copied ? 'Copied' : 'Copy link'}</button>
+      </div>
+      <p className="earn-note">{data.note} You get {Math.round(data.ratePercent * 100)}% of what they spend.</p>
+
+      <div className="jub-reserve">
+        <span><i>Brought</i><b>{data.brought}</b></span>
+        <span><i>Owed you</i><b>{MONEY(data.earnedCents)}</b></span>
+        <span><i>Paid out</i><b>{MONEY(data.paidCents)}</b></span>
+      </div>
+
+      <div className="give-list">
+        <h4>What you have earned</h4>
+        {data.credits.length === 0 && <p className="dash-empty">Nothing yet. It starts when somebody you brought spends.</p>}
+        {data.credits.map((k) => (
+          <div key={k.creditId} className={`give-row${k.status === 'PAID' ? ' done' : ''}`}>
+            <div className="dash-info">
+              <strong>{MONEY(k.commissionCents)}</strong>
+              <span className="dash-num">{k.eventLabel} · on {MONEY(k.grossCents)}</span>
+            </div>
+            <span className={`jub-chip${k.status === 'PAID' ? ' ok' : ''}`}>{k.status}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
 // ── Giving, and asking for a seat ──────────────────────────────────────────
 //
 // The two things a member can actually do about a programme. Neither happens to
@@ -8257,6 +8888,151 @@ function HostBattleControl() {
   );
 }
 
+// ── The house settling everybody else's money ──────────────────────────────
+//
+// Four queues, one screen, in the order somebody has been waiting. Nothing on
+// it is automatic: every row is a person here saying the money actually
+// arrived, and every row says what pressing it does BEFORE it is pressed.
+//
+// A shared venue code can read this and cannot move any of it. That is not a
+// UI choice — the server refuses it — but the screen says so rather than
+// letting somebody find out by tapping.
+function HouseMoneyPanel() {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [ref, setRef] = useState('');
+
+  const load = async () => {
+    try { setData(await apiHouseMoney()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!data) {
+    return <AppPanel title="Money" subtitle="Waiting on somebody here"><p className="dash-empty">{err || 'Loading…'}</p></AppPanel>;
+  }
+  const total = data.orders.length + data.toSecure.length + data.toPayOut.length
+              + data.licenses.length + data.credits.length;
+
+  return (
+    <AppPanel title="Money" subtitle={total ? `${total} waiting on somebody here` : 'Nothing outstanding'}>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      {!data.canSettle && (
+        <p className="k-nudge k-nudge--no">
+          You are signed in on the venue code. You can see what is outstanding, but
+          approving money takes a named sign-in.
+        </p>
+      )}
+      {total === 0 && <p className="dash-empty">Every sale, booking, licence and commission is settled.</p>}
+
+      {data.orders.length > 0 && (
+        <div className="give-list">
+          <h4>Sales to confirm</h4>
+          {data.orders.map((o) => (
+            <div key={o.orderId} className="give-row">
+              <div className="dash-info">
+                <strong>{o.title}</strong>
+                <span className="dash-num">
+                  {o.buyer} → {o.seller} · {MONEY(o.priceCents)} · seller gets {MONEY(o.toSellerCents)}
+                </span>
+              </div>
+              <button type="button" className="bingo-btn compact gold" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiMarketSettle(o.orderId, true, 'cash'))}>Money in</button>
+              <button type="button" className="bingo-btn compact ghost" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiMarketSettle(o.orderId, false))}>No</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.toSecure.length > 0 && (
+        <div className="give-list">
+          <h4>Bookings to secure</h4>
+          {data.toSecure.map((b) => (
+            <div key={b.bookingId} className="give-row">
+              <div className="dash-info">
+                <strong>{b.title}</strong>
+                <span className="dash-num">
+                  {b.client} booked {b.provider} · deposit {MONEY(b.depositCents)} · stake {MONEY(b.stakeCents)}
+                </span>
+              </div>
+              <button type="button" className="bingo-btn compact gold" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiGigSecure(b.bookingId))}>Deposit in</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.toPayOut.length > 0 && (
+        <div className="give-list">
+          <h4>Bookings to pay out</h4>
+          {data.toPayOut.map((b) => (
+            <div key={b.bookingId} className="give-row">
+              <div className="dash-info">
+                <strong>{b.title}</strong>
+                <span className="dash-num">
+                  {b.provider} gets {MONEY(b.toProviderCents)} · venue {MONEY(b.toVenueCents)} · stake back {MONEY(b.stakeCents)}
+                </span>
+              </div>
+              <button type="button" className="bingo-btn compact gold" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiGigSettle(b.bookingId))}>Pay it out</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.licenses.length > 0 && (
+        <div className="give-list">
+          <h4>Licences to confirm</h4>
+          {data.licenses.map((g) => (
+            <div key={g.grantId} className="give-row">
+              <div className="dash-info">
+                <strong>{g.work}</strong>
+                <span className="dash-num">
+                  {g.buyer} → {g.creator} · {g.typeLabel} · {MONEY(g.priceCents)}
+                </span>
+              </div>
+              <button type="button" className="bingo-btn compact gold" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiLicenseSettle(g.grantId, true))}>Money in</button>
+              <button type="button" className="bingo-btn compact ghost" disabled={busy || !data.canSettle}
+                      onClick={() => act(() => apiLicenseSettle(g.grantId, false))}>No</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.credits.length > 0 && (
+        <div className="give-list">
+          <h4>Commission owed</h4>
+          {/* A payout carries a reference so it reconciles against a bank line
+              later. Without one there is a payment nobody can trace. */}
+          <input className="jub-input" placeholder="Reference — cash drawer, Zelle, cheque no."
+                 maxLength={80} value={ref} onChange={(e) => setRef(e.target.value)} />
+          {data.credits.map((k) => (
+            <div key={k.creditId} className="give-row">
+              <div className="dash-info">
+                <strong>{k.referrer} · {MONEY(k.commissionCents)}</strong>
+                <span className="dash-num">{k.eventLabel} · on {MONEY(k.grossCents)}</span>
+              </div>
+              <button type="button" className="bingo-btn compact gold"
+                      disabled={busy || !data.canSettle || !ref.trim()}
+                      onClick={() => act(async () => { await apiReferralPay([k.creditId], ref.trim()); })}>
+                Paid
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </AppPanel>
+  );
+}
+
 function HostScreen({ initialTab = 'run' }) {
   const [board, setBoard] = useState(null);
   const [tab, setTab] = useState(initialTab);
@@ -8300,6 +9076,7 @@ function HostScreen({ initialTab = 'run' }) {
           ['claims', `Claims${board?.claims.length ? ` (${board.claims.length})` : ''}`],
           ['players', `Players${board?.players.length ? ` (${board.players.length})` : ''}`],
           ['support', 'Support'],
+          ['money', 'Money'],
           ['media', 'TV'],
         ].map(([id, label]) => (
           <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}${id === 'claims' && board?.claims.length ? ' alert' : ''}`}
@@ -8310,6 +9087,7 @@ function HostScreen({ initialTab = 'run' }) {
       {(board?.status === 'podium' || board?.podium?.length > 0) && (
         <PodiumBoard state={board} meId={null} isHost onChanged={poll} />
       )}
+      {tab === 'money' && <HouseMoneyPanel />}
       {tab === 'run' && (
         <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
           {/* Said here, where the round gets started, rather than only on the
