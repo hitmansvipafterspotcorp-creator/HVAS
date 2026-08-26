@@ -486,6 +486,67 @@ export function openDb(path) {
   // the same fact stated twice, not two performances.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_perf_unique ON performance_rights(member_id, content_hash)`);
 
+  // ── Licensing ───────────────────────────────────────────────────────────
+  //
+  // The registry proves who made a thing and when. This is what turns that into
+  // something sellable: OFFERS the creator puts up, and GRANTS somebody bought.
+  //
+  // A licence is a grant of use, not a sale of the work — the creator still owns
+  // it afterwards, which is what lets the same recording be licensed for a film,
+  // a T-shirt and a remix and still be theirs.
+  {
+    const cols = db.prepare(`PRAGMA table_info(performance_rights)`).all().map((c) => c.name);
+    // The registry started as performances. An app somebody builds is as
+    // licensable as a verse somebody sings, so the row carries its kind.
+    if (!cols.includes('work_kind')) db.exec(`ALTER TABLE performance_rights ADD COLUMN work_kind TEXT`);
+    if (!cols.includes('title')) db.exec(`ALTER TABLE performance_rights ADD COLUMN title TEXT`);
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS ip_license_offers (
+    offer_id TEXT PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES performance_rights(asset_id),
+    member_id TEXT NOT NULL,             -- the creator; only they may offer
+    type TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    term TEXT NOT NULL,
+    exclusive INTEGER NOT NULL DEFAULT 0,
+    price_units INTEGER NOT NULL,        -- cents, integer only
+    credit INTEGER NOT NULL DEFAULT 1,
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN | WITHDRAWN
+    at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_offers_asset ON ip_license_offers(asset_id, status)`);
+  // A grant is a record of something somebody now holds. It is never edited to
+  // take it away — an expired licence has a date on it, and a revoked one says
+  // who revoked it and why. A grant that could quietly vanish is worth nothing
+  // to the person who paid for it.
+  db.exec(`CREATE TABLE IF NOT EXISTS ip_license_grants (
+    grant_id TEXT PRIMARY KEY,
+    offer_id TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    creator_id TEXT NOT NULL,
+    buyer_id TEXT,                       -- null when the venue itself licenses
+    buyer_name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    term TEXT NOT NULL,
+    exclusive INTEGER NOT NULL DEFAULT 0,
+    price_units INTEGER NOT NULL,
+    terms_json TEXT NOT NULL,            -- the licence, in full, as agreed
+    terms_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING | GRANTED | REFUNDED | REVOKED
+    rail TEXT,
+    paid_at INTEGER,
+    settled_by TEXT,
+    at INTEGER NOT NULL,
+    starts_at INTEGER,
+    expires_at INTEGER,                  -- null = perpetual
+    receipt_id TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_grants_asset ON ip_license_grants(asset_id, status)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_grants_buyer ON ip_license_grants(buyer_id, at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_grants_creator ON ip_license_grants(creator_id, at DESC)`);
+
   // ── Jubilee (§37, §68) ───────────────────────────────────────────────────
   // A member's need, the approved providers who can be paid for it, and the
   // award that only counts as delivered when the provider says so.

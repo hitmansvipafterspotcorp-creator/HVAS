@@ -14,6 +14,10 @@ import { randomBytes, createHash } from 'node:crypto';
 import { openDb, nightKey } from './db.mjs';
 import { COVENANT, COVENANT_VERSION, onboardingState } from './economy/covenant.mjs';
 import { MEMBER_ROLE, rolesByGroup, roleGrants } from './economy/roles.mjs';
+import {
+  LICENSE_TYPES, LICENSE_TYPE_LIST, LICENSE_SCOPES, LICENSE_TERMS, WORK_KIND_LIST, WORK_KINDS,
+  licenseActive, licenseConflict, licenseTerms, newOfferId, newGrantId,
+} from './economy/licensing.mjs';
 // The SAME rules the phones run. Imported rather than restated: a prize table
 // or a vote threshold that exists twice is a prize table that will eventually
 // disagree with itself, and the disagreement would be about money in a room.
@@ -1207,6 +1211,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     json(res, 403, { error: `Only ${admin.name} manages the team.` });
     return null;
   };
+  const offerRow = (o) => ({
+    offerId: o.offer_id, assetId: o.asset_id, type: o.type,
+    typeLabel: LICENSE_TYPES[o.type]?.label, grants: LICENSE_TYPES[o.type]?.grants,
+    scope: o.scope, scopeLabel: LICENSE_SCOPES[o.scope]?.label,
+    term: o.term, termLabel: LICENSE_TERMS[o.term]?.label,
+    exclusive: !!o.exclusive, priceCents: o.price_units, credit: !!o.credit,
+    note: o.note || null, status: o.status, at: o.at,
+  });
+  const grantRow = (g) => ({
+    grantId: g.grant_id, offerId: g.offer_id, assetId: g.asset_id,
+    buyer: g.buyer_name, type: g.type, typeLabel: LICENSE_TYPES[g.type]?.label,
+    scope: g.scope, term: g.term, exclusive: !!g.exclusive,
+    priceCents: g.price_units, status: g.status,
+    startsAt: g.starts_at || null, expiresAt: g.expires_at,
+    terms: (() => { try { return JSON.parse(g.terms_json); } catch { return null; } })(),
+    termsHash: g.terms_hash,
+  });
+
   // Where somebody is in becoming a member here.
   const onboardingOf = (memberId) => {
     const m = db.prepare('SELECT member_role, program FROM members WHERE id=?').get(memberId);
@@ -1679,6 +1701,207 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       // An unspent invite for somebody who has been removed must not still work.
       db.prepare('DELETE FROM staff_invites WHERE staff_id=? AND used_at IS NULL').run(staffId);
       json(res, 200, { ok: true, name: row.name });
+    },
+
+    // ── Licensing ────────────────────────────────────────────────────────────
+    //
+    // The registry proves a creator made a thing. This is what makes that worth
+    // something: they put up OFFERS, somebody buys one, and what they hold is a
+    // GRANT with the terms written into it and hashed.
+    //
+    // The creator keeps ownership every time. That is the whole difference
+    // between this and the buyout an unsigned artist is usually offered.
+    'GET /license/terms': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      json(res, 200, {
+        types: LICENSE_TYPE_LIST,
+        scopes: Object.entries(LICENSE_SCOPES).map(([id, v]) => ({ id, ...v })),
+        terms: Object.entries(LICENSE_TERMS).map(([id, v]) => ({ id, ...v })),
+        workKinds: WORK_KIND_LIST,
+      });
+    },
+
+    // What the creator has put up, and what is already out on each work.
+    'GET /license/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const works = db.prepare('SELECT * FROM performance_rights WHERE member_id=? ORDER BY registered_at DESC').all(c.sub);
+      json(res, 200, {
+        works: works.map((w) => ({
+          assetId: w.asset_id, title: w.title || w.song || 'Untitled',
+          kind: w.work_kind || 'PERFORMANCE', kindLabel: WORK_KINDS[w.work_kind || 'PERFORMANCE']?.label,
+          artist: w.artist, song: w.song, contentHash: w.content_hash, registeredAt: w.registered_at,
+          offers: db.prepare(`SELECT * FROM ip_license_offers WHERE asset_id=? AND status='OPEN' ORDER BY at DESC`)
+            .all(w.asset_id).map(offerRow),
+          granted: db.prepare('SELECT * FROM ip_license_grants WHERE asset_id=? ORDER BY at DESC').all(w.asset_id)
+            .map(grantRow),
+        })),
+        // What they have actually been paid for licences that settled.
+        earnedCents: db.prepare(
+          `SELECT COALESCE(SUM(price_units),0) c FROM ip_license_grants WHERE creator_id=? AND status='GRANTED'`)
+          .get(c.sub).c,
+      });
+    },
+
+    // Putting a licence up for sale. Only the creator of the work may.
+    'POST /license/offer': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      if (!economyFlags().HITK_IP_REGISTRY) return json(res, 503, { error: 'ip registry is off' });
+      const { assetId, type, scope, term, exclusive = false, priceCents, credit = true, note } = await readBody(req);
+      const work = db.prepare('SELECT * FROM performance_rights WHERE asset_id=?').get(assetId);
+      if (!work) return json(res, 404, { error: 'no such work' });
+      // You cannot license what you did not make. The registry is the only
+      // thing that decides that, and it decided it when they registered.
+      if (work.member_id !== c.sub) return json(res, 403, { error: 'That is not your work to license.' });
+      const t = LICENSE_TYPES[type];
+      if (!t) return json(res, 400, { error: `"${type}" is not a licence type`, types: Object.keys(LICENSE_TYPES) });
+      if (!LICENSE_SCOPES[scope]) return json(res, 400, { error: `"${scope}" is not a scope` });
+      if (!LICENSE_TERMS[term]) return json(res, 400, { error: `"${term}" is not a term` });
+      const price = Math.floor(Number(priceCents));
+      if (!Number.isFinite(price) || price < 0) return json(res, 400, { error: 'Say what you are charging. Free is allowed; a blank is not.' });
+      const wantExclusive = !!exclusive;
+      if (wantExclusive && !t.exclusive) {
+        return json(res, 400, { error: `A ${t.label} licence cannot be exclusive — it is the kind anybody can hold at once.` });
+      }
+      // Refuse now rather than at the sale, so a creator does not advertise
+      // something they have already sold away.
+      const live = db.prepare('SELECT * FROM ip_license_grants WHERE asset_id=?').all(assetId);
+      const clash = licenseConflict({ type, exclusive: wantExclusive, existing: live });
+      if (!clash.ok) return json(res, 409, { error: clash.reason, blockedBy: clash.blockedBy });
+      const offerId = newOfferId();
+      db.prepare(`INSERT INTO ip_license_offers
+        (offer_id, asset_id, member_id, type, scope, term, exclusive, price_units, credit, note, status, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?, 'OPEN', ?)`)
+        .run(offerId, assetId, c.sub, type, scope, term, wantExclusive ? 1 : 0, price,
+             credit ? 1 : 0, String(note || '').slice(0, 300), Date.now());
+      json(res, 200, { ok: true, offerId, terms: licenseTerms({ type, scope, term, exclusive: wantExclusive, credit }) });
+    },
+
+    // Taking one down. Only stops FUTURE sales — what is already granted stays
+    // granted, because a licence somebody paid for cannot be withdrawn from
+    // under them.
+    'POST /license/withdraw': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { offerId } = await readBody(req);
+      const o = db.prepare('SELECT * FROM ip_license_offers WHERE offer_id=?').get(offerId);
+      if (!o) return json(res, 404, { error: 'no such offer' });
+      if (o.member_id !== c.sub) return json(res, 403, { error: 'That is not your offer.' });
+      db.prepare(`UPDATE ip_license_offers SET status='WITHDRAWN' WHERE offer_id=?`).run(offerId);
+      json(res, 200, {
+        ok: true,
+        note: 'Taken down. Anything already licensed stays licensed — that cannot be withdrawn.',
+      });
+    },
+
+    // Everything on sale, from every creator. This is the shop.
+    'GET /license/market': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT o.*, p.title, p.song, p.artist, p.work_kind, p.content_hash, m.name AS creator
+        FROM ip_license_offers o
+        JOIN performance_rights p ON p.asset_id=o.asset_id
+        JOIN members m ON m.id=o.member_id
+        WHERE o.status='OPEN' ORDER BY o.at DESC LIMIT 200`).all();
+      json(res, 200, {
+        offers: rows.map((r) => ({
+          ...offerRow(r),
+          creator: r.creator, creatorId: r.member_id === c.sub ? c.sub : undefined,
+          mine: r.member_id === c.sub,
+          work: {
+            assetId: r.asset_id, title: r.title || r.song || 'Untitled',
+            artist: r.artist, song: r.song,
+            kind: r.work_kind || 'PERFORMANCE',
+            kindLabel: WORK_KINDS[r.work_kind || 'PERFORMANCE']?.label,
+            contentHash: r.content_hash,
+          },
+        })),
+      });
+    },
+
+    // Buying one. Like every other payment here it is a CLAIM until somebody
+    // confirms the money arrived — the licence is not granted before that.
+    'POST /license/buy': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { offerId, rail = 'cash' } = await readBody(req);
+      const o = db.prepare('SELECT * FROM ip_license_offers WHERE offer_id=?').get(offerId);
+      if (!o) return json(res, 404, { error: 'no such offer' });
+      if (o.status !== 'OPEN') return json(res, 409, { error: 'that licence is no longer offered' });
+      if (o.member_id === c.sub) return json(res, 400, { error: 'You already own this. You do not need a licence for it.' });
+      if (!['cash', 'zelle', 'card', 'paypal'].includes(String(rail))) return json(res, 400, { error: 'bad rail' });
+      const live = db.prepare('SELECT * FROM ip_license_grants WHERE asset_id=?').all(o.asset_id);
+      const clash = licenseConflict({ type: o.type, exclusive: !!o.exclusive, existing: live });
+      if (!clash.ok) return json(res, 409, { error: clash.reason, blockedBy: clash.blockedBy });
+      const me = db.prepare('SELECT name FROM members WHERE id=?').get(c.sub);
+      const terms = licenseTerms({ type: o.type, scope: o.scope, term: o.term, exclusive: !!o.exclusive, credit: !!o.credit });
+      const grantId = newGrantId();
+      const body = JSON.stringify(terms);
+      db.prepare(`INSERT INTO ip_license_grants
+        (grant_id, offer_id, asset_id, creator_id, buyer_id, buyer_name, type, scope, term, exclusive,
+         price_units, terms_json, terms_hash, status, rail, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?, ?)`)
+        .run(grantId, offerId, o.asset_id, o.member_id, c.sub, me?.name || 'member', o.type, o.scope, o.term,
+             o.exclusive, o.price_units, body, createHash('sha256').update(body).digest('hex'),
+             String(rail), Date.now());
+      json(res, 200, {
+        ok: true, grantId, status: 'PENDING — NOT SETTLED',
+        priceCents: o.price_units, terms,
+      });
+    },
+
+    // The house confirming the money reached the creator, which is the moment
+    // the licence actually exists.
+    'POST /license/settle': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { grantId, received } = await readBody(req);
+      const g = db.prepare('SELECT * FROM ip_license_grants WHERE grant_id=?').get(grantId);
+      if (!g) return json(res, 404, { error: 'no such licence' });
+      if (g.status !== 'PENDING') return json(res, 409, { error: `that licence is already ${g.status}` });
+      if (g.buyer_id === c.sub) return json(res, 403, { error: 'You cannot confirm your own purchase.' });
+      const now = Date.now();
+      if (!received) {
+        db.prepare(`UPDATE ip_license_grants SET status='REFUNDED', settled_by=? WHERE grant_id=?`)
+          .run(c.name || c.sub, grantId);
+        return json(res, 200, { ok: true, status: 'REFUNDED' });
+      }
+      // Re-check the conflict at the moment of granting. Two buyers can both be
+      // pending on the same exclusive licence; only one can end up holding it.
+      const live = db.prepare(`SELECT * FROM ip_license_grants WHERE asset_id=? AND status='GRANTED'`).all(g.asset_id);
+      const clash = licenseConflict({ type: g.type, exclusive: !!g.exclusive, existing: live });
+      if (!clash.ok) return json(res, 409, { error: clash.reason, blockedBy: clash.blockedBy });
+      const ms = LICENSE_TERMS[g.term]?.ms ?? null;
+      db.prepare(`UPDATE ip_license_grants SET status='GRANTED', paid_at=?, settled_by=?, starts_at=?, expires_at=? WHERE grant_id=?`)
+        .run(now, c.name || c.sub, now, ms == null ? null : now + ms, grantId);
+      // An exclusive grant closes every offer it now conflicts with, rather than
+      // leaving the creator advertising something they can no longer sell.
+      if (g.exclusive) {
+        const blocked = [g.type, ...(LICENSE_TYPES[g.type]?.conflicts || [])];
+        for (const t of blocked) {
+          db.prepare(`UPDATE ip_license_offers SET status='WITHDRAWN' WHERE asset_id=? AND type=? AND status='OPEN'`)
+            .run(g.asset_id, t);
+        }
+      }
+      record({ eventType: 'IP_LICENSE', memberId: g.creator_id, amount: usd(g.price_units),
+               rail: g.rail === 'cash' ? 'CASH' : 'BANK', authorizedBy: c.name || c.sub,
+               delivered: `${LICENSE_TYPES[g.type]?.label} licence to ${g.buyer_name}`,
+               reference: grantId, settled: true,
+               meta: { assetId: g.asset_id, termsHash: g.terms_hash, exclusive: !!g.exclusive } });
+      json(res, 200, { ok: true, status: 'GRANTED', expiresAt: ms == null ? null : now + ms });
+    },
+
+    // What a buyer holds, and whether it is still running.
+    'GET /license/held': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT g.*, p.title, p.song, p.artist, m.name AS creator
+        FROM ip_license_grants g
+        JOIN performance_rights p ON p.asset_id=g.asset_id
+        JOIN members m ON m.id=g.creator_id
+        WHERE g.buyer_id=? ORDER BY g.at DESC`).all(c.sub);
+      json(res, 200, {
+        licenses: rows.map((r) => ({
+          ...grantRow(r),
+          creator: r.creator,
+          work: { assetId: r.asset_id, title: r.title || r.song || 'Untitled', artist: r.artist },
+          active: licenseActive(r),
+        })),
+      });
     },
 
     // ── Getting in ───────────────────────────────────────────────────────────
@@ -3013,7 +3236,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'POST /ip/performance': async (req, res) => {
       const c = acceptedMember(req, res); if (!c) return;
       if (!economyFlags().HITK_IP_REGISTRY) return json(res, 503, { error: 'ip registry is off' });
-      const { contentHash, artist, song, durationMs, performedAt } = await readBody(req);
+      const { contentHash, artist, song, durationMs, performedAt, kind, title } = await readBody(req);
+      // The registry began as performances. An app somebody builds is as
+      // licensable as a verse somebody sings, so a work says what kind it is.
+      const workKind = WORK_KINDS[String(kind || '').toUpperCase()] ? String(kind).toUpperCase() : 'PERFORMANCE';
       // A hash is the whole submission, so it has to actually be one.
       if (!/^sha256:[0-9a-f]{64}$/.test(String(contentHash || ''))) {
         return json(res, 400, { error: 'contentHash must be sha256:<64 hex>' });
@@ -3051,11 +3277,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
 
       db.prepare(`INSERT INTO performance_rights
         (asset_id, member_id, content_hash, rights_hash, artist, song, duration_ms,
-         venue_night, performed_at, registered_at, owner_controller, status, receipt_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+         venue_night, performed_at, registered_at, owner_controller, status, receipt_id,
+         work_kind, title)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(assetId, c.sub, contentHash, rightsHash, artist || null, song || null,
              Number(durationMs) || null, nightKey(), performedAt || now, now, m.number,
-             'registered', receipt?.receiptId || null);
+             'registered', receipt?.receiptId || null,
+             workKind, String(title || song || '').slice(0, 120) || null);
 
       json(res, 200, {
         ok: true, assetId, contentHash, rightsHash, registeredAt: now,
