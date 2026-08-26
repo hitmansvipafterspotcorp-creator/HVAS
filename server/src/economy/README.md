@@ -20,7 +20,16 @@ not re-litigate a decision that has already been made.
 | `flags.mjs` | §63's flags. All four chain flags default off; MAINNET needs two switches (§64). |
 
 Required tests from the directive live in `../../economy-test.mjs`: §65 (HITK),
-§66 (fiat), §67 (WORLD), §68 (Jubilee).
+§66 (fiat), §67 (WORLD), §68 (Jubilee). §69's failure drill has a suite of its
+own, `../../drill-2030-test.mjs`, because it is not a unit test — it takes the
+power, the card processor, the internet and the owner away and asks whether the
+nine things the directive says must stay true still do.
+
+It has already earned its place. It found two real defects on its first run: an
+award could be PAID TWICE, each payment with its own reference, leaving the
+reserve reporting one commitment against two real payments; and ProofVault could
+verify a receipt somebody already suspected but had no way to check the whole
+vault, which is the only question an after-action review actually asks.
 
 ## In, but dormant until configured
 
@@ -45,7 +54,7 @@ this line is here so it is not flagged a third time.
 - **§52, the public dashboard.** §51's rule (safe aggregates only, never expose
   a private figure) is honoured everywhere data leaves the house side, but there
   is no public page yet.
-- **§69, the 2030 failure drill.**
+*(§69, the 2030 failure drill, is now `../../drill-2030-test.mjs`.)*
 
 ## The rule the whole directory answers to
 

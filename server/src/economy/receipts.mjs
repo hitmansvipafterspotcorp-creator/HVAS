@@ -95,8 +95,26 @@ export function proofVault(db) {
       return db.prepare('SELECT * FROM proof_vault WHERE member_id=? ORDER BY at DESC LIMIT ?')
         .all(memberId, limit).map((r) => ({ ...r, settled: !!r.settled, meta: JSON.parse(r.meta || '{}') }));
     },
+    /**
+     * The whole vault, checked end to end.
+     *
+     * §45 is not satisfied by being able to verify a receipt somebody already
+     * suspects. An after-action review asks whether ANYTHING was altered, and
+     * that question has to be answerable without knowing what to look for.
+     * Returns the first bad record rather than a bare false, because "something
+     * is wrong somewhere" is not a finding anybody can act on.
+     */
+    verifyAll() {
+      const ids = db.prepare('SELECT receipt_id FROM proof_vault ORDER BY at ASC').all();
+      for (const { receipt_id: id } of ids) {
+        const r = this.verify(id);
+        if (!r.ok) return { ok: false, count: ids.length, failed: id, reason: r.reason };
+      }
+      return { ok: true, count: ids.length };
+    },
     /** Does the stored copy still match its own fingerprint? */
     verify(receiptId) {
+      if (!receiptId) return { ok: false, reason: 'verify() needs a receipt id — use verifyAll() to check the whole vault' };
       const r = this.get(receiptId);
       if (!r) return { ok: false, reason: 'no such receipt' };
       const body = {

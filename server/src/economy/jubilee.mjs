@@ -149,6 +149,9 @@ export function approvalsSatisfied({ approvals = [], emergency = false, amount, 
  * and it starts UNPAID — because §41 says show pending until settlement and
  * §31 says the money has to actually move.
  */
+/** The one state an award may be paid from. */
+export const AWARD_APPROVED = 'APPROVED — NOT YET PAID';
+
 export function makeAward({ application, assessment, approvals, provider, emergency = false, at = Date.now() } = {}) {
   if (economyFlags().WORLD_AUTOMATIC_RELEASE) {
     // Defensive: the flag is off by design (§63). If somebody turns it on, this
@@ -167,7 +170,7 @@ export function makeAward({ application, assessment, approvals, provider, emerge
       providerId: provider.providerId, providerName: provider.name,
       approvals: approvals.map((a) => ({ by: a.by, at: a.at })),
       emergency,
-      status: 'APPROVED — NOT YET PAID',
+      status: AWARD_APPROVED,
       paidAt: null, deliveredAt: null, deliveryConfirmedBy: null,
       at,
     }),
@@ -178,6 +181,13 @@ export function makeAward({ application, assessment, approvals, provider, emerge
 export function markPaid(award, { by, reference, at = Date.now() } = {}) {
   if (!by) return { ok: false, reason: 'a payment must name who released it' };
   if (!reference) return { ok: false, reason: 'a payment must carry the provider’s reference — otherwise nothing can be reconciled' };
+  // Only an award that has not been paid can be paid. Without this an award
+  // could be paid twice, each with its own reference, and the reserve would
+  // report one commitment against two real payments — found by the §69 drill,
+  // which is exactly the night it would have happened on.
+  if (award?.status && award.status !== AWARD_APPROVED) {
+    return { ok: false, reason: `that award is already ${award.status}` };
+  }
   return { ok: true, award: Object.freeze({ ...award, status: 'PAID — AWAITING DELIVERY', paidAt: at, paidBy: by, paymentReference: reference }) };
 }
 
