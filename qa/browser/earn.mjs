@@ -290,8 +290,12 @@ await cdp('Page.navigate',{url:appUrl});await settle(7000);await tap('Enter');aw
 ok(await openEarn('License'),'licensing opens again');
 await tap('You hold');await settle(2200);
 const held2=await text();
-ok(/Live/.test(held2)&&!/PENDING/i.test(held2),'and only then is the licence live');
-ok(/sha256:/i.test(held2)||await js(`return !!document.querySelector('.lic-hash')`),'the buyer holds the hash of the terms they agreed to');
+// The chip is uppercased by CSS, so this reads what a person actually sees.
+ok(/LIVE/i.test(held2)&&!/PENDING/i.test(held2),'and only then is the licence live');
+ok(await js(`return !!document.querySelector('.lic-hash')`),'the buyer holds the hash of the terms they agreed to');
+// The two lines that decide whether somebody has been taken advantage of.
+ok(/grant of use, not a sale/i.test(held2),'the licence says on its face that the creator still owns the work');
+ok(/does NOT permit training a model/i.test(held2),'and states the AI training position rather than leaving it to silence');
 // Nova still owns it: the same work can be licensed again to somebody else.
 const still=(await call('GET','/license/mine',null,nova.token)).body;
 ok(still.works[0].granted.length===1&&still.earnedCents===25000,'the creator was paid and still holds the work');

@@ -6121,9 +6121,19 @@ function LicenseTab() {
                 {g.exclusive && <span className="onb-tag alt">Exclusive</span>}
               </div>
               {/* The terms, verbatim, in the buyer's hands. A licence nobody can
-                  read is a licence nobody can rely on. */}
-              {g.terms?.youMay && <p className="lic-grants">{g.terms.youMay}</p>}
-              {g.terms?.youMayNot && <p className="jub-note">{g.terms.youMayNot}</p>}
+                  read is a licence nobody can rely on — and the two lines the
+                  server puts on EVERY licence are the two that decide whether
+                  somebody has been taken advantage of: who still owns it, and
+                  whether a model may be trained on it. */}
+              {g.terms?.grants && <p className="lic-grants">{g.terms.grants}</p>}
+              {g.terms?.scopeLabel && (
+                <p className="jub-note">
+                  {g.terms.scopeLabel} · {g.terms.termLabel}
+                  {g.terms.credit ? ' · you must credit the creator' : ''}
+                </p>
+              )}
+              {g.terms?.ownership && <p className="jub-note">{g.terms.ownership}</p>}
+              {g.terms?.aiTraining && <p className="jub-note">{g.terms.aiTraining}</p>}
               <p className="lic-hash">{g.termsHash}</p>
             </div>
           ))}
