@@ -3195,37 +3195,15 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
         <button type="button" className={`mem-tab${tab === 'pass' ? ' on' : ''}`} onClick={() => setTab('pass')}>My Card</button>
         <button type="button" className={`mem-tab${tab === 'account' ? ' on' : ''}`} onClick={() => setTab('account')}>Account</button>
       </div>
-      {/* Which programme they stand behind. Required — and shown at the top of
-          the card rather than buried in Account, because a member who has not
-          chosen one has a decision to make, not a setting to find. */}
-      {apiEnabled() && <ProgramPicker compact />}
-      {apiEnabled() && navigate && (
-        <button type="button" className="prog-do" onClick={() => navigate('programs')}>
-          <strong>Give to a cause, or serve on a board</strong>
-          <span>Playing gives a programme nothing. This is how you actually put something in.</span>
-        </button>
-      )}
-      {/* And the other direction: what this place can pay YOU. It sits beside
-          giving on purpose — a member should meet both on the same screen, on
-          the day they join, rather than finding out months later that the room
-          was a market the whole time. */}
-      {apiEnabled() && navigate && (
-        <button type="button" className="prog-do earn-do" onClick={() => navigate('earn')}>
-          <strong>Get paid here</strong>
-          <span>Sell what you do, take bookings, license what you made, or earn on who you bring.</span>
-        </button>
-      )}
-      {/* The relationship itself, rather than anything done inside it. A member
-          of a private association is owed the document they signed, the record
-          held about them, and the way out — and none of those should be
-          something they have to ask a person for. */}
-      {apiEnabled() && navigate && (
-        <button type="button" className="prog-do stand-do" onClick={() => navigate('standing')}>
-          <strong>Your membership</strong>
-          <span>What you signed, what we hold about you, and how to leave.</span>
-        </button>
-      )}
+      {/* NOTHING GOES ABOVE THE PASS.
 
+          This screen had grown a programme picker and three full-width calls to
+          action stacked over the card, which meant a member standing in a queue
+          on a Saturday night scrolled past all four to reach the QR that gets
+          them through the door. Every one of those is a thing you do sitting at
+          home. The pass is the thing you need with somebody waiting behind you.
+
+          So they live under Account now — one tap away, and out of the way. */}
       {tab === 'pass' && (
       <>
       {/* The road in was Continue, pick a tier, join, and then a member is
@@ -3378,6 +3356,36 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
 
       {tab === 'account' && (
       <>
+      {/* Where the association lives: what you stand behind, what you can earn,
+          and the relationship itself. All three were stacked over the pass and
+          are here now — the pass is for the door, this is for the sofa. */}
+      {apiEnabled() && <ProgramPicker compact />}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do" onClick={() => navigate('programs')}>
+          <strong>Give to a cause, or serve on a board</strong>
+          <span>Playing gives a programme nothing. This is how you actually put something in.</span>
+        </button>
+      )}
+      {/* The other direction: what this place can pay YOU. It sits beside
+          giving on purpose — a member should meet both together rather than
+          finding out months later that the room was a market the whole time. */}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do earn-do" onClick={() => navigate('earn')}>
+          <strong>Get paid here</strong>
+          <span>Sell what you do, take bookings, license what you made, or earn on who you bring.</span>
+        </button>
+      )}
+      {/* The relationship itself, rather than anything done inside it. A member
+          of a private association is owed the document they signed, the record
+          held about them, and the way out — and none of those should be
+          something they have to ask a person for. */}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do stand-do" onClick={() => navigate('standing')}>
+          <strong>Your membership</strong>
+          <span>What you signed, what we hold about you, and how to leave.</span>
+        </button>
+      )}
+
       {/* — actions: renew (prominent when expired) + step-up to the next tier — */}
       {expired && <div className="renew-alert">⚠ Your {member.tier} membership expired — renew to get back in.</div>}
       <div className="mem-actions">

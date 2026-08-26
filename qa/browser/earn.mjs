@@ -75,11 +75,15 @@ const waitFor=async(label,tries=20)=>{for(let i=0;i<tries;i++){
 // The screen transition refuses a navigate while it is running, so a single
 // tap can land on nothing and look like a broken button. This keeps tapping
 // until the earn screen is actually up, which is what a person would do.
+// Nothing sits above the pass any more — the QR is what a member needs with
+// somebody waiting behind them, so earning lives one tap away under Account.
+const toAccount=()=>js(`const b=[...document.querySelectorAll('.mem-tab')].find(b=>(b.innerText||'').trim()==='Account');if(!b)return false;b.click();return true;`);
 const openEarn=async(tab)=>{
   let on=false;
   for(let i=0;i<24&&!on;i++){
     on=await js(`return [...document.querySelectorAll('button')].some(b=>(b.innerText||'').trim()==='Bring people')`);
     if(on)break;
+    await toAccount(); await settle(350);
     await tap('Get paid here');
     await settle(900);
   }
@@ -119,12 +123,18 @@ const asHouse=async(code)=>{
   await tap('Unlock');await settle(4500);
 };
 
-console.log('THE WAY IN IS ON THE CARD');
+console.log('THE PASS IS FIRST; EARNING IS ONE TAP AWAY');
 await as(nova,'Nova','850-960-0001');
+const landed=await text();
+// The screen a member lands on is the one they need in a queue. Anything that
+// pushes the QR down the page is in the wrong place, however good it is.
+ok(!/get paid here/i.test(landed),'nothing about earning is stacked above the pass');
+ok(await toAccount(),'Account is the other tab');
+await settle(900);
 const card=await text();
-console.log('   [card]', card.slice(0,260));
-ok(/get paid here/i.test(card),'a member meets earning on the screen they land on');
-ok(/give to a cause/i.test(card),'and giving sits right beside it');
+console.log('   [account]', card.slice(0,260));
+ok(/get paid here/i.test(card),'and earning is right there');
+ok(/give to a cause/i.test(card),'with giving beside it');
 await shot('earn-0-card.png');
 
 console.log('\nWHAT THE VENUE TAKES IS SAID FIRST (§46)');

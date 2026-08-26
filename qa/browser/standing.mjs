@@ -87,11 +87,15 @@ const ok=(c,m)=>{console.log(`  ${c?'PASS':'FAIL'}  ${m}`);c?pass++:fail++;};
 const waitBtn=async(label,tries=24)=>{for(let i=0;i<tries;i++){
   if(await js(`const t=${JSON.stringify(label)}.toLowerCase();return [...document.querySelectorAll('button')].some(b=>(b.innerText||'').toLowerCase().includes(t)&&!b.disabled&&b.offsetParent)`))return true;
   await settle(500);}return false;};
+// Under Account, because nothing goes above the pass — the QR is what a member
+// needs standing in a queue.
+const toAccount=()=>js(`const b=[...document.querySelectorAll('.mem-tab')].find(b=>(b.innerText||'').trim()==='Account');if(!b)return false;b.click();return true;`);
 const open=async(tab)=>{
   let on=false;
   for(let i=0;i<24&&!on;i++){
     on=await js(`return [...document.querySelectorAll('button')].some(b=>(b.innerText||'').trim()==='What we hold')`);
     if(on)break;
+    await toAccount(); await settle(350);
     await tap('Your membership'); await settle(900);
   }
   if(!on)return false;
@@ -112,10 +116,16 @@ await js(`localStorage.clear();localStorage.setItem('hvas_hub_off','1');localSto
 await cdp('Page.navigate',{url:appUrl});await settle(8000);
 await tap('Enter');await settle(3500);
 
-console.log('IT IS ON THE CARD, NOT BURIED');
+console.log('ONE TAP FROM THE CARD, AND NOT BURIED DEEPER THAN THAT');
+const landed=await text();
+ok(!/how to leave/i.test(landed),'the pass screen is the pass, with nothing stacked over the QR');
+ok(await toAccount(),'Account is the other tab');
+await settle(900);
 const card=await text();
-ok(/your membership/i.test(card),'a member meets their own standing on the screen they land on');
-ok(/how to leave/i.test(card),'and leaving is named there, not hidden behind it');
+ok(/your membership/i.test(card),'their own standing is right there');
+// The thing this really guards: leaving is NAMED on the way in. A resignation
+// somebody has to go hunting for is a favour, not a right.
+ok(/how to leave/i.test(card),'and leaving is named on the way in, not hidden behind it');
 await shot('stand-0-card.png');
 
 console.log('\nWHAT YOU SIGNED, IN THE WORDS YOU SIGNED IT');
