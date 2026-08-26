@@ -13,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-timer-test.mjs', 'hook-test.mjs', 'stream-test.mjs', 'tunnel-pick-test.mjs', 'render-safety-test.mjs', 'deck-sync-test.mjs', 'yt-search-test.mjs', 'prize-test.mjs', 'entry-test.mjs', 'economy-test.mjs', 'ip-test.mjs', 'jubilee-test.mjs', 'jubilee-api-test.mjs', 'staff-test.mjs', 'pulse-test.mjs', 'chrome-test.mjs', 'program-test.mjs', 'privacy-test.mjs', 'drill-2030-test.mjs', 'onboarding-test.mjs', 'license-test.mjs'];
+const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-timer-test.mjs', 'hook-test.mjs', 'stream-test.mjs', 'tunnel-pick-test.mjs', 'render-safety-test.mjs', 'deck-sync-test.mjs', 'yt-search-test.mjs', 'prize-test.mjs', 'entry-test.mjs', 'economy-test.mjs', 'ip-test.mjs', 'jubilee-test.mjs', 'jubilee-api-test.mjs', 'staff-test.mjs', 'pulse-test.mjs', 'chrome-test.mjs', 'program-test.mjs', 'privacy-test.mjs', 'drill-2030-test.mjs', 'onboarding-test.mjs', 'license-test.mjs', 'earning-test.mjs'];
 
 const run = (file) => new Promise((res) => {
   const child = spawn(process.execPath, [resolve(__dirname, file)], { cwd: __dirname, stdio: 'inherit' });

@@ -486,6 +486,155 @@ export function openDb(path) {
   // the same fact stated twice, not two performances.
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_perf_unique ON performance_rights(member_id, content_hash)`);
 
+  // ── The ways a member makes money here ──────────────────────────────────
+  //
+  // Licensing covers creative work. It does not cover a chef, a nail tech or a
+  // promoter, so there are three more: selling to the room, partnering with the
+  // venue, and being paid for who you bring.
+  db.exec(`CREATE TABLE IF NOT EXISTS market_listings (
+    listing_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    kind TEXT NOT NULL,                  -- SERVICE | GOODS | FOOD | BOOKING
+    title TEXT NOT NULL,
+    detail TEXT,
+    price_units INTEGER NOT NULL,        -- cents
+    price_mode TEXT NOT NULL,            -- FIXED | FROM | HOURLY | PER_HEAD
+    delivery TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'OPEN', -- OPEN | PAUSED | CLOSED
+    at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_listings_open ON market_listings(status, at DESC)`);
+  // The fee is stored ON the order, not looked up later. §46: what was taken is
+  // what was disclosed at the time, even if the venue's rate changes tomorrow.
+  db.exec(`CREATE TABLE IF NOT EXISTS market_orders (
+    order_id TEXT PRIMARY KEY,
+    listing_id TEXT NOT NULL,
+    seller_id TEXT NOT NULL,
+    buyer_id TEXT NOT NULL,
+    buyer_name TEXT NOT NULL,
+    price_units INTEGER NOT NULL,
+    fee_units INTEGER NOT NULL,
+    fee_percent REAL NOT NULL,
+    seller_units INTEGER NOT NULL,
+    note TEXT,
+    rail TEXT,
+    status TEXT NOT NULL DEFAULT 'PLACED', -- PLACED | PAID | DELIVERED | CANCELLED
+    at INTEGER NOT NULL,
+    paid_at INTEGER,
+    paid_by TEXT,
+    delivered_at INTEGER,
+    delivered_note TEXT,
+    contribution_id TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_seller ON market_orders(seller_id, at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_orders_buyer ON market_orders(buyer_id, at DESC)`);
+
+  // A booking is the one thing here where BOTH sides put something down. §18's
+  // chain, stage for stage, with the stake as a performance bond rather than
+  // yield — the directive is explicit that staking must not be passive
+  // speculation, and a no-show is the real failure this marketplace has.
+  db.exec(`CREATE TABLE IF NOT EXISTS bookings (
+    booking_id TEXT PRIMARY KEY,
+    listing_id TEXT,
+    provider_id TEXT NOT NULL REFERENCES members(id),
+    client_id TEXT NOT NULL REFERENCES members(id),
+    title TEXT NOT NULL,
+    detail TEXT,
+    starts_at INTEGER,
+    price_units INTEGER NOT NULL,
+    deposit_units INTEGER NOT NULL DEFAULT 0,
+    stake_units INTEGER NOT NULL DEFAULT 0,
+    stake_layer TEXT NOT NULL DEFAULT 'USD',   -- USD | HITK, see the flag note
+    fee_percent REAL NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'REQUESTED',
+    failure TEXT,                              -- null unless it went wrong
+    at INTEGER NOT NULL,
+    agreed_at INTEGER,
+    secured_at INTEGER,
+    secured_by TEXT,
+    worked_at INTEGER,
+    verified_at INTEGER,
+    settled_at INTEGER,
+    settled_by TEXT,
+    to_provider_units INTEGER,
+    to_venue_units INTEGER,
+    to_client_units INTEGER,
+    stake_returned_units INTEGER,
+    stake_forfeited_units INTEGER,
+    receipt_id TEXT
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_bookings_provider ON bookings(provider_id, at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_bookings_client ON bookings(client_id, at DESC)`);
+  // Every move a booking made, and who moved it. A stage that can be rewritten
+  // in place is a stage nobody can audit after the night.
+  db.exec(`CREATE TABLE IF NOT EXISTS booking_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    by_id TEXT,
+    by_name TEXT,
+    at INTEGER NOT NULL,
+    note TEXT
+  )`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS partnerships (
+    partnership_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    terms TEXT,
+    house_percent REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PROPOSED', -- PROPOSED | ACTIVE | DECLINED | ENDED
+    proposed_by TEXT NOT NULL,           -- 'house' or 'member' — who opened it
+    proposed_at INTEGER NOT NULL,
+    member_agreed_at INTEGER,
+    house_agreed_at INTEGER,
+    house_agreed_by TEXT,
+    ended_at INTEGER
+  )`);
+  // Each night the partnership actually ran, and what each side got.
+  db.exec(`CREATE TABLE IF NOT EXISTS partnership_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    partnership_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    gross_units INTEGER NOT NULL,
+    house_units INTEGER NOT NULL,
+    member_units INTEGER NOT NULL,
+    house_percent REAL NOT NULL,
+    note TEXT,
+    recorded_by TEXT NOT NULL
+  )`);
+
+  {
+    const cols = db.prepare(`PRAGMA table_info(members)`).all().map((c) => c.name);
+    // A promoter's code goes on a flyer, so it lives on the member.
+    if (!cols.includes('referral_code')) db.exec(`ALTER TABLE members ADD COLUMN referral_code TEXT`);
+    // Who brought them. Written ONCE at signup and never rewritten — otherwise
+    // a promoter's work can be reassigned after the fact.
+    if (!cols.includes('referred_by')) db.exec(`ALTER TABLE members ADD COLUMN referred_by TEXT`);
+    if (!cols.includes('referred_at')) db.exec(`ALTER TABLE members ADD COLUMN referred_at INTEGER`);
+  }
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_code ON members(referral_code) WHERE referral_code IS NOT NULL`);
+  db.exec(`CREATE TABLE IF NOT EXISTS referral_credits (
+    credit_id TEXT PRIMARY KEY,
+    referrer_id TEXT NOT NULL REFERENCES members(id),
+    member_id TEXT NOT NULL REFERENCES members(id),
+    event TEXT NOT NULL,                 -- MEMBERSHIP | ENTRY | MARKET
+    reference TEXT NOT NULL,             -- the thing that was actually paid
+    gross_units INTEGER NOT NULL,
+    commission_units INTEGER NOT NULL,
+    rate_percent REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'EARNED', -- EARNED | PAID
+    at INTEGER NOT NULL,
+    paid_at INTEGER,
+    paid_by TEXT,
+    paid_reference TEXT
+  )`);
+  // One credit per referrer per paid thing. A membership bought once earns once,
+  // however many times the code was mentioned.
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_once ON referral_credits(referrer_id, event, reference)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_credits_referrer ON referral_credits(referrer_id, at DESC)`);
+
   // ── Licensing ───────────────────────────────────────────────────────────
   //
   // The registry proves who made a thing and when. This is what turns that into

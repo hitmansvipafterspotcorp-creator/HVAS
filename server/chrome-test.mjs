@@ -56,6 +56,21 @@ ok(!!edgeGlow, 'a panel-edge glow token exists');
 ok(edgeGlow && violet && Number(edgeGlow[1]) < Number(violet[1]),
    `and is weaker than the accent glow (${edgeGlow?.[1]} < ${violet?.[1]})`);
 
+console.log('\nNO TWO ROUTES ANSWER TO THE SAME NAME');
+// The routes are one big object literal. A duplicate key does not error — the
+// later one silently wins, and the earlier endpoint stops existing. That is how
+// a working table-booking endpoint quietly became a nail appointment, and it
+// cost half an hour to find because the symptom was "pick a valid date" from a
+// handler nobody was calling.
+const appSrc = readFileSync(resolve(here, 'src/app.mjs'), 'utf8');
+const routeKeys = appSrc.match(/^ {4}'(?:GET|POST|PUT|DELETE) \/[^']*'/gm) || [];
+const seen = new Map();
+for (const k of routeKeys) seen.set(k, (seen.get(k) || 0) + 1);
+const shadowed = [...seen].filter(([, n]) => n > 1).map(([k]) => k.trim());
+shadowed.forEach((k) => console.log(`    ${k}`));
+ok(routeKeys.length > 100, `the routes were found to check (${routeKeys.length})`);
+ok(shadowed.length === 0, `no route is defined twice (${shadowed.length} shadowed)`);
+
 console.log('\nNO SECRETS IN THE SHIPPED BUNDLE');
 // The venue codes used to be compiled into the JavaScript, where anybody who
 // opened the file could read them — and the gate PRINTED one on screen as a

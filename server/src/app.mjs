@@ -18,6 +18,12 @@ import {
   LICENSE_TYPES, LICENSE_TYPE_LIST, LICENSE_SCOPES, LICENSE_TERMS, WORK_KIND_LIST, WORK_KINDS,
   licenseActive, licenseConflict, licenseTerms, newOfferId, newGrantId,
 } from './economy/licensing.mjs';
+import {
+  LISTING_KINDS, PRICE_MODES, DELIVERY, PARTNERSHIP_KINDS, REFERRAL_EVENTS,
+  BOOKING_STAGES, BOOKING_STAGE, BOOKING_FAILURES,
+  marketSplit, partnershipSplit, referralCommission, referralCodeFor,
+  bookingCanAdvance, bookingOutcome, stakeFor,
+} from './economy/earning.mjs';
 // The SAME rules the phones run. Imported rather than restated: a prize table
 // or a vote threshold that exists twice is a prize table that will eventually
 // disagree with itself, and the disagreement would be about money in a room.
@@ -1211,6 +1217,73 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     json(res, 403, { error: `Only ${admin.name} manages the team.` });
     return null;
   };
+  // The venue's cut of a member-to-member sale, and what a referral pays.
+  // Both are SETTINGS, adopted by the house, never constants — a rate baked
+  // into the code is a rate nobody agreed to and nobody can change tonight.
+  const rateSetting = (key, fallback) => {
+    const raw = setting(key);
+    if (raw == null || String(raw).trim() === '') return fallback;
+    const v = Number(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
+  };
+  const marketFeePercent = () => rateSetting('market_fee_percent', 0.10);
+  const referralRatePercent = () => rateSetting('referral_rate_percent', 0.05);
+  // Everybody has a code, made the first time somebody asks for it, derived
+  // from their name so a promoter can put it on a flyer.
+  const codeFor = (memberId) => {
+    const m = db.prepare('SELECT id, name, referral_code FROM members WHERE id=?').get(memberId);
+    if (!m) return null;
+    if (m.referral_code) return m.referral_code;
+    for (let i = 0; i < 40; i++) {
+      const code = referralCodeFor(m.name, `${m.id}:${i}`);
+      const taken = db.prepare('SELECT id FROM members WHERE referral_code=?').get(code);
+      if (!taken) { db.prepare('UPDATE members SET referral_code=? WHERE id=?').run(code, m.id); return code; }
+    }
+    return null;
+  };
+  // Credit whoever brought this member, for money that actually arrived.
+  //
+  // Paid on real settled money and never on a signup: otherwise the incentive is
+  // to produce accounts rather than people, and a promoter who fills a room and
+  // one who fills a spreadsheet earn the same.
+  const creditReferrer = ({ memberId, event, reference, grossCents }) => {
+    const m = db.prepare('SELECT referred_by FROM members WHERE id=?').get(memberId);
+    if (!m?.referred_by) return null;
+    const calc = referralCommission({ grossCents, ratePercent: referralRatePercent(), event });
+    if (!calc.ok || calc.commissionCents <= 0) return null;
+    const creditId = `REF-${randomBytes(6).toString('hex').toUpperCase()}`;
+    try {
+      db.prepare(`INSERT INTO referral_credits
+        (credit_id, referrer_id, member_id, event, reference, gross_units, commission_units, rate_percent, status, at)
+        VALUES (?,?,?,?,?,?,?,?, 'EARNED', ?)`)
+        .run(creditId, m.referred_by, memberId, event, String(reference),
+             calc.grossCents, calc.commissionCents, calc.ratePercent, Date.now());
+    } catch { return null; }   // the unique index: one credit per paid thing
+    return { creditId, commissionCents: calc.commissionCents };
+  };
+  const bookingRow = (b) => ({
+    bookingId: b.booking_id, title: b.title, detail: b.detail || null,
+    startsAt: b.starts_at || null, priceCents: b.price_units,
+    depositCents: b.deposit_units, stakeCents: b.stake_units, stakeLayer: b.stake_layer,
+    stage: b.stage, stageLabel: BOOKING_STAGE[b.stage]?.label,
+    nextIs: BOOKING_STAGES[(BOOKING_STAGE[b.stage]?.order ?? 0) + 1] || null,
+    failure: b.failure || null,
+    failureLabel: b.failure ? BOOKING_FAILURES[b.failure]?.label : null,
+    settlement: b.settled_at ? {
+      toProvider: b.to_provider_units, toVenue: b.to_venue_units, toClient: b.to_client_units,
+      stakeReturned: b.stake_returned_units, stakeForfeited: b.stake_forfeited_units,
+    } : null,
+    at: b.at,
+  });
+  const listingRow = (l) => ({
+    listingId: l.listing_id, kind: l.kind, kindLabel: LISTING_KINDS[l.kind]?.label,
+    title: l.title, detail: l.detail || null,
+    priceCents: l.price_units, priceMode: l.price_mode,
+    priceModeLabel: PRICE_MODES[l.price_mode]?.label,
+    delivery: l.delivery, deliveryLabel: DELIVERY[l.delivery]?.label,
+    status: l.status, at: l.at,
+  });
+
   const offerRow = (o) => ({
     offerId: o.offer_id, assetId: o.asset_id, type: o.type,
     typeLabel: LICENSE_TYPES[o.type]?.label, grants: LICENSE_TYPES[o.type]?.grants,
@@ -1454,7 +1527,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { sent: true, devCode: code }); // devCode only in demo
     },
     'POST /auth/member/verify': async (req, res) => {
-      const { contact, code, name } = await readBody(req);
+      const { contact, code, name, referral } = await readBody(req);
       const row = db.prepare('SELECT * FROM otps WHERE contact=?').get(contact);
       if (!row || row.code !== String(code) || Date.now() > row.expires_at) return json(res, 401, { error: 'bad code' });
       db.prepare('DELETE FROM otps WHERE contact=?').run(contact);
@@ -1463,6 +1536,18 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         const id = randomBytes(8).toString('hex');
         commit('member.upsert', { id, name: (name || 'Member').trim(), contact, number: memNumber(), created_at: Date.now() });
         m = db.prepare('SELECT * FROM members WHERE id=?').get(id);
+        // Who brought them, written ONCE, here, and never again. A promoter's
+        // work cannot be reassigned after the fact, and somebody who arrived on
+        // their own cannot later be claimed by whoever asks first.
+        const said = String(referral || '').trim().toUpperCase();
+        if (said) {
+          const by = db.prepare('SELECT id FROM members WHERE UPPER(referral_code)=?').get(said);
+          // Nobody refers themselves, which the id check makes structural
+          // rather than a rule somebody has to remember.
+          if (by && by.id !== id) {
+            db.prepare('UPDATE members SET referred_by=?, referred_at=? WHERE id=?').run(by.id, Date.now(), id);
+          }
+        }
       }
       json(res, 200, { token: signSession(secret, { sub: m.id, role: 'member' }, SESSION_TTL), member: publicMember(m) });
     },
@@ -1701,6 +1786,481 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       // An unspent invite for somebody who has been removed must not still work.
       db.prepare('DELETE FROM staff_invites WHERE staff_id=? AND used_at IS NULL').run(staffId);
       json(res, 200, { ok: true, name: row.name });
+    },
+
+    // ── Ways to earn ─────────────────────────────────────────────────────────
+    //
+    // Licensing covers creative work. It does not cover a chef, a nail tech or a
+    // promoter, so there are three more: SELL to the room, PARTNER with the
+    // venue, and be paid for who you BRING.
+    'GET /earn': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const mine = c.role === 'member';
+      const feePct = marketFeePercent();
+      json(res, 200, {
+        // §46: what the venue takes is stated before anybody lists anything.
+        feePercent: feePct,
+        feeSaid: `The venue keeps ${Math.round(feePct * 100)}% of a member-to-member sale. It goes to the community reserve.`,
+        referralPercent: referralRatePercent(),
+        kinds: Object.entries(LISTING_KINDS).map(([id, v]) => ({ id, ...v })),
+        priceModes: Object.entries(PRICE_MODES).map(([id, v]) => ({ id, ...v })),
+        delivery: Object.entries(DELIVERY).map(([id, v]) => ({ id, ...v })),
+        partnershipKinds: Object.entries(PARTNERSHIP_KINDS).map(([id, v]) => ({ id, ...v })),
+        bookingStages: BOOKING_STAGES,
+        bookingFailures: Object.entries(BOOKING_FAILURES).map(([id, v]) => ({ id, ...v })),
+        referralEvents: Object.entries(REFERRAL_EVENTS).map(([id, v]) => ({ id, ...v })),
+        ...(mine ? { code: codeFor(c.sub), grants: (() => {
+          const r = db.prepare('SELECT member_role FROM members WHERE id=?').get(c.sub)?.member_role;
+          return r ? roleGrants(r) : null;
+        })() } : {}),
+      });
+    },
+
+    // Putting up what you do. Open to any trade that sells — which is every
+    // role on the list except somebody who is only here for the night.
+    'POST /market/list': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { kind, title, detail, priceCents, priceMode = 'FIXED', delivery = 'AT_VENUE' } = await readBody(req);
+      const role = db.prepare('SELECT member_role FROM members WHERE id=?').get(c.sub)?.member_role;
+      if (role && !roleGrants(role).sells) {
+        return json(res, 403, {
+          error: 'The kind of member you signed up as does not sell anything. Change what you do on your card and you can list.',
+        });
+      }
+      if (!LISTING_KINDS[kind]) return json(res, 400, { error: `"${kind}" is not a kind of listing`, kinds: Object.keys(LISTING_KINDS) });
+      if (!PRICE_MODES[priceMode]) return json(res, 400, { error: `"${priceMode}" is not a way to price something` });
+      if (!DELIVERY[delivery]) return json(res, 400, { error: `"${delivery}" is not a way to deliver something` });
+      const t = String(title || '').trim().slice(0, 80);
+      if (t.length < 3) return json(res, 400, { error: 'Say what you are offering.' });
+      const price = Math.floor(Number(priceCents));
+      if (!Number.isFinite(price) || price < 0) return json(res, 400, { error: 'Put a price on it. Free is allowed; blank is not.' });
+      const listingId = `LST-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO market_listings
+        (listing_id, member_id, kind, title, detail, price_units, price_mode, delivery, status, at)
+        VALUES (?,?,?,?,?,?,?,?, 'OPEN', ?)`)
+        .run(listingId, c.sub, kind, t, String(detail || '').slice(0, 500), price, priceMode, delivery, Date.now());
+      const split = marketSplit({ priceCents: price, feePercent: marketFeePercent() });
+      json(res, 200, { ok: true, listingId, youKeep: split.sellerCents, venueFee: split.feeCents });
+    },
+
+    'POST /market/close': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { listingId } = await readBody(req);
+      const l = db.prepare('SELECT * FROM market_listings WHERE listing_id=?').get(listingId);
+      if (!l) return json(res, 404, { error: 'no such listing' });
+      if (l.member_id !== c.sub) return json(res, 403, { error: 'That is not your listing.' });
+      db.prepare(`UPDATE market_listings SET status='CLOSED' WHERE listing_id=?`).run(listingId);
+      json(res, 200, { ok: true, note: 'Closed. Orders already placed still stand.' });
+    },
+
+    // The shop. Everything members are selling each other.
+    'GET /market': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT l.*, m.name AS seller, m.member_role, m.role_other
+        FROM market_listings l JOIN members m ON m.id=l.member_id
+        WHERE l.status='OPEN' ORDER BY l.at DESC LIMIT 200`).all();
+      json(res, 200, {
+        feePercent: marketFeePercent(),
+        listings: rows.map((r) => ({
+          ...listingRow(r),
+          seller: r.seller,
+          // What they do, so a buyer knows a nail tech from a mechanic.
+          trade: r.member_role === 'OTHER' ? r.role_other : (MEMBER_ROLE[r.member_role]?.label || null),
+          mine: r.member_id === c.sub,
+        })),
+      });
+    },
+
+    // Buying. The fee is stored on the order, so what was taken is what was
+    // disclosed at the time even if the venue's rate changes tomorrow (§46).
+    'POST /market/order': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { listingId, note } = await readBody(req);
+      const l = db.prepare('SELECT * FROM market_listings WHERE listing_id=?').get(listingId);
+      if (!l) return json(res, 404, { error: 'no such listing' });
+      if (l.status !== 'OPEN') return json(res, 409, { error: 'that listing is closed' });
+      if (l.member_id === c.sub) return json(res, 400, { error: 'That is your own listing.' });
+      const split = marketSplit({ priceCents: l.price_units, feePercent: marketFeePercent() });
+      if (!split.ok) return json(res, 400, { error: split.reason });
+      const me = db.prepare('SELECT name FROM members WHERE id=?').get(c.sub);
+      const orderId = `ORD-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO market_orders
+        (order_id, listing_id, seller_id, buyer_id, buyer_name, price_units, fee_units, fee_percent,
+         seller_units, note, status, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?, 'PLACED', ?)`)
+        .run(orderId, listingId, l.member_id, c.sub, me?.name || 'member',
+             split.priceCents, split.feeCents, split.feePercent, split.sellerCents,
+             String(note || '').slice(0, 300), Date.now());
+      json(res, 200, {
+        ok: true, orderId, status: 'PLACED — NOT PAID',
+        priceCents: split.priceCents, venueFee: split.feeCents, sellerGets: split.sellerCents,
+      });
+    },
+
+    // The house confirming the money arrived. The seller never confirms their
+    // own sale, for the same reason a member never confirms their own payment.
+    'POST /market/settle': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { orderId, received, rail = 'cash' } = await readBody(req);
+      const o = db.prepare('SELECT * FROM market_orders WHERE order_id=?').get(orderId);
+      if (!o) return json(res, 404, { error: 'no such order' });
+      if (o.status !== 'PLACED') return json(res, 409, { error: `that order is already ${o.status}` });
+      if (o.seller_id === c.sub) return json(res, 403, { error: 'You cannot confirm your own sale.' });
+      const now = Date.now();
+      if (!received) {
+        db.prepare(`UPDATE market_orders SET status='CANCELLED', paid_by=? WHERE order_id=?`).run(c.name || c.sub, orderId);
+        return json(res, 200, { ok: true, status: 'CANCELLED' });
+      }
+      db.prepare(`UPDATE market_orders SET status='PAID', paid_at=?, paid_by=?, rail=? WHERE order_id=?`)
+        .run(now, c.name || c.sub, String(rail), orderId);
+      // The venue's cut is a real contribution to the reserve, not a number in
+      // a column — §27 names marketplace_platform_fee as a source it accepts.
+      let contribution = null;
+      if (o.fee_units > 0 && economyFlags().WORLD_RESERVE_LEDGER) {
+        const made = makeContribution({
+          sourceType: 'marketplace_platform_fee',
+          sourceEntity: process.env.HVAS_VENUE_NAME || 'HITMANS VIP AFTER SPOT',
+          sourceTransaction: orderId, amount: usd(o.fee_units),
+          vault: setting('bingo_world_vault') || 'CORE_RESILIENCE',
+          legalCustodian: setting('world_custodian') || 'HITMANS VIP AFTER SPOT CORP',
+          beneficialPurpose: 'Platform fee on a member-to-member sale',
+        });
+        if (made.ok) {
+          const k = made.contribution;
+          db.prepare(`INSERT OR IGNORE INTO world_contributions
+            (contribution_id, source_type, source_entity, source_transaction, amount_units, currency,
+             asset_type, restriction_status, authorization_id, vault, legal_custodian,
+             beneficial_purpose, refused, reason, timestamp, proof_hash)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+            .run(k.contributionId, k.sourceType, k.sourceEntity, k.sourceTransaction, k.amount.units,
+                 k.currency, k.assetType, k.restrictionStatus, k.authorizationId || null, k.vault,
+                 k.legalCustodian, k.beneficialPurpose, 0, null, k.timestamp, k.proofHash || null);
+          db.prepare('UPDATE market_orders SET contribution_id=? WHERE order_id=?').run(k.contributionId, orderId);
+          contribution = k.contributionId;
+        }
+      }
+      const credit = creditReferrer({ memberId: o.buyer_id, event: 'MARKET', reference: orderId, grossCents: o.price_units });
+      json(res, 200, { ok: true, status: 'PAID', sellerGets: o.seller_units, venueFee: o.fee_units, contribution, referral: credit });
+    },
+
+    // The BUYER says they got it. The seller saying so would be the seller
+    // marking their own homework, which is the thing this venue never does.
+    'POST /market/received': async (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { orderId, note } = await readBody(req);
+      const o = db.prepare('SELECT * FROM market_orders WHERE order_id=?').get(orderId);
+      if (!o) return json(res, 404, { error: 'no such order' });
+      if (o.buyer_id !== c.sub) return json(res, 403, { error: 'Only the buyer says whether they got it.' });
+      if (o.status !== 'PAID') return json(res, 409, { error: `that order is ${o.status}, not paid for yet` });
+      db.prepare(`UPDATE market_orders SET status='DELIVERED', delivered_at=?, delivered_note=? WHERE order_id=?`)
+        .run(Date.now(), String(note || '').slice(0, 300), orderId);
+      json(res, 200, { ok: true, status: 'DELIVERED' });
+    },
+
+    // What a member is selling, what they have sold, and what they have bought.
+    'GET /market/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const sold = db.prepare('SELECT * FROM market_orders WHERE seller_id=? ORDER BY at DESC LIMIT 50').all(c.sub);
+      json(res, 200, {
+        listings: db.prepare(`SELECT * FROM market_listings WHERE member_id=? ORDER BY at DESC`).all(c.sub).map(listingRow),
+        sold: sold.map((o) => ({ orderId: o.order_id, buyer: o.buyer_name, priceCents: o.price_units,
+          youGet: o.seller_units, venueFee: o.fee_units, status: o.status, at: o.at })),
+        bought: db.prepare('SELECT * FROM market_orders WHERE buyer_id=? ORDER BY at DESC LIMIT 50').all(c.sub)
+          .map((o) => ({ orderId: o.order_id, priceCents: o.price_units, status: o.status, at: o.at })),
+        // Only money that actually settled.
+        earnedCents: sold.filter((o) => o.status === 'PAID' || o.status === 'DELIVERED')
+          .reduce((a, o) => a + o.seller_units, 0),
+      });
+    },
+
+    // ── Bookings, and the stake (§18) ────────────────────────────────────────
+    //
+    // §18's chain, stage for stage, and its closing rule: staking must not be
+    // passive-yield speculation. So the stake here is a PERFORMANCE BOND. The
+    // real failure in a members' marketplace is not fraud — it is the provider
+    // who does not turn up and the client who books three and picks one. Both
+    // put something down; whoever fails to show is the one who loses it.
+    'POST /gig/request': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { listingId, providerId, title, detail, startsAt, priceCents, depositCents } = await readBody(req);
+      const listing = listingId ? db.prepare('SELECT * FROM market_listings WHERE listing_id=?').get(listingId) : null;
+      const provider = listing?.member_id || providerId;
+      if (!provider) return json(res, 400, { error: 'say who you are booking' });
+      if (provider === c.sub) return json(res, 400, { error: 'You cannot book yourself.' });
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(provider)) return json(res, 404, { error: 'no such member' });
+      const price = Math.floor(Number(priceCents ?? listing?.price_units));
+      if (!Number.isFinite(price) || price <= 0) return json(res, 400, { error: 'a booking needs a price' });
+      const deposit = Math.min(price, Math.max(0, Math.floor(Number(depositCents) || Math.floor(price * 0.25))));
+      const bookingId = `BKG-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO bookings
+        (booking_id, listing_id, provider_id, client_id, title, detail, starts_at,
+         price_units, deposit_units, stake_units, stake_layer, fee_percent, stage, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'REQUESTED', ?)`)
+        .run(bookingId, listingId || null, provider, c.sub,
+             String(title || listing?.title || 'Booking').slice(0, 80),
+             String(detail || '').slice(0, 400), Number(startsAt) || null,
+             price, deposit, stakeFor({ priceCents: price }),
+             // With no chain live the stake is a recorded hold in the venue's own
+             // books, and the response says so rather than implying a token moved.
+             economyFlags().HITK_REAL_CHAIN ? 'HITK' : 'USD',
+             marketFeePercent(), Date.now());
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at) VALUES(?,?,?,?,?)`)
+        .run(bookingId, 'REQUESTED', c.sub, 'client', Date.now());
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      json(res, 200, { ok: true, ...bookingRow(b),
+        stakeNote: 'The provider posts a stake when they agree. If they do not turn up, it goes to you.' });
+    },
+
+    // The provider taking it. This is §18's AGREEMENT, and posting the stake is
+    // what makes it more than a reply.
+    'POST /gig/agree': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { bookingId } = await readBody(req);
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      if (!b) return json(res, 404, { error: 'no such booking' });
+      if (b.provider_id !== c.sub) return json(res, 403, { error: 'Only the provider can take this booking.' });
+      const step = bookingCanAdvance(b.stage, 'AGREED');
+      if (!step.ok) return json(res, 409, { error: step.reason });
+      db.prepare(`UPDATE bookings SET stage='AGREED', agreed_at=? WHERE booking_id=?`).run(Date.now(), bookingId);
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at) VALUES(?,?,?,?,?)`)
+        .run(bookingId, 'AGREED', c.sub, 'provider', Date.now());
+      json(res, 200, { ok: true, stage: 'AGREED', stakeCents: b.stake_units,
+        note: `You are staking ${(b.stake_units / 100).toFixed(2)} on turning up. Do the work and it comes straight back.` });
+    },
+
+    // Deposit in, stake posted — the house confirms both, because it is the
+    // house that actually took the money.
+    'POST /gig/secure': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { bookingId } = await readBody(req);
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      if (!b) return json(res, 404, { error: 'no such booking' });
+      const step = bookingCanAdvance(b.stage, 'SECURED');
+      if (!step.ok) return json(res, 409, { error: step.reason });
+      const now = Date.now();
+      db.prepare(`UPDATE bookings SET stage='SECURED', secured_at=?, secured_by=? WHERE booking_id=?`)
+        .run(now, c.name || c.sub, bookingId);
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at) VALUES(?,?,?,?,?)`)
+        .run(bookingId, 'SECURED', c.sub, c.name || 'house', now);
+      json(res, 200, { ok: true, stage: 'SECURED', depositCents: b.deposit_units, stakeCents: b.stake_units });
+    },
+
+    // The provider says the work is done. Saying it is not the same as it being
+    // true, which is why the next stage belongs to the client.
+    'POST /gig/worked': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { bookingId, note } = await readBody(req);
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      if (!b) return json(res, 404, { error: 'no such booking' });
+      if (b.provider_id !== c.sub) return json(res, 403, { error: 'Only the provider says the work is done.' });
+      const step = bookingCanAdvance(b.stage, 'WORKED');
+      if (!step.ok) return json(res, 409, { error: step.reason });
+      db.prepare(`UPDATE bookings SET stage='WORKED', worked_at=? WHERE booking_id=?`).run(Date.now(), bookingId);
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at, note) VALUES(?,?,?,?,?,?)`)
+        .run(bookingId, 'WORKED', c.sub, 'provider', Date.now(), String(note || '').slice(0, 300));
+      json(res, 200, { ok: true, stage: 'WORKED', note: 'Waiting on the client to confirm they got it.' });
+    },
+
+    // §18's VERIFICATION. The client, and only the client.
+    'POST /gig/verify': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { bookingId, note } = await readBody(req);
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      if (!b) return json(res, 404, { error: 'no such booking' });
+      if (b.client_id !== c.sub) return json(res, 403, { error: 'Only the person who booked it says they got it.' });
+      const step = bookingCanAdvance(b.stage, 'VERIFIED');
+      if (!step.ok) return json(res, 409, { error: step.reason });
+      db.prepare(`UPDATE bookings SET stage='VERIFIED', verified_at=? WHERE booking_id=?`).run(Date.now(), bookingId);
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at, note) VALUES(?,?,?,?,?,?)`)
+        .run(bookingId, 'VERIFIED', c.sub, 'client', Date.now(), String(note || '').slice(0, 300));
+      json(res, 200, { ok: true, stage: 'VERIFIED', note: 'Payment and stake release next.' });
+    },
+
+    // PAYMENT RELEASE and STAKE RELEASE, together, with the receipt (§18).
+    // Also the only place a booking that went wrong is settled, so every ending
+    // is decided by the same function rather than four scattered refund rules.
+    'POST /gig/settle': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { bookingId, failure = null } = await readBody(req);
+      const b = db.prepare('SELECT * FROM bookings WHERE booking_id=?').get(bookingId);
+      if (!b) return json(res, 404, { error: 'no such booking' });
+      if (b.settled_at) return json(res, 409, { error: 'that booking is already settled' });
+      if (failure && !BOOKING_FAILURES[failure]) return json(res, 400, { error: `"${failure}" is not one of the ways a booking fails` });
+      // A clean settlement is only available once the client has verified. A
+      // failure can be settled from any stage, because that is when they happen.
+      if (!failure && b.stage !== 'VERIFIED') {
+        return json(res, 409, { error: `nothing is released until the client confirms — this booking is ${BOOKING_STAGE[b.stage]?.label}` });
+      }
+      const out = bookingOutcome({
+        priceCents: b.price_units, depositCents: b.deposit_units,
+        stakeCents: b.stake_units, feePercent: b.fee_percent, failure,
+      });
+      if (!out.ok) return json(res, 400, { error: out.reason });
+      const now = Date.now();
+      db.prepare(`UPDATE bookings SET stage=?, failure=?, settled_at=?, settled_by=?,
+        to_provider_units=?, to_venue_units=?, to_client_units=?,
+        stake_returned_units=?, stake_forfeited_units=? WHERE booking_id=?`)
+        .run(failure ? b.stage : 'SETTLED', failure, now, c.name || c.sub,
+             out.toProvider, out.toVenue, out.toClient, out.stakeReturned, out.stakeForfeited, bookingId);
+      db.prepare(`INSERT INTO booking_events(booking_id, stage, by_id, by_name, at, note) VALUES(?,?,?,?,?,?)`)
+        .run(bookingId, failure || 'SETTLED', c.sub, c.name || 'house', now, out.note);
+      record({ eventType: 'BOOKING', memberId: b.provider_id, amount: usd(out.toProvider),
+               rail: 'CASH', authorizedBy: c.name || c.sub,
+               delivered: failure ? BOOKING_FAILURES[failure].label : b.title,
+               reference: bookingId, settled: true,
+               meta: { outcome: out.outcome, stakeForfeited: out.stakeForfeited, toClient: out.toClient } });
+      json(res, 200, { ok: true, outcome: out.outcome, ...out, note: out.note });
+    },
+
+    'GET /gig/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = db.prepare(`SELECT * FROM bookings WHERE provider_id=? OR client_id=? ORDER BY at DESC LIMIT 60`)
+        .all(c.sub, c.sub);
+      json(res, 200, {
+        bookings: rows.map((b) => ({
+          ...bookingRow(b),
+          role: b.provider_id === c.sub ? 'provider' : 'client',
+          // Whose move it is. A stage chart nobody can read is a stage chart.
+          yourMove: (b.stage === 'REQUESTED' && b.provider_id === c.sub)
+                 || (b.stage === 'WORKED' && b.client_id === c.sub)
+                 || (b.stage === 'SECURED' && b.provider_id === c.sub),
+        })),
+      });
+    },
+
+    // ── Partnerships: a business running something WITH the venue ────────────
+    //
+    // A chef, a caterer, a supplier, a residency. The split is agreed by BOTH
+    // sides before anything runs — neither can set it alone, which is the whole
+    // difference between a partnership and a venue dictating terms.
+    'POST /partnership/propose': async (req, res) => {
+      const c = auth(req);
+      if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { memberId, kind, title, terms, housePercent } = await readBody(req);
+      const house = c.role === 'staff' || c.role === 'host';
+      const member = house ? memberId : c.sub;
+      if (!PARTNERSHIP_KINDS[kind]) return json(res, 400, { error: `"${kind}" is not a kind of partnership`, kinds: Object.keys(PARTNERSHIP_KINDS) });
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(member)) return json(res, 404, { error: 'no such member' });
+      const t = String(title || '').trim().slice(0, 80);
+      if (t.length < 3) return json(res, 400, { error: 'Say what the partnership is.' });
+      const split = partnershipSplit({ grossCents: 0, housePercent });
+      if (!split.ok) return json(res, 400, { error: split.reason });
+      const id = `PTN-${randomBytes(6).toString('hex').toUpperCase()}`;
+      const now = Date.now();
+      db.prepare(`INSERT INTO partnerships
+        (partnership_id, member_id, kind, title, terms, house_percent, status, proposed_by, proposed_at,
+         member_agreed_at, house_agreed_at, house_agreed_by)
+        VALUES (?,?,?,?,?,?, 'PROPOSED', ?,?,?,?,?)`)
+        .run(id, member, kind, t, String(terms || '').slice(0, 800), split.housePercent,
+             house ? 'house' : 'member', now,
+             house ? null : now, house ? now : null, house ? (c.name || c.sub) : null);
+      json(res, 200, { ok: true, partnershipId: id, housePercent: split.housePercent,
+        waitingOn: house ? 'the member' : 'the house' });
+    },
+
+    // The other side agreeing. Only then does it run.
+    'POST /partnership/accept': async (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const { partnershipId } = await readBody(req);
+      const p = db.prepare('SELECT * FROM partnerships WHERE partnership_id=?').get(partnershipId);
+      if (!p) return json(res, 404, { error: 'no such partnership' });
+      if (p.status !== 'PROPOSED') return json(res, 409, { error: `that partnership is already ${p.status}` });
+      const now = Date.now();
+      if (c.role === 'member') {
+        if (p.member_id !== c.sub) return json(res, 403, { error: 'That is not your partnership.' });
+        db.prepare('UPDATE partnerships SET member_agreed_at=? WHERE partnership_id=?').run(now, partnershipId);
+      } else {
+        const h = moneyAuth(req, res); if (!h) return;
+        db.prepare('UPDATE partnerships SET house_agreed_at=?, house_agreed_by=? WHERE partnership_id=?')
+          .run(now, h.name || h.sub, partnershipId);
+      }
+      const after = db.prepare('SELECT * FROM partnerships WHERE partnership_id=?').get(partnershipId);
+      const both = !!after.member_agreed_at && !!after.house_agreed_at;
+      if (both) db.prepare(`UPDATE partnerships SET status='ACTIVE' WHERE partnership_id=?`).run(partnershipId);
+      json(res, 200, { ok: true, status: both ? 'ACTIVE' : 'PROPOSED',
+        waitingOn: both ? null : (after.member_agreed_at ? 'the house' : 'the member') });
+    },
+
+    // A night it actually ran, and what each side got. Recorded by the house
+    // because the house counted the till, and stored with the split that was
+    // agreed rather than whatever the rate is today.
+    'POST /partnership/night': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { partnershipId, grossCents, note } = await readBody(req);
+      const p = db.prepare('SELECT * FROM partnerships WHERE partnership_id=?').get(partnershipId);
+      if (!p) return json(res, 404, { error: 'no such partnership' });
+      if (p.status !== 'ACTIVE') return json(res, 409, { error: `that partnership is ${p.status}, not running` });
+      const split = partnershipSplit({ grossCents, housePercent: p.house_percent });
+      if (!split.ok) return json(res, 400, { error: split.reason });
+      db.prepare(`INSERT INTO partnership_events(partnership_id, at, gross_units, house_units, member_units, house_percent, note, recorded_by)
+        VALUES (?,?,?,?,?,?,?,?)`)
+        .run(partnershipId, Date.now(), split.grossCents, split.houseCents, split.memberCents,
+             p.house_percent, String(note || '').slice(0, 200), c.name || c.sub);
+      json(res, 200, { ok: true, ...split });
+    },
+
+    'GET /partnership/mine': (req, res) => {
+      const c = auth(req); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const rows = c.role === 'member'
+        ? db.prepare('SELECT * FROM partnerships WHERE member_id=? ORDER BY proposed_at DESC').all(c.sub)
+        : db.prepare(`SELECT p.*, m.name FROM partnerships p JOIN members m ON m.id=p.member_id ORDER BY p.proposed_at DESC LIMIT 100`).all();
+      json(res, 200, {
+        partnerships: rows.map((p) => {
+          const nights = db.prepare('SELECT * FROM partnership_events WHERE partnership_id=? ORDER BY at DESC').all(p.partnership_id);
+          return {
+            partnershipId: p.partnership_id, kind: p.kind, kindLabel: PARTNERSHIP_KINDS[p.kind]?.label,
+            title: p.title, terms: p.terms || null, housePercent: p.house_percent,
+            status: p.status, member: p.name, proposedBy: p.proposed_by,
+            waitingOn: p.status === 'PROPOSED' ? (p.member_agreed_at ? 'the house' : 'the member') : null,
+            nights: nights.length,
+            earnedCents: nights.reduce((a, n) => a + n.member_units, 0),
+            venueCents: nights.reduce((a, n) => a + n.house_units, 0),
+          };
+        }),
+      });
+    },
+
+    // ── Bringing people: promoters and influencers ───────────────────────────
+    //
+    // Everybody has a code. It pays on money that ARRIVED — never on a signup,
+    // because otherwise the incentive is to produce accounts rather than people.
+    'GET /referral/mine': (req, res) => {
+      const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
+      const credits = db.prepare('SELECT * FROM referral_credits WHERE referrer_id=? ORDER BY at DESC LIMIT 100').all(c.sub);
+      json(res, 200, {
+        code: codeFor(c.sub),
+        ratePercent: referralRatePercent(),
+        brought: db.prepare('SELECT COUNT(*) n FROM members WHERE referred_by=?').get(c.sub).n,
+        earnedCents: credits.filter((k) => k.status === 'EARNED').reduce((a, k) => a + k.commission_units, 0),
+        paidCents: credits.filter((k) => k.status === 'PAID').reduce((a, k) => a + k.commission_units, 0),
+        credits: credits.map((k) => ({
+          creditId: k.credit_id, event: k.event, eventLabel: REFERRAL_EVENTS[k.event]?.label,
+          grossCents: k.gross_units, commissionCents: k.commission_units,
+          status: k.status, at: k.at,
+        })),
+        // Said plainly, because a promoter deserves to know what does not pay.
+        note: 'You earn when somebody you brought actually pays for something. A signup on its own does not pay.',
+      });
+    },
+
+    // Paying a promoter what they earned. A separate act by the house, with a
+    // reference, so it can be reconciled like every other payment here.
+    'POST /referral/pay': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { creditIds, reference } = await readBody(req);
+      const ids = Array.isArray(creditIds) ? creditIds : [creditIds];
+      if (!String(reference || '').trim()) return json(res, 400, { error: 'a payout needs a reference that reconciles' });
+      const now = Date.now();
+      let paid = 0, total = 0;
+      for (const id of ids) {
+        const k = db.prepare(`SELECT * FROM referral_credits WHERE credit_id=? AND status='EARNED'`).get(id);
+        if (!k) continue;
+        if (k.referrer_id === c.sub) continue;   // nobody pays themselves
+        db.prepare(`UPDATE referral_credits SET status='PAID', paid_at=?, paid_by=?, paid_reference=? WHERE credit_id=?`)
+          .run(now, c.name || c.sub, String(reference).slice(0, 80), id);
+        paid += 1; total += k.commission_units;
+      }
+      json(res, 200, { ok: true, paid, totalCents: total });
     },
 
     // ── Licensing ────────────────────────────────────────────────────────────
@@ -2264,7 +2824,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         member_id: c.sub, tier, vip: t.vip, payment: payment || null,
         purchased_at: now, expires_at: now + t.days * 86400000, status: 'active',
       });
-      json(res, 200, { member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)) });
+      // Whoever brought them earns on the money, not on the signup.
+      const credit = creditReferrer({
+        memberId: c.sub, event: 'MEMBERSHIP', reference: `${c.sub}:${tier}:${now}`,
+        grossCents: Math.round((t.price || 0) * 100),
+      });
+      json(res, 200, {
+        member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)),
+        referral: credit,
+      });
     },
 
     // ── HVAS Pay: rail-agnostic settlement ledger ──
