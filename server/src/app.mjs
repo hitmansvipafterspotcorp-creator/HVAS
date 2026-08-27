@@ -2107,8 +2107,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         });
       }
       if (!LISTING_KINDS[kind]) return json(res, 400, { error: `"${kind}" is not a kind of listing`, kinds: Object.keys(LISTING_KINDS) });
-      if (!PRICE_MODES[priceMode]) return json(res, 400, { error: `"${priceMode}" is not a way to price something` });
-      if (!DELIVERY[delivery]) return json(res, 400, { error: `"${delivery}" is not a way to deliver something` });
+      // Naming the valid options is not politeness — a refusal that does not say
+      // what would work leaves whoever is integrating guessing, and the line
+      // above has always done it.
+      if (!PRICE_MODES[priceMode]) {
+        return json(res, 400, { error: `"${priceMode}" is not a way to price something`,
+                                priceModes: Object.keys(PRICE_MODES) });
+      }
+      if (!DELIVERY[delivery]) {
+        return json(res, 400, { error: `"${delivery}" is not a way to deliver something`,
+                                delivery: Object.keys(DELIVERY) });
+      }
       const t = String(title || '').trim().slice(0, 80);
       if (t.length < 3) return json(res, 400, { error: 'Say what you are offering.' });
       const price = Math.floor(Number(priceCents));
@@ -2155,8 +2164,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'POST /market/order': async (req, res) => {
       const c = acceptedMember(req, res); if (!c) return;
       const { listingId, note } = await readBody(req);
-      const l = db.prepare('SELECT * FROM market_listings WHERE listing_id=?').get(listingId);
-      if (!l) return json(res, 404, { error: 'no such listing' });
+      // Coerce before this reaches SQLite. An id that arrived as undefined — a
+      // stale screen, a listing that failed to create, a double tap — used to
+      // come back as a 500, which tells a member their app is broken when what
+      // actually happened is that the thing they tapped is no longer there.
+      const wanted = (typeof listingId === 'string' || typeof listingId === 'number')
+        ? String(listingId).trim() : '';
+      if (!wanted) return json(res, 400, { error: 'Nothing was selected to buy.' });
+      const l = db.prepare('SELECT * FROM market_listings WHERE listing_id=?').get(wanted);
+      if (!l) return json(res, 404, { error: 'That listing is no longer there.' });
       if (l.status !== 'OPEN') return json(res, 409, { error: 'that listing is closed' });
       if (l.member_id === c.sub) return json(res, 400, { error: 'That is your own listing.' });
       const split = marketSplit({ priceCents: l.price_units, feePercent: marketFeePercent() });
