@@ -1691,6 +1691,24 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       }
       const now = Date.now();
 
+      // Checked before the rate gate on purpose. It sends nothing, so it should
+      // not eat somebody's allowance — and being told to wait twenty seconds
+      // for an answer that was never going to be yes is the worst version of
+      // this conversation to have at a door.
+      //
+      // Showing the code to somebody NEW is harmless: they are creating an
+      // identity nobody holds, and a human checks the person at the door.
+      // Showing it for a contact that already belongs to a member is account
+      // takeover — type their number, read the code off your own screen, and
+      // you are them.
+      if (!cfg.canSend && db.prepare('SELECT id FROM members WHERE contact=?').get(who)) {
+        return json(res, 409, {
+          error: 'That contact already belongs to a member, and this venue cannot send codes yet. '
+               + 'Ask a member of staff to sign you in at the door.',
+          needsStaff: true,
+        });
+      }
+
       // A code sender with no limit on it is two things: a way to burn the
       // venue's sending quota, and a way to make somebody's phone buzz all
       // night. Both are somebody else's problem to endure and this venue's
@@ -1703,8 +1721,15 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         .run(who, code, now + 5 * 60000);
 
       if (!cfg.canSend) {
-        // No provider configured. The venue is its own room; say so plainly
-        // rather than pretending something was sent.
+        // No provider configured, so the code is shown on screen. That is
+        // harmless for somebody NEW — they are creating an identity nobody
+        // holds yet, and the person is checked by a human at the door anyway.
+        //
+        // For a contact that already belongs to a member it is account
+        // takeover: type a member's number, read the code off your own screen,
+        // and you are them. So an existing member always needs a code that was
+        // really sent, and when the venue cannot send one they are signed in by
+        // a named member of staff who is looking at them.
         return json(res, 200, { sent: false, echoed: true, devCode: code,
           note: 'This venue is not set up to send codes, so it is shown here instead.' });
       }
@@ -1775,6 +1800,41 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // What the QR carries is a single-use code that expires in fifteen minutes,
     // so the screenshot of it in somebody's camera roll is worthless by the
     // time it could be misused.
+    // Signing a member in when the venue cannot send them a code.
+    //
+    // The other half of refusing to echo a code to an existing member. Without
+    // this that refusal just locks people out: somebody who changed phones, or
+    // whose venue has no mail provider, would have no way back into their own
+    // membership.
+    //
+    // So a NAMED member of staff, looking at the person, issues them one. It is
+    // deliberately not something a shared venue code can do — the whole value
+    // of this is that somebody's name is against it — and it is recorded, so
+    // "who let that account back in" always has an answer.
+    'POST /staff/signin-code': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { number, contact } = await readBody(req);
+      const m = number
+        ? memberByNumber(String(number || '').trim())
+        : db.prepare('SELECT * FROM members WHERE contact=?').get(String(contact || '').trim());
+      if (!m) return json(res, 404, { error: 'No member with that number.' });
+      const code = String(100000 + Math.floor(Math.random() * 900000));
+      const now = Date.now();
+      // Short. This is read out to somebody standing in front of you, not sent
+      // across a network to be typed later.
+      db.prepare(`INSERT INTO otps(contact,code,expires_at) VALUES(?,?,?)
+        ON CONFLICT(contact) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at`)
+        .run(m.contact, code, now + 3 * 60000);
+      record({ eventType: 'ACCESS', memberId: m.id, authorizedBy: c.name || c.sub,
+               delivered: 'signed in at the door by staff', reference: `SIGNIN-${now}`, settled: true,
+               meta: { by: c.name || c.sub, reason: 'venue cannot send codes' } });
+      json(res, 200, {
+        ok: true, code, expiresInMs: 3 * 60000,
+        member: { name: m.name, number: m.number },
+        note: 'Read this to them. It lasts three minutes and it is recorded against your name.',
+      });
+    },
+
     'POST /staff/invite': async (req, res) => {
       const c = adminAuth(req, res); if (!c) return;
       const body = await readBody(req);

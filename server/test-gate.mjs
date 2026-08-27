@@ -16,7 +16,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-timer-test.mjs', 'hook-test.mjs', 'stream-test.mjs', 'tunnel-pick-test.mjs', 'render-safety-test.mjs', 'deck-sync-test.mjs', 'yt-search-test.mjs', 'prize-test.mjs', 'entry-test.mjs', 'economy-test.mjs', 'ip-test.mjs', 'jubilee-test.mjs', 'jubilee-api-test.mjs', 'staff-test.mjs', 'pulse-test.mjs', 'chrome-test.mjs', 'program-test.mjs', 'privacy-test.mjs', 'drill-2030-test.mjs', 'onboarding-test.mjs', 'license-test.mjs', 'earning-test.mjs',
   // Last, and the one that matters most on a night: a stranger signs up and
   // the door lets them in. If this fails, nothing else being green helps.
-  'verify-test.mjs', 'pma-test.mjs', 'launch-test.mjs'];
+  'verify-test.mjs', 'pma-test.mjs', 'roles-test.mjs', 'launch-test.mjs'];
 
 const run = (file) => new Promise((res) => {
   const child = spawn(process.execPath, [resolve(__dirname, file)], { cwd: __dirname, stdio: 'inherit' });

@@ -119,6 +119,38 @@ ok(/few seconds/.test(again.body.error), 'and said kindly, because this is usual
 eq((await call('POST', '/auth/member/start', { contact: 'other@gmail.com' })).status, 200,
    'somebody else signing up at the same moment is not blocked');
 
+console.log('\nAN ECHOED CODE MUST NOT BE A WAY INTO SOMEBODY ELSE\u2019S MEMBERSHIP');
+// This is what makes launching without a mail provider survivable. Showing the
+// code to somebody NEW is harmless: they are creating an identity nobody holds,
+// and a human checks the person at the door. Showing it for a contact that
+// already belongs to a member is account takeover — type their number, read the
+// code off your own screen, and you are them.
+const realOne = await call('POST', '/auth/member/start', { contact: '850-555-4242' });
+ok(!!realOne.body.devCode, 'a brand new contact is shown the code, so a stranger can still join');
+await call('POST', '/auth/member/verify',
+  { contact: '850-555-4242', code: realOne.body.devCode, name: 'Simone' });
+const takeover = await call('POST', '/auth/member/start', { contact: '850-555-4242' });
+eq(takeover.status, 409, 'but once that contact is a member, it is NOT shown again');
+ok(!takeover.body.devCode, 'no code comes back at all');
+eq(takeover.body.needsStaff, true, 'and the app is told a person has to do this');
+ok(/ask a member of staff/i.test(takeover.body.error), 'with what to actually do about it');
+
+console.log('\nSO A NAMED MEMBER OF STAFF SIGNS THEM IN INSTEAD');
+// The other half. Refusing without this would just lock people out — somebody
+// who changed phones would have no way back into their own membership.
+const shared = await call('POST', '/staff/signin-code', { contact: '850-555-4242' }, venue);
+eq(shared.status, 403, 'a shared venue code cannot do it — the point is that a NAME is against it');
+const issued = await call('POST', '/staff/signin-code', { contact: '850-555-4242' }, owner);
+eq(issued.status, 200, 'a named one can');
+ok(/^\d{6}$/.test(issued.body.code || ''), 'and gets a code to read out');
+eq(issued.body.member.name, 'Simone', 'for the person standing in front of them');
+ok(/recorded against your name/i.test(issued.body.note), 'and is told it is recorded against them');
+eq((await call('POST', '/auth/member/verify',
+  { contact: '850-555-4242', code: issued.body.code, name: 'Simone' })).status, 200,
+  'the code works');
+eq((await call('POST', '/staff/signin-code', { number: 'HV-0000-0000' }, owner)).status, 404,
+   'and a number nobody holds gets nothing');
+
 console.log('\nCONFIGURED: THE CODE NEVER APPEARS IN THE RESPONSE');
 eq((await call('POST', '/notify/config', { resend_api_key: 're_x', mail_from: 'door@hvas.app' }, owner)).status, 200,
    'the owner sets it up from their own screen');
