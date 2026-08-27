@@ -89,6 +89,13 @@ eq(roster.find((p) => p.id === 'FOOD').members, 1, 'the new one counts them');
 eq((await call('POST', '/me/program', { program: 'FOOD' }, nova.token)).body.unchanged, true,
    'joining the one you are already in is not a move');
 
+// She has agreed, said what she does and chosen a cause. Dues are the fourth
+// and last step, and until she takes one she is not a member — everything
+// below this line is a member acting, so she finishes joining here.
+const joined = await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, nova.token);
+eq(joined.status, 200, 'she takes a membership, which is the last step of joining');
+eq((await call('GET', '/onboarding', null, nova.token)).body.accepted, true, 'and only now is she a member');
+
 console.log('\nPLAYING IS NOT DONATING');
 // The correction. An entry fee is the venue's, and belongs to the venue's own
 // reserve vault — not to whichever programme the payer happens to be in.

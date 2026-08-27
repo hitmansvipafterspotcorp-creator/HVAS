@@ -5536,6 +5536,35 @@ function Onboarding({ onDone }) {
             <p className="mem-fineprint">You can move to another one later, any time.</p>
           </>
         )}
+
+        {/* Last, and last on purpose. Nobody is asked for money until they know
+            what they are joining, what they will be here as, and what they are
+            standing behind. Dues first would make this a subscription with a
+            covenant attached, rather than an association with dues. */}
+        {step === 'TIER' && (
+          <>
+            <h1 className="onb-title">Choose your membership</h1>
+            <p className="onb-lead">
+              You have agreed to the covenant, said what you do, and chosen a cause.
+              This is the last step — pick how long you are in for.
+            </p>
+            <div className="onb-tiers">
+              {(d.tiers || []).map((t) => (
+                <button type="button" key={t.id} className={`onb-tier${t.vip ? ' vip' : ''}`} disabled={busy}
+                        onClick={() => act(() => apiPurchase(t.id, 'card'))}>
+                  <strong>{t.id}</strong>
+                  <span className="onb-tier-price">${t.price}</span>
+                  <span>for {t.every}</span>
+                  {t.vip && <span className="onb-tag">VIP</span>}
+                </button>
+              ))}
+            </div>
+            <p className="mem-fineprint">
+              You pay at the door or in the app. Nothing is charged to you here —
+              the venue confirms the money arrived before your membership starts.
+            </p>
+          </>
+        )}
       </div>
     </section>
   );

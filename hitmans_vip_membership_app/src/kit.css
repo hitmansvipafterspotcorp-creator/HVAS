@@ -3000,3 +3000,24 @@
 .bingo-btn.danger {
   border-color: rgba(255, 138, 160, .55); color: #ff8aa0; background: rgba(255, 138, 160, .07);
 }
+
+/* ── The last step of joining ─────────────────────────────────────────────
+   Dues, asked for after somebody knows what they are joining. Priced plainly
+   and side by side: a tier list a member has to interpret is a tier list that
+   gets the wrong one chosen at a door. */
+.onb-tiers { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.onb-tier {
+  display: grid; gap: 3px; justify-items: start; text-align: left; cursor: pointer;
+  padding: 14px; border-radius: 13px; color: var(--k-text);
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+.onb-tier:active { transform: translateY(1px); }
+.onb-tier[disabled] { opacity: .55; cursor: progress; }
+.onb-tier strong { font: 800 14px/1.2 var(--k-font); }
+.onb-tier span { font: 600 11.5px/1.35 var(--k-font); color: var(--k-text-dim); }
+.onb-tier-price {
+  font: 900 22px/1 var(--k-font) !important; color: var(--k-gold) !important;
+  font-variant-numeric: tabular-nums;
+}
+.onb-tier.vip { border-color: rgba(255, 207, 71, .5); background: rgba(255, 207, 71, .07); }
+.onb-tier.vip strong { color: var(--k-gold); }

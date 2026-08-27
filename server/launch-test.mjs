@@ -64,15 +64,22 @@ eq(onb0.body.next?.id, 'AGREE', 'and the app is told exactly what to ask for fir
 eq((await call('POST', '/me/agree', { version: COVENANT_VERSION, agree: true }, me)).status, 200, 'they agree to the covenant');
 eq((await call('POST', '/me/role', { role: 'NAILS' }, me)).status, 200, 'they say what they do');
 eq((await call('POST', '/me/program', { program: 'HOUSING' }, me)).status, 200, 'they pick a cause to stand behind');
-const onb = await call('GET', '/onboarding', null, me);
-eq(onb.body.accepted, true, 'and now they are a member of this place');
-// Three screens is the whole cost of joining. If this ever grows, it grows
-// on purpose — a queue outside does not wait for a fourth.
-eq(onb0.body.steps.length, 3, 'joining is three steps, not four');
+const mid = await call('GET', '/onboarding', null, me);
+eq(mid.body.accepted, false, 'three steps in, they are still not a member — dues are the fourth');
+eq(mid.body.next?.id, 'TIER', 'and the app is told that is what is left');
+ok((mid.body.tiers || []).length >= 3, 'with the memberships to choose from on the same call');
+ok(mid.body.tiers.every((t) => t.price > 0 && t.every), 'each priced, and each saying how long it lasts in words');
+// Four screens is the whole cost of joining, and dues are LAST on purpose:
+// nobody is asked for money until they know what they are joining, what they
+// will be here as, and what they are standing behind.
+eq(onb0.body.steps.length, 4, 'joining is four steps');
+eq(onb0.body.steps[3].id, 'TIER', 'and paying is the last of them, never the first');
 
 console.log('\nA MEMBERSHIP, AND A PASS TO SHOW FOR IT');
 const buy = await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, me);
 eq(buy.status, 200, 'they take a membership');
+const onb = await call('GET', '/onboarding', null, me);
+eq(onb.body.accepted, true, 'and NOW they are a member of this place');
 const passRes = await call('GET', '/pass/current', null, me);
 eq(passRes.status, 200, 'the app can fetch their pass');
 const token = passRes.body.pass;

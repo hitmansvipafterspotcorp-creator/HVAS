@@ -16,12 +16,16 @@ import { COVENANT_VERSION } from './src/economy/covenant.mjs';
  * `call` is the suite's own client, in its usual (method, path, body, token)
  * shape. Returns the member's accepted state so a caller can assert on it.
  */
-export async function onboard(call, token, { role = 'PATRON', program = 'CORE' } = {}) {
+export async function onboard(call, token, { role = 'PATRON', program = 'CORE', tier = 'Monthly' } = {}) {
   await call('POST', '/me/agree', { version: COVENANT_VERSION, agree: true }, token);
   await call('POST', '/me/role', { role }, token);
   // CORE is not a programme id — the suites do not care which one, only that a
   // member has stood behind something, so default to the housing programme
   // rather than inventing an id that would fail silently.
   await call('POST', '/me/program', { program: program === 'CORE' ? 'HOUSING' : program }, token);
+  // Dues are the fourth and last step of joining. A suite can pass tier:null to
+  // get a member who has done everything EXCEPT take a membership, which is the
+  // state the sign-up screen has to handle and the door has to refuse.
+  if (tier) await call('POST', '/membership/purchase', { tier, payment: 'card' }, token);
   return (await call('GET', '/onboarding', null, token)).body;
 }

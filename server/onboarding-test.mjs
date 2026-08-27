@@ -39,10 +39,11 @@ const st0 = await call('GET', '/onboarding', null, nova.token);
 eq(st0.status, 200, 'a signed-in person can see what is left to do');
 eq(st0.body.accepted, false, 'and they are not accepted yet');
 eq(st0.body.next.id, 'AGREE', 'the first step is agreeing');
-eq(st0.body.steps.length, 3, 'three steps, said out loud');
+eq(st0.body.steps.length, 4, 'four steps, said out loud');
+eq(st0.body.steps[3].id, 'TIER', 'and dues are the LAST of them — nobody is asked for money before they know what they are joining');
 console.log('   ', st0.body.steps.map((s2) => `${s2.id}:${s2.done ? '✓' : '·'}`).join(' '));
 
-console.log('\nAND THE DOOR IS SHUT UNTIL ALL THREE ARE DONE');
+console.log('\nAND THE DOOR IS SHUT UNTIL ALL FOUR ARE DONE');
 const blocked = await call('POST', '/bingo/join', {}, nova.token);
 eq(blocked.status, 403, 'they cannot join a game');
 ok(/finish signing up/i.test(blocked.body.error), 'and are told to finish signing up');
@@ -53,6 +54,12 @@ for (const [m, path, body] of [
   ['POST', '/board/apply', { program: 'FOOD', position: 'CHAIR', brings: 'A very long and serious statement.' }],
   ['POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }],
 ]) eq((await call(m, path, body, nova.token)).status, 403, `${path} is shut too`);
+// Including taking a membership — which IS the fourth step, and so is shut only
+// until the first three are done. Any other rule is a deadlock: accepted needs
+// dues, dues need accepted, and nobody ever joins.
+ok(/agree to the community covenant/i.test(
+  (await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, nova.token)).body.error || ''),
+  'and paying is refused for the step they are actually on, not for not having paid');
 
 console.log('\nTHE COVENANT IS SOMETHING YOU CAN ACTUALLY READ');
 const cov = st0.body.covenant;
@@ -100,13 +107,24 @@ const almost = await call('POST', '/bingo/join', {}, nova.token);
 eq(almost.status, 403, 'two of three is not accepted');
 eq(almost.body.onboarding.next.id, 'PROGRAM', 'and it names the last one');
 
-console.log('\nCHOOSING A PROGRAMME IS WHAT LETS THEM IN');
+console.log('\nCHOOSING A PROGRAMME OPENS THE LAST STEP');
 const prog = await call('POST', '/me/program', { program: 'HOUSING' }, nova.token);
 eq(prog.status, 200, 'they stand behind a programme');
-eq((await call('GET', '/onboarding', null, nova.token)).body.accepted, true, 'and now they are accepted');
-eq((await call('POST', '/bingo/join', {}, nova.token)).status, 200, 'the game opens');
+const three = await call('GET', '/onboarding', null, nova.token);
+eq(three.body.accepted, false, 'three of four is still not a member');
+eq(three.body.next.id, 'TIER', 'what is left is the membership itself');
+ok((three.body.tiers || []).length >= 3, 'and the choices come with the answer, not from another screen');
+eq((await call('POST', '/bingo/join', {}, nova.token)).status, 403, 'the game is still shut');
+
+console.log('\nTAKING A MEMBERSHIP IS WHAT LETS THEM IN');
+// The order matters and is the whole argument: somebody is asked for money
+// only after they know what they are joining, what they will be here as, and
+// what they are standing behind. Dues first would make this a subscription
+// with a covenant attached.
 eq((await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, nova.token)).status, 200,
-   'and so does buying a membership');
+   'they take a membership');
+eq((await call('GET', '/onboarding', null, nova.token)).body.accepted, true, 'and NOW they are accepted');
+eq((await call('POST', '/bingo/join', {}, nova.token)).status, 200, 'the game opens');
 
 console.log('\nNOBODY CAN BE SIGNED UP BY SOMEBODY ELSE');
 const rio = await mk('850-800-0002', 'Rio');

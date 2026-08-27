@@ -32,11 +32,11 @@ const eq = (a, b, m) => ok(a === b, `${m}${a === b ? '' : ` — got ${JSON.strin
 const venue = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
 const inv = await call('POST', '/staff/invite', { name: 'Kenya', role: 'host' }, venue);
 const owner = (await call('POST', '/auth/staff/claim', { code: inv.body.code })).body.token;
-const mk = async (ph, nm, role, referral) => {
+const mk = async (ph, nm, role, referral, { tier = 'Monthly' } = {}) => {
   const s = await call('POST', '/auth/member/start', { contact: ph });
   const v = (await call('POST', '/auth/member/verify',
     { contact: ph, code: s.body.devCode, name: nm, referral })).body;
-  await onboard(call, v.token, { role });
+  await onboard(call, v.token, { role, tier });
   return v;
 };
 
@@ -167,12 +167,15 @@ const mine = await call('GET', '/referral/mine', null, promo.token);
 eq(mine.status, 200, 'she has a code');
 ok(/^[A-Z]+[2-9][A-Z][2-9]$/.test(mine.body.code), `readable enough for a flyer (${mine.body.code})`);
 ok(/does not pay/i.test(mine.body.note), 'and is told plainly that a signup alone does not pay');
-const brought = await mk('850-720-0010', 'Kem', 'BARBER', mine.body.code);
+// Signed in, agreed, said what he does, chose a cause — and has NOT taken a
+// membership. That is the state where the rule is actually tested: an account
+// and four screens of good intentions are not money.
+const brought = await mk('850-720-0010', 'Kem', 'BARBER', mine.body.code, { tier: null });
 eq((await call('GET', '/referral/mine', null, promo.token)).body.brought, 1, 'the person she brought is counted');
 eq((await call('GET', '/referral/mine', null, promo.token)).body.earnedCents, 0,
    'but a signup on its own has earned her nothing');
 const bought = await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, brought.token);
-eq(bought.status, 200, 'then he buys a membership');
+eq(bought.status, 200, 'then he takes a membership, which is the step where money actually moves');
 const after = (await call('GET', '/referral/mine', null, promo.token)).body;
 ok(after.earnedCents > 0, `and NOW she has earned (${after.earnedCents})`);
 eq(after.credits[0].event, 'MEMBERSHIP', 'credited against the thing he actually paid for');

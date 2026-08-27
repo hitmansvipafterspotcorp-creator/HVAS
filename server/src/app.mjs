@@ -1363,6 +1363,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       agreedVersion: a?.version || null,
       memberRole: m?.member_role || null,
       program: m?.program || null,
+      // Dues are the last step of joining, not a separate errand afterwards.
+      // A membership that has lapsed is not a joined member either — they are
+      // asked again rather than quietly kept inside on an expired one.
+      hasMembership: (() => {
+        const ms = membershipOf(memberId);
+        return !!ms && ms.status === 'active' && ms.expires_at > Date.now();
+      })(),
       knownRole: (r) => !!MEMBER_ROLE[r],
     });
   };
@@ -1388,6 +1395,28 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     if (!st.accepted) {
       json(res, 403, {
         error: st.next ? `Finish signing up first: ${st.next.label.toLowerCase()}.` : 'Finish signing up first.',
+        onboarding: st,
+      });
+      return null;
+    }
+    return c;
+  };
+
+  // Taking a membership is the LAST step of joining, which means it cannot
+  // require joining to be finished — that is a deadlock, and it is exactly the
+  // one that appears the moment dues become part of the sign-up.
+  //
+  // So this gate is the same as acceptedMember with the dues step excused: they
+  // have read the covenant and agreed to it, said what they do, and chosen a
+  // programme. What they have not done yet is the thing they are about to do.
+  const joiningMember = (req, res) => {
+    const c = auth(req, 'member');
+    if (!c) { json(res, 401, { error: 'unauthorized' }); return null; }
+    const st = onboardingOf(c.sub);
+    const owed = st.steps.filter((s2) => !s2.done && s2.id !== 'TIER');
+    if (owed.length) {
+      json(res, 403, {
+        error: `Finish signing up first: ${owed[0].label.toLowerCase()}.`,
         onboarding: st,
       });
       return null;
@@ -2909,6 +2938,19 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         grants: m?.member_role ? roleGrants(m.member_role) : null,
         programs: programBoard(),
         program: m?.program || null,
+        // The last step needs its options on the same call, or the app has to
+        // go somewhere else mid-sign-up to find out what it is asking for.
+        tiers: Object.entries(TIERS).map(([id, t]) => ({
+          id, days: t.days, vip: !!t.vip, price: t.price,
+          // What the length actually means to somebody choosing, rather than a
+          // number of days they have to convert in their head at the door.
+          every: t.days === 1 ? 'a night' : t.days === 7 ? 'a week'
+               : t.days === 30 ? 'a month' : t.days === 365 ? 'a year' : `${t.days} days`,
+        })),
+        membership: (() => {
+          const ms = membershipOf(c.sub);
+          return ms ? { tier: ms.tier, vip: !!ms.vip, status: ms.status, until: ms.expires_at } : null;
+        })(),
       });
     },
 
@@ -3239,7 +3281,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       json(res, 200, { enabled: hitkoinEnabled(), ...walletSummary(db, c.sub) });
     },
     'POST /membership/purchase': async (req, res) => {
-      const c = acceptedMember(req, res); if (!c) return;
+      // The last step of joining, so it is gated on the first three and not on
+      // its own completion — see joiningMember.
+      const c = joiningMember(req, res); if (!c) return;
       const { tier, payment } = await readBody(req);
       const t = TIERS[tier]; if (!t) return json(res, 400, { error: 'bad tier' });
       const now = Date.now();

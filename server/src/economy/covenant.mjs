@@ -117,7 +117,8 @@ export function covenantFingerprint(doc) {
  * Returned as a list of steps rather than a boolean, because "not accepted" is
  * useless to somebody standing there — they need to know which part is left.
  */
-export function onboardingState({ agreedVersion = null, memberRole = null, program = null, knownRole = () => true } = {}) {
+export function onboardingState({ agreedVersion = null, memberRole = null, program = null,
+                                  hasMembership = false, knownRole = () => true } = {}) {
   const steps = [
     {
       id: 'AGREE',
@@ -129,6 +130,12 @@ export function onboardingState({ agreedVersion = null, memberRole = null, progr
     },
     { id: 'ROLE', label: 'Say what you do', done: !!memberRole && knownRole(memberRole) },
     { id: 'PROGRAM', label: 'Choose a programme to stand behind', done: !!program },
+    // Last, and last on purpose. Somebody is asked to pay only after they know
+    // what they are joining, what they will be here as, and what they are
+    // standing behind — never as the first thing, which would make this a
+    // subscription with a covenant attached rather than an association with
+    // dues.
+    { id: 'TIER', label: 'Choose your membership', done: !!hasMembership },
   ];
   const next = steps.find((s) => !s.done) || null;
   return { accepted: steps.every((s) => s.done), steps, next, version: COVENANT_VERSION };
