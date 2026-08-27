@@ -6896,6 +6896,14 @@ function TeamScreen() {
       {/* And how anybody finds the room in the first place: a code to post,
           rather than a link to hand out. */}
       <PosterScreen />
+
+      {/* Which build this phone is running.
+          
+          There was one of these on the member's card and none on the staff
+          side, which is exactly backwards: the person who needs to answer "am I
+          on the new one?" is whoever just deployed, and they are standing in
+          Staff Check-In, not looking at their own membership card. */}
+      <p className="build-stamp">App build {BUILD_ID} · updates automatically</p>
     </>
   );
 }
