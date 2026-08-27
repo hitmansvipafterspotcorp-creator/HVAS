@@ -4562,3 +4562,11 @@ body:has(.battle-stage) .staff-hub-tabs { display: none; }
    "Card screen layout" and "Card screen fit" sections there. It lives with
    the rest of the kit rather than here so the whole screen is described in
    one place. */
+
+/* The line on a failed connection that is addressed to the VENUE rather than
+   to the person reading it. Quiet, and in sentence case — it is a sentence,
+   not a label, and .door-fine is uppercase fine print doing another job. */
+.door-note {
+  margin-top: 14px; max-width: 34rem; font-size: 12px; line-height: 1.55;
+  color: #8f7fb8;
+}

@@ -1224,8 +1224,25 @@ function ConnectFailedScreen({ url, onRetry, onForget, stale }) {
         <p className="door-tag">
           {stale
             ? "This is the address you joined with last time, and the venue isn't answering on it any more. We looked the venue up by name and it isn't listed as running right now either — try again when the room opens, or scan tonight's join QR."
-            : "This usually means you're not on the same network as the venue — switch to the venue's wifi (not cellular data) and try again, or ask staff for the current link."}
+            : "The room isn't answering. Either it isn't open right now, or it isn't reachable from outside the venue yet. Try again in a moment — nothing is wrong with your phone."}
         </p>
+        {/* This screen used to tell somebody to get on the venue's wifi. That is
+            written for a person standing in the building, and it is exactly
+            wrong for the way this launches: somebody scans a code off a poster
+            at home, on cellular data, and is told to join a wifi network they
+            are nowhere near. It reads as their fault and sends them looking for
+            a fault that is not theirs.
+
+            The honest version names the two real causes, and the second one is
+            the venue's to fix — so it is said in words the OWNER will recognise
+            if a member reads this screen out to them over the phone. */}
+        {!stale && (
+          <p className="door-note">
+            If you are the venue: the room is only reachable to people who are
+            already on it. Publish it to the internet, then scan your own code
+            with mobile data on to check.
+          </p>
+        )}
         <div className="door-actions">
           <button type="button" className="door-primary" onClick={onRetry}>Try again →</button>
           {/* There used to be a third button here: "Continue without connecting
