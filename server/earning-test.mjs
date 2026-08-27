@@ -181,14 +181,14 @@ ok(after.earnedCents > 0, `and NOW she has earned (${after.earnedCents})`);
 eq(after.credits[0].event, 'MEMBERSHIP', 'credited against the thing he actually paid for');
 // Fifteen per cent of the tier THEY chose. Not a flat finder's fee, which
 // would pay the same for bringing somebody in for one night as for a year.
-eq(after.ratePercent, 0.15, 'the rate is 15%');
+eq(after.ratePercent, 0.10, 'the rate is 10%');
 eq(after.credits[0].grossCents, 30000, 'against the Monthly he actually bought, at $300');
-eq(after.credits[0].commissionCents, 4500, 'so she is owed $45.00');
+eq(after.credits[0].commissionCents, 3000, 'so she is owed $30.00');
 
 console.log('\nAND IT FOLLOWS THE TIER, NOT A FLAT FEE');
 // The whole point of a percentage: bringing somebody in on a Daily and
 // bringing somebody in on a VIP are not the same piece of work.
-for (const [tier, price, owed] of [['Daily', 2000, 300], ['Weekly', 10000, 1500], ['VIP', 500000, 75000]]) {
+for (const [tier, price, owed] of [['Daily', 2000, 200], ['Weekly', 10000, 1000], ['VIP', 500000, 50000]]) {
   const p2 = await mk(`850-721-${String(price).slice(0, 4)}`, `Tier${tier}`, 'PATRON', mine.body.code, { tier: null });
   const before = (await call('GET', '/referral/mine', null, promo.token)).body.earnedCents;
   await call('POST', '/membership/purchase', { tier, payment: 'card' }, p2.token);

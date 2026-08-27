@@ -132,11 +132,11 @@ for (const roleId of ALL) {
 
 console.log('\nAND EVERY TRADE CAN BRING SOMEBODY');
 // Not just promoters. Bringing people is the one kind of work anybody here can
-// do, so every trade has a code and it is worth the same 15%.
+// do, so every trade has a code and it is worth the same 10%.
 for (const { label, token } of [sellers[0], nonSellers[0], creatives[0]].filter(Boolean)) {
   const mine = await call('GET', '/referral/mine', null, token);
   ok(mine.status === 200 && !!mine.body.code, `${label} has a code`);
-  eq(mine.body.ratePercent, 0.15, `${label} earns the same 15% as anybody else`);
+  eq(mine.body.ratePercent, 0.10, `${label} earns the same 10% as anybody else`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

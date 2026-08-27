@@ -1264,11 +1264,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
   };
   const marketFeePercent = () => rateSetting('market_fee_percent', 0.10);
-  // Fifteen per cent of the tier the person they brought actually paid for.
+  // Ten per cent of the tier the person they brought actually paid for.
+  //
+  // It was fifteen. Playing a whole night through showed what that actually
+  // meant: the promoter who brought nine people went home with more than double
+  // what the chef who cooked took, having done no work in the room. Ten keeps
+  // bringing people well paid without making it the best-paid thing here.
+  //
   // Every member has a code, not only promoters — bringing somebody is the one
   // kind of work here that anybody can do, and it pays on the membership rather
   // than on the signup, so producing accounts earns nothing.
-  const referralRatePercent = () => rateSetting('referral_rate_percent', 0.15);
+  const referralRatePercent = () => rateSetting('referral_rate_percent', 0.10);
   // Everybody has a code, made the first time somebody asks for it, derived
   // from their name so a promoter can put it on a flyer.
   const codeFor = (memberId) => {

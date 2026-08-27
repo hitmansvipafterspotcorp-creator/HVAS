@@ -9292,7 +9292,7 @@ function PosterScreen({ onDone }) {
         <input className="jub-input" placeholder="Member code — e.g. TRINA2L5" value={ref}
                maxLength={16} onChange={(e) => setRef(e.target.value)} />
         <p className="jub-note">
-          Every member has a code. Whoever's code is on this poster earns 15% of the
+          Every member has a code. Whoever's code is on this poster earns 10% of the
           membership each person takes after scanning it.
         </p>
       </div>

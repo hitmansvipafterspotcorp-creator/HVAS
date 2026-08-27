@@ -168,8 +168,10 @@ for (const p of workers) {
 eq(await earned(jas), 0, 'and the one who came out to spend, went home having spent');
 
 // The rate, stated in what it actually paid, so a change to it is visible here.
+// It was 15% until this suite showed the promoter out-earning everyone who did
+// the work by more than double. Ten still pays well for bringing people.
 const brought = await earned(trina);
-console.log(`  Trina brought nine people and earned ${$(brought)} at 15%`);
+console.log(`  Trina brought nine people and earned ${$(brought)} at 10%`);
 ok(brought > 0, 'bringing people pays');
 
 console.log(`\n${pass} passed, ${fail} failed`);
