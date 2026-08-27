@@ -46,7 +46,17 @@ let id=0;const w=new Map();const errors=[];
 ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id&&w.has(m.id)){w.get(m.id)(m);w.delete(m.id);return;}
   if(m.method==='Runtime.exceptionThrown'){const d=String(m.params.exceptionDetails.exception?.description||m.params.exceptionDetails.text||'');
     if(!/ServiceWorker/i.test(d))errors.push(d.split('\n')[0].slice(0,140));}});
-const cdp=(m,p={})=>new Promise(res=>{const i=++id;w.set(i,res);ws.send(JSON.stringify({id:i,method:m,params:p}));});
+// Every call gets a deadline. Without one a single lost response — a reply
+// that arrives while the page is navigating, a socket that drops — parks the
+// whole suite on one await forever. This ran SIX HOURS on a single step
+// before the timeout existed, which reads as a hung machine rather than as a
+// failing test, and is how a suite stops being able to tell you anything.
+const cdp=(m,p={})=>new Promise(res=>{
+  const i=++id;
+  const t=setTimeout(()=>{ if(w.has(i)){ w.delete(i); console.log(`   [cdp timeout] ${m}`); res({}); } }, 15000);
+  w.set(i,(msg)=>{ clearTimeout(t); res(msg); });
+  ws.send(JSON.stringify({id:i,method:m,params:p}));
+});
 await cdp('Runtime.enable');await cdp('Page.enable');
 const js=async e=>(await cdp('Runtime.evaluate',{expression:`(()=>{${e}})()`,returnByValue:true,awaitPromise:true})).result?.result?.value;
 const jsA=async e=>(await cdp('Runtime.evaluate',{expression:`(async()=>{${e}})()`,returnByValue:true,awaitPromise:true})).result?.result?.value;
