@@ -83,11 +83,18 @@ const openEarn=async(tab)=>{
   for(let i=0;i<24&&!on;i++){
     on=await js(`return [...document.querySelectorAll('button')].some(b=>(b.innerText||'').trim()==='Bring people')`);
     if(on)break;
+    // Get there from wherever this actually is. After a reload the boot
+    // transition can still be running, which leaves the app on the door with
+    // none of these buttons on it — and a loop that only ever taps the last
+    // step spins on that door until it gives up.
+    await tap('Enter'); await settle(250);
     await toAccount(); await settle(350);
     await tap('Get paid here');
     await settle(900);
   }
-  if(!on)return false;
+  // A failure here is worth a sentence rather than a bare false — otherwise the
+  // eight assertions that depend on it all fail saying nothing about why.
+  if(!on){ console.log('   [openEarn gave up on]', (await text()).slice(0,200)); return false; }
   await settle(600);
   if(!tab)return true;
   for(let i=0;i<10;i++){ if(await tap(tab))break; await settle(500); }
