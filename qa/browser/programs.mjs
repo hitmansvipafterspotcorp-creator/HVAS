@@ -59,6 +59,9 @@ const text=()=>js(`return (document.body.innerText||'').replace(/\\n+/g,' / ')`)
 const type=(sel,v)=>js(`const el=document.querySelector(${JSON.stringify(sel)});if(!el)return false;
   const p=Object.getPrototypeOf(el);Object.getOwnPropertyDescriptor(p,'value').set.call(el,${JSON.stringify(v)});
   el.dispatchEvent(new Event('input',{bubbles:true}));return true;`);
+// Nothing is stacked over the pass any more: the QR is what a member needs in
+// a queue, so the programme, earning and membership all live under Account.
+const toAccount=()=>js(`const b=[...document.querySelectorAll('.mem-tab')].find(b=>(b.innerText||'').trim()==='Account');if(!b)return false;b.click();return true;`);
 let pass=0,fail=0;
 const ok=(c,m)=>{console.log(`  ${c?'PASS':'FAIL'}  ${m}`);c?pass++:fail++;};
 
@@ -107,24 +110,47 @@ ok(await js(`const b=[...document.querySelectorAll('.onb-role')].find(b=>/Nail t
 await settle(2500);
 const t2=await text();
 console.log('   [step 3]', t2.slice(0,260));
-ok(/which cause do you stand behind/i.test(t2),'last step is the programme');
+ok(/which cause do you stand behind/i.test(t2),'third step is the programme');
 await shot('onb-4-cause.png');
 
-console.log('\nAND ONLY THEN ARE THEY IN');
+console.log('\nAND THE LAST STEP IS THE MEMBERSHIP ITSELF');
 ok(await js(`const b=[...document.querySelectorAll('.prog-card')].find(b=>/Housing stability/.test(b.innerText));if(!b)return false;b.click();return true;`),
    'they stand behind one');
 await settle(4000);
 const t3=await text();
-console.log('   [in]', t3.slice(0,260));
-ok(/my pass|my card/i.test(t3),'and the app opens');
-ok((await call('GET','/onboarding',null,nova.token)).body.accepted===true,'the server agrees they are accepted');
-await shot('onb-5-in.png');
+console.log('   [step 4]', t3.slice(0,300));
+// Dues are asked for LAST, and that order is the argument: nobody is asked for
+// money before they know what they are joining and what they are standing
+// behind. If this ever moves earlier, this fails.
+ok(/choose your membership/i.test(t3),'they are asked for dues only now, at the end');
+ok(/agreed to the covenant/i.test(t3),'and told why they are being asked at this point');
+ok(await js(`return document.querySelectorAll('.onb-tier').length>=3`),'the tiers are on screen, priced');
+ok(/\$300/.test(t3)&&/for a month/i.test(t3),'each saying what it costs and how long it lasts in words');
+ok((await call('GET','/onboarding',null,nova.token)).body.accepted===false,
+   'and until one is taken the server still says they are not a member');
+await shot('onb-5-tier.png');
 
-console.log('\nWHAT THEY JOINED IS ON THE CARD');
+console.log('\nAND ONLY THEN ARE THEY IN');
+ok(await js(`const b=[...document.querySelectorAll('.onb-tier')].find(b=>/Monthly/.test(b.innerText));if(!b)return false;b.click();return true;`),
+   'they take a membership');
+await settle(4500);
+const t4=await text();
+console.log('   [in]', t4.slice(0,260));
+ok(/my pass|my card/i.test(t4),'and the app opens');
+ok((await call('GET','/onboarding',null,nova.token)).body.accepted===true,'the server agrees they are accepted');
+await shot('onb-6-in.png');
+
+console.log('\nTHE PASS IS WHAT THEY LAND ON');
 const card=await text();
 console.log('   [pass]', card.slice(0,420));
-ok(/your programme/i.test(card),'the card shows which one is theirs');
-ok(/Housing stability/.test(card),'by name');
+// Nothing may be stacked over the QR — see the note on MembershipScreen.
+ok(!/your programme/i.test(card),'the programme picker is not stacked over the pass');
+ok(await js(`const b=[...document.querySelectorAll('.mem-tab')].find(b=>(b.innerText||'').trim()==='Account');if(!b)return false;b.click();return true;`),
+   'it is under Account');
+await settle(1200);
+const acct=await text();
+ok(/your programme/i.test(acct),'where the card shows which one is theirs');
+ok(/Housing stability/.test(acct),'by name');
 await shot('prog-2-joined.png');
 
 console.log('\nPLAYING IS NOT GIVING');
@@ -136,6 +162,7 @@ const cl=await call('POST','/bingo/entry/claim',{rail:'cash'},nova.token);
 await call('POST','/bingo/entry/resolve',{id:cl.body.id,confirm:true},owner);
 await cdp('Page.navigate',{url:appUrl});await settle(7000);
 await tap('Enter');await settle(4000);
+await toAccount();await settle(1500);
 const potAfter=await js(`const e=document.querySelector('.prog-mine-num');return e?e.innerText:''`);
 console.log('   [after playing]', potAfter);
 ok(/\$0\.00 given/.test(potAfter),'paying to play still gives the programme nothing — it was not a donation');
@@ -143,6 +170,7 @@ const v0=(await call('GET','/world/reserve',null,owner)).body.byVault;
 ok(!(v0.HOUSING_STABILITY>0),"and nothing landed in their programme's vault");
 
 console.log('\nGIVING IS A SEPARATE, DELIBERATE ACT');
+await toAccount();await settle(1200);
 ok(await tap('Give to a cause'),'there is a way in from the card');
 await settle(3000);
 const g0=await text();
@@ -171,6 +199,7 @@ ok((await call('POST','/programs/donation/settle',{donationId:don.donationId,rec
    'the house can');
 await cdp('Page.navigate',{url:appUrl});await settle(7000);
 await tap('Enter');await settle(3500);
+await toAccount();await settle(1200);
 await tap('Give to a cause');await settle(3000);
 const g2=await text();
 ok(/received/i.test(g2),'and the member sees it turn from pledged to received');
@@ -213,6 +242,7 @@ ok((await call('POST','/board/decide',{applicationId:q[0].applicationId,approve:
    'approving seats them');
 await cdp('Page.navigate',{url:appUrl});await settle(7000);
 await tap('Enter');await settle(3500);
+await toAccount();await settle(1200);
 await tap('Give to a cause');await settle(3000);
 const a2=await text();
 console.log('   [seated]', a2.slice(0,300));
