@@ -1264,7 +1264,11 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     return Number.isFinite(v) && v >= 0 && v <= 1 ? v : fallback;
   };
   const marketFeePercent = () => rateSetting('market_fee_percent', 0.10);
-  const referralRatePercent = () => rateSetting('referral_rate_percent', 0.05);
+  // Fifteen per cent of the tier the person they brought actually paid for.
+  // Every member has a code, not only promoters — bringing somebody is the one
+  // kind of work here that anybody can do, and it pays on the membership rather
+  // than on the signup, so producing accounts earns nothing.
+  const referralRatePercent = () => rateSetting('referral_rate_percent', 0.15);
   // Everybody has a code, made the first time somebody asks for it, derived
   // from their name so a promoter can put it on a flyer.
   const codeFor = (memberId) => {

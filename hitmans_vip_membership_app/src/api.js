@@ -114,11 +114,31 @@ async function call(method, path, body, token) {
 // Member OTP: start → (code) → verify. Stores the session token + member id so
 // the game's social client can use them.
 export function memberOtpStart(contact) { return call('POST', '/auth/member/start', { contact }); }
+
+// Who brought them, if anybody.
+//
+// A promoter's code arrives as ?ref= on the link they shared and is stashed the
+// moment the app boots, because the sign-up that will use it happens several
+// screens and one page-tidy later. It is written ONCE, by the server, when the
+// member is created — a promoter's work cannot be reassigned afterwards, and
+// somebody who arrived on their own cannot later be claimed by whoever asks.
+const REF_KEY = 'hvas_referred_by';
+export function rememberReferral(code) {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c || ls(REF_KEY)) return;   // the first person to bring you keeps you
+  try { localStorage.setItem(REF_KEY, c); } catch { /* private window */ }
+}
+export function pendingReferral() { return ls(REF_KEY); }
+
 export async function memberOtpVerify(contact, code, name) {
-  const r = await call('POST', '/auth/member/verify', { contact, code, name });
+  const referral = pendingReferral() || undefined;
+  const r = await call('POST', '/auth/member/verify', { contact, code, name, referral });
   if (r?.token) {
     localStorage.setItem('hvas_api_token', r.token);
     localStorage.setItem('hvas_api_member_id', r.member.id);
+    // Spent. Keeping it would credit the same promoter for the next person who
+    // happened to sign up on this phone.
+    try { localStorage.removeItem(REF_KEY); } catch { /* ignore */ }
   }
   return r;
 }

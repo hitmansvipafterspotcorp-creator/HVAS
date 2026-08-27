@@ -14,7 +14,7 @@ import {
   BINGO_MIC_DECIDE_SECONDS, micDecideEndsAt, micVoters, micIsForced, micOutcome,
   bingoProgress, bingoHasPattern, oneAwayIds,
 } from './bingoRules';
-import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
+import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVerify, rememberReferral, apiSignOut, apiPurchase, apiWallet, apiMe, apiMyTimeline,
   apiSetOtw, apiSignalLeave, apiMyStats, apiLeaderboard,
   zelleHandle, payClaim, payPending, payConfirm, payVoid, connectVenue, venueConfig, disconnectVenue,
   apiStaffToken, apiStaffRole, apiStaffLogin, apiStaffSignOut, apiDoorVerify, apiDoorBoard, apiDoorCheckout, apiMembersSearch,
@@ -1319,6 +1319,10 @@ function App() {
     // Scanning the venue's "join QR" with an ordinary camera app (not the
     // in-app scanner) opens this page with ?connect=<backend url> — connect
     // to it immediately so a plain camera scan works, not just the in-app one.
+    // Whoever brought them, off the link they followed. Read before anything
+    // tidies the URL, because the sign-up that uses it is several screens away.
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) rememberReferral(ref);
     const toConnect = new URLSearchParams(window.location.search).get('connect');
     // A join link RE-POINTS the app, even when it is already connected to
     // something. This used to bail out whenever a venue address was already
@@ -6445,7 +6449,11 @@ function BringTab() {
   }, []);
   if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
 
-  const link = `${location.origin}${import.meta.env.BASE_URL}?ref=${data.code}`;
+  // The link carries BOTH: which room to join, and who brought them. Without
+  // the venue a stranger lands on a door with a room list; without the code the
+  // promoter did the work for nothing.
+  const link = `${location.origin}${import.meta.env.BASE_URL}`
+    + `?connect=${encodeURIComponent(apiBase())}&ref=${data.code}`;
 
   return (
     <>
@@ -6458,7 +6466,13 @@ function BringTab() {
                   catch { setCopied(false); }
                 }}>{copied ? 'Copied' : 'Copy link'}</button>
       </div>
-      <p className="earn-note">{data.note} You get {Math.round(data.ratePercent * 100)}% of what they spend.</p>
+      {/* Said as the thing it actually is: a share of the membership THEY take.
+          A percentage of "what they spend" is vague enough to be a disappointment
+          later, and this is the number somebody will repeat to a friend. */}
+      <p className="earn-note">
+        Give this code to anybody. When they join on it you get <b>{Math.round(data.ratePercent * 100)}%</b> of
+        the membership they take — every time, whichever tier they choose. {data.note}
+      </p>
 
       <div className="jub-reserve">
         <span><i>Brought</i><b>{data.brought}</b></span>
@@ -6861,6 +6875,10 @@ function TeamScreen() {
           the same job as the roster — who is allowed in, and how the venue
           knows they are who they say. Only the owner sees this screen. */}
       <SignInSetupPanel />
+
+      {/* And how anybody finds the room in the first place: a code to post,
+          rather than a link to hand out. */}
+      <PosterScreen />
     </>
   );
 }
@@ -9209,6 +9227,75 @@ function HostBattleControl() {
 // which means anybody can sign up as any contact. That is fine for a laptop
 // serving its own room and it is not fine on the open internet, so this says
 // so in words rather than leaving it to a green tick nobody reads.
+// ── The thing you post ─────────────────────────────────────────────────────
+//
+// Launching by handing out a URL means the URL IS the venue: it gets pasted
+// into a group chat, it outlives the night, and the address it points at
+// changes every time the venue's tunnel restarts.
+//
+// A code posted as a picture is a different object. Somebody points a camera
+// at it, the app opens already connected to this room, and what lands on their
+// home screen afterwards is the logo rather than a browser bookmark. This is
+// the screen that makes that picture, big enough to photograph off a phone and
+// clean enough to put on a flyer.
+function PosterScreen({ onDone }) {
+  const [ref, setRef] = useState('');
+  const [copied, setCopied] = useState(false);
+  const base = apiBase();
+  const app = `${location.origin}${import.meta.env.BASE_URL}`;
+  // ?connect points the app at THIS venue on a plain camera scan — no in-app
+  // scanner, no typing an address, and no room list to guess from.
+  const url = `${app}?connect=${encodeURIComponent(base)}`
+    + (ref.trim() ? `&ref=${encodeURIComponent(ref.trim().toUpperCase())}` : '');
+  const qr = useQrDataUrl(url, ui.fullLogoClear);
+
+  return (
+    <AppPanel title="Post this" subtitle="A code, not a link">
+      {!base && (
+        <p className="k-nudge k-nudge--no">
+          This phone is not connected to the venue, so there is nothing to point a code at yet.
+        </p>
+      )}
+      <div className="poster">
+        {qr ? <img className="poster-qr" src={qr} alt="Join HITMANS VIP" /> : <div className="qr-load">Making the code…</div>}
+        <strong className="poster-name">HITMANS VIP After Spot</strong>
+        <span className="poster-sub">Point your camera. Members only.</span>
+      </div>
+
+      <p className="earn-note">
+        Screenshot this and post it. Whoever scans it lands in the sign-up already
+        pointed at this room — they agree to the covenant, say what they do, choose
+        a cause to stand behind, and take a membership. Then they are in.
+      </p>
+
+      <div className="jub-form">
+        <label className="jub-label">Credit somebody for who this brings (optional)</label>
+        {/* The same poster, made twice with two codes, is how a promoter gets
+            paid for the people they actually brought. */}
+        <input className="jub-input" placeholder="Member code — e.g. TRINA2L5" value={ref}
+               maxLength={16} onChange={(e) => setRef(e.target.value)} />
+        <p className="jub-note">
+          Every member has a code. Whoever's code is on this poster earns 15% of the
+          membership each person takes after scanning it.
+        </p>
+      </div>
+
+      <button type="button" className="bingo-btn" disabled={!base}
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+                catch { setCopied(false); }
+              }}>
+        {copied ? 'Link copied' : 'Copy the link behind it'}
+      </button>
+      <p className="mem-fineprint">
+        The code and the link are the same thing. Post the picture — the link is
+        here for a message where a picture will not do.
+      </p>
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
+  );
+}
+
 function SignInSetupPanel() {
   const [st, setSt] = useState(null);
   const [form, setForm] = useState({ resend_api_key: '', mail_from: '', venue_display_name: '' });

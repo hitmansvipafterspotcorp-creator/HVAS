@@ -3021,3 +3021,26 @@
 }
 .onb-tier.vip { border-color: rgba(255, 207, 71, .5); background: rgba(255, 207, 71, .07); }
 .onb-tier.vip strong { color: var(--k-gold); }
+
+/* ── The thing you post ───────────────────────────────────────────────────
+   Made to be screenshotted off a phone, so it is a self-contained object with
+   its own edge and its own name on it — not a QR floating in a screen full of
+   other controls. */
+.poster {
+  display: grid; gap: 6px; justify-items: center; text-align: center;
+  padding: 22px 18px 20px; border-radius: 18px; margin-bottom: 14px;
+  border: 1px solid var(--k-gold);
+  background: linear-gradient(180deg, rgba(255, 207, 71, .10), rgba(255, 255, 255, .03));
+}
+.poster-qr {
+  width: min(74vw, 300px); height: auto; border-radius: 12px;
+  background: #f7ecff; padding: 8px;
+}
+.poster-name {
+  margin-top: 8px; font: 900 clamp(15px, 4.6vw, 19px)/1.15 var(--k-font);
+  color: var(--k-gold); letter-spacing: .01em; text-wrap: balance;
+}
+.poster-sub {
+  font: 700 11.5px/1.35 var(--k-font); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--k-text-dim);
+}
