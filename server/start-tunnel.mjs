@@ -63,6 +63,45 @@ function startFunnel(port) {
   });
 }
 
+// Is Funnel actually serving this port to the PUBLIC?
+//
+// This exists because the reachability check below cannot answer it. That check
+// fetches the public URL from this machine — and for a .ts.net address, this
+// machine is on the tailnet, so it reaches itself over the tailnet whether or
+// not Funnel is on. It prints YOU'RE LIVE either way.
+//
+// Which is the worst possible failure for a launch: the owner posts a QR code,
+// and every person who scans it from outside gets nothing, while the venue's
+// own screen says it is live.
+//
+// Tailscale itself is the only authority on this, so ask it. Anything we cannot
+// confirm is reported as unconfirmed rather than assumed good.
+function funnelServing(port) {
+  return new Promise((res) => {
+    const child = spawn(tailscaleBin(), ['serve', 'status', '--json'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.on('error', () => res({ confirmed: false, why: 'tailscale not found' }));
+    child.on('close', () => {
+      try {
+        const st = JSON.parse(out || '{}');
+        // AllowFunnel is keyed by "host:port" and is the switch that decides
+        // whether the wider internet may reach this at all.
+        const allow = st.AllowFunnel || {};
+        const on = Object.entries(allow).filter(([, v]) => v === true).map(([k]) => k);
+        if (!on.length) return res({ confirmed: true, serving: false, why: 'Funnel is not switched on for this machine' });
+        // And something has to actually be behind it on our port.
+        const behind = JSON.stringify(st.Web || st.TCP || {}).includes(`:${port}`)
+                    || JSON.stringify(st).includes(`localhost:${port}`)
+                    || JSON.stringify(st).includes(`127.0.0.1:${port}`);
+        return res({ confirmed: true, serving: true, behind, ports: on });
+      } catch {
+        res({ confirmed: false, why: 'could not read tailscale serve status' });
+      }
+    });
+  });
+}
+
 function findCloudflared() {
   const explicit = process.env.CLOUDFLARED_PATH;
   if (explicit && existsSync(explicit)) return explicit;
@@ -174,6 +213,12 @@ function openBrowser(url) {
 // or the tunnel has not finished routing yet (wait). Check both so the message
 // at the end can say which — the old one just said the network was unsettled,
 // which sends somebody to fiddle with their wifi when their server is down.
+// Can this venue be reached on its public address?
+//
+// Honest about its own limits: from the venue's own machine a tailnet address
+// answers over the tailnet, so a pass here proves the SERVER is up and routing
+// — not that a stranger on mobile data can get in. funnelServing() answers that
+// part, and the only test that settles it is a phone with wifi off.
 async function waitUntilReachable(url, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   let local = false, lastPublic = '';
@@ -205,6 +250,38 @@ function announce(url, permanent) {
   if (!permanent) console.log('  the old link to is cut off. See SELF_HOST.md to make it permanent.');
   console.log('==================================================\n');
   console.log('Confirming the tunnel is actually reachable before opening the app...');
+  // For a tailnet address, ask Tailscale whether the public can get in — the
+  // fetch below cannot tell us, because this machine reaches itself over the
+  // tailnet regardless. Said before YOU'RE LIVE has a chance to be believed.
+  const tailnet = /\.ts\.net$/i.test((() => { try { return new URL(url).hostname; } catch { return ''; } })());
+  const funnelCheck = tailnet ? funnelServing(PORT) : Promise.resolve(null);
+  funnelCheck.then((f) => {
+    if (!f) return;
+    if (f.confirmed && f.serving === false) {
+      console.log('\n--------------------------------------------------');
+      console.log('  NOBODY OUTSIDE CAN REACH YOU YET');
+      console.log('  Tailscale says Funnel is not switched on for this machine,');
+      console.log('  so this address only works for your own devices. Anyone who');
+      console.log('  scans your code from their own phone will get nothing.');
+      console.log('');
+      console.log('  Turn it on:');
+      console.log('    admin console -> DNS -> enable MagicDNS + HTTPS Certificates');
+      console.log('    admin console -> Access controls -> allow Funnel for this machine');
+      console.log(`    then run:  tailscale funnel --bg ${PORT}`);
+      console.log('');
+      console.log('  Check it worked by opening your own code on a phone with');
+      console.log('  WIFI OFF. That is the only test that proves it.');
+      console.log('--------------------------------------------------\n');
+    } else if (f.confirmed && f.serving && f.behind === false) {
+      console.log('\n  Funnel is on, but nothing is published on port ' + PORT + ' yet.');
+      console.log(`  Run:  tailscale funnel --bg ${PORT}\n`);
+    } else if (f.confirmed && f.serving) {
+      console.log('  Tailscale confirms Funnel is serving this publicly.\n');
+    } else {
+      console.log(`  (Could not confirm Funnel with Tailscale: ${f.why}.)`);
+      console.log('  Check by opening your own code on a phone with WIFI OFF.\n');
+    }
+  });
   waitUntilReachable(url).then((ready) => {
     if (!ready.ok) {
       console.log('\n--------------------------------------------------');
