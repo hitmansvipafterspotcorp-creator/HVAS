@@ -174,10 +174,22 @@ export const PARTNERSHIP_KINDS = Object.freeze({
 });
 
 /** What a referral is paid on. Never a signup — a signup is not money. */
+// Bringing somebody pays ONCE, on the membership they take. Nothing else.
+//
+// There were three of these. A referral also paid on every entry the person
+// bought and on everything they ever bought from another member, which sounds
+// generous and is two different problems.
+//
+// It is a cut of somebody's livelihood taken by a person who did no part of the
+// work — a nail tech's client pays her, and a share leaves for whoever posted a
+// code once. And it was not funded: the venue's whole fee on a member-to-member
+// sale went to the referrer, so the reserve got nothing and at the old rate the
+// venue paid out more than it took.
+//
+// Bringing somebody to this place is real work and it is paid for. It is paid
+// for when they join, which is the moment the work actually happened.
 export const REFERRAL_EVENTS = Object.freeze({
-  MEMBERSHIP: { label: 'They bought a membership' },
-  ENTRY: { label: 'They paid to play' },
-  MARKET: { label: 'They bought from a member' },
+  MEMBERSHIP: { label: 'They joined on your code' },
 });
 
 const pct = (n) => {

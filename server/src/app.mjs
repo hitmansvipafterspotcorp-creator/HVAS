@@ -2308,8 +2308,19 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
           contribution = k.contributionId;
         }
       }
-      const credit = creditReferrer({ memberId: o.buyer_id, event: 'MARKET', reference: orderId, grossCents: o.price_units });
-      json(res, 200, { ok: true, status: 'PAID', sellerGets: o.seller_units, venueFee: o.fee_units, contribution, referral: credit });
+      // No referral is paid here, and that is deliberate.
+      //
+      // This used to credit whoever brought the BUYER, 10% of every member-to-
+      // member sale, forever. Two things wrong with it. It is a cut of somebody
+      // else's livelihood — a nail tech's client pays her, and a share leaves
+      // for a person who did no part of the work and posted a code once. And it
+      // was not funded: the whole venue fee on the sale went to the referrer, so
+      // the community reserve got nothing from it, and at the old rate the venue
+      // paid out more than it had taken.
+      //
+      // Bringing somebody here is real work and it is paid for — once, when they
+      // join, which is when the work actually happened.
+      json(res, 200, { ok: true, status: 'PAID', sellerGets: o.seller_units, venueFee: o.fee_units, contribution });
     },
 
     // The BUYER says they got it. The seller saying so would be the seller
@@ -2607,8 +2618,12 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
           grossCents: k.gross_units, commissionCents: k.commission_units,
           status: k.status, at: k.at,
         })),
-        // Said plainly, because a promoter deserves to know what does not pay.
-        note: 'You earn when somebody you brought actually pays for something. A signup on its own does not pay.',
+        // Said plainly, because somebody deserves to know exactly what pays and
+        // what does not — including the generous-sounding thing this does NOT
+        // do, so nobody is counting on money that is never coming.
+        note: 'You earn once, when somebody you brought takes a membership. '
+            + 'Not on the signup, and not on anything they earn or spend here afterwards — '
+            + 'what a member makes is theirs.',
       });
     },
 

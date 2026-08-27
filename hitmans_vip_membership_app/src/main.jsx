@@ -6488,7 +6488,7 @@ function BringTab() {
           later, and this is the number somebody will repeat to a friend. */}
       <p className="earn-note">
         Give this code to anybody. When they join on it you get <b>{Math.round(data.ratePercent * 100)}%</b> of
-        the membership they take — every time, whichever tier they choose. {data.note}
+        the membership they take — whichever tier they choose. {data.note}
       </p>
 
       <div className="jub-reserve">
@@ -9293,7 +9293,8 @@ function PosterScreen({ onDone }) {
                maxLength={16} onChange={(e) => setRef(e.target.value)} />
         <p className="jub-note">
           Every member has a code. Whoever's code is on this poster earns 10% of the
-          membership each person takes after scanning it.
+          membership each person takes after scanning it — once, at joining. Nobody
+          takes a cut of what a member earns here afterwards.
         </p>
       </div>
 

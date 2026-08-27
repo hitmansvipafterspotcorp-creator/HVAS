@@ -166,7 +166,9 @@ console.log('\nA PROMOTER IS PAID FOR WHO SHE BRINGS — ON MONEY, NOT SIGNUPS')
 const mine = await call('GET', '/referral/mine', null, promo.token);
 eq(mine.status, 200, 'she has a code');
 ok(/^[A-Z]+[2-9][A-Z][2-9]$/.test(mine.body.code), `readable enough for a flyer (${mine.body.code})`);
-ok(/does not pay/i.test(mine.body.note), 'and is told plainly that a signup alone does not pay');
+ok(/does not pay|Not on the signup/i.test(mine.body.note), 'and is told plainly that a signup alone does not pay');
+ok(/what a member makes is theirs/i.test(mine.body.note),
+   'and that nobody takes a cut of what a member earns here afterwards');
 // Signed in, agreed, said what he does, chose a cause — and has NOT taken a
 // membership. That is the state where the rule is actually tested: an account
 // and four screens of good intentions are not money.
@@ -200,6 +202,29 @@ for (const [tier, price, owed] of [['Daily', 2000, 200], ['Weekly', 10000, 1000]
 await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, brought.token);
 const twice = (await call('GET', '/referral/mine', null, promo.token)).body;
 ok(twice.credits.length >= 1, 'a second purchase is its own credit, not a duplicate of the first');
+
+console.log('\nAND IT STOPS THERE — NO CUT OF WHAT THEY EARN AFTERWARDS');
+// The rule: bringing somebody pays ONCE, on the membership. It is not a
+// standing share of their livelihood. A nail tech's client pays the nail tech,
+// and nothing leaves for whoever posted a code once.
+{
+  const before = (await call('GET', '/referral/mine', null, promo.token)).body.earnedCents;
+  // The person she brought buys something from another member — a real sale,
+  // settled by the house.
+  const seller = await mk('850-722-0001', 'Vic', 'BARBER');
+  const l = await call('POST', '/market/list',
+    { kind: 'SERVICE', title: 'Cut and line-up', priceCents: 4000 }, seller.token);
+  const o = await call('POST', '/market/order', { listingId: l.body.listingId }, brought.token);
+  eq(o.status, 200, 'somebody she brought buys from another member');
+  const done = await call('POST', '/market/settle',
+    { orderId: o.body.orderId, received: true, rail: 'cash' }, owner);
+  eq(done.status, 200, 'and the money is confirmed');
+  const after2 = (await call('GET', '/referral/mine', null, promo.token)).body;
+  eq(after2.earnedCents, before, 'she earns NOTHING from it — a referral is not a share of their income');
+  ok(!after2.credits.some((k) => k.event === 'MARKET'), 'and no market credit is written at all');
+  // And the venue's own fee stays with the venue, where the reserve draws from.
+  eq(done.body.venueFee, 400, 'the venue keeps its fee on that sale, undiminished');
+}
 
 console.log('\nNOBODY REFERS THEMSELVES');
 const selfCode = (await call('GET', '/referral/mine', null, dana.token)).body.code;
