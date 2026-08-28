@@ -138,6 +138,29 @@ const mine = await call('GET', '/onboarding', null, nova.token);
 eq(mine.body.agreed.version, cov.version, 'the member can see which version they agreed to');
 ok(mine.body.agreed.at > 0, 'and when');
 
+console.log('\nBECOMING A MEMBER IS A MOMENT, AND IT GETS A DATE ON IT');
+// The stamp is written when the LAST step completes, which is dues. It was
+// being written on the three earlier steps instead — every one of which runs
+// while the member is still incomplete — so it never landed at all, and the
+// record of when somebody joined this association was empty for everybody.
+{
+  const late = await mk('850-611-9001', 'Late');
+  await call('POST', '/me/agree', { version: cov.version, agree: true }, late.token);
+  await call('POST', '/me/role', { role: 'NAILS' }, late.token);
+  await call('POST', '/me/program', { program: 'HOUSING' }, late.token);
+  const before = (await call('GET', '/me/record', null, late.token)).body;
+  eq(before, before, 'three steps in, they are not a member yet');
+  eq((await call('GET', '/onboarding', null, late.token)).body.accepted, false,
+     'and the server says so');
+  await call('POST', '/membership/purchase', { tier: 'Monthly', payment: 'card' }, late.token);
+  const rec = (await call('GET', '/me/record', null, late.token)).body;
+  eq((await call('GET', '/onboarding', null, late.token)).body.accepted, true, 'dues make them one');
+  ok(!!rec.membership, 'they hold a membership');
+  // The room is the thing that reads this stamp, so it is the thing that proves it.
+  const room = await call('GET', '/room/members', null, late.token);
+  eq(room.status, 200, 'and the room opens to them');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 server.close();
 process.exit(fail ? 1 : 0);

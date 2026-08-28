@@ -823,6 +823,101 @@ export function openDb(path) {
   )`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_standing_member ON member_standing(member_id, at DESC)`);
 
+  // ── The Room: what members do with each other ────────────────────────────
+  //
+  // Everything Instagram and Snapchat give somebody, between members, with no
+  // restrictions on what they say to each other. The gate is the door, not the
+  // content: nobody posts, messages, or is even visible here until they have
+  // agreed to the covenant, said what they do, chosen a programme and taken a
+  // membership.
+  //
+  // Private by construction. There is no public timeline, no share link, no
+  // outside reader. A post here is seen by members and nobody else — which is
+  // the whole difference between this and the platforms it borrows from.
+
+  // A member's face and words, as the room sees them. Kept apart from the
+  // members table on purpose: that one holds identity the door needs, this one
+  // holds what a person chose to show, and the two should not be one row.
+  db.exec(`CREATE TABLE IF NOT EXISTS profiles (
+    member_id TEXT PRIMARY KEY REFERENCES members(id),
+    handle TEXT UNIQUE,                  -- @name, theirs, changeable
+    bio TEXT,
+    avatar TEXT,                         -- data URI, small, on their own terms
+    links TEXT,                          -- json: where else to find them
+    updated_at INTEGER NOT NULL
+  )`);
+
+  // A post. Text, an image, or both.
+  db.exec(`CREATE TABLE IF NOT EXISTS posts (
+    post_id TEXT PRIMARY KEY,
+    member_id TEXT NOT NULL REFERENCES members(id),
+    body TEXT,
+    media TEXT,                          -- data URI
+    kind TEXT NOT NULL DEFAULT 'POST',   -- POST | MOMENT
+    -- A MOMENT disappears. Somebody should be able to put something up on a
+    -- Saturday night without it following them into a Monday.
+    expires_at INTEGER,
+    at INTEGER NOT NULL,
+    hidden_at INTEGER,                   -- taken down by its author
+    UNIQUE(member_id, at)
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_posts_at ON posts(at DESC)`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS post_reactions (
+    post_id TEXT NOT NULL REFERENCES posts(post_id),
+    member_id TEXT NOT NULL REFERENCES members(id),
+    emoji TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (post_id, member_id)     -- one reaction each; changing it replaces it
+  )`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS post_comments (
+    comment_id TEXT PRIMARY KEY,
+    post_id TEXT NOT NULL REFERENCES posts(post_id),
+    member_id TEXT NOT NULL REFERENCES members(id),
+    body TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    hidden_at INTEGER
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments(post_id, at)`);
+
+  // Following is one-way and needs nobody's permission, the way it works
+  // everywhere else. `connections` stays what it was — a mutual introduction
+  // between two people who both agreed — because those are different things.
+  db.exec(`CREATE TABLE IF NOT EXISTS follows (
+    follower_id TEXT NOT NULL REFERENCES members(id),
+    followee_id TEXT NOT NULL REFERENCES members(id),
+    at INTEGER NOT NULL,
+    PRIMARY KEY (follower_id, followee_id)
+  )`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id)`);
+
+  // Somebody a member does not want to hear from. Theirs alone to set, and it
+  // needs no reason and no approval — a private association that cannot be left
+  // alone in is not private.
+  db.exec(`CREATE TABLE IF NOT EXISTS member_blocks (
+    member_id TEXT NOT NULL REFERENCES members(id),
+    blocked_id TEXT NOT NULL REFERENCES members(id),
+    at INTEGER NOT NULL,
+    PRIMARY KEY (member_id, blocked_id)
+  )`);
+
+  // Reporting something to the house. Members say what they say to each other;
+  // this is the one route by which the venue hears about it, and it is a member
+  // asking rather than the venue watching.
+  db.exec(`CREATE TABLE IF NOT EXISTS room_reports (
+    report_id TEXT PRIMARY KEY,
+    by_id TEXT NOT NULL REFERENCES members(id),
+    kind TEXT NOT NULL,                  -- POST | COMMENT | MESSAGE | MEMBER
+    reference TEXT NOT NULL,
+    reason TEXT,
+    at INTEGER NOT NULL,
+    handled_at INTEGER,
+    handled_by TEXT,
+    outcome TEXT
+  )`);
+
+
   // ── Giving to a programme, and sitting on its board ─────────────────────
   //
   // Belonging to a programme is an affiliation, not a payment. Playing bingo is

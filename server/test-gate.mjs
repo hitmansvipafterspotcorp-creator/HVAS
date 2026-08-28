@@ -17,6 +17,8 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   // A whole evening lived rather than asserted. It found two defects the
   // moment it was first played, with everything else already green.
   'night-test.mjs',
+  // What members do with each other, and the door that gates it.
+  'room-test.mjs',
   // Last, and the one that matters most on a night: a stranger signs up and
   // the door lets them in. If this fails, nothing else being green helps.
   'launch-test.mjs'];

@@ -1349,6 +1349,67 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     termsHash: g.terms_hash,
   });
 
+  // ── The Room's helpers ────────────────────────────────────────────────────
+
+  // Somebody as the room sees them. NOT as the door sees them: no contact, no
+  // member number, no tier. Those belong to the person and to the door, and a
+  // social feed is the last place they should surface — a screenshot of a feed
+  // must never be a screenshot of somebody's identity.
+  const profileOf = (memberId) => {
+    const m = db.prepare('SELECT id, name, member_role FROM members WHERE id=?').get(memberId);
+    if (!m) return null;
+    const p = db.prepare('SELECT * FROM profiles WHERE member_id=?').get(memberId) || {};
+    return {
+      id: m.id,
+      name: m.name,
+      handle: p.handle || null,
+      bio: p.bio || null,
+      avatar: p.avatar || null,
+      links: (() => { try { return JSON.parse(p.links || 'null'); } catch { return null; } })(),
+      trade: m.member_role || null,
+      tradeLabel: m.member_role ? MEMBER_ROLE[m.member_role]?.label : null,
+      followers: db.prepare('SELECT COUNT(*) n FROM follows WHERE followee_id=?').get(memberId).n,
+      following: db.prepare('SELECT COUNT(*) n FROM follows WHERE follower_id=?').get(memberId).n,
+      posts: db.prepare('SELECT COUNT(*) n FROM posts WHERE member_id=? AND hidden_at IS NULL').get(memberId).n,
+    };
+  };
+
+  const blocked = (a, b) =>
+    !!db.prepare('SELECT 1 FROM member_blocks WHERE member_id=? AND blocked_id=?').get(a, b);
+
+  const reactionsOn = (postId, viewerId) => {
+    const rows = db.prepare('SELECT emoji, member_id FROM post_reactions WHERE post_id=?').all(postId);
+    const counts = {};
+    let mine = null;
+    for (const r of rows) {
+      counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+      if (r.member_id === viewerId) mine = r.emoji;
+    }
+    return { counts, mine, total: rows.length };
+  };
+
+  const commentsOn = (postId, viewerId) =>
+    db.prepare(`SELECT * FROM post_comments WHERE post_id=? AND hidden_at IS NULL ORDER BY at ASC LIMIT 200`)
+      .all(postId)
+      .filter((x) => !blocked(x.member_id, viewerId) && !blocked(viewerId, x.member_id))
+      .map((x) => ({
+        commentId: x.comment_id, body: x.body, at: x.at,
+        by: profileOf(x.member_id), mine: x.member_id === viewerId,
+      }));
+
+  const postRow = (p, viewerId) => ({
+    postId: p.post_id,
+    by: profileOf(p.member_id),
+    body: p.body || null,
+    media: p.media || null,
+    kind: p.kind,
+    expiresAt: p.expires_at || null,
+    at: p.at,
+    mine: p.member_id === viewerId,
+    reactions: reactionsOn(p.post_id, viewerId),
+    comments: db.prepare('SELECT COUNT(*) n FROM post_comments WHERE post_id=? AND hidden_at IS NULL').get(p.post_id).n,
+  });
+
   // Where a member stands with the association: in, gone, or put out.
   //
   // Derived from the history rather than stored as a flag, so that leaving and
@@ -2854,6 +2915,316 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     // the Community Covenant, say what they do, and choose a programme to stand
     // behind. All three are the member's own act; none of them can be done for
     // them by the house.
+    // ── THE ROOM ─────────────────────────────────────────────────────────────
+    //
+    // What members do with each other. Profiles, posts, photographs, reactions,
+    // comments, following, and messages — the things Instagram and Snapchat are
+    // for, between the people in this association, with no restriction on what
+    // they say to one another.
+    //
+    // The gate is the door, not the content. Nothing in here opens until
+    // somebody has agreed to the covenant, said what they do, chosen a
+    // programme and taken a membership — which is why every single route below
+    // is behind acceptedMember and not merely behind a session.
+    //
+    // And it is private by construction. There is no public timeline, no share
+    // link, no outside reader, and a member's contact and door number never
+    // appear anywhere in it. What makes this different from the platforms it
+    // borrows from is not the features. It is that the room is closed.
+
+    // Who somebody is here, in their own words.
+    'GET /room/me': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      json(res, 200, { profile: profileOf(c.sub), you: true });
+    },
+
+    'POST /room/profile': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { handle, bio, avatar, links } = await readBody(req);
+      const now = Date.now();
+      if (handle != null) {
+        // A handle is how one member points another at somebody. Letters,
+        // numbers and underscore, because anything else is a handle nobody can
+        // read out loud in a dark room.
+        const h = String(handle).trim().replace(/^@+/, '').toLowerCase();
+        if (!/^[a-z0-9_]{3,20}$/.test(h)) {
+          return json(res, 400, { error: 'A handle is 3–20 letters, numbers or underscores.' });
+        }
+        const taken = db.prepare('SELECT member_id FROM profiles WHERE handle=? AND member_id<>?').get(h, c.sub);
+        if (taken) return json(res, 409, { error: `@${h} is taken.` });
+      }
+      // An avatar is stored as the member sent it and capped, because a photo
+      // nobody can load is worse than no photo.
+      if (avatar != null && String(avatar).length > 400000) {
+        return json(res, 413, { error: 'That picture is too big — try a smaller one.' });
+      }
+      const cur = db.prepare('SELECT * FROM profiles WHERE member_id=?').get(c.sub);
+      db.prepare(`INSERT INTO profiles(member_id, handle, bio, avatar, links, updated_at)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(member_id) DO UPDATE SET
+          handle=excluded.handle, bio=excluded.bio, avatar=excluded.avatar,
+          links=excluded.links, updated_at=excluded.updated_at`)
+        .run(c.sub,
+             handle != null ? String(handle).trim().replace(/^@+/, '').toLowerCase() : cur?.handle || null,
+             bio != null ? String(bio).slice(0, 300) : cur?.bio || null,
+             avatar != null ? String(avatar) : cur?.avatar || null,
+             links != null ? JSON.stringify(links).slice(0, 1000) : cur?.links || null,
+             now);
+      json(res, 200, { ok: true, profile: profileOf(c.sub) });
+    },
+
+    // Somebody else, as the room sees them.
+    'GET /room/member': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const url = new URL(req.url, 'http://x');
+      const who = String(url.searchParams.get('id') || url.searchParams.get('handle') || '').trim();
+      if (!who) return json(res, 400, { error: 'who?' });
+      const row = who.startsWith('@') || !/^[0-9a-f]{16}$/.test(who)
+        ? db.prepare('SELECT member_id FROM profiles WHERE handle=?').get(who.replace(/^@/, '').toLowerCase())
+        : { member_id: who };
+      if (!row?.member_id) return json(res, 404, { error: 'no such member' });
+      if (blocked(row.member_id, c.sub)) return json(res, 404, { error: 'no such member' });
+      json(res, 200, {
+        profile: profileOf(row.member_id),
+        following: !!db.prepare('SELECT 1 FROM follows WHERE follower_id=? AND followee_id=?').get(c.sub, row.member_id),
+        blocked: !!db.prepare('SELECT 1 FROM member_blocks WHERE member_id=? AND blocked_id=?').get(c.sub, row.member_id),
+        posts: db.prepare(`SELECT * FROM posts WHERE member_id=? AND hidden_at IS NULL
+                           AND (expires_at IS NULL OR expires_at > ?) ORDER BY at DESC LIMIT 30`)
+          .all(row.member_id, Date.now()).map((p) => postRow(p, c.sub)),
+      });
+    },
+
+    // Everybody who is in. This is the directory a private association is FOR:
+    // a room full of people you can actually reach, listed by what they do.
+    'GET /room/members': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const url = new URL(req.url, 'http://x');
+      const trade = String(url.searchParams.get('trade') || '').trim().toUpperCase();
+      const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+      const rows = db.prepare(`SELECT m.id, m.name, m.member_role FROM members m
+        WHERE m.accepted_at IS NOT NULL ORDER BY m.accepted_at DESC LIMIT 500`).all();
+      const out = [];
+      for (const m of rows) {
+        if (m.id === c.sub) continue;
+        if (blocked(m.id, c.sub) || blocked(c.sub, m.id)) continue;
+        if (trade && m.member_role !== trade) continue;
+        const p = profileOf(m.id);
+        if (q && !(`${p.name} ${p.handle || ''} ${p.tradeLabel || ''}`.toLowerCase().includes(q))) continue;
+        out.push({ ...p, following: !!db.prepare('SELECT 1 FROM follows WHERE follower_id=? AND followee_id=?').get(c.sub, m.id) });
+      }
+      json(res, 200, { members: out, trades: rolesByGroup() });
+    },
+
+    // The feed. Everybody's, newest first — a room this size does not need an
+    // algorithm deciding who a member gets to see, and one would quietly become
+    // the venue picking favourites among people who pay the same dues.
+    'GET /room/feed': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const url = new URL(req.url, 'http://x');
+      const only = String(url.searchParams.get('only') || '').toLowerCase();
+      const now = Date.now();
+      const rows = db.prepare(`SELECT p.* FROM posts p
+        WHERE p.hidden_at IS NULL AND (p.expires_at IS NULL OR p.expires_at > ?)
+        ORDER BY p.at DESC LIMIT 200`).all(now);
+      const feed = [];
+      for (const p of rows) {
+        if (blocked(p.member_id, c.sub) || blocked(c.sub, p.member_id)) continue;
+        if (only === 'following' && p.member_id !== c.sub
+            && !db.prepare('SELECT 1 FROM follows WHERE follower_id=? AND followee_id=?').get(c.sub, p.member_id)) continue;
+        if (only === 'moments' && p.kind !== 'MOMENT') continue;
+        feed.push(postRow(p, c.sub));
+      }
+      json(res, 200, { feed, at: now });
+    },
+
+    'POST /room/post': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { body, media, kind = 'POST' } = await readBody(req);
+      const text = String(body || '').trim().slice(0, 2000);
+      if (!text && !media) return json(res, 400, { error: 'Say something, or put a picture up.' });
+      if (media && String(media).length > 2500000) {
+        return json(res, 413, { error: 'That picture is too big — try a smaller one.' });
+      }
+      const k = kind === 'MOMENT' ? 'MOMENT' : 'POST';
+      const now = Date.now();
+      const postId = `PST-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare(`INSERT INTO posts(post_id, member_id, body, media, kind, expires_at, at)
+        VALUES (?,?,?,?,?,?,?)`)
+        // A MOMENT is gone in a day. Somebody should be able to put something up
+        // on a Saturday night without it following them into a Monday.
+        .run(postId, c.sub, text || null, media ? String(media) : null, k,
+             k === 'MOMENT' ? now + 24 * 3600 * 1000 : null, now);
+      const p = db.prepare('SELECT * FROM posts WHERE post_id=?').get(postId);
+      json(res, 200, { ok: true, post: postRow(p, c.sub) });
+    },
+
+    // Taking your own thing down. Nobody else's — not even the house's, from
+    // here; that goes through a report and a named decision.
+    'POST /room/post/hide': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { postId } = await readBody(req);
+      const p = db.prepare('SELECT * FROM posts WHERE post_id=?').get(String(postId || ''));
+      if (!p) return json(res, 404, { error: 'no such post' });
+      if (p.member_id !== c.sub) return json(res, 403, { error: 'That is not yours to take down.' });
+      db.prepare('UPDATE posts SET hidden_at=? WHERE post_id=?').run(Date.now(), p.post_id);
+      json(res, 200, { ok: true });
+    },
+
+    'POST /room/react': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { postId, emoji } = await readBody(req);
+      const p = db.prepare('SELECT * FROM posts WHERE post_id=?').get(String(postId || ''));
+      if (!p) return json(res, 404, { error: 'no such post' });
+      if (blocked(p.member_id, c.sub)) return json(res, 403, { error: 'no' });
+      const e = String(emoji || '').trim().slice(0, 8);
+      if (!e) {
+        // Tapping the same one again takes it back, the way it works everywhere.
+        db.prepare('DELETE FROM post_reactions WHERE post_id=? AND member_id=?').run(p.post_id, c.sub);
+        return json(res, 200, { ok: true, reactions: reactionsOn(p.post_id, c.sub) });
+      }
+      db.prepare(`INSERT INTO post_reactions(post_id, member_id, emoji, at) VALUES (?,?,?,?)
+        ON CONFLICT(post_id, member_id) DO UPDATE SET emoji=excluded.emoji, at=excluded.at`)
+        .run(p.post_id, c.sub, e, Date.now());
+      json(res, 200, { ok: true, reactions: reactionsOn(p.post_id, c.sub) });
+    },
+
+    'POST /room/comment': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { postId, body } = await readBody(req);
+      const p = db.prepare('SELECT * FROM posts WHERE post_id=?').get(String(postId || ''));
+      if (!p) return json(res, 404, { error: 'no such post' });
+      if (blocked(p.member_id, c.sub) || blocked(c.sub, p.member_id)) return json(res, 403, { error: 'no' });
+      const text = String(body || '').trim().slice(0, 1000);
+      if (!text) return json(res, 400, { error: 'Say something.' });
+      const id = `CMT-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare('INSERT INTO post_comments(comment_id, post_id, member_id, body, at) VALUES (?,?,?,?,?)')
+        .run(id, p.post_id, c.sub, text, Date.now());
+      json(res, 200, { ok: true, comments: commentsOn(p.post_id, c.sub) });
+    },
+
+    'GET /room/post': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const url = new URL(req.url, 'http://x');
+      const p = db.prepare('SELECT * FROM posts WHERE post_id=?').get(String(url.searchParams.get('id') || ''));
+      if (!p || p.hidden_at) return json(res, 404, { error: 'no such post' });
+      if (blocked(p.member_id, c.sub)) return json(res, 404, { error: 'no such post' });
+      json(res, 200, { post: postRow(p, c.sub), comments: commentsOn(p.post_id, c.sub) });
+    },
+
+    // Following needs nobody's permission, the way it works everywhere else.
+    'POST /room/follow': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { memberId, on = true } = await readBody(req);
+      const who = String(memberId || '');
+      if (who === c.sub) return json(res, 400, { error: 'You already know what you are doing.' });
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(who)) return json(res, 404, { error: 'no such member' });
+      if (on) {
+        if (blocked(who, c.sub)) return json(res, 403, { error: 'no' });
+        db.prepare('INSERT OR IGNORE INTO follows(follower_id, followee_id, at) VALUES (?,?,?)')
+          .run(c.sub, who, Date.now());
+      } else {
+        db.prepare('DELETE FROM follows WHERE follower_id=? AND followee_id=?').run(c.sub, who);
+      }
+      json(res, 200, { ok: true, following: !!on });
+    },
+
+    // Being left alone. Theirs alone to set, needing no reason and no approval —
+    // a private association somebody cannot be left alone in is not private.
+    'POST /room/block': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { memberId, on = true } = await readBody(req);
+      const who = String(memberId || '');
+      if (who === c.sub) return json(res, 400, { error: 'no' });
+      if (on) {
+        db.prepare('INSERT OR IGNORE INTO member_blocks(member_id, blocked_id, at) VALUES (?,?,?)')
+          .run(c.sub, who, Date.now());
+        // Blocking somebody undoes the following in both directions, because
+        // otherwise their name keeps arriving in a feed you asked to be rid of.
+        db.prepare('DELETE FROM follows WHERE (follower_id=? AND followee_id=?) OR (follower_id=? AND followee_id=?)')
+          .run(c.sub, who, who, c.sub);
+      } else {
+        db.prepare('DELETE FROM member_blocks WHERE member_id=? AND blocked_id=?').run(c.sub, who);
+      }
+      json(res, 200, { ok: true, blocked: !!on });
+    },
+
+    // Telling the house about something. A member asking, never the venue
+    // watching — nothing in here is read by staff until somebody reports it.
+    'POST /room/report': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { kind, reference, reason } = await readBody(req);
+      if (!['POST', 'COMMENT', 'MESSAGE', 'MEMBER'].includes(String(kind))) {
+        return json(res, 400, { error: 'what kind of thing?' });
+      }
+      const id = `RPT-${randomBytes(6).toString('hex').toUpperCase()}`;
+      db.prepare('INSERT INTO room_reports(report_id, by_id, kind, reference, reason, at) VALUES (?,?,?,?,?,?)')
+        .run(id, c.sub, String(kind), String(reference || '').slice(0, 120),
+             String(reason || '').slice(0, 500), Date.now());
+      json(res, 200, { ok: true, reportId: id,
+        note: 'A person will look at this. Nothing in the room is read by staff until somebody reports it.' });
+    },
+
+    // ── Messages, member to member ───────────────────────────────────────────
+    //
+    // No restriction on what two members say to each other, and no eye on it.
+    // The house does not read this; the only way anything here reaches staff is
+    // a member reporting it. That is the deal a private association makes and it
+    // is worth being explicit about, because every platform this borrows from
+    // makes the opposite one quietly.
+    'GET /room/threads': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const rows = db.prepare(`SELECT * FROM messages
+        WHERE (from_id=? OR to_id=?) AND to_id IS NOT NULL ORDER BY at DESC LIMIT 800`).all(c.sub, c.sub);
+      const byPerson = new Map();
+      for (const m of rows) {
+        const other = m.from_id === c.sub ? m.to_id : m.from_id;
+        if (!other || blocked(c.sub, other) || blocked(other, c.sub)) continue;
+        if (!byPerson.has(other)) {
+          byPerson.set(other, {
+            with: profileOf(other),
+            last: { body: m.body, at: m.at, mine: m.from_id === c.sub },
+            unread: 0,
+          });
+        }
+      }
+      json(res, 200, { threads: [...byPerson.values()].filter((t) => t.with) });
+    },
+
+    'GET /room/thread': (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const url = new URL(req.url, 'http://x');
+      const other = String(url.searchParams.get('with') || '');
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(other)) return json(res, 404, { error: 'no such member' });
+      if (blocked(other, c.sub)) return json(res, 403, { error: 'You cannot message them.' });
+      const rows = db.prepare(`SELECT * FROM messages
+        WHERE ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?)) ORDER BY at ASC LIMIT 500`)
+        .all(c.sub, other, other, c.sub);
+      json(res, 200, {
+        with: profileOf(other),
+        blockedByYou: blocked(c.sub, other),
+        messages: rows.map((m) => ({ id: m.id, body: m.body, at: m.at, mine: m.from_id === c.sub })),
+      });
+    },
+
+    'POST /room/message': async (req, res) => {
+      const c = acceptedMember(req, res); if (!c) return;
+      const { to, body } = await readBody(req);
+      const other = String(to || '');
+      if (other === c.sub) return json(res, 400, { error: 'You are already talking to yourself.' });
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(other)) return json(res, 404, { error: 'no such member' });
+      // Blocking runs both ways here: somebody who blocked you does not hear
+      // from you, and somebody you blocked does not get to reach you either.
+      if (blocked(other, c.sub)) return json(res, 403, { error: 'You cannot message them.' });
+      if (blocked(c.sub, other)) return json(res, 403, { error: 'You blocked them. Unblock them to write.' });
+      const text = String(body || '').trim().slice(0, 4000);
+      if (!text) return json(res, 400, { error: 'Say something.' });
+      const id = `MSG-${randomBytes(8).toString('hex')}`;
+      const now = Date.now();
+      db.prepare('INSERT INTO messages(id, from_id, to_id, venue, body, at) VALUES (?,?,?,?,?,?)')
+        .run(id, c.sub, other, null, text, now);
+      json(res, 200, { ok: true, message: { id, body: text, at: now, mine: true } });
+    },
+
     // ── What a member can ask of the association about themselves ────────────
     //
     // A private membership association rests on one thing being true: that the
@@ -3397,6 +3768,17 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         memberId: c.sub, event: 'MEMBERSHIP', reference: `${c.sub}:${tier}:${now}`,
         grossCents: Math.round((t.price || 0) * 100),
       });
+      // Dues are the LAST of the four steps, so this is the moment somebody
+      // actually becomes a member of this association — and the moment that has
+      // to be stamped.
+      //
+      // It was missing. The stamp was written on the three earlier steps, every
+      // one of which runs while the member is still incomplete, so
+      // markAcceptedIfDone found them not-yet-accepted, returned false, and was
+      // never called again. Since dues became step four, accepted_at has been
+      // null for everybody: onboarding said accepted while the column recording
+      // WHEN it happened stayed empty.
+      markAcceptedIfDone(c.sub);
       json(res, 200, {
         member: publicMember(db.prepare('SELECT * FROM members WHERE id=?').get(c.sub)),
         referral: credit,
