@@ -22,6 +22,23 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   // Two venue nodes, separate databases, no cloud — and one of them dying
   // mid-night without taking the night with it.
   'cluster-test.mjs',
+  // ── The layers under all of it ───────────────────────────────────────────
+  //
+  // These eight were passing and ungated, which is the same state cluster-test
+  // was in when it turned out to have been broken for weeks. A suite nothing
+  // runs is not a safety net, it is a file.
+  //
+  // They are the mesh the venue converges over, the money rails, the offline
+  // shell and the deploy keeper — the layers everything above assumes and
+  // nothing above would notice the loss of until a night went wrong.
+  'mesh-test.mjs', 'mesh-tcp-test.mjs', 'mesh-encrypted-test.mjs', 'network-test.mjs',
+  'pay-test.mjs', 'local-app-test.mjs', 'deploy-keeper-test.mjs',
+  // Bluetooth: staff phones meshing with no wifi, no router and no cell tower.
+  // Runs against a simulated radio, so it needs no hardware and belongs here.
+  '../native/ble-test.mjs',
+  // hitkoin-test is deliberately NOT here: it needs a live chain and an RPC URL,
+  // and a gate that cannot pass on a laptop is a gate people learn to skip.
+  //
   // Last, and the one that matters most on a night: a stranger signs up and
   // the door lets them in. If this fails, nothing else being green helps.
   'launch-test.mjs'];
