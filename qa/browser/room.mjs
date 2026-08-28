@@ -141,7 +141,13 @@ ok(await openRoom(),'the room opens');
 const r0=await text();
 console.log('   [room]', r0.slice(0,300));
 ok(/Feed/.test(r0)&&/Who’s in/.test(r0)&&/Messages/.test(r0),'feed, people and messages are all there');
-ok(/Say something to the room/i.test(r0),'and the first thing on it is a box to write in, not a wall to read');
+// A placeholder never appears in innerText, so this asks the DOM directly:
+// is there a box to write in, and is it ABOVE the first post?
+ok(await js(`const t=document.querySelector('.rm-compose .jub-textarea');return !!t&&/Say something/i.test(t.placeholder||'')`),
+   'and the first thing on it is a box to write in, not a wall to read');
+ok(await js(`const c=document.querySelector('.rm-compose');const f=document.querySelector('.rm-post,.dash-empty');
+  return !!c&&!!f&&(c.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING)>0`),
+   'and it sits above the feed rather than under it');
 await shot('room-0-feed.png');
 
 console.log('\nSHE POSTS');
@@ -189,11 +195,11 @@ ok(/what do you charge/.test(await text()),'the comment is there');
 
 console.log('\nTHE DIRECTORY IS WHY A ROOM LIKE THIS IS WORTH JOINING');
 ok(await openRoom('Who’s in'),'she opens who is in');
-const w=await text();
-console.log('   [who]', w.slice(0,300));
-ok(/Nova/.test(w),'Nova is listed');
-ok(/Nail tech/.test(w),'by what she does');
-ok(!/850-963/.test(w)&&!/HV-\d+-\d+/.test(w),'and the directory holds nobody’s contact or number');
+const whoText=await text();
+console.log('   [who]', whoText.slice(0,300));
+ok(/Nova/.test(whoText),'Nova is listed');
+ok(/Nail tech/.test(whoText),'by what she does');
+ok(!/850-963/.test(whoText)&&!/HV-\d+-\d+/.test(whoText),'and the directory holds nobody’s contact or number');
 await shot('room-3-who.png');
 
 console.log('\nMESSAGES, WHICH NOBODY AT THE VENUE READS');
