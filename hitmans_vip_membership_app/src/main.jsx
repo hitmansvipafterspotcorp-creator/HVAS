@@ -6358,7 +6358,10 @@ function RoomYou({ onOpenMember }) {
         <Avatar who={p} size={72} />
         <div>
           <strong className="rm-name">{p.name}</strong>
-          <span className="rm-sub">{p.tradeLabel}</span>
+          {/* Shown back as text, not only sitting in the edit box below. Somebody
+              needs to see the handle they gave out, and an input's value is not
+              something you can read at a glance or point somebody at. */}
+          <span className="rm-sub">{p.handle ? `@${p.handle} · ` : ''}{p.tradeLabel}</span>
           <div className="rm-counts">
             <span><b>{p.posts}</b> posts</span>
             <span><b>{p.followers}</b> followers</span>

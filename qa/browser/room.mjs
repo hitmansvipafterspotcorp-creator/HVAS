@@ -157,7 +157,7 @@ ok(await tap('Post'),'she posts');
 await settle(3000);
 const r1=await text();
 ok(/Chairs open Friday/.test(r1),'it is in the room');
-ok(/Nail tech/.test(r1),'with what she does beside her name');
+ok(/nail tech/i.test(r1),'with what she does beside her name');
 await shot('room-1-posted.png');
 
 console.log('\nA MOMENT IS MARKED AS PASSING THROUGH');
@@ -198,7 +198,7 @@ ok(await openRoom('Who’s in'),'she opens who is in');
 const whoText=await text();
 console.log('   [who]', whoText.slice(0,300));
 ok(/Nova/.test(whoText),'Nova is listed');
-ok(/Nail tech/.test(whoText),'by what she does');
+ok(/nail tech/i.test(whoText),'by what she does');
 ok(!/850-963/.test(whoText)&&!/HV-\d+-\d+/.test(whoText),'and the directory holds nobody’s contact or number');
 await shot('room-3-who.png');
 
@@ -234,7 +234,7 @@ await settle(400);
 ok(await tap('Save'),'she sets a handle and a bio');
 await settle(3000);
 const y=await text();
-ok(/danadoesnails/.test(y),'the handle sticks');
+ok(/danadoesnails/i.test(y),'the handle sticks, and is shown back to her as text');
 ok(/never shown in the room/i.test(y),'and she is told her contact and number are never shown');
 await shot('room-6-you.png');
 

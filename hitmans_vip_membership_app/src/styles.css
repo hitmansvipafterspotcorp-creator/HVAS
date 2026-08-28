@@ -437,15 +437,20 @@ button {
   overflow: hidden;
 }
 
-.blueprint-panel header,
-.app-panel header {
+.blueprint-panel > header,
+.app-panel > header {
   padding: 16px 18px;
   border-bottom: 1px solid rgba(255, 214, 109, 0.25);
   background: linear-gradient(90deg, rgba(8, 2, 14, 0.92), rgba(91, 13, 122, 0.62));
 }
 
-.blueprint-panel header span,
-.app-panel header span {
+/* The panel's OWN header, not every <header> that happens to be inside one.
+   This was a descendant selector, so a component using semantic <header> in a
+   panel body silently inherited the panel title's styling — pink, 900 weight,
+   uppercase. A post in the room came out shouting NAIL TECH · JUST NOW under
+   somebody's name. Direct-child is what this always meant. */
+.blueprint-panel > header span,
+.app-panel > header span {
   color: #ff5cf4;
   font-size: 12px;
   font-weight: 900;
@@ -560,7 +565,7 @@ button {
   min-height: 520px;
 }
 
-.app-menu-board .app-panel header {
+.app-menu-board .app-panel > header {
   min-height: 88px;
 }
 
@@ -4388,9 +4393,9 @@ button {
   .staff-dash .stat-widgets { display: none; }
   .dash-roster-panel .app-panel-body { max-height: 110px; padding: 6px 16px; }
   .dash-scroll-panel .app-panel-body { max-height: 80px; padding: 6px 16px; }
-  .staff-dash .app-panel header { padding: 6px 14px; }
+  .staff-dash .app-panel > header { padding: 6px 14px; }
   .staff-dash .app-panel h2 { font-size: 18px; }
-  .staff-dash .app-panel header span { font-size: 10px; }
+  .staff-dash .app-panel > header span { font-size: 10px; }
   .staff-dash { gap: 6px; }
 }
 
