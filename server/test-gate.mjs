@@ -36,6 +36,9 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   // Bluetooth: staff phones meshing with no wifi, no router and no cell tower.
   // Runs against a simulated radio, so it needs no hardware and belongs here.
   '../native/ble-test.mjs',
+  // And finding those phones in the first place: dedupe, cool-off, letting go
+  // of a link that ended, and leaving nothing behind when the app closes.
+  '../native/ble-mesh-test.mjs',
   // hitkoin-test is deliberately NOT here: it needs a live chain and an RPC URL,
   // and a gate that cannot pass on a laptop is a gate people learn to skip.
   //

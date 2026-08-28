@@ -59,6 +59,17 @@ export class MeshNode {
     tp.onMessage((msg, reply) => this._handle(msg, reply));
     return tp;
   }
+  // Links go away. A door phone walks out of Bluetooth range, a tablet goes
+  // flat, a laptop is closed — and until now nothing ever left this list, so
+  // every broadcast kept writing into a radio that is not there. On a wired
+  // mesh that is a slow leak; on Bluetooth in a room people move around in it
+  // is the normal case.
+  removeTransport(tp) {
+    const i = this.transports.indexOf(tp);
+    if (i < 0) return false;
+    this.transports.splice(i, 1);
+    return true;
+  }
   _broadcast(msg) { for (const tp of this.transports) tp.send(msg); }
 
   // ── local writes ──

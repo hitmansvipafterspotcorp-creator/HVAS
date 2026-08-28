@@ -42,10 +42,25 @@ npx cap sync
 npx cap open android         # or: npx cap open ios
 ```
 
-Wire the BLE discovery loop (see the sketch at the bottom of
-`ble-radio-capacitor.js`) into the app's startup so each device advertises the
-HVAS service, scans for peers, and hands every connection to the mesh as a
-`BleTransport(radio, VENUE_KEY)`.
+Wire the discovery loop into the app's startup:
+
+```js
+import { BleClient } from '@capacitor-community/bluetooth-le';
+import { startBleMesh } from './native/ble-mesh.mjs';
+
+const mesh = startBleMesh({ BleClient, node, key: VENUE_KEY })
+  .onChange(({ event, peers }) => showOnVenueScreen(event, peers));
+await mesh.start();
+// on app teardown:
+await mesh.stop();
+```
+
+It advertises the HVAS service, scans for peers, and hands every connection to
+the mesh as a `BleTransport(radio, VENUE_KEY)` — and, more to the point, it
+handles the four things a room full of moving phones does to a radio: the same
+device offered by the scanner over and over, a link that ends when somebody
+walks away, a phone that is switched off, and closing the app. All of that is
+`ble-mesh.mjs` and all of it is tested without hardware.
 
 ## Permissions
 
@@ -61,8 +76,10 @@ HVAS service, scans for peers, and hands every connection to the mesh as a
 |---|---|---|
 | Fragment / reassemble (loss + reorder) | `native/ble.mjs` | ✅ `ble-test.mjs` |
 | Encrypt + mesh convergence over BLE-shaped link | `native/ble.mjs` + mesh | ✅ `ble-test.mjs` |
+| Discovery: dedupe, cool-off, drop, teardown | `native/ble-mesh.mjs` | ✅ `ble-mesh-test.mjs` |
 | GATT read/write/notify, scan/advertise | `ble-radio-capacitor.js` | device only |
 
 ```bash
-node native/ble-test.mjs   # fragmentation + encrypted mesh over a simulated radio
+node native/ble-test.mjs        # fragmentation + encrypted mesh over a simulated radio
+node native/ble-mesh-test.mjs   # discovery, dedupe, dropped links, teardown
 ```
