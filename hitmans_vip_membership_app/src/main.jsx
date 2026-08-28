@@ -40,6 +40,9 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiHouseMoney, apiMarketSettle, apiGigSecure, apiGigSettle, apiLicenseSettle, apiReferralPay,
   apiNotifyStatus, apiNotifyConfig, apiNotifyTest,
   apiMyCovenant, apiMyRecord, apiResign, apiRejoin,
+  apiRoomMe, apiRoomProfile, apiRoomMember, apiRoomMembers, apiRoomFeed, apiRoomPost,
+  apiRoomHide, apiRoomReact, apiRoomComment, apiRoomPostOne, apiRoomFollow, apiRoomBlock,
+  apiRoomThreads, apiRoomThread, apiRoomMessage,
   apiBingoReset, apiBingoBoard, apiBingoDecks, apiYoutubeSearch, apiBingoPlayMedia, apiBingoStopMedia,
   apiYoutubeKeyStatus, apiSetYoutubeKey, apiGoogleStatus, apiGoogleDisconnect, googleSignInUrl,
   apiPartyState, apiPartyStart, apiPartyVote, apiPartyEnd, apiPartyReset,
@@ -874,6 +877,13 @@ const screens = [
     detail: 'Give to a cause, or apply for a seat on its board.',
   },
   {
+    id: 'room',
+    label: 'The Room',
+    eyebrow: 'Members Only',
+    title: 'The Room',
+    detail: 'The feed, who’s in, and messages nobody else reads.',
+  },
+  {
     id: 'standing',
     label: 'Membership',
     eyebrow: 'The Association',
@@ -1115,7 +1125,7 @@ const ROLES = [
     // night from inside Lip Sync Bingo (behind the venue's host code), so the
     // host screens have to be reachable from the member role.
     allowed: ['membership', 'myPass', 'profile', 'checkout', 'history', 'lobby', 'playerCard', 'party', 'booking',
-      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs', 'earn', 'standing'],
+      'host', 'songQueue', 'winner', 'tv', 'bingoStyle', 'lipsyncBattle', 'support', 'programs', 'earn', 'standing', 'room'],
   },
   {
     id: 'staff',
@@ -1800,6 +1810,7 @@ function ScreenBody({ activeScreen, navigate, session }) {
   if (activeScreen === 'programs') return <ProgramActions onDone={() => navigate('myPass')} />;
   if (activeScreen === 'earn') return <EarnScreen onDone={() => navigate('myPass')} />;
   if (activeScreen === 'standing') return <StandingScreen onDone={() => navigate('myPass')} />;
+  if (activeScreen === 'room') return <RoomScreen onDone={() => navigate('myPass')} />;
   if (activeScreen === 'staffDashboard') return <StaffDashboardScreen />;
   if (activeScreen === 'watchlist') return <WatchlistScreen />;
   if (activeScreen === 'payments') return <PaymentsScreen />;
@@ -3377,6 +3388,15 @@ function MemberPass({ member, checkedIn, onRenew, onCancelled, navigate }) {
 
       {tab === 'account' && (
       <>
+      {/* The room comes first of these, because it is the one a member opens
+          on a Tuesday. Everything else here is something you do occasionally;
+          this is the reason to have the app on your phone at all. */}
+      {apiEnabled() && navigate && (
+        <button type="button" className="prog-do room-do" onClick={() => navigate('room')}>
+          <strong>The Room</strong>
+          <span>The feed, who’s in, and messages nobody at the venue reads.</span>
+        </button>
+      )}
       {/* Where the association lives: what you stand behind, what you can earn,
           and the relationship itself. All three were stacked over the pass and
           are here now — the pass is for the door, this is for the sofa. */}
@@ -5882,6 +5902,510 @@ function StandingScreen({ onDone }) {
 
       {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
     </AppPanel>
+  );
+}
+
+// How long ago, the way a person would say it. A feed full of timestamps is a
+// feed nobody reads the timestamps in.
+function timeAgo(ts) {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.round(h / 24);
+  if (d < 7) return `${d}d`;
+  return fmtDate(ts);
+}
+
+// ── THE ROOM ───────────────────────────────────────────────────────────────
+//
+// What members do with each other. A feed, the people in it, and messages —
+// the things Instagram and Snapchat are for, between the members of this
+// association, with no restriction on what they say to one another.
+//
+// The whole screen is behind acceptance. Every call under it is refused by the
+// server until somebody has agreed to the covenant, said what they do, chosen
+// a programme and taken a membership, so there is nothing to guard here — the
+// door already did it.
+//
+// One rule shows up everywhere below: a member's contact and door number are
+// never rendered. The server does not send them, and nothing here asks. A
+// screenshot of this screen must never be a screenshot of somebody's identity.
+function RoomScreen({ onDone }) {
+  const [tab, setTab] = useState('feed');
+  const [openMember, setOpenMember] = useState(null);   // a profile being read
+  const [openThread, setOpenThread] = useState(null);   // a conversation
+
+  if (openThread) {
+    return <RoomThread withId={openThread} onBack={() => setOpenThread(null)} />;
+  }
+  if (openMember) {
+    return (
+      <RoomProfile
+        id={openMember}
+        onBack={() => setOpenMember(null)}
+        onMessage={(id) => { setOpenMember(null); setOpenThread(id); }}
+      />
+    );
+  }
+
+  return (
+    <AppPanel title="The Room" subtitle="Members, and only members">
+      <div className="staff-hub-tabs prog-tabs">
+        {[['feed', 'Feed'], ['who', 'Who’s in'], ['dms', 'Messages'], ['you', 'You']].map(([id, label]) => (
+          <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}`}
+                  onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+      {tab === 'feed' && <RoomFeed onOpenMember={setOpenMember} />}
+      {tab === 'who' && <RoomWho onOpenMember={setOpenMember} onMessage={setOpenThread} />}
+      {tab === 'dms' && <RoomMessages onOpen={setOpenThread} />}
+      {tab === 'you' && <RoomYou onOpenMember={setOpenMember} />}
+      {onDone && <button type="button" className="bingo-btn ghost" onClick={onDone}>← Back</button>}
+    </AppPanel>
+  );
+}
+
+// Reading a picture off the phone without uploading anything anywhere. It is
+// scaled down here, on the device, because a 12-megapixel photo posted to a
+// venue feed is a photo nobody on a phone will wait to load.
+async function shrinkImage(file, max = 1280, quality = 0.72) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale), h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+// Somebody's face and name, at the size the context needs.
+function Avatar({ who, size = 40, onClick }) {
+  const initials = (who?.name || '?').trim().slice(0, 1).toUpperCase();
+  const style = { width: size, height: size, fontSize: Math.round(size * 0.42) };
+  return (
+    <button type="button" className="rm-avatar" style={style} onClick={onClick} disabled={!onClick}
+            aria-label={who?.name || 'Member'}>
+      {who?.avatar ? <img src={who.avatar} alt="" /> : <span>{initials}</span>}
+    </button>
+  );
+}
+
+const REACTIONS = ['🔥', '💯', '❤️', '😂', '👏'];
+
+function RoomFeed({ onOpenMember }) {
+  const [only, setOnly] = useState('');
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [body, setBody] = useState('');
+  const [media, setMedia] = useState('');
+  const [kind, setKind] = useState('POST');
+  const [openComments, setOpenComments] = useState(null);
+
+  const load = async () => {
+    try { setData(await apiRoomFeed(only)); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load the room.'); }
+  };
+  useEffect(() => { load(); }, [only]);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+
+  if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
+
+  return (
+    <>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+
+      <div className="rm-compose">
+        <textarea className="jub-input jub-textarea" rows={2} maxLength={2000}
+                  placeholder="Say something to the room…"
+                  value={body} onChange={(e) => setBody(e.target.value)} />
+        {media && (
+          <div className="rm-media-preview">
+            <img src={media} alt="" />
+            <button type="button" className="bingo-btn compact ghost" onClick={() => setMedia('')}>Remove</button>
+          </div>
+        )}
+        <div className="rm-compose-row">
+          <label className="rm-photo-btn">
+            📷 Photo
+            <input type="file" accept="image/*" hidden
+                   onChange={async (e) => {
+                     const f = e.target.files?.[0];
+                     if (!f) return;
+                     try { setMedia(await shrinkImage(f)); }
+                     catch { setErr('Could not read that picture.'); }
+                   }} />
+          </label>
+          {/* A moment is gone in a day. Somebody should be able to put something
+              up on a Saturday night without it following them into a Monday. */}
+          <button type="button" className={`rm-kind${kind === 'MOMENT' ? ' on' : ''}`}
+                  onClick={() => setKind(kind === 'MOMENT' ? 'POST' : 'MOMENT')}>
+            {kind === 'MOMENT' ? '⏳ Gone in a day' : 'Stays up'}
+          </button>
+          <button type="button" className="bingo-btn compact gold"
+                  disabled={busy || (!body.trim() && !media)}
+                  onClick={() => act(async () => {
+                    await apiRoomPost({ body: body.trim(), media: media || undefined, kind });
+                    setBody(''); setMedia(''); setKind('POST');
+                  })}>
+            {busy ? 'Posting…' : 'Post'}
+          </button>
+        </div>
+      </div>
+
+      <div className="rm-filters">
+        {[['', 'Everyone'], ['following', 'Following'], ['moments', 'Moments']].map(([id, label]) => (
+          <button type="button" key={id} className={`rm-filter${only === id ? ' on' : ''}`}
+                  onClick={() => setOnly(id)}>{label}</button>
+        ))}
+      </div>
+
+      {data.feed.length === 0 && (
+        <p className="dash-empty">
+          {only === 'following' ? 'Nobody you follow has posted yet.' : 'Nothing here yet. Be the first.'}
+        </p>
+      )}
+
+      {data.feed.map((p) => (
+        <article key={p.postId} className={`rm-post${p.kind === 'MOMENT' ? ' moment' : ''}`}>
+          <header className="rm-post-head">
+            <Avatar who={p.by} onClick={() => onOpenMember(p.by.id)} />
+            <div className="rm-post-who">
+              <button type="button" className="rm-name" onClick={() => onOpenMember(p.by.id)}>{p.by.name}</button>
+              <span className="rm-sub">
+                {p.by.handle ? `@${p.by.handle}` : p.by.tradeLabel}
+                {p.by.handle && p.by.tradeLabel ? ` · ${p.by.tradeLabel}` : ''} · {timeAgo(p.at)}
+              </span>
+            </div>
+            {p.kind === 'MOMENT' && <span className="jub-chip">⏳</span>}
+          </header>
+          {p.body && <p className="rm-body">{p.body}</p>}
+          {p.media && <img className="rm-media" src={p.media} alt="" />}
+          <div className="rm-actions">
+            {REACTIONS.map((e) => (
+              <button type="button" key={e} disabled={busy}
+                      className={`rm-react${p.reactions.mine === e ? ' on' : ''}`}
+                      onClick={() => act(() => apiRoomReact(p.postId, p.reactions.mine === e ? '' : e))}>
+                {e}{p.reactions.counts[e] ? ` ${p.reactions.counts[e]}` : ''}
+              </button>
+            ))}
+            <button type="button" className="rm-react"
+                    onClick={() => setOpenComments(openComments === p.postId ? null : p.postId)}>
+              💬{p.comments ? ` ${p.comments}` : ''}
+            </button>
+            {p.mine && (
+              <button type="button" className="rm-react danger" disabled={busy}
+                      onClick={() => act(() => apiRoomHide(p.postId))}>Delete</button>
+            )}
+          </div>
+          {openComments === p.postId && <RoomComments postId={p.postId} onOpenMember={onOpenMember} />}
+        </article>
+      ))}
+    </>
+  );
+}
+
+function RoomComments({ postId, onOpenMember }) {
+  const [data, setData] = useState(null);
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = async () => { try { setData(await apiRoomPostOne(postId)); } catch { /* gone */ } };
+  useEffect(() => { load(); }, [postId]);
+  if (!data) return <p className="dash-empty">Loading…</p>;
+  return (
+    <div className="rm-comments">
+      {data.comments.map((c) => (
+        <div key={c.commentId} className="rm-comment">
+          <Avatar who={c.by} size={26} onClick={() => onOpenMember(c.by.id)} />
+          <div>
+            <button type="button" className="rm-name sm" onClick={() => onOpenMember(c.by.id)}>{c.by.name}</button>
+            <p>{c.body}</p>
+          </div>
+        </div>
+      ))}
+      <div className="rm-comment-add">
+        <input className="jub-input" placeholder="Say something…" maxLength={1000}
+               value={body} onChange={(e) => setBody(e.target.value)}
+               onKeyDown={(e) => { if (e.key === 'Enter' && body.trim()) e.currentTarget.blur(); }} />
+        <button type="button" className="bingo-btn compact" disabled={busy || !body.trim()}
+                onClick={async () => {
+                  setBusy(true);
+                  try { await apiRoomComment(postId, body.trim()); setBody(''); await load(); } catch { /* ignore */ }
+                  setBusy(false);
+                }}>Send</button>
+      </div>
+    </div>
+  );
+}
+
+
+// Who is in. The directory is the point of a room like this: a private
+// association is worth belonging to because of who else belongs, and a member
+// should be able to find the barber, the bookkeeper or the welder by trade
+// rather than by asking around.
+function RoomWho({ onOpenMember, onMessage }) {
+  const [q, setQ] = useState('');
+  const [trade, setTrade] = useState('');
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    let live = true;
+    apiRoomMembers(q, trade)
+      .then((d) => { if (live) { setData(d); setErr(''); } })
+      .catch((e) => { if (live) setErr(e.message || 'Could not load.'); });
+    return () => { live = false; };
+  }, [q, trade]);
+  if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
+  return (
+    <>
+      <input className="jub-input" placeholder="Search by name or trade…"
+             value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="rm-filters">
+        <button type="button" className={`rm-filter${trade === '' ? ' on' : ''}`} onClick={() => setTrade('')}>All</button>
+        {(data.trades || []).map((g) => (
+          <button type="button" key={g.id} className={`rm-filter${trade === g.id ? ' on' : ''}`}
+                  onClick={() => setTrade(trade === g.id ? '' : g.id)}>{g.label}</button>
+        ))}
+      </div>
+      {data.members.length === 0 && <p className="dash-empty">Nobody matches that.</p>}
+      {data.members.map((m) => (
+        <div key={m.id} className="rm-person">
+          <Avatar who={m} onClick={() => onOpenMember(m.id)} />
+          <div className="dash-info">
+            <button type="button" className="rm-name" onClick={() => onOpenMember(m.id)}>{m.name}</button>
+            <span className="rm-sub">{m.handle ? `@${m.handle} · ` : ''}{m.tradeLabel || '—'}</span>
+          </div>
+          <button type="button" className="bingo-btn compact ghost" onClick={() => onMessage(m.id)}>Message</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function RoomMessages({ onOpen }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    apiRoomThreads().then(setData).catch((e) => setErr(e.message || 'Could not load.'));
+  }, []);
+  if (!data) return <p className="dash-empty">{err || 'Loading…'}</p>;
+  if (!data.threads.length) {
+    return <p className="dash-empty">No conversations yet. Find somebody under “Who’s in”.</p>;
+  }
+  return (
+    <>
+      {/* Said once, here, because it is the part of this that is genuinely
+          different from the apps it looks like. */}
+      <p className="earn-note">Nobody at the venue reads these. Only the two of you.</p>
+      {data.threads.map((t) => (
+        <button type="button" key={t.with.id} className="rm-thread" onClick={() => onOpen(t.with.id)}>
+          <Avatar who={t.with} />
+          <div className="dash-info">
+            <strong>{t.with.name}</strong>
+            <span className="rm-sub">{t.last.mine ? 'You: ' : ''}{t.last.body.slice(0, 60)}</span>
+          </div>
+          <span className="rm-sub">{timeAgo(t.last.at)}</span>
+        </button>
+      ))}
+    </>
+  );
+}
+
+function RoomThread({ withId, onBack }) {
+  const [data, setData] = useState(null);
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const load = async () => {
+    try { setData(await apiRoomThread(withId)); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not open that.'); }
+  };
+  useEffect(() => { load(); }, [withId]);
+  // A conversation that only updates when you reload is not a conversation.
+  useEffect(() => {
+    const id = setInterval(load, 5000);
+    return () => clearInterval(id);
+  }, [withId]);
+  const send = async () => {
+    const text = body.trim();
+    if (!text) return;
+    setBusy(true); setErr('');
+    try { await apiRoomMessage(withId, text); setBody(''); await load(); }
+    catch (e) { setErr(e.message || 'That did not send.'); }
+    setBusy(false);
+  };
+  if (!data) {
+    return <AppPanel title="Messages"><p className="dash-empty">{err || 'Loading…'}</p>
+      <button type="button" className="bingo-btn ghost" onClick={onBack}>← Back</button></AppPanel>;
+  }
+  return (
+    <AppPanel title={data.with?.name || 'Messages'} subtitle={data.with?.tradeLabel || ''}>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <div className="rm-chat">
+        {data.messages.length === 0 && <p className="dash-empty">Say the first thing.</p>}
+        {data.messages.map((m) => (
+          <div key={m.id} className={`rm-bubble${m.mine ? ' mine' : ''}`}>
+            <p>{m.body}</p>
+            <span>{timeAgo(m.at)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="rm-comment-add">
+        <input className="jub-input" placeholder="Write…" maxLength={4000} value={body}
+               onChange={(e) => setBody(e.target.value)}
+               onKeyDown={(e) => { if (e.key === 'Enter') send(); }} />
+        <button type="button" className="bingo-btn compact gold" disabled={busy || !body.trim()} onClick={send}>Send</button>
+      </div>
+      <button type="button" className="bingo-btn ghost" onClick={onBack}>← Back</button>
+    </AppPanel>
+  );
+}
+
+function RoomProfile({ id, onBack, onMessage }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    try { setData(await apiRoomMember(id)); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not open that.'); }
+  };
+  useEffect(() => { load(); }, [id]);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+  if (!data) {
+    return <AppPanel title="Member"><p className="dash-empty">{err || 'Loading…'}</p>
+      <button type="button" className="bingo-btn ghost" onClick={onBack}>← Back</button></AppPanel>;
+  }
+  const p = data.profile;
+  return (
+    <AppPanel title={p.name} subtitle={p.tradeLabel || ''}>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <div className="rm-profile-head">
+        <Avatar who={p} size={72} />
+        <div>
+          {p.handle && <span className="rm-sub">@{p.handle}</span>}
+          <div className="rm-counts">
+            <span><b>{p.posts}</b> posts</span>
+            <span><b>{p.followers}</b> followers</span>
+            <span><b>{p.following}</b> following</span>
+          </div>
+        </div>
+      </div>
+      {p.bio && <p className="rm-body">{p.bio}</p>}
+      <div className="rm-profile-actions">
+        <button type="button" className={`bingo-btn compact${data.following ? ' ghost' : ' gold'}`} disabled={busy}
+                onClick={() => act(() => apiRoomFollow(p.id, !data.following))}>
+          {data.following ? 'Following' : 'Follow'}
+        </button>
+        <button type="button" className="bingo-btn compact" onClick={() => onMessage(p.id)}>Message</button>
+        {/* Being left alone needs no reason and no approval. */}
+        <button type="button" className="bingo-btn compact ghost" disabled={busy}
+                onClick={() => act(() => apiRoomBlock(p.id, !data.blocked))}>
+          {data.blocked ? 'Unblock' : 'Block'}
+        </button>
+      </div>
+      {data.posts?.length > 0 && (
+        <div className="give-list">
+          <h4>Their posts</h4>
+          {data.posts.map((x) => (
+            <article key={x.postId} className="rm-post">
+              {x.body && <p className="rm-body">{x.body}</p>}
+              {x.media && <img className="rm-media" src={x.media} alt="" />}
+              <span className="rm-sub">{timeAgo(x.at)}</span>
+            </article>
+          ))}
+        </div>
+      )}
+      <button type="button" className="bingo-btn ghost" onClick={onBack}>← Back</button>
+    </AppPanel>
+  );
+}
+
+// Your own page, and the one screen here where you change what the room sees.
+function RoomYou({ onOpenMember }) {
+  const [me, setMe] = useState(null);
+  const [form, setForm] = useState({ handle: '', bio: '' });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [saved, setSaved] = useState('');
+  const load = async () => {
+    try {
+      const d = await apiRoomMe();
+      setMe(d);
+      setForm({ handle: d.profile?.handle || '', bio: d.profile?.bio || '' });
+      setErr('');
+    } catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  if (!me) return <p className="dash-empty">{err || 'Loading…'}</p>;
+  const p = me.profile;
+  return (
+    <>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      {saved && <p className="k-nudge">{saved}</p>}
+      <div className="rm-profile-head">
+        <Avatar who={p} size={72} />
+        <div>
+          <strong className="rm-name">{p.name}</strong>
+          <span className="rm-sub">{p.tradeLabel}</span>
+          <div className="rm-counts">
+            <span><b>{p.posts}</b> posts</span>
+            <span><b>{p.followers}</b> followers</span>
+            <span><b>{p.following}</b> following</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="jub-form">
+        <label className="jub-label">Your picture</label>
+        <input className="jub-input" type="file" accept="image/*"
+               onChange={async (e) => {
+                 const f = e.target.files?.[0];
+                 if (!f) return;
+                 setBusy(true); setErr('');
+                 try {
+                   await apiRoomProfile({ avatar: await shrinkImage(f, 512, 0.8) });
+                   await load(); setSaved('Saved.'); setTimeout(() => setSaved(''), 2500);
+                 } catch (e2) { setErr(e2.message || 'Could not save that picture.'); }
+                 setBusy(false);
+               }} />
+        <label className="jub-label">Your handle</label>
+        <input className="jub-input" placeholder="@yourname" maxLength={21} value={form.handle}
+               onChange={(e) => setForm((f) => ({ ...f, handle: e.target.value.replace(/^@/, '') }))} />
+        <label className="jub-label">About you</label>
+        <textarea className="jub-input jub-textarea" rows={3} maxLength={300} value={form.bio}
+                  placeholder="What you do, where to find you."
+                  onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))} />
+        <button type="button" className="bingo-btn gold" disabled={busy}
+                onClick={async () => {
+                  setBusy(true); setErr('');
+                  try {
+                    await apiRoomProfile({ handle: form.handle.trim() || undefined, bio: form.bio });
+                    await load(); setSaved('Saved.'); setTimeout(() => setSaved(''), 2500);
+                  } catch (e2) { setErr(e2.message || 'That did not save.'); }
+                  setBusy(false);
+                }}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+
+      <p className="earn-note">
+        Your contact and your member number are never shown in the room — not on your
+        page, not in the feed, not to anybody. What the room sees is your name, your
+        picture, and what you do.
+      </p>
+    </>
   );
 }
 

@@ -3044,3 +3044,105 @@
   font: 700 11.5px/1.35 var(--k-font); letter-spacing: .08em;
   text-transform: uppercase; color: var(--k-text-dim);
 }
+
+/* ── The Room ─────────────────────────────────────────────────────────────
+   What members do with each other. It should feel like the apps they already
+   use — because the argument for it is not that it is a new kind of place, it
+   is that this one is CLOSED, and that difference is worth nothing if the
+   thing itself is worse to use. */
+.room-do { border-color: rgba(176, 107, 255, .55); background: rgba(176, 107, 255, .07); }
+.room-do strong { color: #c89bff; }
+
+.rm-avatar {
+  flex: none; display: grid; place-items: center; overflow: hidden; padding: 0;
+  border-radius: 50%; border: 1px solid var(--k-edge-soft);
+  background: rgba(255, 255, 255, .06); color: var(--k-text);
+  font-weight: 900; cursor: pointer;
+}
+.rm-avatar:disabled { cursor: default; }
+.rm-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.rm-name {
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+  font: 800 13.5px/1.25 var(--k-font); color: var(--k-text);
+}
+.rm-name.sm { font-size: 12px; }
+.rm-sub { display: block; font: 600 11px/1.4 var(--k-font); color: var(--k-text-dim); }
+
+/* Writing something. Deliberately the first thing on the screen — a feed you
+   can only read is a noticeboard. */
+.rm-compose {
+  display: grid; gap: 8px; padding: 12px; border-radius: 13px; margin-bottom: 12px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+.rm-compose-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rm-compose-row .bingo-btn { margin-left: auto; }
+.rm-photo-btn, .rm-kind {
+  padding: 8px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .04);
+  font: 700 11.5px/1 var(--k-font); color: var(--k-text-dim);
+}
+.rm-kind.on { border-color: var(--k-gold); color: var(--k-gold); background: rgba(255, 207, 71, .09); }
+.rm-media-preview { position: relative; display: grid; gap: 6px; justify-items: start; }
+.rm-media-preview img { max-width: 100%; border-radius: 10px; }
+
+.rm-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.rm-filter {
+  padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+  font: 700 11.5px/1 var(--k-font); color: var(--k-text-dim);
+}
+.rm-filter.on { border-color: var(--k-cyan-lt); color: var(--k-cyan-lt); background: rgba(34, 211, 238, .08); }
+
+.rm-post {
+  display: grid; gap: 9px; padding: 13px; border-radius: 13px; margin-bottom: 10px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+}
+/* A moment is going to be gone. It should look like it is passing through. */
+.rm-post.moment { border-color: rgba(255, 207, 71, .4); background: rgba(255, 207, 71, .05); }
+.rm-post-head { display: flex; align-items: center; gap: 10px; }
+.rm-post-who { min-width: 0; }
+.rm-body { margin: 0; font: 500 13.5px/1.55 var(--k-font); color: var(--k-text); overflow-wrap: anywhere; }
+.rm-media { width: 100%; border-radius: 11px; display: block; }
+
+.rm-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.rm-react {
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .03);
+  font: 700 12px/1 var(--k-font); color: var(--k-text-dim);
+}
+.rm-react.on { border-color: var(--k-gold); background: rgba(255, 207, 71, .12); color: var(--k-gold); }
+.rm-react.danger { color: #ff8aa0; border-color: rgba(255, 138, 160, .4); }
+
+.rm-comments { display: grid; gap: 8px; padding-top: 4px; border-top: 1px solid var(--k-edge-soft); }
+.rm-comment { display: flex; gap: 8px; align-items: flex-start; }
+.rm-comment p { margin: 2px 0 0; font: 500 12.5px/1.5 var(--k-font); color: var(--k-text); overflow-wrap: anywhere; }
+.rm-comment-add { display: flex; gap: 6px; align-items: center; }
+.rm-comment-add .jub-input { flex: 1 1 auto; min-width: 0; }
+
+.rm-person, .rm-thread {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; margin-bottom: 6px; cursor: pointer;
+  border: 1px solid var(--k-edge-soft); border-radius: 11px;
+  background: rgba(255, 255, 255, .025); color: var(--k-text);
+}
+
+.rm-profile-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+.rm-counts { display: flex; gap: 12px; margin-top: 5px; }
+.rm-counts span { font: 600 11px/1.3 var(--k-font); color: var(--k-text-dim); }
+.rm-counts b { display: block; font: 900 15px/1.1 var(--k-font); color: var(--k-text); }
+.rm-profile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+
+/* A conversation. Theirs on the left, yours on the right, the way every
+   messaging app has taught everybody to read one. */
+.rm-chat { display: grid; gap: 8px; margin: 10px 0; }
+.rm-bubble {
+  justify-self: start; max-width: 82%; padding: 9px 12px; border-radius: 14px 14px 14px 4px;
+  border: 1px solid var(--k-edge-soft); background: rgba(255, 255, 255, .04);
+}
+.rm-bubble.mine {
+  justify-self: end; border-radius: 14px 14px 4px 14px;
+  border-color: rgba(176, 107, 255, .45); background: rgba(176, 107, 255, .12);
+}
+.rm-bubble p { margin: 0; font: 500 13px/1.5 var(--k-font); color: var(--k-text); overflow-wrap: anywhere; }
+.rm-bubble span { display: block; margin-top: 3px; font: 600 9.5px/1 var(--k-font); color: var(--k-text-faint); }

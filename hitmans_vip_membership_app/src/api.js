@@ -204,6 +204,33 @@ export function apiMarketClose(listingId) { return call('POST', '/market/close',
 export function apiMarketOrder(listingId, note) { return call('POST', '/market/order', { listingId, note }, apiToken()); }
 export function apiMarketReceived(orderId, note) { return call('POST', '/market/received', { orderId, note }, apiToken()); }
 // Whether this venue can actually reach a member, and setting it up so it can.
+// ── The Room ─────────────────────────────────────────────────────────────
+// What members do with each other. Every one of these is refused until the
+// member has been accepted — the door is the gate, not the content.
+export function apiRoomMe() { return call('GET', '/room/me', null, apiToken()); }
+export function apiRoomProfile(body) { return call('POST', '/room/profile', body, apiToken()); }
+export function apiRoomMember(id) { return call('GET', `/room/member?id=${encodeURIComponent(id)}`, null, apiToken()); }
+export function apiRoomMembers(q, trade) {
+  const p = new URLSearchParams();
+  if (q) p.set('q', q);
+  if (trade) p.set('trade', trade);
+  return call('GET', `/room/members${p.toString() ? `?${p}` : ''}`, null, apiToken());
+}
+export function apiRoomFeed(only) {
+  return call('GET', `/room/feed${only ? `?only=${only}` : ''}`, null, apiToken());
+}
+export function apiRoomPost(body) { return call('POST', '/room/post', body, apiToken()); }
+export function apiRoomHide(postId) { return call('POST', '/room/post/hide', { postId }, apiToken()); }
+export function apiRoomReact(postId, emoji) { return call('POST', '/room/react', { postId, emoji }, apiToken()); }
+export function apiRoomComment(postId, body) { return call('POST', '/room/comment', { postId, body }, apiToken()); }
+export function apiRoomPostOne(id) { return call('GET', `/room/post?id=${encodeURIComponent(id)}`, null, apiToken()); }
+export function apiRoomFollow(memberId, on) { return call('POST', '/room/follow', { memberId, on }, apiToken()); }
+export function apiRoomBlock(memberId, on) { return call('POST', '/room/block', { memberId, on }, apiToken()); }
+export function apiRoomReport(body) { return call('POST', '/room/report', body, apiToken()); }
+export function apiRoomThreads() { return call('GET', '/room/threads', null, apiToken()); }
+export function apiRoomThread(withId) { return call('GET', `/room/thread?with=${encodeURIComponent(withId)}`, null, apiToken()); }
+export function apiRoomMessage(to, body) { return call('POST', '/room/message', { to, body }, apiToken()); }
+
 // ── What a member can ask of the association about themselves ────────────
 // Their own rights, so every one of these is authorised by their own session.
 export function apiMyCovenant() { return call('GET', '/me/covenant', null, apiToken()); }
