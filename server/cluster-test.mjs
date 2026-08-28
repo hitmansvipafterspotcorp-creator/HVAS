@@ -42,7 +42,10 @@ await wait(150); // let the mesh link establish
 console.log('MEMBER SIGNS UP + BUYS ON NODE A');
 const s = await call(urlA, 'POST', '/auth/member/start', { contact: '850-555-0000' });
 const v = await call(urlA, 'POST', '/auth/member/verify', { contact: '850-555-0000', code: s.body.devCode, name: 'Mesh' });
-await onboard(call, v.body.token);
+// onboard() speaks call(method, path, body, token); this file's call takes the
+// node URL first, because there are two of them. Bind A and hand that over.
+const callA = (m, path, body, token) => call(urlA, m, path, body, token);
+await onboard(callA, v.body.token);
 const mtok = v.body.token; const number = v.body.member.number;
 await call(urlA, 'POST', '/membership/purchase', { tier: 'Monthly', payment: 'Cash App' }, mtok);
 ok(number, `member ${number} created on A`);
@@ -67,6 +70,46 @@ ok(boardA.body.inside.some((x) => x.number === number), 'A’s door board shows 
 
 console.log('\nCONVERGENCE');
 ok(A.node.digest() === B.node.digest(), 'both nodes converged on the same op-set');
+
+console.log('\nONE DEVICE DIES MID-NIGHT AND THE NIGHT KEEPS GOING');
+// The whole argument for running a venue on two or three trusted devices
+// instead of one server: the failure that actually happens to a nightclub is a
+// phone going flat, getting knocked off a bar, or walking out of the building
+// in somebody's pocket. A cloud server does not help with any of those, because
+// the thing that died was the door.
+//
+// So: a second member arrives while both are up, node A is killed outright, and
+// the door has to keep working on B alone.
+const s2 = await call(urlA, 'POST', '/auth/member/start', { contact: '850-555-0001' });
+const v2 = await call(urlA, 'POST', '/auth/member/verify',
+  { contact: '850-555-0001', code: s2.body.devCode, name: 'Second' });
+await onboard(callA, v2.body.token);
+await call(urlA, 'POST', '/membership/purchase', { tier: 'Monthly', payment: 'Cash App' }, v2.body.token);
+const num2 = v2.body.member.number;
+await wait(400);
+ok(!!(await call(urlB, 'POST', '/door/verify', { number: num2 }, staffB.body.token)).body.ok,
+   'while both are up, either door admits them');
+
+// Kill A the way a phone dies: no warning, no handover.
+A.server.close();
+await new Promise((r) => A.server.close(r));
+await wait(300);
+ok(true, 'node A is gone');
+
+// B has to be a whole venue on its own now.
+const aloneAdmit = await call(urlB, 'POST', '/door/verify', { number: number }, staffB.body.token);
+ok(aloneAdmit.body.ok, 'B still admits the member who signed up on the node that died');
+const aloneBoard = await call(urlB, 'GET', '/door/board', null, staffB.body.token);
+ok(Array.isArray(aloneBoard.body.inside), 'B still has a door board');
+const s3 = await call(urlB, 'POST', '/auth/member/start', { contact: '850-555-0002' });
+const v3 = await call(urlB, 'POST', '/auth/member/verify',
+  { contact: '850-555-0002', code: s3.body.devCode, name: 'Third' });
+ok(!!v3.body.token, 'and somebody NEW can still join on B with A in the bin');
+const callB = (m, path, body, token) => call(urlB, m, path, body, token);
+await onboard(callB, v3.body.token);
+await call(urlB, 'POST', '/membership/purchase', { tier: 'Monthly', payment: 'Cash App' }, v3.body.token);
+ok(!!(await call(urlB, 'POST', '/door/verify', { number: v3.body.member.number }, staffB.body.token)).body.ok,
+   'they take a membership and the door lets them in — the night carried on');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 A.closeMesh(); B.closeMesh(); A.server.close(); B.server.close();

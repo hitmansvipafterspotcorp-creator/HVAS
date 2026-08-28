@@ -19,6 +19,9 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   'night-test.mjs',
   // What members do with each other, and the door that gates it.
   'room-test.mjs',
+  // Two venue nodes, separate databases, no cloud — and one of them dying
+  // mid-night without taking the night with it.
+  'cluster-test.mjs',
   // Last, and the one that matters most on a night: a stranger signs up and
   // the door lets them in. If this fails, nothing else being green helps.
   'launch-test.mjs'];
