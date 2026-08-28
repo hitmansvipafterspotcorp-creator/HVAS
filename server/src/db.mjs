@@ -905,6 +905,19 @@ export function openDb(path) {
   // Reporting something to the house. Members say what they say to each other;
   // this is the one route by which the venue hears about it, and it is a member
   // asking rather than the venue watching.
+  // How far somebody has read in a conversation.
+  //
+  // Its own table rather than a flag on each message, because "read" is a fact
+  // about the reader and not about the message: two people in the same thread
+  // have read to different points, and a message does not become read, it
+  // becomes read BY somebody.
+  db.exec(`CREATE TABLE IF NOT EXISTS thread_reads (
+    member_id TEXT NOT NULL REFERENCES members(id),
+    other_id TEXT NOT NULL REFERENCES members(id),
+    read_at INTEGER NOT NULL,
+    PRIMARY KEY (member_id, other_id)
+  )`);
+
   db.exec(`CREATE TABLE IF NOT EXISTS room_reports (
     report_id TEXT PRIMARY KEY,
     by_id TEXT NOT NULL REFERENCES members(id),

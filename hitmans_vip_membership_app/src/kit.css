@@ -3146,3 +3146,12 @@
 }
 .rm-bubble p { margin: 0; font: 500 13px/1.5 var(--k-font); color: var(--k-text); overflow-wrap: anywhere; }
 .rm-bubble span { display: block; margin-top: 3px; font: 600 9.5px/1 var(--k-font); color: var(--k-text-faint); }
+
+/* Something waiting to be read. Weight rather than colour: a bold line is what
+   every messaging app has taught people to scan for. */
+.rm-sub.unread { color: var(--k-text); font-weight: 800; }
+.rm-badge {
+  flex: none; min-width: 20px; padding: 2px 7px; border-radius: 999px; text-align: center;
+  background: var(--k-gold); color: #1a1206;
+  font: 900 11px/1.5 var(--k-font); font-variant-numeric: tabular-nums;
+}

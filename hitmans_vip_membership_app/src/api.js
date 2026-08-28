@@ -227,6 +227,10 @@ export function apiRoomPostOne(id) { return call('GET', `/room/post?id=${encodeU
 export function apiRoomFollow(memberId, on) { return call('POST', '/room/follow', { memberId, on }, apiToken()); }
 export function apiRoomBlock(memberId, on) { return call('POST', '/room/block', { memberId, on }, apiToken()); }
 export function apiRoomReport(body) { return call('POST', '/room/report', body, apiToken()); }
+export function apiRoomReports() { return call('GET', '/room/reports', null, apiStaffToken()); }
+export function apiRoomReportHandle(reportId, outcome) {
+  return call('POST', '/room/report/handle', { reportId, outcome }, apiStaffToken());
+}
 export function apiRoomThreads() { return call('GET', '/room/threads', null, apiToken()); }
 export function apiRoomThread(withId) { return call('GET', `/room/thread?with=${encodeURIComponent(withId)}`, null, apiToken()); }
 export function apiRoomMessage(to, body) { return call('POST', '/room/message', { to, body }, apiToken()); }

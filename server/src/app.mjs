@@ -1374,6 +1374,14 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     };
   };
 
+  // Messages from `other` that arrived after this member last opened the thread.
+  const unreadFrom = (memberId, otherId) => {
+    const seen = db.prepare('SELECT read_at FROM thread_reads WHERE member_id=? AND other_id=?')
+      .get(memberId, otherId)?.read_at || 0;
+    return db.prepare('SELECT COUNT(*) n FROM messages WHERE from_id=? AND to_id=? AND at>?')
+      .get(otherId, memberId, seen).n;
+  };
+
   const blocked = (a, b) =>
     !!db.prepare('SELECT 1 FROM member_blocks WHERE member_id=? AND blocked_id=?').get(a, b);
 
@@ -2055,6 +2063,20 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
           detail: 'Sales, bookings, licences and commissions. None of it moves until somebody here confirms it.',
           waitingMs: oldest ? now - oldest : 0,
           action: { label: 'Settle them', screen: 'host', tab: 'money' },
+        });
+      }
+
+      // 5c. A member asked the house to look at something. Nothing in the room
+      //     is read by staff until this happens, which is exactly why it must
+      //     not sit in a table nobody opens.
+      const reports = db.prepare('SELECT report_id, at FROM room_reports WHERE handled_at IS NULL ORDER BY at ASC').all();
+      if (reports.length) {
+        items.push({
+          id: 'room-reports', urgency: 55, count: reports.length,
+          headline: reports.length === 1 ? 'A member reported something' : `${reports.length} things members reported`,
+          detail: 'They asked a person to look. Nothing else in the room is read by staff.',
+          waitingMs: now - reports[0].at,
+          action: { label: 'Look at it', screen: 'host', tab: 'reports' },
         });
       }
 
@@ -3164,6 +3186,68 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         note: 'A person will look at this. Nothing in the room is read by staff until somebody reports it.' });
     },
 
+    // ── What the house does hear about ───────────────────────────────────────
+    //
+    // Nothing in the room is read by staff until a member reports it. That is
+    // the deal, and it only holds if the reports actually reach somebody — a
+    // member is told "a person will look at this", and until now that sentence
+    // was false: reports were written to a table nothing ever read.
+    //
+    // Named sign-in only. A shared venue code runs a door; it does not read
+    // what members said to each other, even when it was reported.
+    'GET /room/reports': (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const rows = db.prepare(`SELECT r.*, m.name AS by_name FROM room_reports r
+        JOIN members m ON m.id=r.by_id ORDER BY r.handled_at IS NOT NULL, r.at ASC LIMIT 200`).all();
+      json(res, 200, {
+        reports: rows.map((r) => ({
+          reportId: r.report_id, kind: r.kind, reference: r.reference,
+          reason: r.reason || null, at: r.at, by: r.by_name,
+          handled: !!r.handled_at,
+          handledAt: r.handled_at || null, handledBy: r.handled_by || null, outcome: r.outcome || null,
+          // The thing complained about, resolved so nobody has to go digging
+          // for it — and ONLY the thing complained about. Reporting a post does
+          // not hand the house the rest of somebody's feed.
+          about: (() => {
+            if (r.kind === 'POST') {
+              const p = db.prepare('SELECT post_id, member_id, body, at, hidden_at FROM posts WHERE post_id=?').get(r.reference);
+              return p ? { by: profileOf(p.member_id)?.name, body: p.body, at: p.at, alreadyDown: !!p.hidden_at } : null;
+            }
+            if (r.kind === 'COMMENT') {
+              const x = db.prepare('SELECT member_id, body, at, hidden_at FROM post_comments WHERE comment_id=?').get(r.reference);
+              return x ? { by: profileOf(x.member_id)?.name, body: x.body, at: x.at, alreadyDown: !!x.hidden_at } : null;
+            }
+            if (r.kind === 'MEMBER') {
+              const p = profileOf(r.reference);
+              return p ? { by: p.name, trade: p.tradeLabel } : null;
+            }
+            // A reported MESSAGE is named but NOT quoted. The member reporting
+            // it can say what was said; the house does not get to read a
+            // private conversation because one line of it was complained about.
+            return { note: 'A message was reported. Its text is not shown here — ask the member what was said.' };
+          })(),
+        })),
+        open: rows.filter((r) => !r.handled_at).length,
+      });
+    },
+
+    // Answering one. Every outcome is a named person's decision with words
+    // against it, the same as every other decision in this venue.
+    'POST /room/report/handle': async (req, res) => {
+      const c = moneyAuth(req, res); if (!c) return;
+      const { reportId, outcome } = await readBody(req);
+      const r = db.prepare('SELECT * FROM room_reports WHERE report_id=?').get(String(reportId || ''));
+      if (!r) return json(res, 404, { error: 'no such report' });
+      if (r.handled_at) return json(res, 409, { error: 'that report has already been answered' });
+      const said = String(outcome || '').trim().slice(0, 500);
+      if (said.length < 4) {
+        return json(res, 400, { error: 'Say what was decided. A report closed with nothing said is a report ignored.' });
+      }
+      db.prepare('UPDATE room_reports SET handled_at=?, handled_by=?, outcome=? WHERE report_id=?')
+        .run(Date.now(), c.name || c.sub, said, r.report_id);
+      json(res, 200, { ok: true });
+    },
+
     // ── Messages, member to member ───────────────────────────────────────────
     //
     // No restriction on what two members say to each other, and no eye on it.
@@ -3183,11 +3267,19 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
           byPerson.set(other, {
             with: profileOf(other),
             last: { body: m.body, at: m.at, mine: m.from_id === c.sub },
-            unread: 0,
+            // How many of theirs have arrived since this member last opened it.
+            // This was hardcoded to zero, which made the whole thing a messaging
+            // app that never tells you somebody wrote to you.
+            unread: unreadFrom(c.sub, other),
           });
         }
       }
-      json(res, 200, { threads: [...byPerson.values()].filter((t) => t.with) });
+      const threads = [...byPerson.values()].filter((t) => t.with);
+      json(res, 200, {
+        threads,
+        // What a badge on the tab is drawn from.
+        unread: threads.reduce((a, t) => a + t.unread, 0),
+      });
     },
 
     'GET /room/thread': (req, res) => {
@@ -3199,9 +3291,18 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const rows = db.prepare(`SELECT * FROM messages
         WHERE ((from_id=? AND to_id=?) OR (from_id=? AND to_id=?)) ORDER BY at ASC LIMIT 500`)
         .all(c.sub, other, other, c.sub);
+      const unread = unreadFrom(c.sub, other);
+      // Opening it is what marks it read. Not receiving it, and not a separate
+      // call the client might forget to make.
+      db.prepare(`INSERT INTO thread_reads(member_id, other_id, read_at) VALUES (?,?,?)
+        ON CONFLICT(member_id, other_id) DO UPDATE SET read_at=excluded.read_at`)
+        .run(c.sub, other, Date.now());
       json(res, 200, {
         with: profileOf(other),
         blockedByYou: blocked(c.sub, other),
+        // What it was when they opened it, so the screen can show what is new
+        // rather than silently swallowing it.
+        wasUnread: unread,
         messages: rows.map((m) => ({ id: m.id, body: m.body, at: m.at, mine: m.from_id === c.sub })),
       });
     },

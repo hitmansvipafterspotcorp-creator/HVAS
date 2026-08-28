@@ -143,6 +143,29 @@ eq((await call('GET', '/room/thread?with=' + kev.member.id, null, venue)).status
    'and neither can the venue — the house does not read the room');
 eq((await call('GET', '/room/threads', null, dana.token)).body.threads.length, 1, 'her conversations list him');
 
+console.log('\nA MESSAGING APP HAS TO SAY WHEN SOMEBODY WROTE TO YOU');
+// This was hardcoded to zero — every thread always claimed nothing new, which
+// makes the whole feature a thing nobody would open twice.
+{
+  await call('POST', '/room/message', { to: rosa.member.id, body: 'first' }, kev.token);
+  await call('POST', '/room/message', { to: rosa.member.id, body: 'second' }, kev.token);
+  const t = await call('GET', '/room/threads', null, rosa.token);
+  const fromKev = t.body.threads.find((x) => x.with.name === 'Kev');
+  eq(fromKev?.unread, 2, 'two of his arrived and she has not opened it');
+  eq(t.body.unread, 2, 'and the total is there for a badge');
+  // Opening it is what marks it read — not receiving it.
+  const open = await call('GET', '/room/thread?with=' + kev.member.id, null, rosa.token);
+  eq(open.body.wasUnread, 2, 'opening it says how many were new');
+  const after = await call('GET', '/room/threads', null, rosa.token);
+  eq(after.body.threads.find((x) => x.with.name === 'Kev')?.unread, 0, 'and then it is read');
+  // Her own replies must never count as unread FOR her.
+  await call('POST', '/room/message', { to: kev.member.id, body: 'mine' }, rosa.token);
+  const own = await call('GET', '/room/threads', null, rosa.token);
+  eq(own.body.threads.find((x) => x.with.name === 'Kev')?.unread, 0, 'her own message is not unread to her');
+  const his = await call('GET', '/room/threads', null, kev.token);
+  eq(his.body.threads.find((x) => x.with.name === 'Rosa')?.unread, 1, 'but it is unread to him');
+}
+
 console.log('\nBEING LEFT ALONE');
 // A private association somebody cannot be left alone in is not private.
 eq((await call('POST', '/room/block', { memberId: kev.member.id }, dana.token)).body.blocked, true,
@@ -161,6 +184,58 @@ const rep = await call('POST', '/room/report',
   { kind: 'MEMBER', reference: kev.member.id, reason: 'Kept messaging after I said no.' }, dana.token);
 eq(rep.status, 200, 'a member can report something');
 ok(/until somebody reports it/i.test(rep.body.note), 'and is told plainly that nothing is watched until they do');
+
+console.log('\nA REPORT REACHES A PERSON, OR THE PROMISE IS A LIE');
+// The member is told "a person will look at this". Until now reports were
+// written to a table nothing ever read, which made that sentence false.
+{
+  const venueCode = (await call('POST', '/auth/staff', { code: 'HOST850' })).body.token;
+  const invite = await call('POST', '/staff/invite', { name: 'Kenya', role: 'host' }, venueCode);
+  const owner = (await call('POST', '/auth/staff/claim', { code: invite.body.code })).body.token;
+
+  const q = await call('GET', '/room/reports', null, owner);
+  eq(q.status, 200, 'the owner can see what was reported');
+  ok(q.body.open >= 1, 'and the one Dana filed is open');
+  const mine2 = q.body.reports.find((r) => r.kind === 'MEMBER');
+  eq(mine2.by, 'Dana', 'it says who reported it');
+  ok(/Kept messaging/.test(mine2.reason), 'and what they said');
+  ok(!!mine2.about, 'with the thing complained about resolved, so nobody goes digging');
+
+  // A shared venue code runs a door. It does not read what members said.
+  eq((await call('GET', '/room/reports', null, venueCode)).status, 403,
+     'a shared venue code cannot read the reports');
+  eq((await call('GET', '/room/reports', null, dana.token)).status, 401,
+     'and a member cannot read other people’s reports');
+
+  // Reporting a MESSAGE must not hand the house the conversation.
+  await call('POST', '/room/message', { to: rosa.member.id, body: 'something private' }, kev.token);
+  const dm = (await call('GET', '/room/thread?with=' + kev.member.id, null, rosa.token)).body.messages[0];
+  await call('POST', '/room/report', { kind: 'MESSAGE', reference: dm.id, reason: 'rude' }, rosa.token);
+  const q2 = await call('GET', '/room/reports', null, owner);
+  const msgReport = q2.body.reports.find((r) => r.kind === 'MESSAGE');
+  ok(!JSON.stringify(msgReport).includes('something private'),
+     'a reported message is NOT quoted to the house — one complained-about line does not open a private conversation');
+  ok(/ask the member what was said/i.test(JSON.stringify(msgReport.about)),
+     'the house is told to ask the member instead');
+
+  // Answering it is a named decision with words against it.
+  eq((await call('POST', '/room/report/handle', { reportId: mine2.reportId, outcome: '' }, owner)).status, 400,
+     'a report cannot be closed with nothing said');
+  eq((await call('POST', '/room/report/handle',
+    { reportId: mine2.reportId, outcome: 'Spoke to him. He has stopped.' }, owner)).status, 200,
+     'with a reason it is answered');
+  eq((await call('POST', '/room/report/handle',
+    { reportId: mine2.reportId, outcome: 'again' }, owner)).status, 409, 'and answered once');
+  const q3 = await call('GET', '/room/reports', null, owner);
+  const done = q3.body.reports.find((r) => r.reportId === mine2.reportId);
+  eq(done.handled, true, 'it shows as handled');
+  eq(done.handledBy, 'Kenya', 'by the person who did it, by name');
+
+  // And it is on the owner's front door until somebody deals with it.
+  const pulse = await call('GET', '/venue/pulse', null, owner);
+  const all = [pulse.body.now, ...(pulse.body.then || [])];
+  ok(all.some((i) => i?.id === 'room-reports'), 'an unanswered report is on the venue pulse');
+}
 
 console.log('\nTHE DIRECTORY IS THE POINT OF A ROOM LIKE THIS');
 const dir = await call('GET', '/room/members', null, dana.token);

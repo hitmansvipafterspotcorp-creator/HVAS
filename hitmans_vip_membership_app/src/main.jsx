@@ -38,7 +38,7 @@ import { apiBase, apiEnabled, apiToken, apiMemberId, memberOtpStart, memberOtpVe
   apiReferral, apiLicenseTerms, apiLicenseMine, apiLicenseMarket, apiLicenseHeld,
   apiLicenseOffer, apiLicenseWithdraw, apiLicenseBuy, apiRegisterWork,
   apiHouseMoney, apiMarketSettle, apiGigSecure, apiGigSettle, apiLicenseSettle, apiReferralPay,
-  apiNotifyStatus, apiNotifyConfig, apiNotifyTest,
+  apiNotifyStatus, apiNotifyConfig, apiNotifyTest, apiRoomReports, apiRoomReportHandle,
   apiMyCovenant, apiMyRecord, apiResign, apiRejoin,
   apiRoomMe, apiRoomProfile, apiRoomMember, apiRoomMembers, apiRoomFeed, apiRoomPost,
   apiRoomHide, apiRoomReact, apiRoomComment, apiRoomPostOne, apiRoomFollow, apiRoomBlock,
@@ -5937,6 +5937,19 @@ function RoomScreen({ onDone }) {
   const [tab, setTab] = useState('feed');
   const [openMember, setOpenMember] = useState(null);   // a profile being read
   const [openThread, setOpenThread] = useState(null);   // a conversation
+  // How many messages are waiting. A social app that never tells you somebody
+  // wrote to you is one nobody opens twice, so this is polled and shown on the
+  // tab whether or not the member is looking at Messages.
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const check = () => apiRoomThreads()
+      .then((d) => { if (live) setUnread(d.unread || 0); })
+      .catch(() => {});
+    check();
+    const id = setInterval(check, 15000);
+    return () => { live = false; clearInterval(id); };
+  }, [openThread, tab]);
 
   if (openThread) {
     return <RoomThread withId={openThread} onBack={() => setOpenThread(null)} />;
@@ -5955,8 +5968,11 @@ function RoomScreen({ onDone }) {
     <AppPanel title="The Room" subtitle="Members, and only members">
       <div className="staff-hub-tabs prog-tabs">
         {[['feed', 'Feed'], ['who', 'Who’s in'], ['dms', 'Messages'], ['you', 'You']].map(([id, label]) => (
-          <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}`}
-                  onClick={() => setTab(id)}>{label}</button>
+          <button type="button" key={id}
+                  className={`staff-hub-tab${tab === id ? ' on' : ''}${id === 'dms' && unread ? ' alert' : ''}`}
+                  onClick={() => setTab(id)}>
+            {label}{id === 'dms' && unread ? ` (${unread})` : ''}
+          </button>
         ))}
       </div>
       {tab === 'feed' && <RoomFeed onOpenMember={setOpenMember} />}
@@ -6210,8 +6226,11 @@ function RoomMessages({ onOpen }) {
           <Avatar who={t.with} />
           <div className="dash-info">
             <strong>{t.with.name}</strong>
-            <span className="rm-sub">{t.last.mine ? 'You: ' : ''}{t.last.body.slice(0, 60)}</span>
+            <span className={`rm-sub${t.unread ? ' unread' : ''}`}>
+              {t.last.mine ? 'You: ' : ''}{t.last.body.slice(0, 60)}
+            </span>
           </div>
+          {t.unread > 0 && <span className="rm-badge">{t.unread}</span>}
           <span className="rm-sub">{timeAgo(t.last.at)}</span>
         </button>
       ))}
@@ -9932,6 +9951,98 @@ function SignInSetupPanel() {
   );
 }
 
+// ── What members asked the house to look at ────────────────────────────────
+//
+// The only window the venue has into the room. Nothing else in there is read by
+// staff — not a post, not a comment, and not a conversation — so this screen is
+// the whole of the deal, and it has to actually get opened.
+//
+// A reported MESSAGE is named and not quoted. One complained-about line does
+// not open somebody's private conversation to the house; the member who
+// reported it can say what was said.
+function RoomReportsPanel() {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [saying, setSaying] = useState({});   // reportId -> what was decided
+
+  const load = async () => {
+    try { setData(await apiRoomReports()); setErr(''); }
+    catch (e) { setErr(e.message || 'Could not load.'); }
+  };
+  useEffect(() => { load(); }, []);
+  const act = async (fn) => {
+    setBusy(true); setErr('');
+    try { await fn(); await load(); } catch (e) { setErr(e.message || 'That did not go through.'); }
+    setBusy(false);
+  };
+  if (!data) {
+    return <AppPanel title="Reports" subtitle="What members asked you to look at">
+      <p className="dash-empty">{err || 'Loading…'}</p></AppPanel>;
+  }
+  const open = data.reports.filter((r) => !r.handled);
+  const done = data.reports.filter((r) => r.handled);
+
+  return (
+    <AppPanel title="Reports" subtitle={open.length ? `${open.length} waiting on you` : 'Nothing waiting'}>
+      {err && <p className="k-nudge k-nudge--no">{err}</p>}
+      <p className="earn-note">
+        This is the only thing you see from the room. Posts, comments and messages
+        are not read by staff — a member has to ask.
+      </p>
+
+      {open.length === 0 && <p className="dash-empty">Nobody has reported anything.</p>}
+
+      {open.map((r) => (
+        <div key={r.reportId} className="jub-case">
+          <div className="jub-case-head">
+            <div className="dash-info">
+              <strong>{r.by} reported a {r.kind.toLowerCase()}</strong>
+              <span className="dash-num">{fmtDateTime(r.at)}</span>
+            </div>
+            <span className="jub-chip">{r.kind}</span>
+          </div>
+          {r.reason && <p className="jub-case-detail">“{r.reason}”</p>}
+          {r.about && (
+            <p className="jub-note">
+              {r.about.note
+                ? r.about.note
+                : `${r.about.by || 'Somebody'}${r.about.body ? `: “${r.about.body}”` : ''}${r.about.alreadyDown ? ' · already taken down' : ''}`}
+            </p>
+          )}
+          {/* A report closed with nothing said is a report ignored, so the
+              server refuses that and this screen does not pretend otherwise. */}
+          <input className="jub-input" placeholder="What did you decide? (the member is owed an answer)"
+                 maxLength={500} value={saying[r.reportId] || ''}
+                 onChange={(e) => setSaying((s) => ({ ...s, [r.reportId]: e.target.value }))} />
+          <button type="button" className="bingo-btn compact gold"
+                  disabled={busy || (saying[r.reportId] || '').trim().length < 4}
+                  onClick={() => act(async () => {
+                    await apiRoomReportHandle(r.reportId, saying[r.reportId].trim());
+                    setSaying((s) => ({ ...s, [r.reportId]: '' }));
+                  })}>
+            Answer it
+          </button>
+        </div>
+      ))}
+
+      {done.length > 0 && (
+        <div className="give-list">
+          <h4>Answered</h4>
+          {done.map((r) => (
+            <div key={r.reportId} className="give-row done">
+              <div className="dash-info">
+                <strong>{r.by} · {r.kind.toLowerCase()}</strong>
+                <span className="dash-num">{r.outcome} — {r.handledBy}, {fmtDate(r.handledAt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </AppPanel>
+  );
+}
+
 function HouseMoneyPanel() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -10112,6 +10223,7 @@ function HostScreen({ initialTab = 'run' }) {
           ['players', `Players${board?.players.length ? ` (${board.players.length})` : ''}`],
           ['support', 'Support'],
           ['money', 'Money'],
+          ['reports', 'Reports'],
           ['media', 'TV'],
         ].map(([id, label]) => (
           <button type="button" key={id} className={`staff-hub-tab${tab === id ? ' on' : ''}${id === 'claims' && board?.claims.length ? ' alert' : ''}`}
@@ -10123,6 +10235,7 @@ function HostScreen({ initialTab = 'run' }) {
         <PodiumBoard state={board} meId={null} isHost onChanged={poll} />
       )}
       {tab === 'money' && <HouseMoneyPanel />}
+      {tab === 'reports' && <RoomReportsPanel />}
       {tab === 'run' && (
         <AppPanel title="Host Control" subtitle={board ? `${BINGO_STATUS_LABEL[board.status]} · ${board.deckName} · ${BINGO_PATTERN_NAME[board.pattern]}` : 'Loading…'}>
           {/* Said here, where the round gets started, rather than only on the
