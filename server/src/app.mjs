@@ -46,6 +46,7 @@ import {
   loadOrCreateKeys, publicKeyRaw, issuePass, verifyPass,
   sessionSecret, signSession, readSession, venueSecret,
 } from './crypto.mjs';
+import { freeMemberNumber } from './member-number.mjs';
 import { MeshNode, meshListen, meshDial } from './mesh.mjs';
 import { applyOp } from './reduce.mjs';
 import { hitkoinEnabled, mintForPayment, walletSummary } from './hitkoin.mjs';
@@ -261,7 +262,7 @@ async function paypalVerify(headers, rawBody) {
   return v.verification_status === 'SUCCESS';
 }
 
-const memNumber = () => `HV-${1000 + Math.floor(Math.random() * 9000)}-${1000 + Math.floor(Math.random() * 9000)}`;
+
 const json = (res, code, obj) => {
   const body = JSON.stringify(obj);
   res.writeHead(code, {
@@ -1824,11 +1825,25 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const { contact, code, name, referral } = await readBody(req);
       const row = db.prepare('SELECT * FROM otps WHERE contact=?').get(contact);
       if (!row || row.code !== String(code) || Date.now() > row.expires_at) return json(res, 401, { error: 'bad code' });
-      db.prepare('DELETE FROM otps WHERE contact=?').run(contact);
       let m = db.prepare('SELECT * FROM members WHERE contact=?').get(contact);
       if (!m) {
         const id = randomBytes(8).toString('hex');
-        commit('member.upsert', { id, name: (name || 'Member').trim(), contact, number: memNumber(), created_at: Date.now() });
+        // Two attempts, because the free-number check cannot see a number that
+        // arrived from another venue device over the mesh — that one only shows
+        // up as a constraint error here.
+        for (let attempt = 0; ; attempt++) {
+          try {
+            commit('member.upsert', { id, name: (name || 'Member').trim(), contact,
+                                      number: freeMemberNumber(db), created_at: Date.now() });
+            break;
+          } catch (e) {
+            if (attempt >= 2) {
+              // The code is still theirs — see below — so the honest thing is to
+              // say try again rather than to hand back a database error.
+              return json(res, 503, { error: 'Could not finish signing you up just then. Tap the button again.' });
+            }
+          }
+        }
         m = db.prepare('SELECT * FROM members WHERE id=?').get(id);
         // Who brought them, written ONCE, here, and never again. A promoter's
         // work cannot be reassigned after the fact, and somebody who arrived on
@@ -1843,6 +1858,14 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
           }
         }
       }
+      // The code is spent here, at the end, and not the moment it matched.
+      // Consuming it first meant that anything going wrong between the two
+      // left the person with no member record AND no way back in: their code
+      // was gone, and the rate limiter made them wait twenty seconds for
+      // another one, at the door, in front of everybody. Spending it once
+      // there is a membership to spend it on costs nothing — it is the same
+      // person, and it still expires on its own.
+      db.prepare('DELETE FROM otps WHERE contact=?').run(contact);
       json(res, 200, { token: signSession(secret, { sub: m.id, role: 'member' }, SESSION_TTL), member: publicMember(m) });
     },
     // Staff / Host code login.

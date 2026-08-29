@@ -44,7 +44,10 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   //
   // Last, and the one that matters most on a night: a stranger signs up and
   // the door lets them in. If this fails, nothing else being green helps.
-  'launch-test.mjs'];
+  'launch-test.mjs',
+  // And the same walk with sixty people on it at once, because a queue is how
+  // opening night differs from every test above it.
+  'rush-test.mjs'];
 
 const run = (file) => new Promise((res) => {
   const child = spawn(process.execPath, [resolve(__dirname, file)], { cwd: __dirname, stdio: 'inherit' });
