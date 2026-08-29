@@ -90,6 +90,19 @@ the very first screen, tap **📡 Connect to venue** near the bottom → paste
 you're testing on the same wifi first). It'll pull the venue's real name,
 Zelle/PayPal, and go live — same backend, same data, every device.
 
+### The tunnel window watches itself
+
+The window running `start-tunnel.mjs` is a supervisor, not just a launcher. If
+cloudflared dies mid-night it restarts it with backoff — and on a quick tunnel
+it says plainly that the address people already have is now dead, then prints
+the replacement. It also re-checks the public link every minute all night. When
+that goes dark it tells you whether the venue itself is down (go look at the
+server window) or only the way in from outside is (the door and everyone inside
+are fine; nobody new can sign up until it's back).
+
+That last part matters because the failure is otherwise invisible: the people a
+dead link hits are the ones who never get inside to complain.
+
 ### If the venue laptop gets stuck
 
 Double-click **`fix-hvas.bat`**. It stops everything, saves a copy of anything

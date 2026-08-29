@@ -165,14 +165,60 @@ if (!found) {
     : `Starting a QUICK Cloudflare Tunnel (${bin}) -> http://localhost:${PORT} ...\n`);
 }
 
-const child = found ? { stdout: { on() {} }, stderr: { on() {} }, on() {}, kill() {} }
-                    : spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+// The tunnel is the front door for everyone who is not standing in the room.
+// If it dies at 11pm the venue keeps running, the door keeps scanning, and
+// every person who tries to sign up from their phone gets nothing — with
+// no sign of trouble anywhere except a line of text in a window nobody is
+// watching. So it gets supervised, the same way the app does.
+let child = null;
+let tunnelBackoff = 2000;
+let steadyTimer = null;
+let shuttingDown = false;
 
-child.on('error', (e) => {
-  console.log(`\nCouldn't start cloudflared: ${e.message}`);
-  console.log(`Looked for it at: ${bin}`);
-  console.log('If it\'s somewhere else, set CLOUDFLARED_PATH to its full path and try again.');
-});
+function spawnTunnel(again) {
+  if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+  child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  child.stdout.on('data', onData);
+  child.stderr.on('data', onData);
+
+  child.on('error', (e) => {
+    console.log(`\nCouldn't start cloudflared: ${e.message}`);
+    console.log(`Looked for it at: ${bin}`);
+    console.log('If it\'s somewhere else, set CLOUDFLARED_PATH to its full path and try again.');
+  });
+
+  child.on('exit', (code) => {
+    if (steadyTimer) { clearTimeout(steadyTimer); steadyTimer = null; }
+    if (shuttingDown) return;
+    console.log(`\ncloudflared exited (code ${code}) — bringing the link back up in ${Math.round(tunnelBackoff / 1000)}s.`);
+    if (!named) {
+      // A quick tunnel cannot keep its address across a restart. Say this
+      // BEFORE the new address appears, because the dangerous assumption is
+      // that the code already stuck to the door still works.
+      console.log('  A quick tunnel gets a NEW address every time it comes back, so');
+      console.log('  the link you already shared is dead. The new one prints below.');
+      console.log('  Reshare it — or set up a permanent address (SELF_HOST.md) so');
+      console.log('  this stops being something you have to catch.');
+      found = false;                    // so the replacement address gets announced
+    }
+    setTimeout(() => spawnTunnel(true), tunnelBackoff);
+    tunnelBackoff = Math.min(tunnelBackoff * 2, 60_000);
+  });
+
+  // Up for two minutes without dying => this was a blip, not a loop. Cancelled
+  // on exit, so a tunnel flapping every second never gets its delay reset.
+  steadyTimer = setTimeout(() => { tunnelBackoff = 2000; }, 120_000);
+
+  if (again && named) {
+    // Same hostname either way, so re-announcing the whole banner would only
+    // make the owner think something changed. It didn't.
+    console.log('  Reconnected — same address, every link you shared still works.\n');
+  }
+  return child;
+}
+
+// Funnel is served by Tailscale itself, which does its own supervising; there
+// is no cloudflared to watch in that case.
 
 
 // Tell the room directory where this venue is now. Runs the same script a host
@@ -235,6 +281,66 @@ async function waitUntilReachable(url, timeoutMs = 60000) {
     await new Promise((res) => setTimeout(res, 1500));
   }
   return { ok: false, local, lastPublic };
+}
+
+// Confirming the link once, at 8pm, proves nothing about 11pm. cloudflared can
+// stay alive and stop routing, Tailscale can drop its cert, the venue's wifi
+// can go. From inside this window all three look identical to a healthy night —
+// and the failure is invisible, because the people it hits are the ones who
+// never made it in to complain. So keep asking, and say it out loud when the
+// answer changes.
+const WATCH_MS = 60_000;
+const DARK_BEFORE_ALARM = 2;   // ~2 min of silence before shouting, so one blip stays quiet
+let darkStreak = 0;
+let watching = false;
+
+function watchPublicLink(url) {
+  if (watching) return;        // a quick tunnel re-announcing must not stack watchers
+  watching = true;
+  setInterval(async () => {
+    let publicOk = false;
+    try {
+      const r = await fetch(`${url}/config`, { signal: AbortSignal.timeout(8000) });
+      publicOk = r.ok;
+    } catch { publicOk = false; }
+
+    if (publicOk) {
+      if (darkStreak >= DARK_BEFORE_ALARM) {
+        console.log(`\n  The public link is answering again — ${new Date().toLocaleTimeString()}. Sign-ups are back.\n`);
+      }
+      darkStreak = 0;
+      return;
+    }
+
+    darkStreak += 1;
+    if (darkStreak !== DARK_BEFORE_ALARM) return;   // announce once per outage, not every minute
+
+    // Which half is down decides who fixes it and how, so find out before
+    // saying anything. The door and everyone already inside are unaffected
+    // either way, and the owner needs to hear that first.
+    let localOk = false;
+    try {
+      const r = await fetch(`http://localhost:${PORT}/config`, { signal: AbortSignal.timeout(2500) });
+      localOk = r.ok;
+    } catch { localOk = false; }
+
+    console.log('\n--------------------------------------------------');
+    console.log(`  THE PUBLIC LINK HAS GONE DARK — ${new Date().toLocaleTimeString()}`);
+    if (localOk) {
+      console.log('  The venue itself is fine. The door still scans, and everyone');
+      console.log('  already inside is unaffected. What is broken is the way in');
+      console.log('  from outside: nobody can sign up on their phone right now.');
+      console.log('');
+      console.log('  It is trying to come back on its own. If it does not, check');
+      console.log("  this laptop's wifi — that is the usual cause.");
+      console.log('  Meanwhile, anyone at the door can still be let in by staff.');
+    } else {
+      console.log('  The server is not answering either, so this is not the tunnel.');
+      console.log('  Check the OTHER window (HVAS Server) — it has probably stopped.');
+      console.log('  Close both windows and run fix-hvas.bat.');
+    }
+    console.log('--------------------------------------------------\n');
+  }, WATCH_MS);
 }
 
 function announce(url, permanent) {
@@ -301,6 +407,7 @@ function announce(url, permanent) {
       return;
     }
     console.log('Confirmed reachable. Opening the app now, already connected to this venue...');
+    watchPublicLink(url);
     openBrowser(connectUrl2);
     // Put the room on the map without anyone having to remember to. The link
     // moves every restart on a quick tunnel, and the whole point of the venue
@@ -308,23 +415,24 @@ function announce(url, permanent) {
     // if something actually publishes where it moved to.
     publishBeacon(url);
     console.log('\nOnce it opens, go to My Pass -> "Show join QR" to share with everyone else tonight.');
-    console.log('Keep this window AND the HVAS Server window open all night.\n');
+    console.log('Keep this window AND the HVAS Server window open all night. This one');
+    console.log('keeps checking the public link and will say so the moment it goes dark.\n');
   });
 }
 
-const onData = (buf) => {
+function onData(buf) {
   const text = buf.toString();
   process.stdout.write(text);          // keep showing cloudflared's own output too
   if (found || named) return;
   const m = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
   if (m) announce(m[0], false);
-};
-child.stdout.on('data', onData);
-child.stderr.on('data', onData);
+}
+
+if (!found) spawnTunnel(false);
 
 // A named tunnel routes to a hostname you already own, so there is no URL to
 // scrape out of the log — announce it as soon as the process is up.
-if (named) {
+if (named && !found) {
   const host = namedHostname();
   if (host) setTimeout(() => announce(`https://${host}`, true), 1500);
   else {
@@ -332,4 +440,5 @@ if (named) {
     console.log('Fill it in (see SELF_HOST.md) or delete the file to fall back to a quick tunnel.\n');
   }
 }
-child.on('exit', (code) => console.log(`\ncloudflared exited (code ${code}).`));
+process.on('SIGINT', () => { shuttingDown = true; try { child && child.kill(); } catch {} process.exit(0); });
+process.on('SIGTERM', () => { shuttingDown = true; try { child && child.kill(); } catch {} process.exit(0); });

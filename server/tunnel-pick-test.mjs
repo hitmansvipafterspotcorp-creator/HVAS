@@ -7,11 +7,11 @@ const BIN = '/tmp/fakebin'; rmSync(BIN, {recursive:true, force:true}); mkdirSync
 const fake = (name, body) => { const p = `${BIN}/${name}`; writeFileSync(p, `#!/bin/sh\n${body}\n`); chmodSync(p, 0o755); return p; };
 let pass=0, fail=0; const ok=(c,m)=>{if(c){pass++;console.log('  ✓',m);}else{fail++;console.log('  ✗',m);}};
 
-const run = (env) => new Promise((res) => {
+const run = (env, ms = 3000) => new Promise((res) => {
   const c = spawn(process.execPath, [new URL('./start-tunnel.mjs', import.meta.url).pathname],
     { env: { ...process.env, ...env }, stdio: ['ignore','pipe','pipe'] });
   let out=''; c.stdout.on('data',d=>out+=d); c.stderr.on('data',d=>out+=d);
-  setTimeout(()=>{ c.kill(); res(out); }, 3000);
+  setTimeout(()=>{ c.kill(); res(out); }, ms);
 });
 
 console.log('FUNNEL AVAILABLE -> USE THE PERMANENT ADDRESS');
@@ -68,6 +68,25 @@ console.log('\nNO TAILSCALE -> QUICK TUNNEL, UNCHANGED');
 out = await run({ TAILSCALE_PATH: `${BIN}/nope`, CLOUDFLARED_PATH: `${BIN}/cloudflared`, HVAS_PORT: '8787' });
 ok(/trycloudflare/.test(out), 'uses the Cloudflare quick tunnel');
 ok(/TEMPORARY/i.test(out), 'and warns that the link is temporary');
+
+console.log('\nTHE TUNNEL DIES MID-NIGHT -> BRING IT BACK, AND SAY THE OLD LINK IS DEAD');
+// cloudflared dropping at 11pm used to print one line and stop. The venue kept
+// running and the door kept scanning, so nothing looked wrong from inside —
+// while every person who scanned the code from the sidewalk got nothing. The
+// people that failure hits are exactly the ones who never get in to complain.
+writeFileSync(`${BIN}/count`, '0');
+fake('cloudflared', `
+N=$(cat ${BIN}/count 2>/dev/null || echo 0)
+N=$((N+1)); echo $N > ${BIN}/count
+echo "https://link-$N.trycloudflare.com"
+sleep 1
+exit 1`);
+out = await run({ TAILSCALE_PATH: `${BIN}/nope`, CLOUDFLARED_PATH: `${BIN}/cloudflared`, HVAS_PORT: '8787' }, 7000);
+ok(/link-1\.trycloudflare/.test(out), 'the first address is announced');
+ok(/cloudflared exited/i.test(out), 'the tunnel going down is reported, not swallowed');
+ok(/bringing the link back up/i.test(out), 'and it says it is coming back on its own');
+ok(/link you already shared is dead/i.test(out), 'it warns that the code already handed out no longer works');
+ok(/link-2\.trycloudflare/.test(out), 'and the replacement address is announced, not left unsaid');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 rmSync(BIN,{recursive:true,force:true});
