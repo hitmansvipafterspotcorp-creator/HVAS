@@ -60,7 +60,14 @@ export async function fetchRooms() {
   try {
     // Cache-busted: the whole point is that this file changes when a venue
     // moves, and a stale copy would send everyone to a dead address.
-    const r = await fetch(`${DIRECTORY_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    // This is the road back for a member whose saved address went stale, so it
+    // is the last thing that should be able to hang. Failing fast returns an
+    // empty list, which the caller already handles.
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 8000);
+    let r;
+    try { r = await fetch(`${DIRECTORY_URL}?t=${Date.now()}`, { cache: 'no-store', signal: c.signal }); }
+    finally { clearTimeout(t); }
     if (!r.ok) return [];
     const d = await r.json();
     return Array.isArray(d?.venues) ? d.venues : [];
@@ -100,14 +107,61 @@ export function disconnectVenue() {
   ['hvas_api_base', 'hvas_cfg', 'hvas_api_token', 'hvas_api_member_id', 'hvas_venue_id'].forEach((k) => localStorage.removeItem(k));
 }
 
-async function call(method, path, body, token) {
-  const res = await fetch(apiBase() + path, {
-    method,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+// Every screen in the app goes through here, so everything that can go wrong
+// between a phone and the venue arrives here first.
+//
+// It had no timeout. A tap during a tunnel blip or a walk out of wifi range
+// left the promise pending forever: the button spins, nothing ever comes back,
+// and there is no error to show because nothing failed — it is still waiting.
+// The member's only move is to kill the app, which loses whatever they were
+// doing. A request that cannot finish has to end, and say so.
+//
+// AbortController rather than AbortSignal.timeout, because this runs on
+// whatever phone somebody walks in holding, and the older ones do not have it.
+async function call(method, path, body, token, timeoutMs) {
+  const payload = body ? JSON.stringify(body) : undefined;
+  // A photo going up on slow venue wifi is not a stuck request, so it gets
+  // room to finish. A tap that has hung for fifteen seconds is stuck.
+  const limit = timeoutMs ?? (payload && payload.length > 100_000 ? 60_000 : 15_000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), limit);
+
+  // The body is read inside the deadline too. Headers can arrive promptly and
+  // then the body stall — clearing the timer the moment fetch() resolves would
+  // hand that case straight back to hanging forever, which is the whole thing
+  // this is here to stop.
+  let res, data;
+  try {
+    res = await fetch(apiBase() + path, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: payload,
+      signal: controller.signal,
+    });
+    data = await res.json().catch(() => ({}));
+  } catch (e) {
+    // Raw fetch failures are unreadable to a member — "Failed to fetch" and
+    // "The operation was aborted" tell them nothing they can act on. Both of
+    // these mean the same thing standing in a room: it did not get there.
+    if (e?.name === 'AbortError') {
+      throw new Error('The venue did not answer. Check your signal and try again.');
+    }
+    throw new Error('Could not reach the venue. Check your signal and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) {
+    // Carry the whole refusal, not just its sentence. The venue says things
+    // like needsStaff and retryInMs alongside the message, and a screen that
+    // wants to offer the member their way out has to be able to read them —
+    // the alternative is matching on English, which breaks the first time
+    // somebody improves the wording.
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 

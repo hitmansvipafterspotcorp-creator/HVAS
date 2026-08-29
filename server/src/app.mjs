@@ -355,6 +355,47 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   const walletKey = venueSecret(`${dataDir}/hitkoin-wallet.key`); // encrypts each member's custodial wallet key at rest
   const sse = new Set(); // live door-board subscribers
 
+  // ── phones leave in the middle of a stream ──────────────────────────────
+  //
+  // Three endpoints hold a socket open for as long as a phone is looking at
+  // them: the door board on a staff device, the member's realtime pipe, and
+  // presence. In a room those sockets do not close politely — somebody walks
+  // out, the lock screen comes on, the adapter blips, and the connection
+  // resets.
+  //
+  // Honest about what this is: node's http.Server already owns these sockets
+  // and does not let a reset become an uncaught exception, so this is not a
+  // crash that was happening. It is belt and braces on the path everything
+  // else in the building depends on — an explicit 'error' listener alongside
+  // the 'close' one that was already here, and subscriber sets that drop a
+  // socket the moment a write to it fails rather than only when close fires.
+  // stream-hangup-test.mjs holds the property either way.
+  const streamSub = (req, res, drop) => {
+    let done = false;
+    const gone = () => { if (done) return; done = true; drop(); };
+    req.on('close', gone);
+    req.on('error', gone);
+    res.on('close', gone);
+    res.on('error', gone);
+  };
+
+  // Writing to a socket that has gone should never be able to end the loop it
+  // is in — every subscriber after it would silently stop getting updates, and
+  // a door board that freezes for one member of staff because a DIFFERENT
+  // phone left the room is not a thing anybody would think to report.
+  const sseWrite = (res, payload) => {
+    try {
+      if (res.writableEnded || res.destroyed) return false;
+      res.write(payload);
+      return true;
+    } catch { return false; }
+  };
+  // Write to everybody, and forget whoever is no longer there.
+  const blast = (set, payload) => {
+    if (!set) return;
+    for (const res of [...set]) if (!sseWrite(res, payload)) set.delete(res);
+  };
+
   // ── mesh (background) ──
   // Every mutation goes through the mesh op-log: the op materializes into this
   // node's SQLite (via applyOp) AND replicates, encrypted, to peer nodes — so a
@@ -382,9 +423,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   node.onLive = (p) => {
     if (!p) return;
     if (p.type === 'presence') { presence.set(p.id, { ...p, ts: Date.now() }); emitPresence(p.venue); }
-    else if (p.type === 'dm') { for (const res of (liveSubs.get(p.to) || [])) res.write(`data: ${JSON.stringify(p.msg)}\n\n`); }
+    else if (p.type === 'dm') { blast(liveSubs.get(p.to), `data: ${JSON.stringify(p.msg)}\n\n`); }
   };
-  const fanout = (to, msg) => { for (const res of (liveSubs.get(to) || [])) res.write(`data: ${JSON.stringify(msg)}\n\n`); };
+  const fanout = (to, msg) => blast(liveSubs.get(to), `data: ${JSON.stringify(msg)}\n\n`);
   // Send a realtime event to a member anywhere on the mesh (local + gossip).
   const sendLive = (to, msg) => { fanout(to, msg); node.live({ type: 'dm', to, msg }); };
   const liveMembers = (venue) => {
@@ -397,7 +438,10 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
   };
   const emitPresence = (venue) => {
     const data = `data: ${JSON.stringify({ venue, members: liveMembers(venue) })}\n\n`;
-    for (const { v, res } of presenceSubs) if (!v || v === venue) res.write(data);
+    for (const sub of [...presenceSubs]) {
+      if (sub.v && sub.v !== venue) continue;
+      if (!sseWrite(sub.res, data)) presenceSubs.delete(sub);
+    }
   };
   setInterval(() => { const now = Date.now(); for (const [id, p] of presence) if (now - p.ts > PRESENCE_TTL) { presence.delete(id); emitPresence(p.venue); } }, 5000).unref?.();
 
@@ -1171,7 +1215,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
 
   const emitBoard = () => {
     const payload = `data: ${JSON.stringify(board())}\n\n`;
-    for (const res of sse) res.write(payload);
+    blast(sse, payload);
   };
   const board = () => {
     const nk = nightKey();
@@ -3543,6 +3587,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
         .get(c.sub);
       json(res, 200, {
         ...onboardingOf(c.sub),
+        // Resigning suspends the membership, which made onboarding report a
+        // former member as somebody who never paid — so the app put the
+        // four-step joining gate in front of them, permanently, and the screen
+        // holding the Rejoin button was behind that gate. They could leave and
+        // then not come back. Saying where they stand is what lets the app tell
+        // "never finished joining" apart from "left, and allowed to return".
+        standing: standingOf(c.sub),
         covenant: COVENANT,
         agreed: agreed ? { version: agreed.version, at: agreed.at } : null,
         groups: rolesByGroup(),
@@ -4004,18 +4055,18 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'GET /live/stream': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
-      res.write('data: {"kind":"hello"}\n\n');
+      sseWrite(res, 'data: {"kind":"hello"}\n\n');
       if (!liveSubs.has(c.sub)) liveSubs.set(c.sub, new Set());
       liveSubs.get(c.sub).add(res);
-      req.on('close', () => liveSubs.get(c.sub)?.delete(res));
+      streamSub(req, res, () => liveSubs.get(c.sub)?.delete(res));
     },
     'GET /venue/stream': (req, res) => {
       const c = auth(req, 'member'); if (!c) return json(res, 401, { error: 'unauthorized' });
       const v = new URL(req.url, 'http://x').searchParams.get('venue');
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
-      res.write(`data: ${JSON.stringify({ venue: v, members: liveMembers(v) })}\n\n`);
+      sseWrite(res, `data: ${JSON.stringify({ venue: v, members: liveMembers(v) })}\n\n`);
       const sub = { v, res }; presenceSubs.add(sub);
-      req.on('close', () => presenceSubs.delete(sub));
+      streamSub(req, res, () => presenceSubs.delete(sub));
     },
 
     // ── networking: link up (durable graph over the mesh) ──
@@ -4198,9 +4249,9 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
     'GET /door/stream': (req, res) => {
       const c = auth(req); if (!c || (c.role !== 'staff' && c.role !== 'host')) return json(res, 401, { error: 'unauthorized' });
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
-      res.write(`data: ${JSON.stringify(board())}\n\n`);
+      sseWrite(res, `data: ${JSON.stringify(board())}\n\n`);
       sse.add(res);
-      req.on('close', () => sse.delete(res));
+      streamSub(req, res, () => sse.delete(res));
     },
 
     // ── Lip Sync Bingo: one shared live round, same on every device ──

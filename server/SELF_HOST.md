@@ -40,12 +40,19 @@ HVAS_HOST_CODE=HOST850
 (Pick your own — these are what staff/host type in to unlock their tools.
 Full list of optional vars, incl. YOUTUBE_API_KEY / HitKoin, in `.env.example`.)
 
-**4. Run it** — this is Deploy Keeper (see below): restarts itself if it
-crashes, and pulls + tests + deploys new pushes automatically:
+**4. Run it.** For a normal night, double-click **`start-hvas.bat`** in the
+repo root — it opens the backend and the public link in their own windows and
+is the thing to use on the 31st. Keep both windows open.
+
+To have the venue also pull, test and deploy new pushes on its own, run Deploy
+Keeper instead (see below). It restarts the app if it crashes, cleans up a
+checkout somebody has edited by hand, and re-syncs itself if the code will not
+start at all:
 ```powershell
 node --env-file=.env deploy-keeper.mjs
 ```
-Leave this window open (minimizing is fine).
+Leave this window open (minimizing is fine). If the laptop ever gets stuck,
+double-click `fix-hvas.bat` — see below.
 
 **5. Stop the laptop from sleeping while it's running:**
 Settings → System → Power & battery → Screen and sleep → "When plugged in,
@@ -84,11 +91,21 @@ That runs it as a Windows service from now on — starts on its own, survives
 reboots, no window to babysit, and the link/QR never changes.
 
 **7. Play it.** Open the app at
-`https://hitmansvipafterspotcorp-creator.github.io/HVAS/` on any phone → on
-the very first screen, tap **📡 Connect to venue** near the bottom → paste
-`https://app.yourdomain.com` (or `http://<your laptop's LAN IP>:8787` if
-you're testing on the same wifi first). It'll pull the venue's real name,
-Zelle/PayPal, and go live — same backend, same data, every device.
+`https://hitmansvipafterspotcorp-creator.github.io/HVAS/` on any phone → on the
+very first screen, tap **📡 Connect to venue** near the bottom. There is no
+address to type: the panel lists the rooms playing right now by name, and
+joining is one tap on yours. If it is not listed yet, **📷 Scan venue QR** —
+the owner's screen has the code under My Pass → *Show join QR*.
+
+Both routes pull the venue's real name and payment details and go live on the
+same backend — same data, every device.
+
+Typing an address was the old way, and it was removed on purpose: a member who
+has joined once never needs a link again. The app remembers the venue by a
+permanent id and looks up where it has moved to, so a tunnel that changed
+address overnight does not strand anybody. If you are testing on the same wifi
+before any of that is set up, the laptop serves the app itself — open
+`http://<your laptop's LAN IP>:8787` and the phone is connected by being there.
 
 ### The tunnel window watches itself
 

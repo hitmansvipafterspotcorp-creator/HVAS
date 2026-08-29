@@ -21,8 +21,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const APP = '/home/claude/hvas/hitmans_vip_membership_app/dist';
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const APP = new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const T = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
 const web = createServer(async (q, s) => {
   let p = decodeURIComponent(q.url.split('?')[0]).replace(/^\/HVAS/, '') || '/';

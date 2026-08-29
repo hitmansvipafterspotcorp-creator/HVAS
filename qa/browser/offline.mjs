@@ -6,19 +6,20 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
+const REPO = new URL('../../', import.meta.url).pathname;
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const APP=new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const web=createServer(async(q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]).replace(/^\/HVAS/,'')||'/';if(p==='/'||!extname(p))p='/index.html';
   try{const b=await readFile(join(APP,normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}
-  catch{try{const b=await readFile(join('/home/claude/hvas',normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}catch{s.writeHead(404).end('no');}}});
+  catch{try{const b=await readFile(join(REPO, normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}catch{s.writeHead(404).end('no');}}});
 await new Promise(r=>web.listen(0,r));
 const appPort=web.address().port;
 const appUrl=`http://127.0.0.1:${appPort}/HVAS/`;
 
 process.env.HVAS_HOST_CODE='HOST850';
-const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
-const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
+const { createApp } = await import(new URL('../../server/src/app.mjs', import.meta.url).href);
+const { onboard } = await import(new URL('../../server/test-helpers.mjs', import.meta.url).href);
 const venue = createApp({ dataDir:`/tmp/hvas-off-${Date.now()}` });
 await new Promise(r=>venue.server.listen(0,r));
 const api=`http://127.0.0.1:${venue.server.address().port}`;

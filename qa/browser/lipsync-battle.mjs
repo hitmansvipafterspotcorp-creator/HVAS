@@ -6,8 +6,8 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 
-const CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const APP = '/home/claude/hvas/hitmans_vip_membership_app/dist';
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const APP = new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const TYPES = { '.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json',
   '.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json' };
 const web = createServer(async (req, res) => {
@@ -21,8 +21,8 @@ await new Promise((r) => web.listen(0, r));
 const appUrl = `http://127.0.0.1:${web.address().port}/HVAS/`;
 
 process.env.HVAS_HOST_CODE = 'HOST850';
-const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
-const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
+const { createApp } = await import(new URL('../../server/src/app.mjs', import.meta.url).href);
+const { onboard } = await import(new URL('../../server/test-helpers.mjs', import.meta.url).href);
 const { server } = createApp({ dataDir: `/tmp/hvas-ui-${Date.now()}` });
 await new Promise((r) => server.listen(0, r));
 const api = `http://127.0.0.1:${server.address().port}`;
@@ -145,8 +145,14 @@ if (/Community Covenant/i.test(body)) {
   await settle(1800);
   await js(`const b=document.querySelector('.prog-card');if(b)b.click();return !!b;`);
   await settle(2500);
+  // Dues are the fourth step and the last one. This suite walked the first
+  // three and then asserted the app was open, which stopped being true the day
+  // membership moved to the end of joining — it had been parking on "Choose
+  // your membership" ever since, failing every check below it.
+  await js(`const b=document.querySelector('.onb-tier');if(b)b.click();return !!b;`);
+  await settle(2500);
   body = await text();
-  ok(!/Community Covenant/i.test(body), 'and through sign-up — the app is open');
+  ok(!/Choose your membership/i.test(body), 'and through sign-up — the app is open');
 }
 
 // The host opens an event server-side; the member's screen must reflect it.

@@ -17,7 +17,7 @@ import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 process.env.HVAS_HOST_CODE = 'HOST850'; process.env.HVAS_STAFF_CODE = 'DOOR850';
-const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { createApp } = await import(new URL('../../server/src/app.mjs', import.meta.url).href);
 const { server: api } = createApp({ dataDir: `/tmp/hvas-team-${Date.now()}` });
 await new Promise((r) => api.listen(0, r));
 const API = `http://127.0.0.1:${api.address().port}`;
@@ -26,7 +26,7 @@ const call = async (m, p, b, t) => {
   return { status: r.status, body: await r.json().catch(() => ({})) };
 };
 
-const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
+const APP=new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const SHOT=process.env.HVAS_SHOTS||'';
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 // One static server PER PHONE, and therefore one origin per phone.
@@ -44,7 +44,7 @@ const serveApp=async()=>{
   servers.push(web);
   return `http://127.0.0.1:${web.address().port}/HVAS/`;
 };
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 // One browser, two independent pages. Separate origins would be cleaner still,
 // but separate PAGES is what makes the second phone a second phone here: the

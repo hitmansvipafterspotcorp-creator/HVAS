@@ -2,15 +2,15 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const APP=new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const web=createServer(async(q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]).replace(/^\/HVAS/,'')||'/';if(p==='/'||!extname(p))p='/index.html';try{const b=await readFile(join(APP,normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}catch{s.writeHead(404).end('no');}});
 await new Promise(r=>web.listen(0,r));
 const appUrl=`http://127.0.0.1:${web.address().port}/HVAS/`;
 process.env.HVAS_HOST_CODE='HOST850'; process.env.BINGO_PODIUM_SECONDS='600';
-const {createApp}=await import('/home/claude/hvas/server/src/app.mjs');
-const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
+const {createApp}=await import(new URL('../../server/src/app.mjs', import.meta.url).href);
+const { onboard, namedStaff, doorSignInCode } = await import(new URL('../../server/test-helpers.mjs', import.meta.url).href);
 const {server}=createApp({dataDir:`/tmp/hvas-ord-${Date.now()}`});
 await new Promise(r=>server.listen(0,r));
 const api=`http://127.0.0.1:${server.address().port}`;
@@ -20,6 +20,9 @@ const mk=async(ph,nm)=>{const s=await call('POST','/auth/member/start',{contact:
   await onboard(call, v.token);   // signing in is not membership
   return v;};
 const host=(await call('POST','/auth/staff',{code:'HOST850'})).body.token;
+// A shared code can run the night but cannot vouch for a person, and issuing
+// somebody a sign-in code is vouching for them. That takes a name on the rota.
+const named=await namedStaff(call, host, 'Kenya');
 const rico=await mk('850-905-0001','Rico');
 await call('POST','/bingo/join',{},rico.token); await call('POST','/bingo/ready',{ready:true},rico.token);
 const nova=await mk('850-905-0002','Nova');
@@ -55,10 +58,20 @@ await cdp('Page.navigate',{url:appUrl}); await settle(1500); await dropSW();
 await cdp('Page.navigate',{url:appUrl}); await settle(2500);
 await tapAny('Member Sign In'); await settle(1500);
 await fill('First name','Rico'); await fill('(850)','850-905-0001'); await settle(400);
-await tap('Send code'); await settle(1600);
-const dev=(await call('POST','/auth/member/start',{contact:'850-905-0001'})).body.devCode;
-await fill('000000',String(dev)); await settle(300);
-await tap('Verify')||await tap('Continue'); await settle(2500);
+// The button says Continue now, not "Send code" — it stopped naming a step the
+// app skips when the venue hands the code straight back. Tapping a label that
+// no longer exists did nothing at all, which is half of why this suite had been
+// failing.
+await tap('Continue'); await settle(1800);
+// Rico already exists — this suite made him over the API a moment ago — and
+// /auth/member/start refuses to echo a code back for a contact that belongs to
+// somebody, because that is account takeover. A named member of staff issuing
+// one is the way an existing member signs in, so that is what happens here.
+// The code box only exists after the venue has refused, so ask for the code
+// once the screen showing it is actually up.
+const dev=await doorSignInCode(call, named, '850-905-0001');
+await fill('000000',String(dev)); await settle(400);
+await tap('Verify'); await settle(2500);
 for(let i=0;i<20;i++){await openTile('lobby');await settle(1300);if(/go to my card|mark ready|✓ ready/i.test(await text()))break;}
 for(let i=0;i<12;i++){await tap('Go to My Card');await settle(1400);if(/now playing|listen/i.test(await text()))break;}
 

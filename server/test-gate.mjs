@@ -9,6 +9,7 @@
 // launcher whose PATH has no node on it, but the running node always knows
 // where it lives.
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,7 +52,10 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   // Every route in the building, fed every wrong shape, by every kind of
   // caller. A 500 reads as "the venue is down" and sends somebody to restart a
   // laptop that was fine, so no route is allowed to answer rubbish with one.
-  'rubbish-test.mjs'];
+  'rubbish-test.mjs',
+  // A room full of phones hanging up mid-stream must not take the venue down,
+  // stop the door, or silence a staff device that is still watching.
+  'stream-hangup-test.mjs'];
 
 const run = (file) => new Promise((res) => {
   const child = spawn(process.execPath, [resolve(__dirname, file)], { cwd: __dirname, stdio: 'inherit' });
@@ -66,4 +70,24 @@ for (const suite of SUITES) {
     process.exit(1);
   }
 }
+// The browser suites — the only things here that check what a member SEES.
+//
+// They are not in SUITES because they need a real Chromium, and a venue laptop
+// does not have one: requiring it would make the keeper reject every deploy on
+// the machine that matters most. So they run when a browser is available and
+// say plainly when it is not.
+//
+// Leaving them entirely outside a gate is what let two of them break for weeks
+// while reporting real product bugs nobody read.
+const browserGate = resolve(__dirname, '../qa/browser/gate.mjs');
+if (process.env.HVAS_SKIP_BROWSER === '1') {
+  console.log('\n───── browser suites: SKIPPED (HVAS_SKIP_BROWSER=1) ─────');
+} else if (existsSync(browserGate)) {
+  console.log('\n───── browser suites ─────');
+  if (!(await run('../qa/browser/gate.mjs'))) {
+    console.error('\nGATE FAILED in the browser suites — not deploying.');
+    process.exit(1);
+  }
+}
+
 console.log(`\nGATE PASSED — ${SUITES.length} suites clean.`);

@@ -1311,10 +1311,18 @@ function App() {
   // does not see the sign-up flash on every load — Onboarding asks the server
   // immediately and puts itself back up if they are not actually through.
   const [accepted, setAccepted] = useState(true);
+  // RESIGNED or EXPELLED. A former member fails the acceptance check for the
+  // same reason a half-finished signup does — no active membership — but they
+  // are not the same person and must not get the same screen.
+  const [standing, setStanding] = useState('');
   useEffect(() => {
     if (!apiEnabled() || !apiToken()) return;
     let live = true;
-    apiOnboarding().then((r) => { if (live) setAccepted(!!r.accepted); }).catch(() => {});
+    apiOnboarding().then((r) => {
+      if (!live) return;
+      setAccepted(!!r.accepted);
+      setStanding(r.standing?.state || '');
+    }).catch(() => {});
     return () => { live = false; };
   }, [auth?.member?.contact]);
   const member = useMember();                    // subscribe: door verification updates this
@@ -1477,6 +1485,25 @@ function App() {
   // refuse everything else anyway, and a menu full of things that all fail is
   // worse than one screen that says what is left.
   if (role === 'member' && apiEnabled() && !accepted) {
+    // Somebody who resigned is not an unfinished signup. Sending them back
+    // through "agree to the covenant, say what you do, choose a programme,
+    // pick a membership" says the association forgot them, when it has their
+    // whole record and a documented way back — and the way back lives on the
+    // screen this gate was covering up. Show them that instead.
+    if (standing === 'RESIGNED' || standing === 'EXPELLED') {
+      // Ask, do not assume. Rejoining restores a membership that still had time
+      // on it, but one that ran out while they were away is NOT handed back —
+      // that would be free time for leaving. Those two land the member in
+      // different places: straight back into the app, or on the dues step with
+      // a membership to take. Guessing "you are in" would drop somebody into a
+      // menu where the server refuses everything they touch.
+      return <StandingScreen onDone={() => {
+        apiOnboarding().then((r) => {
+          setStanding(r.standing?.state || '');
+          setAccepted(!!r.accepted);
+        }).catch(() => { setStanding(''); });
+      }} />;
+    }
     return <Onboarding onDone={() => setAccepted(true)} />;
   }
 
@@ -2149,6 +2176,9 @@ function MemberAuthScreen({ onBack, onDone }) {
   const [code, setCode] = useState('');
   const [devCode, setDevCode] = useState('');
   const [sentTo, setSentTo] = useState('');
+  // Set when the venue refuses because this contact is already a member and it
+  // cannot send mail: the code has to come from a person at the door.
+  const [needsStaff, setNeedsStaff] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const backend = apiEnabled();
@@ -2184,6 +2214,23 @@ function MemberAuthScreen({ onBack, onDone }) {
       setSentTo(r.to || '');
       setStage('code');
     } catch (e) {
+      // Already a member, at a venue that cannot send mail yet. The venue is
+      // right to refuse — echoing a code back for a contact somebody already
+      // holds is account takeover, type their number and read it off your own
+      // screen. But refusing was ALL that happened: the screen showed the
+      // sentence and stayed put, with no box to type into. A member who signed
+      // out or changed phones could not get back into their own membership,
+      // and staff could issue them a code that had nowhere to go.
+      //
+      // The code staff hand over is a real one, sitting in the venue's table
+      // waiting to be used. So take them to the box for it.
+      if (e?.data?.needsStaff) {
+        setDevCode(''); setSentTo('');
+        setNeedsStaff(true);
+        setStage('code');
+        setErr('');
+        return;
+      }
       // The venue tells us WHY when it is something the member can act on —
       // asked too soon, a contact it cannot reach, mail that would not send.
       // "Check the connection" for all of those sends somebody to reboot a
@@ -2231,13 +2278,18 @@ function MemberAuthScreen({ onBack, onDone }) {
               {/* The venue can be configured to echo the code back instead of paying
                   for SMS. When it does, show it plainly — a member staring at an
                   empty code box with nothing arriving is stuck at the door. */}
+              {needsStaff && (
+                <p className="auth-fine">You are already a member here. This venue cannot send codes yet,
+                  so ask a member of staff to sign you in — they will read you a 6-digit code.
+                  It lasts three minutes.</p>
+              )}
               {sentTo && <p className="auth-fine">Sent to <b>{sentTo}</b>. It expires in 5 minutes.</p>}
               {devCode && <p className="auth-fine">Your code: <code>{devCode}</code></p>}
               {err && <p className="gate-err">{err}</p>}
               <button type="button" className="auth-continue" disabled={code.trim().length < 4 || busy} onClick={verify}>
                 {busy ? 'Verifying…' : 'Verify →'}
               </button>
-              <button type="button" className="auth-back" onClick={() => { setStage('id'); setErr(''); }}>← Change details</button>
+              <button type="button" className="auth-back" onClick={() => { setStage('id'); setErr(''); setNeedsStaff(false); }}>← Change details</button>
             </>
           )}
           <button type="button" className="auth-back" onClick={onBack}>← Back</button>
@@ -7045,7 +7097,11 @@ function BringTab() {
 
       <div className="give-list">
         <h4>What you have earned</h4>
-        {data.credits.length === 0 && <p className="dash-empty">Nothing yet. It starts when somebody you brought spends.</p>}
+        {/* "when somebody you brought spends" was the old rule, and it is the exact
+            thing this does not do — a promoter reading it would be waiting on a cut
+            of somebody else's takings that is never coming. It pays once, on the
+            membership, and what a member earns after that is theirs. */}
+        {data.credits.length === 0 && <p className="dash-empty">Nothing yet. It starts when somebody you brought takes a membership.</p>}
         {data.credits.map((k) => (
           <div key={k.creditId} className={`give-row${k.status === 'PAID' ? ' done' : ''}`}>
             <div className="dash-info">

@@ -5,18 +5,19 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-const CHROME='/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
+const REPO = new URL('../../', import.meta.url).pathname;
+const CHROME = process.env.HVAS_CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const APP=new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const DIR=join(APP,'venues.json');
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const web=createServer(async(q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]).replace(/^\/HVAS/,'')||'/';if(p==='/'||!extname(p))p='/index.html';
   try{const b=await readFile(join(APP,normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream','Cache-Control':'no-store'});s.end(b);}
-  catch{try{const b=await readFile(join('/home/claude/hvas',normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}catch{s.writeHead(404).end('no');}}});
+  catch{try{const b=await readFile(join(REPO, normalize(p)));s.writeHead(200,{'Content-Type':T[extname(p)]||'application/octet-stream'});s.end(b);}catch{s.writeHead(404).end('no');}}});
 await new Promise(r=>web.listen(0,r));
 const appUrl=`http://127.0.0.1:${web.address().port}/HVAS/`;
 
 process.env.HVAS_HOST_CODE='HOST850';
-const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
+const { createApp } = await import(new URL('../../server/src/app.mjs', import.meta.url).href);
 // ONE venue database, served on two different addresses in turn — exactly what
 // a tunnel restart does to a room.
 const dataDir=`/tmp/hvas-rooms-${Date.now()}`;

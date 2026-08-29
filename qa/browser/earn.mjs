@@ -20,8 +20,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createHash } from 'node:crypto';
 process.env.HVAS_HOST_CODE='HOST850';
-const { createApp } = await import('/home/claude/hvas/server/src/app.mjs');
-const { onboard } = await import('/home/claude/hvas/server/test-helpers.mjs');
+const { createApp } = await import(new URL('../../server/src/app.mjs', import.meta.url).href);
+const { onboard } = await import(new URL('../../server/test-helpers.mjs', import.meta.url).href);
 const { server: api } = createApp({ dataDir: `/tmp/hvas-earn-${Date.now()}` });
 await new Promise(r=>api.listen(0,r));
 const API=`http://127.0.0.1:${api.address().port}`;
@@ -36,7 +36,7 @@ const trina=await mk('850-960-0002','Trina');    // buys, books, and brings peop
 await onboard(call,nova.token,{role:'NAILS',program:'HOUSING'});
 await onboard(call,trina.token,{role:'PROMOTER',program:'HOUSING'});
 
-const APP='/home/claude/hvas/hitmans_vip_membership_app/dist';
+const APP=new URL('../../hitmans_vip_membership_app/dist', import.meta.url).pathname;
 const SHOT=process.env.HVAS_SHOTS||'';
 const T={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
 const web=createServer(async(q,s)=>{let p=decodeURIComponent(q.url.split('?')[0]).replace(/^\/HVAS/,'')||'/';if(p==='/'||!extname(p))p='/index.html';
@@ -331,7 +331,13 @@ console.log('\nBRINGING PEOPLE PAYS ON MONEY THAT ARRIVED');
 ok(await openEarn('Bring people'),'the promoter page opens');
 const b0=await text();
 console.log('   [bring]', b0.slice(0,320));
-ok(/signup on its own does not pay/i.test(b0),'a signup on its own does not pay');
+// Assert the substance, not one phrasing of it. The screen has to say that a
+// signup alone pays nothing AND that a member's own earnings are never touched
+// — the second is the promise that stops this becoming a cut of somebody
+// else's livelihood, and it is the one that would quietly go missing.
+ok(/not on the signup/i.test(b0),'a signup on its own does not pay');
+ok(/takes a membership/i.test(b0),'it pays on the membership they take');
+ok(/what a member makes is theirs/i.test(b0),'and never on what that member earns afterwards');
 ok(await js(`const el=document.querySelector('.ref-code b');return !!el&&el.innerText.length>=6`),'she has a code big enough to read in a dark room');
 await shot('earn-9-bring.png');
 
