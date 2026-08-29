@@ -90,6 +90,17 @@ the very first screen, tap **📡 Connect to venue** near the bottom → paste
 you're testing on the same wifi first). It'll pull the venue's real name,
 Zelle/PayPal, and go live — same backend, same data, every device.
 
+### If the venue laptop gets stuck
+
+Double-click **`fix-hvas.bat`**. It stops everything, saves a copy of anything
+that got edited on the laptop into `server\data\clobbered-<date>`, puts the
+code files back the way they should be, pulls the latest version, and runs the
+full test suite before telling you it's safe. Then double-click
+`start-hvas.bat` as normal.
+
+It does not open `server\.env` or `server\data`, so your members, entries,
+money and staff codes come through it untouched.
+
 ## 2. Start it (other devices — Mac / Linux / Pi / Termux)
 ```bash
 cd server
@@ -226,8 +237,21 @@ KEEPER_POLL_SECONDS=120        # how often to check for new commits
 KEEPER_NOTIFY_WEBHOOK=https://ntfy.sh/your-topic   # POSTed on crash/deploy events
 ```
 
-Live status (pid, current commit, restart count, last event) is written to
-`server/data/keeper-status.json`.
+Live status (pid, current commit, restart count, crash streak, last event) is
+written to `server/data/keeper-status.json`.
+
+**If a source file on the venue machine gets edited by hand**, the keeper does
+not stop deploying. It copies the edited files into
+`server/data/clobbered-<timestamp>/`, discards the edits, and carries on. It
+only ever touches files git is tracking — `server/.env`, `server/data/` and
+`server/venue-key.json` are ignored files, so members, entries, money and your
+staff codes are never in its path.
+
+**If the app can't start at all**, five crashes in a row (`KEEPER_HEAL_AFTER_CRASHES`)
+make the keeper clean the checkout and force it back onto `origin/<branch>`,
+then let the app try again. If the checkout is already clean and current, it
+says so — `heal-exhausted` — instead of healing in circles, because at that
+point the committed code itself is the problem and only a person can fix it.
 
 **Run it forever, even across reboots**, with systemd (Linux — mini-PC, Pi, or
 a $5/mo VPS all work the same way):

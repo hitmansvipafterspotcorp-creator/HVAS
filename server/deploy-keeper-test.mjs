@@ -6,10 +6,14 @@
 //   3) a new commit that passes its tests gets deployed live
 //   4) a new commit that FAILS its tests gets rejected and rolled back —
 //      the app keeps serving the last good version, not the broken one
+//   5) a locally-modified tracked file does NOT wedge deploys forever — the
+//      edit is copied aside, discarded, and the deploy lands
+//   6) a checkout whose code cannot start gets re-synced on its own instead of
+//      crash-looping until someone drives to the venue
 //
 //   node deploy-keeper-test.mjs
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -94,6 +98,8 @@ try {
       KEEPER_BRANCH: 'main',
       KEEPER_TEST_CMD: 'npm test',
       KEEPER_POLL_SECONDS: '2',
+      KEEPER_HEAL_AFTER_CRASHES: '3', // 1s+2s+4s of backoff instead of 31s — same code path, shorter test
+
       PORT: String(PORT),
     },
     stdio: 'pipe',
@@ -125,6 +131,25 @@ try {
   await sleep(6000); // give the keeper a couple of poll cycles to see + reject it
   ok((await fetchVersion()) === 'v2', 'app is STILL serving v2, not the broken v3');
   ok(g(workDir, ['rev-parse', 'HEAD']) === goodSha, 'work checkout rolled back to the last good commit, not left on the broken one');
+
+  console.log('\n4) DIRTY TREE — a hand-edited file must not wedge deploys forever');
+  // This is the failure that actually took the venue down: one modified tracked
+  // file, and `git merge --ff-only` aborted on every poll from then on.
+  writeFileSync(join(workDir, 'app.mjs'), '// somebody edited this by hand\n' + appSource('hand-edited'));
+  writeCommit(seedDir, { version: 'v4', testBody: passingTest, message: 'v4 good' });
+  g(seedDir, ['push', 'origin', 'main', '--quiet']);
+  ok(await waitForVersion('v4', 25000), 'deploy lands despite the local edit, instead of aborting forever');
+  const clobbered = readdirSync(join(workDir, 'data')).filter((d) => d.startsWith('clobbered-'));
+  ok(clobbered.length >= 1, 'the discarded local edit was copied aside, not silently deleted');
+  ok(clobbered.some((d) => existsSync(join(workDir, 'data', d, 'app.mjs'))), 'the copy is the actual file that was overwritten');
+
+  console.log('\n5) UNRUNNABLE CHECKOUT — self-heals instead of crash-looping');
+  writeFileSync(join(workDir, 'app.mjs'), "throw new Error('cannot start');\n");
+  const stBefore = readStatus();
+  if (stBefore?.pid) { try { process.kill(stBefore.pid, 'SIGKILL'); } catch {} }
+  ok(await waitForVersion('v4', 30000), 'app is serving again on its own after the checkout was left unrunnable');
+  const stAfter = readStatus();
+  ok(stAfter?.lastEvent?.event !== 'crash' || stAfter.crashStreak === 0, 'the crash streak cleared once it came back up');
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exitCode = fail ? 1 : 0;
