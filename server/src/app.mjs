@@ -273,9 +273,20 @@ const json = (res, code, obj) => {
   });
   res.end(body);
 };
+// Always a plain object, whatever arrived. Every handler here does
+// `const { x } = await readBody(req)`, and JSON.parse('null') is null, which
+// destructures into a TypeError and comes back as a 500 — the status that
+// tells a member their app is broken when what really happened is that a
+// retrying phone, a proxy or a fat-fingered curl sent a body of `null`.
+// A bare array, number or string has the same problem. None of them is a shape
+// any handler can read, so none of them gets past here.
 const readBody = (req) => new Promise((resolve) => {
   let d = ''; req.on('data', (c) => { d += c; if (d.length > 1e6) req.destroy(); });
-  req.on('end', () => { try { resolve(d ? JSON.parse(d) : {}); } catch { resolve({}); } });
+  req.on('end', () => {
+    let v;
+    try { v = d ? JSON.parse(d) : {}; } catch { v = {}; }
+    resolve(v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  });
 });
 const readRaw = (req) => new Promise((resolve) => {
   let d = ''; req.on('data', (c) => { d += c; if (d.length > 1e6) req.destroy(); });
@@ -3162,7 +3173,7 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const { memberId, on = true } = await readBody(req);
       const who = String(memberId || '');
       if (who === c.sub) return json(res, 400, { error: 'You already know what you are doing.' });
-      if (!db.prepare('SELECT id FROM members WHERE id=?').get(who)) return json(res, 404, { error: 'no such member' });
+      if (!db.prepare('SELECT id FROM members WHERE id=?').get(who)) return json(res, 404, { error: 'No member by that id.' });
       if (on) {
         if (blocked(who, c.sub)) return json(res, 403, { error: 'no' });
         db.prepare('INSERT OR IGNORE INTO follows(follower_id, followee_id, at) VALUES (?,?,?)')
@@ -3179,7 +3190,13 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       const c = acceptedMember(req, res); if (!c) return;
       const { memberId, on = true } = await readBody(req);
       const who = String(memberId || '');
-      if (who === c.sub) return json(res, 400, { error: 'no' });
+      // Without this, a call that names nobody wrote an empty id straight into
+      // a foreign key and came back as a 500 — "the app is down", for what is
+      // really a tap that lost its argument.
+      if (!who || !db.prepare('SELECT 1 FROM members WHERE id=?').get(who)) {
+        return json(res, 404, { error: 'No member by that id.' });
+      }
+      if (who === c.sub) return json(res, 400, { error: 'You cannot block yourself.' });
       if (on) {
         db.prepare('INSERT OR IGNORE INTO member_blocks(member_id, blocked_id, at) VALUES (?,?,?)')
           .run(c.sub, who, Date.now());
@@ -5507,7 +5524,20 @@ export function createApp({ dataDir, nodeId = `node-${randomBytes(3).toString('h
       }
       return json(res, 404, { error: 'not found' });
     }
-    try { await handler(req, res); } catch (e) { json(res, 500, { error: String(e.message || e) }); }
+    try {
+      await handler(req, res);
+    } catch (e) {
+      // A required field that never arrived reaches the database as undefined,
+      // and node:sqlite refuses to bind it. That is the caller's request being
+      // incomplete, not this server failing — and the difference matters,
+      // because a 500 on a phone is read as "the venue is down" and sends
+      // somebody to restart a laptop that was fine all along.
+      const msg = String(e?.message || e);
+      if (/cannot be bound to SQLite parameter/i.test(msg)) {
+        return json(res, 400, { error: 'That request was missing something it needed. Nothing was changed.' });
+      }
+      json(res, 500, { error: msg });
+    }
   });
 
   // Join the encrypted mesh in the background (peers = other door nodes).

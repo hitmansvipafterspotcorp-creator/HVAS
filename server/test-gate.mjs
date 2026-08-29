@@ -47,7 +47,11 @@ const SUITES = ['test.mjs', 'lipsync-test.mjs', 'bingo-modes-test.mjs', 'clip-ti
   'launch-test.mjs',
   // And the same walk with sixty people on it at once, because a queue is how
   // opening night differs from every test above it.
-  'rush-test.mjs'];
+  'rush-test.mjs',
+  // Every route in the building, fed every wrong shape, by every kind of
+  // caller. A 500 reads as "the venue is down" and sends somebody to restart a
+  // laptop that was fine, so no route is allowed to answer rubbish with one.
+  'rubbish-test.mjs'];
 
 const run = (file) => new Promise((res) => {
   const child = spawn(process.execPath, [resolve(__dirname, file)], { cwd: __dirname, stdio: 'inherit' });
