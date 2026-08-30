@@ -1,3 +1,9 @@
 .claude/
 node_modules/
 *.DS_Store
+hitmans_vip_membership_app/node_modules/
+hitmans_vip_membership_app/dist/
+hitmans_vip_membership_app/visual-qa/
+hitmans_vip_membership_app/dev-server*.log
+hitmans_vip_membership_app/public/assets/ui/**/sources/
+hitmans_vip_membership_app/public/assets/ui/sliced_clean_v5/

@@ -4,7 +4,7 @@ import { AudioSystem } from '../systems/AudioSystem';
 import { UISystem, UI } from '../systems/UISystem';
 
 // ── MemberCheckInScene ───────────────────────────────────────────────────────
-// Layout from LSB Sheet 5 (lsb_sheet_05_card_verification.png):
+// Layout from LSB Sheet 5 (complete_ui_set card verification screen asset):
 //   Title:   CARD VERIFICATION • MEMBER CHECK-IN UI KIT
 //   Left:    PANEL_CHECK_IN — QR_SCAN_FRAME + card number boxes + PRIVATE CLUB ACCESS
 //   Center:  KEYPAD_CARD_NUMBER — numpad 1-9 / backspace / 0 / clear / ENTER
@@ -74,7 +74,7 @@ export class MemberCheckInScene extends Phaser.Scene {
     this.selectedPayment = 0;
     this.seedDemoMembers();
 
-    // Background — solid color only. The raw lsb_sheet_05_card_verification.png
+    // Background — solid color only. The raw complete_ui_set card verification screen asset
     // is a developer reference sheet, not live UI. All UI below is drawn from
     // code (or, once sliced, individual cropped component assets).
     this.cameras.main.setBackgroundColor(COLORS.bg);
