@@ -16,7 +16,7 @@
 // Chromium is not on a venue laptop, so this SKIPS there rather than failing —
 // but it says so out loud, because a gate that goes quiet when it cannot do its
 // job is worse than one that is missing.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,22 +59,57 @@ const suites = readdirSync(here)
   .filter((f) => f.endsWith('.mjs') && f !== 'gate.mjs')
   .sort();
 
+// Every suite gets a deadline.
+//
+// These drive a browser over a socket, and there are a dozen ways for one to
+// stop without ending: a WebSocket that never opens, a CDP reply that never
+// comes back, a Chromium that starts but never listens. None of them fail —
+// they park, forever, on an await that has nothing behind it. One suite did
+// exactly that here and took the whole gate with it, which is worse than any
+// test failing: the keeper runs this before it deploys, so a gate that can
+// hang is a venue that can never take an update again. That is the same shape
+// as the bug that took the venue down this morning.
+//
+// A suite that has gone quiet for this long is not going to finish. Kill it,
+// call it failed, and carry on to the next one — a report with one FAIL in it
+// is worth infinitely more than a run that never returns.
+const SUITE_TIMEOUT_MS = Number(process.env.HVAS_SUITE_TIMEOUT_MS || 8 * 60 * 1000);
+
 const run = (file) => new Promise((res) => {
   const started = Date.now();
   const child = spawn(process.execPath, [resolve(here, file)], { cwd: here, stdio: 'inherit' });
-  child.on('close', (code) => res({ file, code, ms: Date.now() - started }));
+  let timedOut = false;
+  const killer = setTimeout(() => {
+    timedOut = true;
+    console.log(`\n  [gate] ${file} has produced nothing for ${Math.round(SUITE_TIMEOUT_MS / 1000)}s — killing it.`);
+    try { child.kill('SIGKILL'); } catch {}
+  }, SUITE_TIMEOUT_MS);
+  child.on('close', (code) => {
+    clearTimeout(killer);
+    res({ file, code: timedOut ? 'TIMEOUT' : code, ms: Date.now() - started });
+  });
 });
+
+// A suite killed mid-run leaves its browser behind, and the next suite pins the
+// same debugging port — so one hang would cascade into every suite after it
+// failing for a reason that has nothing to do with the code under test.
+const reap = () => {
+  try { execFileSync('pkill', ['-9', '-f', 'chrome-linux/chrome'], { stdio: 'ignore' }); } catch { /* none left */ }
+};
 
 const results = [];
 for (const f of suites) {
   console.log(`\n${'='.repeat(60)}\n  ${f}\n${'='.repeat(60)}`);
-  results.push(await run(f));
+  const r = await run(f);
+  if (r.code !== 0) reap();
+  results.push(r);
 }
 
 console.log(`\n${'='.repeat(60)}`);
 const failed = results.filter((r) => r.code !== 0);
 for (const r of results) {
-  console.log(`  ${r.code === 0 ? 'ok  ' : 'FAIL'}  ${r.file.padEnd(24)} ${(r.ms / 1000).toFixed(0)}s`);
+  const mark = r.code === 0 ? 'ok  ' : r.code === 'TIMEOUT' ? 'HUNG' : 'FAIL';
+  console.log(`  ${mark}  ${r.file.padEnd(24)} ${(r.ms / 1000).toFixed(0)}s`);
 }
 if (failed.length) {
   console.log(`\nBROWSER GATE FAILED — ${failed.length} of ${results.length} suites: ${failed.map((f) => f.file).join(', ')}`);
