@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PocketPage</title>
 <meta name="description" content="Build a live mobile page for a local business in ten minutes, hand them your phone, get paid.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#E9E3D4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Space+Mono:wght@400;700&display=swap">
@@ -98,17 +100,17 @@ a{color:var(--blue)}
 /* tabs */
 .tabs{
   position:fixed; left:0; right:0; bottom:0; z-index:50;
-  display:grid; grid-template-columns:repeat(3,1fr);
+  display:grid; grid-template-columns:repeat(4,1fr);
   background:var(--stock); border-top:1px solid var(--rule-2);
   padding-bottom:env(safe-area-inset-bottom);
 }
 .tab{
   appearance:none; border:0; background:none; cursor:pointer;
-  font-family:"Space Mono",monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-  color:var(--ink-3); padding:14px 4px 13px; border-top:3px solid transparent; margin-top:-1px;
+  font-family:"Space Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); padding:12px 2px 11px; border-top:3px solid transparent; margin-top:-1px;
 }
 .tab[aria-selected="true"]{color:var(--ink); border-top-color:var(--blue)}
-.tab b{display:block; font-family:"Archivo",sans-serif; font-size:15px; letter-spacing:-.01em; font-weight:600; text-transform:none}
+.tab b{display:block; font-family:"Archivo",sans-serif; font-size:14.5px; letter-spacing:-.01em; font-weight:600; text-transform:none}
 
 .pane{display:none; padding:16px}
 .pane.on{display:block}
@@ -116,7 +118,7 @@ a{color:var(--blue)}
   .pane{padding:24px}
   .tabs{
     position:static; max-width:1120px; margin:0 auto;
-    grid-template-columns:repeat(3,auto) 1fr; justify-content:start;
+    grid-template-columns:repeat(4,auto) 1fr; justify-content:start;
     border-top:0; border-bottom:1px solid var(--rule-2); padding-bottom:0;
   }
   .tab{padding:14px 26px 12px; border-top:0; border-bottom:3px solid transparent; margin:0 0 -1px}
@@ -290,6 +292,38 @@ select{font-size:15px}
   font-size:12.5px; color:var(--ink-2); line-height:1.45; background:var(--paper);
   border:1px dashed var(--rule-2); padding:10px 12px; border-radius:3px; margin-top:10px;
 }
+/* ---- blast lane ---- */
+.trades{display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px}
+.trade{
+  appearance:none; cursor:pointer; text-align:left; font-family:inherit;
+  border:1px solid var(--rule-2); background:var(--paper); color:var(--ink);
+  border-radius:3px; padding:10px 10px 9px; line-height:1.25;
+}
+.trade .ico{font-size:19px; display:block; margin-bottom:4px}
+.trade .nm{font-size:13px; font-weight:600; display:block}
+.trade[aria-pressed="true"]{background:var(--blue); border-color:var(--blue); color:var(--on-accent)}
+.step{
+  font-family:"Space Mono",monospace; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-3); display:flex; align-items:center; gap:7px; margin:2px 0 7px;
+}
+.step::after{content:""; flex:1; height:1px; background:var(--rule)}
+.msgbox{
+  background:var(--paper); border:1px solid var(--rule-2); border-radius:3px;
+  padding:11px 13px; font-size:14.5px; line-height:1.5; white-space:pre-wrap;
+  word-break:break-word; max-height:190px; overflow-y:auto;
+}
+.warnbox{
+  background:var(--stamp-soft); border:1px solid var(--stamp); border-radius:3px;
+  padding:10px 12px; font-size:13px; line-height:1.45; color:var(--ink); margin-top:10px;
+}
+.warnbox b{color:var(--stamp)}
+.sent{
+  font-family:"Space Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3);
+}
+.due{border-left:3px solid var(--stamp); padding-left:11px; margin-bottom:10px}
+.due:last-child{margin-bottom:0}
+.due .who{font-weight:600; font-size:15px}
 .qrbox{text-align:center; padding:10px 0}
 .qrbox img{width:220px; height:220px; background:#fff; padding:8px; border-radius:3px}
 details{border-top:1px dotted var(--rule-2); padding-top:8px; margin-top:8px}
@@ -310,8 +344,9 @@ summary{cursor:pointer; font-family:"Space Mono",monospace; font-size:11px; lett
 <div class="wrap">
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true" data-pane="build">01<b>Build</b></button>
-    <button class="tab" role="tab" aria-selected="false" data-pane="pitch">02<b>Pitch</b></button>
-    <button class="tab" role="tab" aria-selected="false" data-pane="money">03<b>Money</b></button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="blast">02<b>Blast</b></button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="pitch">03<b>Pitch</b></button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="money">04<b>Money</b></button>
   </nav>
 
   <!-- ========================= BUILD ========================= -->
@@ -402,9 +437,11 @@ summary{cursor:pointer; font-family:"Space Mono",monospace; font-size:11px; lett
               <input type="text" id="f-emoji" data-k="emoji" maxlength="4" placeholder="🚗" style="font-size:24px"></div>
             <div class="field"><label for="f-cta">Main button text</label>
               <input type="text" id="f-cta" data-k="cta" placeholder="Text to book"></div>
-            <div class="field"><label for="f-by">Your credit line — goes at the bottom of every page</label>
-              <input type="text" id="f-by" data-k="by" placeholder="Page by Chris — 850-555-0199">
-              <p class="hint">Type this once; it sticks between jobs. This one line is how the next customer finds you.</p></div>
+            <div class="field"><label for="f-by">Your name — goes at the bottom of every page</label>
+              <input type="text" id="f-by" data-k="by" placeholder="Chris"></div>
+            <div class="field"><label for="f-bytel">Your number</label>
+              <input type="tel" id="f-bytel" data-k="byTel" placeholder="850-555-0199">
+              <p class="hint">Type these once; they stick between jobs. This is how the next customer finds you — and it's what the Blast tab puts a Call button on.</p></div>
           </div>
         </div>
 
@@ -439,6 +476,62 @@ summary{cursor:pointer; font-family:"Space Mono",monospace; font-size:11px; lett
         <div class="phone"><iframe id="pvDesk" title="Preview"></iframe></div>
       </aside>
     </div>
+  </section>
+
+  <!-- ========================= BLAST ========================= -->
+  <section class="pane" id="pane-blast">
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>Draft in thirty seconds</h2><span class="ticket-no">No conversation</span></div>
+      <div class="ticket-bd">
+        <p class="hint" style="margin:2px 0 12px">Walking storefronts caps you at ten conversations a day. This doesn't. Pick the trade, type the name and number off their truck or their Facebook post, and send them a finished page cold. Forty of these from a library bench beats ten doors.</p>
+
+        <p class="step">Step 1 — their trade</p>
+        <div class="trades" id="tradeGrid"></div>
+
+        <p class="step" style="margin-top:16px">Step 2 — who they are</p>
+        <div class="field"><label for="b-name">Business name</label>
+          <input type="text" id="b-name" placeholder="Fade Lab Barbers"></div>
+        <div class="field"><label for="b-phone">Their number</label>
+          <input type="tel" id="b-phone" placeholder="850-555-0177"></div>
+
+        <p class="step" style="margin-top:16px">Step 3 — send it</p>
+        <div class="btns">
+          <button class="btn btn-pri wide" id="blastMake">Make the draft</button>
+        </div>
+        <div id="blastOut" hidden>
+          <p class="hint" style="margin:12px 0 6px">Your message, ready to go:</p>
+          <div class="msgbox" id="blastMsg"></div>
+          <div class="btns" style="margin-top:9px">
+            <button class="btn btn-go wide" id="blastText">Open it in Messages</button>
+            <button class="btn" id="blastCopyMsg">Copy message</button>
+            <button class="btn" id="blastCopyLink">Copy link only</button>
+            <button class="btn" id="blastOpen">See the page</button>
+            <button class="btn" id="blastEdit">Open in Build</button>
+          </div>
+          <p class="hint" style="margin-top:9px">Logged under Money automatically, with the link saved so you can follow up on it in two days without rebuilding anything.</p>
+        </div>
+
+        <div class="warnbox">
+          <b>Every draft says it's a draft.</b> It carries a banner with your name and a Call button, and it says the prices are your guess and not confirmed by the business. It publishes no business data to search engines and it never invents customer reviews. Send it as what it is — a proposal you already finished — and let them correct you. "Those aren't my prices" is them starting the conversation for you.
+        </div>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>How to work this</h2><span class="ticket-no">Volume</span></div>
+      <div class="ticket-bd">
+        <ol class="checklist">
+          <li><span class="n">01</span><span>Sit somewhere with free wifi. The main library downtown has it, so does every coffee shop lobby.</span></li>
+          <li><span class="n">02</span><span>Open Facebook Marketplace, local buy/sell groups, and Google Maps. Search "barber Tallahassee", "food truck Tallahassee", "mobile detail". You want anybody posting a phone number with no website link.</span></li>
+          <li><span class="n">03</span><span>Name, number, trade, send. Thirty seconds each. Do forty.</span></li>
+          <li><span class="n">04</span><span>Expect one to three replies out of forty, and most of them will be corrections, not rejections. A correction is a live customer.</span></li>
+          <li><span class="n">05</span><span>Follow up in two days on everyone who didn't answer. The Money tab tells you who and hands you the message.</span></li>
+          <li><span class="n">06</span><span>Keep walking doors too. Cold sends are volume; in person is your close rate. You need both this week.</span></li>
+        </ol>
+      </div>
+    </div>
+
   </section>
 
   <!-- ========================= PITCH ========================= -->
@@ -547,6 +640,14 @@ summary{cursor:pointer; font-family:"Space Mono",monospace; font-size:11px; lett
       </div>
     </div>
 
+    <div class="ticket" id="followTicket" hidden>
+      <div class="ticket-hd"><h2>Chase these today</h2><span class="ticket-no" id="followCount">—</span></div>
+      <div class="ticket-bd">
+        <div id="followList"></div>
+        <p class="note">Two days of silence isn't a no — most sales here come off the second message. Tap and it opens with the follow-up already written and their original link attached.</p>
+      </div>
+    </div>
+
     <div class="ticket">
       <div class="ticket-hd"><h2>Who you talked to</h2><span class="ticket-no" id="leadCount">0</span></div>
       <div class="ticket-bd">
@@ -599,8 +700,60 @@ function blank(){
   return { name:"", tagline:"", phone:"", address:"", photo:"", color:COLORS[0], emoji:"",
            cta:"Text to book", services:[], hours:[null,null,null,null,null,null,null],
            cashapp:"", venmo:"", zelle:"", instagram:"", facebook:"",
-           q1:"", a1:"", q2:"", a2:"", by:"" };
+           q1:"", a1:"", q2:"", a2:"", by:"", byTel:"", unclaimed:false };
 }
+
+/* Hour shapes, reused by the presets and the trade templates. */
+var HOURS = {
+  weekday: [null,["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],null],
+  retail:  [null,["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"]],
+  late:    [["11:00","21:00"],null,["11:00","21:00"],["11:00","21:00"],["11:00","21:00"],["11:00","22:00"],["11:00","22:00"]],
+  shop:    [null,["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","19:00"],["09:00","19:00"],["08:00","16:00"]],
+  early:   [null,["07:00","17:00"],["07:00","17:00"],["07:00","17:00"],["07:00","17:00"],["07:00","17:00"],["08:00","14:00"]],
+  clear:   [null,null,null,null,null,null,null]
+};
+
+/* Trade templates for cold drafts. Services and prices are STARTING GUESSES —
+   every draft says so on its face. Never seed testimonials: inventing a quote
+   for a business that didn't say it is fabricating a review. */
+var TRADES = [
+  { id:"barber", label:"Barber", ico:"💈", color:"#2B2F36", cta:"Text to book", hours:"shop",
+    tagline:"Cuts, fades and lineups",
+    services:[["Haircut","$25",""],["Fade & lineup","$35",""],["Beard trim","$15",""],["Kids cut","$20",""]] },
+  { id:"braids", label:"Braids & hair", ico:"💇", color:"#8B1F52", cta:"Text to book", hours:"retail",
+    tagline:"Braids, twists and natural hair care",
+    services:[["Knotless braids","$180","Hair included"],["Box braids","$150",""],["Retwist","$75",""],["Kids styles","$65",""]] },
+  { id:"food", label:"Food truck", ico:"🌮", color:"#B4591F", cta:"Text your order", hours:"late",
+    tagline:"Fresh off the truck",
+    services:[["Plate","$12",""],["Tacos (3)","$10",""],["Wings","$11",""],["Drinks","$2",""]] },
+  { id:"detail", label:"Detailing", ico:"🚗", color:"#1F5F8B", cta:"Text to book", hours:"weekday",
+    tagline:"Hand wash and interior detail — we come to you",
+    services:[["Outside wash & wax","$45",""],["Interior detail","$95",""],["Inside + out","$130",""]] },
+  { id:"lawn", label:"Lawn care", ico:"🌱", color:"#1F6B4A", cta:"Text for a quote", hours:"early",
+    tagline:"Mowing, edging and cleanup",
+    services:[["Mow & edge","$45","Standard yard"],["Hedge trimming","$60",""],["Leaf cleanup","$85",""]] },
+  { id:"nails", label:"Nails & lashes", ico:"💅", color:"#5B3E8E", cta:"Text to book", hours:"retail",
+    tagline:"Nails, lashes and brows",
+    services:[["Full set","$55",""],["Fill","$40",""],["Pedicure","$45",""],["Lash extensions","$90",""]] },
+  { id:"clean", label:"Cleaning", ico:"🧽", color:"#166B6B", cta:"Text for a quote", hours:"weekday",
+    tagline:"Homes, offices and move-outs",
+    services:[["Standard clean","$120",""],["Deep clean","$200",""],["Move-out clean","$250",""]] },
+  { id:"haul", label:"Moving & hauling", ico:"📦", color:"#7A2E2E", cta:"Text for a quote", hours:"early",
+    tagline:"Moving, hauling and junk removal",
+    services:[["Two movers, per hour","$90",""],["Single item move","$75",""],["Junk haul-off","$150","Truckload"]] },
+  { id:"handy", label:"Handyman", ico:"🔧", color:"#B4591F", cta:"Text for a quote", hours:"weekday",
+    tagline:"Repairs, mounting and small jobs",
+    services:[["Service call","$65","First hour"],["TV mounting","$95",""],["Drywall patch","$120",""]] },
+  { id:"photo", label:"Photo & DJ", ico:"🎧", color:"#2B2F36", cta:"Text to book", hours:"late",
+    tagline:"Events, portraits and parties",
+    services:[["Portrait session","$150","One hour"],["Event coverage","$400",""],["DJ, four hours","$350",""]] },
+  { id:"mech", label:"Mobile mechanic", ico:"🔩", color:"#575B64", cta:"Text for a quote", hours:"weekday",
+    tagline:"Repairs at your driveway",
+    services:[["Diagnostic","$60",""],["Brake job","$180","Per axle"],["Oil change","$70",""]] },
+  { id:"tattoo", label:"Tattoo", ico:"🖋️", color:"#2B2F36", cta:"Text to book", hours:"late",
+    tagline:"Custom work and walk-ins",
+    services:[["Shop minimum","$80",""],["Hourly","$140",""],["Small piece","$100",""]] }
+];
 
 function example(){
   var d = blank();
@@ -639,6 +792,7 @@ function esc(s){
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 function digits(s){ return String(s||"").replace(/[^\d+]/g,""); }
+function copyHours(h){ return h.map(function(d){ return d ? [d[0], d[1]] : null; }); }
 function money(n){ return "$" + (Math.round(Number(n)||0)).toLocaleString("en-US"); }
 var toastTimer;
 function toast(msg){
@@ -693,6 +847,12 @@ function decode(str){
   });
 }
 function baseURL(){ return location.origin + location.pathname; }
+function makeLink(obj){ return encode(obj).then(function(p){ return baseURL() + "#p=" + p; }); }
+
+/* Leads are shared: Blast writes them, Money reads and chases them. */
+var leads = LS.get("pp.leads", []);
+var redrawMoney = function(){};
+function saveLeads(){ LS.set("pp.leads", leads); redrawMoney(); }
 
 /* ================= the page they get ================= */
 function renderSite(d){
@@ -736,12 +896,16 @@ function renderSite(d){
   if ((d.instagram||"").trim()) socials.push(['https://instagram.com/' + encodeURIComponent(d.instagram.replace(/^@/,"")), 'Instagram']);
   if ((d.facebook||"").trim()) socials.push([d.facebook, 'Facebook']);
 
-  var ld = {
+  /* An unclaimed draft was written without asking the business, so its prices
+     and hours are guesses. Never hand those to search engines as fact — the
+     structured data goes out only once someone has claimed the page. */
+  var claimed = !d.unclaimed;
+  var ld = claimed ? {
     "@context":"https://schema.org", "@type":"LocalBusiness",
     name: name, description: d.tagline || undefined,
     telephone: d.phone || undefined, address: d.address || undefined,
     image: d.photo || undefined
-  };
+  } : null;
 
   var h = [];
   h.push('<!doctype html><html lang="en"><head><meta charset="utf-8">');
@@ -752,7 +916,8 @@ function renderSite(d){
   h.push('<meta property="og:title" content="' + esc(name) + '">');
   h.push('<meta property="og:description" content="' + esc(d.tagline || "") + '">');
   if (d.photo) h.push('<meta property="og:image" content="' + esc(d.photo) + '">');
-  h.push('<script type="application/ld+json">' + JSON.stringify(ld).replace(/</g,"\\u003c") + '<\/script>');
+  if (ld) h.push('<script type="application/ld+json">' + JSON.stringify(ld).replace(/</g,"\\u003c") + '<\/script>');
+  else h.push('<meta name="robots" content="noindex">');
 
   h.push('<style>' +
     '*{box-sizing:border-box}' +
@@ -788,13 +953,36 @@ function renderSite(d){
     '.bar a{flex:1;text-align:center;padding:13px 6px;border-radius:9px;font-weight:700;font-size:15px;text-decoration:none;border:1px solid ' + accent + ';color:' + accent + '}' +
     '.bar a.solid{background:' + accent + ';color:#fff}' +
     'footer{text-align:center;font-size:12.5px;color:#8A8F98;padding:0 20px 24px}' +
+    '.claim{background:#FDF3D3;color:#4A3A0B;padding:13px 18px;border-bottom:1px solid #E8D8A4;font-size:14px;line-height:1.5}' +
+    '.claim b{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px}' +
+    '.claim .acts{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}' +
+    '.claim .acts a{background:#4A3A0B;color:#FDF3D3;padding:9px 15px;border-radius:7px;text-decoration:none;font-weight:700;font-size:14px}' +
+    '.draftnote{font-size:12.5px;color:#8A8F98;margin:-4px 0 10px;font-style:italic}' +
     '@media(prefers-color-scheme:dark){' +
+      '.claim{background:#2C2513;color:#F2E4B6;border-bottom-color:#453A17}' +
+      '.claim .acts a{background:#F2E4B6;color:#2C2513}' +
       'body{background:#111316;color:#ECE9E3}' +
       '.svc{border-bottom-color:#262A31}.hr{border-bottom-color:#20242A}.hr.today span:first-child{color:#ECE9E3}' +
       'blockquote{background:#191C21}.pay a,.pay span{border-color:#2C3138;color:#ECE9E3}' +
       '.where{color:#C3C7CE}.bar{background:rgba(17,19,22,.97);border-top-color:#262A31}' +
     '}' +
   '</style></head><body>');
+
+  /* A cold draft has to introduce itself honestly before it shows anything:
+     who made it, that nobody at the business approved it, and that the
+     numbers below are a guess. */
+  if (!claimed){
+    var mkr = (d.by||"").trim(), mkrTel = digits(d.byTel);
+    h.push('<div class="claim"><b>Draft — not claimed yet</b>' +
+      (mkr ? esc(mkr) + ' made this page for ' + esc(name) + '. ' : 'This page was made for ' + esc(name) + '. ') +
+      'Nobody here has confirmed it, so the prices and hours below are a best guess. ' +
+      'Say the word and they get fixed — or say no and it goes away.');
+    if (mkrTel){
+      h.push('<div class="acts"><a href="tel:' + esc(mkrTel) + '">Call ' + esc(mkr || "the maker") + '</a>' +
+        '<a href="sms:' + esc(mkrTel) + '?&body=' + encodeURIComponent("About the page you made for " + name + ": ") + '">Text</a></div>');
+    }
+    h.push('</div>');
+  }
 
   h.push('<header class="hero">');
   if ((d.emoji||"").trim()) h.push('<div class="sym">' + esc(d.emoji) + '</div>');
@@ -809,6 +997,7 @@ function renderSite(d){
 
   if (svcs.length){
     h.push('<section><h2>Services</h2>');
+    if (!claimed) h.push('<p class="draftnote">Typical prices for this trade — not confirmed by the business.</p>');
     svcs.forEach(function(s){
       h.push('<div class="svc"><div><b>' + esc(s[0]) + '</b>' +
         ((s[2]||"").trim() ? '<small>' + esc(s[2]) + '</small>' : '') + '</div>' +
@@ -857,7 +1046,12 @@ function renderSite(d){
 
   h.push('</main>');
 
-  if ((d.by||"").trim()) h.push('<footer>' + esc(d.by) + '</footer>');
+  if ((d.by||"").trim() || (d.byTel||"").trim()){
+    var byTel = digits(d.byTel);
+    h.push('<footer>Page by ' + esc((d.by||"").trim() || "a neighbor") +
+      (byTel ? ' · <a href="tel:' + esc(byTel) + '">' + esc(d.byTel) + '</a>' : '') +
+      '</footer>');
+  }
 
   if (tel){
     h.push('<nav class="bar">');
@@ -920,6 +1114,15 @@ if (hash.indexOf("#p=") === 0){
   });
 } else {
   whenParsed(boot);
+}
+
+/* Cache the shell so the tool — and every page already handed out — keeps
+   working with no signal. Absent or blocked (file://, the artifact frame),
+   this is a no-op and nothing else changes. */
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
 }
 
 /* ================= builder ================= */
@@ -1020,11 +1223,7 @@ function boot(){
   }
   document.querySelectorAll("[data-preset]").forEach(function(b){
     b.addEventListener("click", function(){
-      var p = b.dataset.preset;
-      if (p === "weekday") data.hours = [null,["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],null];
-      if (p === "retail")  data.hours = [null,["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"]];
-      if (p === "late")    data.hours = [["11:00","21:00"],null,["11:00","21:00"],["11:00","21:00"],["11:00","21:00"],["11:00","22:00"],["11:00","22:00"]];
-      if (p === "clear")   data.hours = [null,null,null,null,null,null,null];
+      data.hours = copyHours(HOURS[b.dataset.preset] || HOURS.clear);
       drawHours(); save();
     });
   });
@@ -1140,7 +1339,102 @@ function boot(){
     return m ? "rgb(" + parseInt(m[1],16) + ", " + parseInt(m[2],16) + ", " + parseInt(m[3],16) + ")" : "";
   }
 
+  blastTab(function(draft){        /* "Open in Build" hands the draft over */
+    data = draft; refill(); save();
+    document.querySelector('[data-pane="build"]').click();
+  });
   moneyTab();
+}
+
+/* ================= blast tab ================= */
+function blastTab(handoff){
+  var picked = LS.get("pp.trade", null);
+  var built = null, builtLink = "", builtMsg = "";
+
+  var grid = $("#tradeGrid");
+  TRADES.forEach(function(t){
+    var b = document.createElement("button");
+    b.className = "trade"; b.type = "button";
+    b.setAttribute("aria-pressed", String(t.id === picked));
+    b.innerHTML = '<span class="ico" aria-hidden="true">' + t.ico + '</span><span class="nm"></span>';
+    b.querySelector(".nm").textContent = t.label;
+    b.addEventListener("click", function(){
+      picked = t.id; LS.set("pp.trade", picked);
+      grid.querySelectorAll(".trade").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+      b.setAttribute("aria-pressed","true");
+    });
+    grid.appendChild(b);
+  });
+
+  function draftFrom(trade, name, phone){
+    var d = blank();
+    d.name = name;
+    d.phone = phone;
+    d.tagline = trade.tagline;
+    d.emoji = trade.ico;
+    d.color = trade.color;
+    d.cta = trade.cta;
+    d.services = trade.services.map(function(s){ return [s[0], s[1], s[2]]; });
+    d.hours = copyHours(HOURS[trade.hours]);
+    d.address = "Tallahassee";
+    d.unclaimed = true;                    /* the banner is not optional */
+    d.by = data.by; d.byTel = data.byTel;  /* your name rides along */
+    return d;
+  }
+
+  function message(name, url){
+    var me = (data.by||"").trim();
+    return "Hey — " + (me ? "I'm " + me + ", I" : "I") + " make one-page websites for local " +
+      "businesses around Tallahassee. I already built one for " + name + ", it's live right now:\n\n" +
+      url + "\n\n" +
+      "Fair warning, I guessed at your prices and hours, so some of it is probably wrong — " +
+      "tell me what to fix and I'll fix it. $59 and it's yours to keep, no monthly, no expiring. " +
+      "If you're not interested just say so and I'll leave you alone.";
+  }
+
+  $("#blastMake").addEventListener("click", function(){
+    var name = $("#b-name").value.trim();
+    var phone = $("#b-phone").value.trim();
+    if (!picked) return toast("Pick their trade first");
+    if (!name)  return toast("What's the business called?");
+    if (!(data.by||"").trim() || !(data.byTel||"").trim())
+      return toast("Add your name and number on the Build tab first");
+
+    var trade = TRADES.filter(function(t){ return t.id === picked; })[0];
+    built = draftFrom(trade, name, phone);
+
+    makeLink(built).then(function(url){
+      builtLink = url;
+      builtMsg = message(name, url);
+      $("#blastMsg").textContent = builtMsg;
+      $("#blastOut").hidden = false;
+      $("#blastOut").scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+      /* Log it now, with the link, so the follow-up needs no rebuilding. */
+      leads.unshift({ name:name, phone:phone, amt:59, stage:"lead",
+                      sent:Date.now(), touched:Date.now(), link:url });
+      saveLeads();
+      toast("Drafted and logged");
+    });
+  });
+
+  $("#blastText").addEventListener("click", function(){
+    if (!builtMsg) return;
+    var to = digits($("#b-phone").value);
+    location.href = "sms:" + to + "?&body=" + encodeURIComponent(builtMsg);
+  });
+  $("#blastCopyMsg").addEventListener("click", function(){
+    if (builtMsg) copy(builtMsg, "Message copied — paste it in a DM");
+  });
+  $("#blastCopyLink").addEventListener("click", function(){
+    if (builtLink) copy(builtLink, "Link copied");
+  });
+  $("#blastOpen").addEventListener("click", function(){
+    if (builtLink) window.open(builtLink, "_blank");
+  });
+  $("#blastEdit").addEventListener("click", function(){
+    if (built) handoff(built);
+  });
 }
 
 /* ================= money tab ================= */
@@ -1148,7 +1442,6 @@ function moneyTab(){
   var STAGES = ["lead","demo","sold","paid"];
   var LABEL = { lead:"Lead", demo:"Demoed", sold:"Sold", paid:"Paid" };
   var goal = LS.get("pp.goal", { amt:"", date:"" });
-  var leads = LS.get("pp.leads", []);
 
   var gAmt = $("#g-amt"), gDate = $("#g-date");
   gAmt.value = goal.amt || ""; gDate.value = goal.date || "";
@@ -1202,7 +1495,8 @@ function moneyTab(){
       pill.textContent = LABEL[l.stage];
       pill.addEventListener("click", function(){
         l.stage = STAGES[(STAGES.indexOf(l.stage) + 1) % STAGES.length];
-        LS.set("pp.leads", leads); drawLeads();
+        l.touched = Date.now();
+        saveLeads();
       });
       meta.appendChild(pill);
       if (l.phone){
@@ -1224,24 +1518,81 @@ function moneyTab(){
       var del = document.createElement("button");
       del.className = "btn btn-icon"; del.type = "button"; del.textContent = "×";
       del.setAttribute("aria-label","Remove " + l.name);
-      del.addEventListener("click", function(){ leads.splice(i,1); LS.set("pp.leads", leads); drawLeads(); });
+      del.addEventListener("click", function(){ leads.splice(i,1); saveLeads(); });
       acts.appendChild(del);
 
       row.appendChild(who); row.appendChild(amt); row.appendChild(meta); row.appendChild(acts);
       box.appendChild(row);
     });
+    drawFollowUps();
     drawGoal();
+  }
+
+  /* Anyone sent a draft two or more days ago who hasn't been moved along.
+     Silence isn't a no — most of these close on the second message. */
+  var CHASE_AFTER = 2 * 86400000;
+  function drawFollowUps(){
+    var now = Date.now();
+    var due = leads.filter(function(l){
+      return (l.stage === "lead" || l.stage === "demo") &&
+             l.touched && (now - l.touched) >= CHASE_AFTER;
+    });
+    $("#followTicket").hidden = !due.length;
+    if (!due.length) return;
+
+    $("#followCount").textContent = due.length + " waiting";
+    var box = $("#followList"); box.innerHTML = "";
+    due.forEach(function(l){
+      var days = Math.floor((now - l.touched) / 86400000);
+      var wrap = document.createElement("div"); wrap.className = "due";
+
+      var who = document.createElement("div"); who.className = "who"; who.textContent = l.name;
+      var when = document.createElement("div"); when.className = "sent";
+      when.textContent = days + (days === 1 ? " day" : " days") + " of silence";
+      wrap.appendChild(who); wrap.appendChild(when);
+
+      var acts = document.createElement("div");
+      acts.style.cssText = "display:flex;gap:7px;margin-top:8px;flex-wrap:wrap";
+      var me = (data.by||"").trim();
+      var msg = "Hey, it's " + (me || "me") + " — did you get a chance to look at the page I made for " +
+        l.name + "?" + (l.link ? "\n\n" + l.link + "\n\n" : " ") +
+        "Happy to fix anything that's wrong on it. Still $59 if you want it, and no hard feelings if you don't.";
+
+      if (l.phone){
+        var a = document.createElement("a");
+        a.className = "btn btn-sm"; a.textContent = "Send follow-up";
+        a.href = "sms:" + digits(l.phone) + "?&body=" + encodeURIComponent(msg);
+        a.addEventListener("click", function(){ l.touched = Date.now(); saveLeads(); });
+        acts.appendChild(a);
+      }
+      var c = document.createElement("button");
+      c.className = "btn btn-sm"; c.type = "button"; c.textContent = "Copy message";
+      c.addEventListener("click", function(){ copy(msg, "Copied"); l.touched = Date.now(); saveLeads(); });
+      acts.appendChild(c);
+
+      var s = document.createElement("button");
+      s.className = "btn btn-sm"; s.type = "button"; s.textContent = "Not interested";
+      s.addEventListener("click", function(){
+        var at = leads.indexOf(l);
+        if (at > -1){ leads.splice(at,1); saveLeads(); }
+      });
+      acts.appendChild(s);
+
+      wrap.appendChild(acts);
+      box.appendChild(wrap);
+    });
   }
 
   $("#addLead").addEventListener("click", function(){
     var n = $("#l-name").value.trim();
     if (!n) return toast("Who did you talk to?");
-    leads.unshift({ name:n, phone:$("#l-phone").value.trim(), amt:$("#l-amt").value || 59, stage:"lead" });
-    LS.set("pp.leads", leads);
+    leads.unshift({ name:n, phone:$("#l-phone").value.trim(), amt:$("#l-amt").value || 59,
+                    stage:"lead", touched:Date.now() });
     $("#l-name").value = ""; $("#l-phone").value = ""; $("#l-amt").value = "";
-    drawLeads(); toast("Logged");
+    saveLeads(); toast("Logged");
   });
 
+  redrawMoney = drawLeads;
   drawLeads();
 }
 </script>

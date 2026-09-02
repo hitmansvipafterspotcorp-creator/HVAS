@@ -41,6 +41,38 @@ Consequences worth knowing:
 `Download file` exports the same page as a standalone `index.html` for a real
 domain later. That's the $19/month upgrade, not the thing you sell on day one.
 
+## Cold drafts, and the rules that keep them honest
+
+Walking storefronts caps you at roughly ten conversations a day. The **Blast**
+tab removes that cap: pick a trade, type a business name and phone number off a
+truck door or a Facebook post, and you have a live page in about thirty
+seconds. Forty of those from a library bench outruns ten doors.
+
+Building a page for a business that never asked for one is only defensible if
+the page says exactly what it is, so three rules are enforced in code rather
+than left to the seller:
+
+1. **Every draft carries a claim banner** naming who made it, stating that
+   nobody at the business confirmed it, and offering a Call and Text button
+   back to the maker. `d.unclaimed` drives it; the Blast tab always sets it.
+2. **Drafts publish nothing to search engines.** `LocalBusiness` JSON-LD is
+   emitted only for claimed pages, and a draft sets `noindex`. Guessed prices
+   never enter the record as fact.
+3. **Testimonials are never seeded.** Trade templates fill in services, prices,
+   hours and a tagline — never a customer quote. Inventing a review for a real
+   business is fabrication, so the quote fields stay empty until a human types
+   something a customer actually said.
+
+The corrections are the point. "Those aren't my prices" is a live customer who
+started the conversation for you.
+
+## Following up
+
+Blasted drafts log themselves as leads with the generated link attached. Any
+lead still at Lead or Demoed after two days surfaces in **Chase these today**
+in the Money tab, with the follow-up message pre-written and the original link
+already in it — no rebuilding. Acting on a lead resets its clock.
+
 ## Running it
 
 It is one static file. Any of these work:
@@ -65,9 +97,10 @@ client's phone, since the link is built from wherever the builder is served.
 
 | Tab | What it does |
 | --- | --- |
-| **Build** | The form. Live preview of the exact page they'll get. Copy link, QR code, download, copy HTML. |
+| **Build** | The full form. Live preview of the exact page they'll get. Copy link, QR code, download, copy HTML. |
+| **Blast** | Twelve trade templates. Name + number + trade = a live draft and a written outreach message in ~30 seconds, logged as a lead automatically. |
 | **Pitch** | The 30-second script, the price sheet, six objections with answers, where in Tallahassee to walk, and how to raise prices after week one. |
-| **Money** | Bill amount and due date, progress against it, and a lead list with Lead → Demoed → Sold → Paid. Only Paid counts, because only paid is real. |
+| **Money** | Bill amount and due date, progress against it, the follow-up queue, and a lead list with Lead → Demoed → Sold → Paid. Only Paid counts, because only paid is real. |
 
 Drafts, leads, and the goal are kept in `localStorage` on the device. Nothing
 leaves the phone. Clearing browser data clears them, so the leads list is a
@@ -84,6 +117,14 @@ working tool, not an archive.
 - Its own light and dark themes, independent of the builder's.
 - No external requests except an optional photo URL, so it loads instantly on
   a bad connection.
+
+## Offline
+
+`sw.js` caches the shell, and since the tool is one file and every client page
+lives in a URL fragment that never reaches a server, that one cache entry makes
+the builder *and every page already handed out* work with no signal. Install it
+with Add to Home Screen. Where a service worker can't register (`file://`, the
+Claude artifact frame) registration fails silently and nothing else changes.
 
 ## Browser support
 
