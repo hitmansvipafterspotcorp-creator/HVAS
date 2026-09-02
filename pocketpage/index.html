@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PocketPage</title>
+<meta name="description" content="Build a live mobile page for a local business in ten minutes, hand them your phone, get paid.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* ============ tokens: carbon-copy sales ticket ============ */
+:root{
+  --paper:#E9E3D4;      /* manila */
+  --stock:#F5F1E6;      /* ticket stock */
+  --stock-2:#DFD8C6;    /* second sheet */
+  --ink:#16181D;
+  --ink-2:#575B64;
+  --ink-3:#8A8375;
+  --rule:#C8C0AC;
+  --rule-2:#B4AA92;
+  --blue:#24406B;       /* ballpoint — primary action */
+  --blue-soft:#DCE3EE;
+  --stamp:#B22B25;      /* rubber stamp — urgency */
+  --stamp-soft:#F2DAD7;
+  --go:#1F6B4A;         /* money in */
+  --go-soft:#D8E7DF;
+  --on-accent:#FFFFFF;  /* text on a filled blue/green button */
+  --shadow:0 1px 0 rgba(22,24,29,.10), 0 2px 10px rgba(22,24,29,.06);
+  --focus:#24406B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#14161A;
+    --stock:#1C1F25;
+    --stock-2:#23272F;
+    --ink:#EDE8DB;
+    --ink-2:#A2A8B4;
+    --ink-3:#727A87;
+    --rule:#333944;
+    --rule-2:#454C59;
+    --blue:#8FB0E8;
+    --blue-soft:#232C3C;
+    --stamp:#EF7B72;
+    --stamp-soft:#33221F;
+    --go:#5CC694;
+    --go-soft:#1B2A24;
+    --on-accent:#0F1319;
+    --shadow:0 1px 0 rgba(0,0,0,.4), 0 2px 12px rgba(0,0,0,.35);
+    --focus:#8FB0E8;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#14161A; --stock:#1C1F25; --stock-2:#23272F;
+  --ink:#EDE8DB; --ink-2:#A2A8B4; --ink-3:#727A87;
+  --rule:#333944; --rule-2:#454C59;
+  --blue:#8FB0E8; --blue-soft:#232C3C;
+  --stamp:#EF7B72; --stamp-soft:#33221F;
+  --go:#5CC694; --go-soft:#1B2A24;
+  --on-accent:#0F1319;
+  --shadow:0 1px 0 rgba(0,0,0,.4), 0 2px 12px rgba(0,0,0,.35);
+  --focus:#8FB0E8;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.5;
+  -webkit-text-size-adjust:100%;
+}
+h1,h2,h3{margin:0; text-wrap:balance; font-weight:800; letter-spacing:-.01em}
+p{margin:0}
+a{color:var(--blue)}
+:focus-visible{outline:2px solid var(--focus); outline-offset:2px; border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ============ shell ============ */
+.wrap{max-width:1120px; margin:0 auto; padding:0 0 96px}
+.masthead{
+  background:var(--stock); border-bottom:1px solid var(--rule-2);
+  padding:12px 16px calc(12px + env(safe-area-inset-top)) 16px;
+  padding-top:calc(12px + env(safe-area-inset-top));
+  position:sticky; top:0; z-index:40;
+}
+.mast-in{max-width:1120px; margin:0 auto; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.brand{font-size:19px; font-weight:800; letter-spacing:-.02em}
+.brand em{font-style:normal; color:var(--blue)}
+.slug{
+  font-family:"Space Mono",ui-monospace,monospace; font-size:10.5px; text-transform:uppercase;
+  letter-spacing:.14em; color:var(--ink-3); margin-left:auto;
+}
+.tagline{
+  width:100%; font-family:"Space Mono",monospace; font-size:11px; color:var(--ink-2);
+  letter-spacing:.02em; margin-top:2px;
+}
+
+/* tabs */
+.tabs{
+  position:fixed; left:0; right:0; bottom:0; z-index:50;
+  display:grid; grid-template-columns:repeat(3,1fr);
+  background:var(--stock); border-top:1px solid var(--rule-2);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tab{
+  appearance:none; border:0; background:none; cursor:pointer;
+  font-family:"Space Mono",monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-3); padding:14px 4px 13px; border-top:3px solid transparent; margin-top:-1px;
+}
+.tab[aria-selected="true"]{color:var(--ink); border-top-color:var(--blue)}
+.tab b{display:block; font-family:"Archivo",sans-serif; font-size:15px; letter-spacing:-.01em; font-weight:600; text-transform:none}
+
+.pane{display:none; padding:16px}
+.pane.on{display:block}
+@media (min-width:860px){
+  .pane{padding:24px}
+  .tabs{
+    position:static; max-width:1120px; margin:0 auto;
+    grid-template-columns:repeat(3,auto) 1fr; justify-content:start;
+    border-top:0; border-bottom:1px solid var(--rule-2); padding-bottom:0;
+  }
+  .tab{padding:14px 26px 12px; border-top:0; border-bottom:3px solid transparent; margin:0 0 -1px}
+  .tab[aria-selected="true"]{border-top-color:transparent; border-bottom-color:var(--blue)}
+  .wrap{padding-bottom:40px}
+}
+
+/* ============ ticket card ============ */
+.ticket{
+  background:var(--stock); border:1px solid var(--rule-2); border-radius:3px;
+  box-shadow:var(--shadow); margin-bottom:14px;
+}
+.ticket-hd{
+  display:flex; align-items:center; gap:8px; padding:11px 14px;
+  border-bottom:1px dashed var(--rule);
+}
+.ticket-hd h2{font-size:14px; letter-spacing:.01em}
+.ticket-no{
+  margin-left:auto; font-family:"Space Mono",monospace; font-size:10.5px;
+  color:var(--ink-3); letter-spacing:.1em; text-transform:uppercase;
+}
+.ticket-bd{padding:6px 14px 14px}
+
+/* ruled form fields */
+.field{border-bottom:1px dotted var(--rule-2); padding:9px 0 7px}
+.field:last-child{border-bottom:0}
+.field > label, .lbl{
+  display:block; font-family:"Space Mono",monospace; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); margin-bottom:3px;
+}
+.hint{font-size:12px; color:var(--ink-2); margin-top:4px; line-height:1.4}
+input[type=text],input[type=tel],input[type=url],input[type=number],input[type=time],textarea,select{
+  width:100%; border:0; background:transparent; color:var(--ink);
+  font-family:"Archivo",sans-serif; font-size:16px; padding:2px 0; border-radius:0;
+}
+textarea{resize:vertical; min-height:52px; line-height:1.45}
+input::placeholder,textarea::placeholder{color:var(--ink-3); opacity:.75}
+select{font-size:15px}
+
+/* rows */
+.row{display:flex; gap:8px; align-items:center}
+.row-3{display:grid; grid-template-columns:1fr 82px 34px; gap:8px; align-items:center;
+  padding:8px 0; border-bottom:1px dotted var(--rule-2)}
+.row-3:last-of-type{border-bottom:0}
+.money{font-family:"Space Mono",monospace; font-variant-numeric:tabular-nums}
+
+.hoursrow{
+  display:grid; grid-template-columns:38px 1fr auto 1fr; gap:6px; align-items:center;
+  padding:5px 0; border-bottom:1px dotted var(--rule-2); font-size:13px;
+}
+.hoursrow:last-of-type{border-bottom:0}
+.hoursrow .d{font-family:"Space Mono",monospace; font-size:10.5px; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--ink-3)}
+.hoursrow.closed input[type=time]{opacity:.32}
+.dash{color:var(--ink-3)}
+
+/* buttons */
+.btn{
+  appearance:none; cursor:pointer; font-family:"Archivo",sans-serif; font-weight:600; font-size:15px;
+  padding:12px 16px; border-radius:3px; border:1px solid var(--rule-2);
+  background:var(--stock-2); color:var(--ink); text-align:center; text-decoration:none;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:46px;
+}
+.btn:active{transform:translateY(1px)}
+.btn-pri{background:var(--blue); border-color:var(--blue); color:var(--on-accent)}
+.btn-go{background:var(--go); border-color:var(--go); color:var(--on-accent)}
+.btn-sm{font-size:13px; padding:8px 11px; min-height:38px}
+.btn-icon{min-height:34px; width:34px; padding:0; font-size:17px; line-height:1; color:var(--ink-3)}
+.btns{display:grid; gap:8px; grid-template-columns:1fr 1fr}
+.btns .wide{grid-column:1/-1}
+
+/* chips / badges */
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
+.chip{
+  font-family:"Space Mono",monospace; font-size:11px; letter-spacing:.04em;
+  border:1px solid var(--rule-2); background:var(--paper); color:var(--ink-2);
+  padding:5px 9px; border-radius:999px; cursor:pointer;
+}
+.chip[aria-pressed="true"]{background:var(--blue); border-color:var(--blue); color:var(--on-accent)}
+.swatches{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px}
+.sw{width:34px; height:34px; border-radius:50%; border:2px solid var(--rule-2); cursor:pointer; padding:0}
+.sw[aria-pressed="true"]{border-color:var(--ink); box-shadow:0 0 0 2px var(--stock), 0 0 0 4px var(--ink)}
+
+/* preview */
+.preview-col{display:none}
+@media (min-width:860px){
+  .build-grid{display:grid; grid-template-columns:minmax(0,1fr) 372px; gap:24px; align-items:start}
+  .preview-col{display:block; position:sticky; top:88px}
+}
+.phone{
+  border:10px solid #23262C; border-radius:30px; overflow:hidden; background:#fff;
+  box-shadow:0 10px 30px rgba(22,24,29,.22); height:640px;
+}
+.phone iframe{width:100%; height:100%; border:0; display:block; background:#fff}
+.preview-note{
+  font-family:"Space Mono",monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink-3); margin:0 0 7px;
+}
+#mobilePreview{height:520px; margin-top:10px}
+
+/* pitch tab */
+.script{
+  background:var(--paper); border-left:3px solid var(--blue); padding:12px 14px;
+  font-size:16px; line-height:1.55; border-radius:0 3px 3px 0;
+}
+.script strong{background:var(--blue-soft); padding:0 3px; border-radius:2px}
+.priceline{
+  display:grid; grid-template-columns:1fr auto; gap:10px; align-items:baseline;
+  padding:10px 0; border-bottom:1px dotted var(--rule-2);
+}
+.priceline:last-child{border-bottom:0}
+.priceline .p{font-family:"Space Mono",monospace; font-weight:700; font-size:17px; color:var(--go)}
+.priceline small{display:block; color:var(--ink-2); font-size:12.5px; line-height:1.4; margin-top:2px}
+.qa{padding:10px 0; border-bottom:1px dotted var(--rule-2)}
+.qa:last-child{border-bottom:0}
+.qa dt{font-weight:600; font-size:14px; margin-bottom:3px}
+.qa dd{margin:0; color:var(--ink-2); font-size:14px}
+.checklist{list-style:none; margin:0; padding:0}
+.checklist li{
+  display:flex; gap:9px; padding:8px 0; border-bottom:1px dotted var(--rule-2); font-size:14.5px;
+}
+.checklist li:last-child{border-bottom:0}
+.checklist .n{
+  font-family:"Space Mono",monospace; font-size:11px; color:var(--ink-3); padding-top:2px; flex:none;
+}
+.targets{list-style:none; margin:0; padding:0; font-size:14px}
+.targets li{padding:7px 0; border-bottom:1px dotted var(--rule-2)}
+.targets li:last-child{border-bottom:0}
+.targets b{display:block; font-size:14.5px}
+.targets span{color:var(--ink-2); font-size:13px}
+
+/* money tab */
+.goal{display:grid; gap:10px}
+.goalnums{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+.big{font-family:"Space Mono",monospace; font-weight:700; font-size:34px; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; line-height:1}
+.of{font-family:"Space Mono",monospace; color:var(--ink-2); font-size:14px}
+.days{margin-left:auto; font-family:"Space Mono",monospace; font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; padding:4px 8px; border-radius:999px;
+  background:var(--stamp-soft); color:var(--stamp); border:1px solid var(--stamp)}
+.days.ok{background:var(--go-soft); color:var(--go); border-color:var(--go)}
+.bar{height:12px; background:var(--paper); border:1px solid var(--rule-2); border-radius:999px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--go); width:0}
+.lead{
+  display:grid; grid-template-columns:1fr auto; gap:4px 10px; padding:11px 0;
+  border-bottom:1px dotted var(--rule-2); align-items:center;
+}
+.lead:last-of-type{border-bottom:0}
+.lead .who{font-weight:600; font-size:15px}
+.lead .meta{grid-column:1; font-size:12.5px; color:var(--ink-2); font-family:"Space Mono",monospace}
+.lead .amt{font-family:"Space Mono",monospace; font-weight:700; font-variant-numeric:tabular-nums}
+.lead .acts{grid-column:2; display:flex; gap:6px}
+.pill{
+  font-family:"Space Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+  padding:3px 7px; border-radius:999px; border:1px solid currentColor;
+}
+.pill.lead-s{color:var(--ink-3)}
+.pill.demo-s{color:var(--blue)}
+.pill.sold-s{color:var(--stamp)}
+.pill.paid-s{color:var(--go)}
+.empty{color:var(--ink-2); font-size:14px; padding:14px 0; text-align:center}
+
+.toast{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:84px; z-index:99;
+  background:var(--ink); color:var(--paper); padding:11px 18px; border-radius:999px;
+  font-size:14px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.3);
+  opacity:0; pointer-events:none; transition:opacity .18s;
+}
+.toast.on{opacity:1}
+.note{
+  font-size:12.5px; color:var(--ink-2); line-height:1.45; background:var(--paper);
+  border:1px dashed var(--rule-2); padding:10px 12px; border-radius:3px; margin-top:10px;
+}
+.qrbox{text-align:center; padding:10px 0}
+.qrbox img{width:220px; height:220px; background:#fff; padding:8px; border-radius:3px}
+details{border-top:1px dotted var(--rule-2); padding-top:8px; margin-top:8px}
+summary{cursor:pointer; font-family:"Space Mono",monospace; font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-3); padding:4px 0}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="mast-in">
+    <span class="brand">Pocket<em>Page</em></span>
+    <span class="slug" id="ticketNo">TICKET —</span>
+    <p class="tagline">Build their page. Hand them your phone. Get paid.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-pane="build">01<b>Build</b></button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="pitch">02<b>Pitch</b></button>
+    <button class="tab" role="tab" aria-selected="false" data-pane="money">03<b>Money</b></button>
+  </nav>
+
+  <!-- ========================= BUILD ========================= -->
+  <section class="pane on" id="pane-build">
+    <div class="build-grid">
+      <div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>The business</h2><span class="ticket-no">Sheet 1</span></div>
+          <div class="ticket-bd">
+            <div class="field"><label for="f-name">Business name</label>
+              <input type="text" id="f-name" data-k="name" placeholder="Rae's Mobile Detail"></div>
+            <div class="field"><label for="f-tag">What they do — one line</label>
+              <input type="text" id="f-tag" data-k="tagline" placeholder="Hand wash &amp; interior detail, we come to you"></div>
+            <div class="field"><label for="f-phone">Phone (this becomes the Call &amp; Text buttons)</label>
+              <input type="tel" id="f-phone" data-k="phone" placeholder="850-555-0134"></div>
+            <div class="field"><label for="f-addr">Address or service area</label>
+              <input type="text" id="f-addr" data-k="address" placeholder="Serving Tallahassee &amp; Leon County">
+              <p class="hint">A street address gets a Directions button. An area just prints as text.</p></div>
+            <div class="field"><label for="f-photo">Photo link (optional)</label>
+              <input type="url" id="f-photo" data-k="photo" placeholder="https://... a photo already on the web">
+              <p class="hint">Paste a link to a photo they already have online. Skip it if you don't have one — the color header looks good on its own.</p></div>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>Services &amp; prices</h2><span class="ticket-no">Sheet 2</span></div>
+          <div class="ticket-bd">
+            <div id="svcRows"></div>
+            <button class="btn btn-sm" id="addSvc" style="margin-top:10px">+ Add a service</button>
+            <p class="hint">Three to six is the sweet spot. Prices sell — "starting at" is fine.</p>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>Hours</h2><span class="ticket-no">Sheet 3</span></div>
+          <div class="ticket-bd">
+            <div class="chips" style="margin-bottom:6px">
+              <button class="chip" data-preset="weekday">Mon–Fri 9–6</button>
+              <button class="chip" data-preset="retail">Mon–Sat 10–7</button>
+              <button class="chip" data-preset="late">Tue–Sun 11–9</button>
+              <button class="chip" data-preset="clear">All closed</button>
+            </div>
+            <div id="hoursRows"></div>
+            <p class="hint">Their page shows a live <b>Open now</b> / <b>Closed</b> badge from these.</p>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>Getting paid &amp; found</h2><span class="ticket-no">Sheet 4</span></div>
+          <div class="ticket-bd">
+            <div class="field"><label for="f-cash">Cash App tag</label>
+              <input type="text" id="f-cash" data-k="cashapp" placeholder="$RaesDetail"></div>
+            <div class="field"><label for="f-venmo">Venmo username</label>
+              <input type="text" id="f-venmo" data-k="venmo" placeholder="raes-detail"></div>
+            <div class="field"><label for="f-zelle">Zelle (phone or email)</label>
+              <input type="text" id="f-zelle" data-k="zelle" placeholder="850-555-0134"></div>
+            <div class="field"><label for="f-ig">Instagram handle</label>
+              <input type="text" id="f-ig" data-k="instagram" placeholder="raesmobiledetail"></div>
+            <div class="field"><label for="f-fb">Facebook page link</label>
+              <input type="url" id="f-fb" data-k="facebook" placeholder="https://facebook.com/..."></div>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>What customers say</h2><span class="ticket-no">Sheet 5</span></div>
+          <div class="ticket-bd">
+            <div class="field"><label for="f-q1">Quote</label>
+              <textarea id="f-q1" data-k="q1" placeholder="Truck looked better than the day I bought it."></textarea></div>
+            <div class="field"><label for="f-a1">Who said it</label>
+              <input type="text" id="f-a1" data-k="a1" placeholder="Marcus T."></div>
+            <div class="field"><label for="f-q2">Second quote (optional)</label>
+              <textarea id="f-q2" data-k="q2" placeholder=""></textarea></div>
+            <div class="field"><label for="f-a2">Who said it</label>
+              <input type="text" id="f-a2" data-k="a2" placeholder=""></div>
+            <p class="hint">Ask them: "What's the nicest thing a customer ever said to you?" Type it in front of them.</p>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>Look</h2><span class="ticket-no">Sheet 6</span></div>
+          <div class="ticket-bd">
+            <div class="field">
+              <span class="lbl">Brand color</span>
+              <div class="swatches" id="swatches"></div>
+            </div>
+            <div class="field"><label for="f-emoji">Header symbol</label>
+              <input type="text" id="f-emoji" data-k="emoji" maxlength="4" placeholder="🚗" style="font-size:24px"></div>
+            <div class="field"><label for="f-cta">Main button text</label>
+              <input type="text" id="f-cta" data-k="cta" placeholder="Text to book"></div>
+            <div class="field"><label for="f-by">Your credit line — goes at the bottom of every page</label>
+              <input type="text" id="f-by" data-k="by" placeholder="Page by Chris — 850-555-0199">
+              <p class="hint">Type this once; it sticks between jobs. This one line is how the next customer finds you.</p></div>
+          </div>
+        </div>
+
+        <div class="ticket">
+          <div class="ticket-hd"><h2>Deliver it</h2><span class="ticket-no">Sheet 7</span></div>
+          <div class="ticket-bd">
+            <div class="btns">
+              <button class="btn btn-pri wide" id="copyLink">Copy their live link</button>
+              <button class="btn" id="openLink">Open it</button>
+              <button class="btn" id="showQR">QR code</button>
+              <button class="btn" id="copyHTML">Copy page HTML</button>
+              <button class="btn" id="dlHTML">Download file</button>
+              <button class="btn wide" id="showMobilePreview" style="display:none">Preview on this phone</button>
+            </div>
+            <div id="qrWrap" class="qrbox" hidden></div>
+            <div id="mobilePreview" class="phone" hidden><iframe id="pvMobile" title="Preview"></iframe></div>
+            <p class="note"><b>The live link is the product.</b> It works on any phone, needs no hosting, and never expires — the whole page is packed inside the link itself. Text it to them once they've paid. <b>Download file</b> gives you an <code>index.html</code> to put on their own domain later; that's the $19/month upgrade.</p>
+            <details>
+              <summary>Start over</summary>
+              <div class="btns" style="margin-top:8px">
+                <button class="btn btn-sm" id="loadExample">Load the example again</button>
+                <button class="btn btn-sm" id="clearAll">Clear every field</button>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+
+      <aside class="preview-col">
+        <p class="preview-note">Live preview — this is exactly what they get</p>
+        <div class="phone"><iframe id="pvDesk" title="Preview"></iframe></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ========================= PITCH ========================= -->
+  <section class="pane" id="pane-pitch">
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>First hour, in order</h2><span class="ticket-no">Do this</span></div>
+      <div class="ticket-bd">
+        <ol class="checklist">
+          <li><span class="n">01</span><span>Set up <b>Cash App</b> and <b>Venmo</b> if you don't have them. Cash App money is spendable the second it lands. Do not use Stripe or Square this week — a new account holds your first payout for a week or more, which is exactly the week you don't have.</span></li>
+          <li><span class="n">02</span><span>Build the example page for a business you can see from where you're standing. Takes six minutes. Now you have a demo.</span></li>
+          <li><span class="n">03</span><span>Save this page to your home screen so it opens like an app and works with no signal.</span></li>
+          <li><span class="n">04</span><span>Walk into ten places today. Ten, not three. Two out of ten is a normal day and two is $118.</span></li>
+          <li><span class="n">05</span><span>Build the page <em>while they watch</em>. That's the whole trick — nobody says no to something already finished with their name on it.</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>What you say</h2><span class="ticket-no">30 seconds</span></div>
+      <div class="ticket-bd">
+        <p class="script">"Hey — quick question, are you the owner? I make one-page websites for local businesses, and I do it right here on my phone in about ten minutes. <strong>Can I show you yours?</strong> No charge to look."</p>
+        <p class="hint" style="margin-top:10px">Then stop talking and start typing. Ask them the questions off Sheet 1 out loud — name, what you do, your number, your prices. Get their hours. Ask for the nicest thing a customer ever said. Then turn the phone around.</p>
+        <p class="script" style="margin-top:12px">"That's live right now. It'll open on any phone, it's got your Call button, your prices, your hours. <strong>It's $59 and I'll text it to you before I walk out.</strong>"</p>
+        <p class="hint" style="margin-top:10px">Then be quiet. Whoever talks first, loses. If they hesitate: <em>"I'll do it for $40 if you can pay right now — Cash App, Venmo, or cash."</em></p>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>Price sheet</h2><span class="ticket-no">Cash today</span></div>
+      <div class="ticket-bd">
+        <div class="priceline"><div><b>Page, on the spot</b><small>Built while they watch, texted to them before you leave.</small></div><div class="p">$59</div></div>
+        <div class="priceline"><div><b>Page + QR sign</b><small>Same page, plus a QR code they tape to the counter, window, or truck.</small></div><div class="p">$89</div></div>
+        <div class="priceline"><div><b>Right-now price</b><small>Only if they're wobbling and can pay this minute. Never lead with it.</small></div><div class="p">$40</div></div>
+        <div class="priceline"><div><b>Monthly updates</b><small>Price changes, new hours, new photos. Sell it at the end, not the start.</small></div><div class="p">$19/mo</div></div>
+        <p class="note">Five pages at $59 is $295. That is a phone bill and groceries. You do not need a hundred customers this week — you need five.</p>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>When they push back</h2><span class="ticket-no">Answers</span></div>
+      <div class="ticket-bd">
+        <dl>
+          <div class="qa"><dt>"I already have a Facebook page."</dt><dd>"Perfect — this is what you put in the bio. Facebook won't show your prices or your hours to somebody who isn't logged in. This opens for anybody, instantly."</dd></div>
+          <div class="qa"><dt>"How much is the monthly?"</dt><dd>"Nothing. You pay once, the link is yours, it doesn't expire. If you ever want me to change prices or hours it's $19 a month, and that's optional."</dd></div>
+          <div class="qa"><dt>"Who are you with?"</dt><dd>"Just me. That's why it's $59 and not $800." Say your real name. Don't pretend to be a company.</dd></div>
+          <div class="qa"><dt>"Let me think about it."</dt><dd>"Totally fair. It's already built though — want me to text it to you and you decide tonight?" Get the number. Follow up tomorrow at 10am. Log it under Money.</dd></div>
+          <div class="qa"><dt>"Can you do it cheaper?"</dt><dd>"$40 if you can pay right now." Then stop.</dd></div>
+          <div class="qa"><dt>"Is this a scam?"</dt><dd>Hand them the phone. Let them tap their own Call button and watch their own phone ring. That ends the conversation.</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>Who buys this in Tallahassee</h2><span class="ticket-no">Where to walk</span></div>
+      <div class="ticket-bd">
+        <ul class="targets">
+          <li><b>Barbershops &amp; braiders</b><span>Frenchtown, Macomb St, the shops around FAMU. They run entirely off Instagram DMs and lose bookings to it. Go Tue–Thu; Friday and Saturday they're slammed.</span></li>
+          <li><b>Food trucks</b><span>Near FAMU on South Adams and Wahnish Way, the lots off Tennessee St, and any brewery lot. Catch them at setup, ~30 minutes before they open, not during a rush.</span></li>
+          <li><b>Mobile detailers &amp; car washes</b><span>Tennessee St and Capital Circle. High ticket, no website, ready to book by text.</span></li>
+          <li><b>Lawn &amp; landscape crews</b><span>The Home Depot and Lowe's lots between 6:30 and 8am. Cash business, cash buyers.</span></li>
+          <li><b>Nail techs, lash techs, hair stylists</b><span>Southside and the strip centers on Apalachee Pkwy. A prices-and-booking page is exactly what they're missing.</span></li>
+          <li><b>Flea market and weekend vendors</b><span>Whole rows of them in one place. Best conversations-per-hour in town.</span></li>
+          <li><b>Railroad Square, First Friday</b><span>Artists and makers, all in a walkable block, all in a buying mood.</span></li>
+          <li><b>Movers, haulers, handymen, cleaners</b><span>Anybody advertising on a Facebook group with no link. Message them, then meet in person.</span></li>
+        </ul>
+        <p class="note"><b>Go where they're already standing still.</b> A vendor at a booth cannot walk away from you, and has nothing to do while waiting for customers. That's the best sales environment you will find for free.</p>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>How this scales</h2><span class="ticket-no">After the 9th</span></div>
+      <div class="ticket-bd">
+        <ol class="checklist">
+          <li><span class="n">01</span><span><b>Week 2 — raise the price.</b> Once five people have paid $59, charge $99. Show the five pages you already built as proof.</span></li>
+          <li><span class="n">02</span><span><b>Week 3 — sell the monthly.</b> Go back to everyone you built for: "$19 a month and I keep it current." Ten of those is $190 arriving every month whether you work or not.</span></li>
+          <li><span class="n">03</span><span><b>Week 4 — pick one trade.</b> Do nothing but barbershops, or nothing but food trucks. Your pitch gets sharper and referrals start moving inside that trade on their own.</span></li>
+          <li><span class="n">04</span><span><b>Month 2 — stop knocking.</b> Every page you built carries a small "Built by [your name] — 850-xxx-xxxx" line at the bottom. That line sells pages while you sleep. Your name and number are already on it.</span></li>
+          <li><span class="n">05</span><span><b>Month 3 — hand off the walking.</b> Someone else knocks and builds, you keep $20 of every $59. That's when it stops being a job.</span></li>
+        </ol>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ========================= MONEY ========================= -->
+  <section class="pane" id="pane-money">
+    <div class="ticket">
+      <div class="ticket-hd"><h2>The goal</h2><span class="ticket-no" id="goalTicket">—</span></div>
+      <div class="ticket-bd">
+        <div class="goal">
+          <div class="goalnums">
+            <span class="big" id="paidTotal">$0</span>
+            <span class="of">of <span id="goalEcho">$0</span> collected</span>
+            <span class="days" id="daysLeft">—</span>
+          </div>
+          <div class="bar"><i id="goalBar"></i></div>
+          <p class="hint" id="goalGap"></p>
+        </div>
+        <div class="row" style="margin-top:12px; gap:14px">
+          <div class="field" style="flex:1; border:0"><label for="g-amt">Bill amount</label>
+            <input type="number" id="g-amt" inputmode="decimal" placeholder="118"></div>
+          <div class="field" style="flex:1; border:0"><label for="g-date">Due date</label>
+            <input type="text" id="g-date" placeholder="2026-09-09"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>Who you talked to</h2><span class="ticket-no" id="leadCount">0</span></div>
+      <div class="ticket-bd">
+        <div class="row" style="gap:8px; align-items:flex-end">
+          <div class="field" style="flex:2; border:0"><label for="l-name">Business</label>
+            <input type="text" id="l-name" placeholder="Rae's Mobile Detail"></div>
+          <div class="field" style="flex:1; border:0"><label for="l-amt">$</label>
+            <input type="number" id="l-amt" inputmode="decimal" placeholder="59"></div>
+        </div>
+        <div class="row" style="gap:8px; align-items:flex-end">
+          <div class="field" style="flex:2; border:0"><label for="l-phone">Phone</label>
+            <input type="tel" id="l-phone" placeholder="850-555-0134"></div>
+          <button class="btn btn-sm" id="addLead" style="flex:1">Add</button>
+        </div>
+        <div id="leadList" style="margin-top:6px"></div>
+        <p class="note">Tap the status pill to move a lead along: <b>Lead → Demoed → Sold → Paid</b>. Only <b>Paid</b> counts toward the goal above, because only paid is real.</p>
+      </div>
+    </div>
+
+    <div class="ticket">
+      <div class="ticket-hd"><h2>Faster than any app</h2><span class="ticket-no">Tallahassee</span></div>
+      <div class="ticket-bd">
+        <ul class="targets">
+          <li><b>Dial 2-1-1</b><span>Big Bend 211 routes you to emergency bill assistance — ECHO, Catholic Charities, Salvation Army all do small one-time payments on phone and utility bills. Free call, do it first.</span></li>
+          <li><b>Lifeline — lifelinesupport.org</b><span>Federal phone discount, often approved online the same day. It can take your monthly bill to near zero going forward. Apply even if this week works out.</span></li>
+          <li><b>The Kearney Center — 2650 Municipal Way</b><span>Caseworkers there handle exactly this situation and know which fund still has money in it this month.</span></li>
+          <li><b>Ask your carrier for a payment arrangement</b><span>Say "I need a payment arrangement to avoid suspension." Most carriers will push the due date two to four weeks. It's a two-minute call and it buys you the time this work needs.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ---------------- storage (never throws) ---------------- */
+var LS = {
+  get: function(k, d){ try{ var v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set: function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---------------- model ---------------- */
+var DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+var COLORS = ["#1F5F8B","#7A2E2E","#1F6B4A","#5B3E8E","#B4591F","#166B6B","#8B1F52","#2B2F36"];
+
+function blank(){
+  return { name:"", tagline:"", phone:"", address:"", photo:"", color:COLORS[0], emoji:"",
+           cta:"Text to book", services:[], hours:[null,null,null,null,null,null,null],
+           cashapp:"", venmo:"", zelle:"", instagram:"", facebook:"",
+           q1:"", a1:"", q2:"", a2:"", by:"" };
+}
+
+function example(){
+  var d = blank();
+  d.name = "Rae's Mobile Detail";
+  d.tagline = "Hand wash and interior detail — we come to you";
+  d.phone = "850-555-0134";
+  d.address = "Serving Tallahassee & Leon County";
+  d.color = "#1F5F8B";
+  d.emoji = "🚗";
+  d.services = [
+    ["Outside wash & wax","$45",""],
+    ["Full interior detail","$95","Seats, carpet, vents"],
+    ["Inside + out","$130","About 3 hours"],
+    ["Engine bay","$40",""]
+  ];
+  d.hours = [null,["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["10:00","15:00"]];
+  d.cashapp = "$RaesDetail";
+  d.instagram = "raesmobiledetail";
+  d.q1 = "Truck looked better than the day I bought it.";
+  d.a1 = "Marcus T.";
+  d.q2 = "Showed up on time and stayed till it was right.";
+  d.a2 = "Deidra W.";
+  return d;
+}
+
+var data = LS.get("pp.draft", null) || example();
+for (var kk in blank()) if (!(kk in data)) data[kk] = blank()[kk];
+if (!Array.isArray(data.services)) data.services = [];
+if (!Array.isArray(data.hours) || data.hours.length !== 7) data.hours = [null,null,null,null,null,null,null];
+
+/* ---------------- helpers ---------------- */
+function $(s){ return document.querySelector(s); }
+function esc(s){
+  return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function digits(s){ return String(s||"").replace(/[^\d+]/g,""); }
+function money(n){ return "$" + (Math.round(Number(n)||0)).toLocaleString("en-US"); }
+var toastTimer;
+function toast(msg){
+  var t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("on"); }, 2200);
+}
+function copy(text, msg){
+  function fallback(){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast(msg); }
+    catch(e){ toast("Couldn't copy — press and hold to select it"); }
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){ toast(msg); }, fallback);
+  } else fallback();
+}
+
+/* ---------------- link encoding (gzip when the browser has it) ---------------- */
+function b64url(bytes){
+  var s = ""; for (var i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function unb64url(str){
+  var s = str.replace(/-/g,"+").replace(/_/g,"/");
+  while (s.length % 4) s += "=";
+  var bin = atob(s), out = new Uint8Array(bin.length);
+  for (var i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function encode(obj){
+  var json = JSON.stringify(obj);
+  var raw = new TextEncoder().encode(json);
+  if (typeof CompressionStream === "undefined") return Promise.resolve("0" + b64url(raw));
+  try{
+    var cs = new CompressionStream("gzip");
+    var w = cs.writable.getWriter(); w.write(raw); w.close();
+    return new Response(cs.readable).arrayBuffer().then(function(buf){
+      return "1" + b64url(new Uint8Array(buf));
+    }).catch(function(){ return "0" + b64url(raw); });
+  }catch(e){ return Promise.resolve("0" + b64url(raw)); }
+}
+function decode(str){
+  var flag = str.charAt(0), body = unb64url(str.slice(1));
+  if (flag === "0") return Promise.resolve(JSON.parse(new TextDecoder().decode(body)));
+  var ds = new DecompressionStream("gzip");
+  var w = ds.writable.getWriter(); w.write(body); w.close();
+  return new Response(ds.readable).arrayBuffer().then(function(buf){
+    return JSON.parse(new TextDecoder().decode(new Uint8Array(buf)));
+  });
+}
+function baseURL(){ return location.origin + location.pathname; }
+
+/* ================= the page they get ================= */
+function renderSite(d){
+  var name = d.name || "Your Business";
+  var tel = digits(d.phone);
+  var accent = d.color || "#1F5F8B";
+  var hasAddr = !!(d.address || "").trim();
+  var streetish = /\d/.test(d.address || "");
+  var cta = d.cta || "Text to book";
+  var svcs = (d.services || []).filter(function(s){ return (s[0]||"").trim(); });
+
+  var openBlocks = [], sched = [];
+  for (var i=0;i<7;i++){
+    var h = d.hours[i];
+    sched.push({ day: DAYS[i], txt: h ? (fmt12(h[0]) + " – " + fmt12(h[1])) : "Closed" });
+    if (h) openBlocks.push([i, h[0], h[1]]);
+  }
+  function fmt12(t){
+    var p = String(t||"").split(":"), H = parseInt(p[0],10), M = p[1] || "00";
+    if (isNaN(H)) return t;
+    var ap = H >= 12 ? "pm" : "am", h12 = H % 12; if (h12 === 0) h12 = 12;
+    return h12 + (M === "00" ? "" : ":" + M) + ap;
+  }
+
+  var quotes = [];
+  if ((d.q1||"").trim()) quotes.push([d.q1, d.a1]);
+  if ((d.q2||"").trim()) quotes.push([d.q2, d.a2]);
+
+  var pays = [];
+  if ((d.cashapp||"").trim()){
+    var tag = d.cashapp.replace(/^\$/,"");
+    pays.push(['https://cash.app/$' + encodeURIComponent(tag), 'Cash App', '$' + tag]);
+  }
+  if ((d.venmo||"").trim()){
+    var vu = d.venmo.replace(/^@/,"");
+    pays.push(['https://venmo.com/u/' + encodeURIComponent(vu), 'Venmo', '@' + vu]);
+  }
+  if ((d.zelle||"").trim()) pays.push(['', 'Zelle', d.zelle]);
+
+  var socials = [];
+  if ((d.instagram||"").trim()) socials.push(['https://instagram.com/' + encodeURIComponent(d.instagram.replace(/^@/,"")), 'Instagram']);
+  if ((d.facebook||"").trim()) socials.push([d.facebook, 'Facebook']);
+
+  var ld = {
+    "@context":"https://schema.org", "@type":"LocalBusiness",
+    name: name, description: d.tagline || undefined,
+    telephone: d.phone || undefined, address: d.address || undefined,
+    image: d.photo || undefined
+  };
+
+  var h = [];
+  h.push('<!doctype html><html lang="en"><head><meta charset="utf-8">');
+  h.push('<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">');
+  h.push('<title>' + esc(name) + (d.tagline ? ' — ' + esc(d.tagline) : '') + '</title>');
+  h.push('<meta name="description" content="' + esc(d.tagline || name) + '">');
+  h.push('<meta name="theme-color" content="' + esc(accent) + '">');
+  h.push('<meta property="og:title" content="' + esc(name) + '">');
+  h.push('<meta property="og:description" content="' + esc(d.tagline || "") + '">');
+  if (d.photo) h.push('<meta property="og:image" content="' + esc(d.photo) + '">');
+  h.push('<script type="application/ld+json">' + JSON.stringify(ld).replace(/</g,"\\u003c") + '<\/script>');
+
+  h.push('<style>' +
+    '*{box-sizing:border-box}' +
+    'body{margin:0;background:#fff;color:#15171B;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:78px}' +
+    'a{color:' + accent + '}' +
+    '.hero{background:linear-gradient(160deg,' + accent + ',' + shade(accent,-28) + ');color:#fff;padding:30px 20px 26px;text-align:center}' +
+    '.hero .sym{font-size:40px;line-height:1;margin-bottom:8px}' +
+    '.hero h1{margin:0;font-size:29px;line-height:1.15;letter-spacing:-.02em}' +
+    '.hero p{margin:8px auto 0;max-width:30em;font-size:16px;opacity:.94}' +
+    '.badge{display:inline-block;margin-top:14px;font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);padding:5px 12px;border-radius:999px}' +
+    '.shot{width:100%;max-height:250px;object-fit:cover;display:block}' +
+    'main{max-width:600px;margin:0 auto;padding:22px 20px 30px}' +
+    'section{margin-bottom:26px}' +
+    'h2{font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#767B85;margin:0 0 10px}' +
+    '.svc{display:flex;justify-content:space-between;gap:14px;align-items:baseline;padding:12px 0;border-bottom:1px solid #E7E4DE}' +
+    '.svc:last-child{border-bottom:0}' +
+    '.svc b{font-weight:600;font-size:16.5px}' +
+    '.svc small{display:block;color:#767B85;font-size:13.5px;font-weight:400;margin-top:2px}' +
+    '.svc .pr{font-weight:700;white-space:nowrap;color:' + accent + ';font-variant-numeric:tabular-nums}' +
+    '.hr{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F0EEEA;font-size:15px}' +
+    '.hr:last-child{border-bottom:0}' +
+    '.hr.today{font-weight:700}' +
+    '.hr span:first-child{color:#767B85}' +
+    '.hr.today span:first-child{color:#15171B}' +
+    'blockquote{margin:0 0 14px;padding:14px 16px;background:#F7F6F3;border-left:3px solid ' + accent + ';border-radius:0 6px 6px 0;font-size:16px}' +
+    'blockquote cite{display:block;margin-top:7px;font-style:normal;font-size:13.5px;color:#767B85}' +
+    '.pay{display:flex;flex-wrap:wrap;gap:8px}' +
+    '.pay a,.pay span{display:inline-flex;flex-direction:column;border:1px solid #DFDCD6;border-radius:8px;padding:9px 14px;text-decoration:none;color:#15171B;font-size:15px;font-weight:600}' +
+    '.pay small{font-weight:400;font-size:12px;color:#767B85;letter-spacing:.06em;text-transform:uppercase}' +
+    '.where{font-size:16px;color:#3C4048}' +
+    '.dirs{display:inline-block;margin-top:8px;font-weight:600}' +
+    '.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #E2DFD9;backdrop-filter:blur(8px)}' +
+    '.bar a{flex:1;text-align:center;padding:13px 6px;border-radius:9px;font-weight:700;font-size:15px;text-decoration:none;border:1px solid ' + accent + ';color:' + accent + '}' +
+    '.bar a.solid{background:' + accent + ';color:#fff}' +
+    'footer{text-align:center;font-size:12.5px;color:#8A8F98;padding:0 20px 24px}' +
+    '@media(prefers-color-scheme:dark){' +
+      'body{background:#111316;color:#ECE9E3}' +
+      '.svc{border-bottom-color:#262A31}.hr{border-bottom-color:#20242A}.hr.today span:first-child{color:#ECE9E3}' +
+      'blockquote{background:#191C21}.pay a,.pay span{border-color:#2C3138;color:#ECE9E3}' +
+      '.where{color:#C3C7CE}.bar{background:rgba(17,19,22,.97);border-top-color:#262A31}' +
+    '}' +
+  '</style></head><body>');
+
+  h.push('<header class="hero">');
+  if ((d.emoji||"").trim()) h.push('<div class="sym">' + esc(d.emoji) + '</div>');
+  h.push('<h1>' + esc(name) + '</h1>');
+  if ((d.tagline||"").trim()) h.push('<p>' + esc(d.tagline) + '</p>');
+  if (openBlocks.length) h.push('<div class="badge" id="openNow">&nbsp;</div>');
+  h.push('</header>');
+
+  if ((d.photo||"").trim()) h.push('<img class="shot" src="' + esc(d.photo) + '" alt="' + esc(name) + '">');
+
+  h.push('<main>');
+
+  if (svcs.length){
+    h.push('<section><h2>Services</h2>');
+    svcs.forEach(function(s){
+      h.push('<div class="svc"><div><b>' + esc(s[0]) + '</b>' +
+        ((s[2]||"").trim() ? '<small>' + esc(s[2]) + '</small>' : '') + '</div>' +
+        ((s[1]||"").trim() ? '<div class="pr">' + esc(s[1]) + '</div>' : '') + '</div>');
+    });
+    h.push('</section>');
+  }
+
+  if (openBlocks.length){
+    h.push('<section><h2>Hours</h2>');
+    sched.forEach(function(r, i){
+      h.push('<div class="hr" data-d="' + i + '"><span>' + r.day + '</span><span>' + esc(r.txt) + '</span></div>');
+    });
+    h.push('</section>');
+  }
+
+  if (quotes.length){
+    h.push('<section><h2>What customers say</h2>');
+    quotes.forEach(function(q){
+      h.push('<blockquote>' + esc(q[0]) +
+        ((q[1]||"").trim() ? '<cite>' + esc(q[1]) + '</cite>' : '') + '</blockquote>');
+    });
+    h.push('</section>');
+  }
+
+  if (hasAddr){
+    h.push('<section><h2>Where</h2><p class="where">' + esc(d.address) + '</p>');
+    if (streetish) h.push('<a class="dirs" href="https://maps.google.com/?q=' + encodeURIComponent(d.address) + '">Get directions →</a>');
+    h.push('</section>');
+  }
+
+  if (pays.length){
+    h.push('<section><h2>Payment accepted</h2><div class="pay">');
+    pays.forEach(function(p){
+      if (p[0]) h.push('<a href="' + esc(p[0]) + '"><small>' + esc(p[1]) + '</small>' + esc(p[2]) + '</a>');
+      else h.push('<span><small>' + esc(p[1]) + '</small>' + esc(p[2]) + '</span>');
+    });
+    h.push('</div></section>');
+  }
+
+  if (socials.length){
+    h.push('<section><h2>Follow along</h2><div class="pay">');
+    socials.forEach(function(s){ h.push('<a href="' + esc(s[0]) + '">' + esc(s[1]) + '</a>'); });
+    h.push('</div></section>');
+  }
+
+  h.push('</main>');
+
+  if ((d.by||"").trim()) h.push('<footer>' + esc(d.by) + '</footer>');
+
+  if (tel){
+    h.push('<nav class="bar">');
+    h.push('<a class="solid" href="sms:' + esc(tel) + '?&body=' + encodeURIComponent("Hi! I found your page — ") + '">' + esc(cta) + '</a>');
+    h.push('<a href="tel:' + esc(tel) + '">Call</a>');
+    if (streetish) h.push('<a href="https://maps.google.com/?q=' + encodeURIComponent(d.address) + '">Directions</a>');
+    h.push('</nav>');
+  }
+
+  if (openBlocks.length){
+    h.push('<script>(function(){var B=' + JSON.stringify(openBlocks) + ';' +
+      'var n=new Date(),d=n.getDay(),m=n.getHours()*60+n.getMinutes(),open=false;' +
+      'for(var i=0;i<B.length;i++){if(B[i][0]!==d)continue;' +
+      'var a=B[i][1].split(":"),b=B[i][2].split(":");' +
+      'var s=+a[0]*60+ +a[1],e=+b[0]*60+ +b[1];if(e<=s)e+=1440;' +
+      'if(m>=s&&m<e){open=true;break}}' +
+      'var el=document.getElementById("openNow");if(el)el.textContent=open?"Open now":"Closed right now";' +
+      'var t=document.querySelector(\'.hr[data-d="\'+d+\'"]\');if(t)t.className="hr today";' +
+      '})();<\/script>');
+  }
+
+  h.push('</body></html>');
+  return h.join("");
+}
+
+/* darken/lighten a hex color */
+function shade(hex, amt){
+  var m = /^#?([0-9a-f]{6})$/i.exec(String(hex||"").trim());
+  if (!m) return hex;
+  var n = parseInt(m[1],16);
+  var r = Math.min(255, Math.max(0, (n>>16) + amt));
+  var g = Math.min(255, Math.max(0, ((n>>8)&255) + amt));
+  var b = Math.min(255, Math.max(0, (n&255) + amt));
+  return "#" + ((1<<24) + (r<<16) + (g<<8) + b).toString(16).slice(1);
+}
+
+/* ================= view mode ================= */
+/* replace the whole document — only ever after parsing is done, or write()
+   splices into the stream instead of replacing it */
+function whenParsed(fn){
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn);
+  else fn();
+}
+
+var hash = location.hash || "";
+if (hash.indexOf("#p=") === 0){
+  decode(hash.slice(3)).then(function(d){
+    var full = blank(); for (var k in d) full[k] = d[k];
+    var html = renderSite(full);
+    whenParsed(function(){ document.open(); document.write(html); document.close(); });
+  }).catch(function(){
+    whenParsed(function(){
+      document.body.innerHTML =
+        '<div style="max-width:34em;margin:12vh auto;padding:0 22px">' +
+        '<h1 style="font-size:24px">This link is incomplete</h1>' +
+        '<p style="color:#575B64;line-height:1.55">The whole page is stored inside the link, so if it got cut off in a text message the page can\'t rebuild itself. ' +
+        'Ask whoever sent it to copy the link again and paste the whole thing.</p>' +
+        '<p><a href="' + baseURL() + '">Open the builder</a></p></div>';
+    });
+  });
+} else {
+  whenParsed(boot);
+}
+
+/* ================= builder ================= */
+function boot(){
+  var stamp = new Date();
+  $("#ticketNo").textContent = "TICKET " +
+    String(stamp.getFullYear()).slice(2) + String(stamp.getMonth()+1).padStart(2,"0") + String(stamp.getDate()).padStart(2,"0");
+
+  /* tabs */
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(t){
+    t.addEventListener("click", function(){
+      document.querySelectorAll(".tab").forEach(function(x){ x.setAttribute("aria-selected","false"); });
+      t.setAttribute("aria-selected","true");
+      document.querySelectorAll(".pane").forEach(function(p){ p.classList.remove("on"); });
+      $("#pane-" + t.dataset.pane).classList.add("on");
+      window.scrollTo(0,0);
+    });
+  });
+
+  /* simple text fields */
+  document.querySelectorAll("[data-k]").forEach(function(el){
+    el.value = data[el.dataset.k] || "";
+    el.addEventListener("input", function(){ data[el.dataset.k] = el.value; save(); });
+  });
+
+  /* colors */
+  var sw = $("#swatches");
+  COLORS.forEach(function(c){
+    var b = document.createElement("button");
+    b.className = "sw"; b.type = "button"; b.style.background = c;
+    b.setAttribute("aria-label", "Brand color " + c);
+    b.setAttribute("aria-pressed", String(c === data.color));
+    b.addEventListener("click", function(){
+      data.color = c; save();
+      sw.querySelectorAll(".sw").forEach(function(x){ x.setAttribute("aria-pressed","false"); });
+      b.setAttribute("aria-pressed","true");
+    });
+    sw.appendChild(b);
+  });
+
+  /* services */
+  function drawSvcs(){
+    var box = $("#svcRows"); box.innerHTML = "";
+    data.services.forEach(function(s, i){
+      var row = document.createElement("div"); row.className = "row-3";
+      var a = document.createElement("input"); a.type="text"; a.value = s[0]||""; a.placeholder = "Service";
+      var b = document.createElement("input"); b.type="text"; b.value = s[1]||""; b.placeholder = "$45"; b.className="money";
+      var x = document.createElement("button"); x.className="btn btn-icon"; x.type="button";
+      x.textContent = "×"; x.setAttribute("aria-label","Remove " + (s[0]||"service"));
+      a.addEventListener("input", function(){ data.services[i][0] = a.value; save(); });
+      b.addEventListener("input", function(){ data.services[i][1] = b.value; save(); });
+      x.addEventListener("click", function(){ data.services.splice(i,1); drawSvcs(); save(); });
+      row.appendChild(a); row.appendChild(b); row.appendChild(x);
+
+      var note = document.createElement("input");
+      note.type="text"; note.value = s[2]||""; note.placeholder = "Detail line (optional)";
+      note.style.cssText = "font-size:13px;color:var(--ink-2);grid-column:1/3";
+      note.addEventListener("input", function(){ data.services[i][2] = note.value; save(); });
+      row.appendChild(note);
+      box.appendChild(row);
+    });
+    if (!data.services.length){
+      var p = document.createElement("p"); p.className = "hint";
+      p.textContent = "No services yet — add the three things they sell most.";
+      box.appendChild(p);
+    }
+  }
+  $("#addSvc").addEventListener("click", function(){
+    data.services.push(["","",""]); drawSvcs(); save();
+    var ins = $("#svcRows").querySelectorAll("input");
+    if (ins.length) ins[ins.length-3].focus();
+  });
+  drawSvcs();
+
+  /* hours */
+  function drawHours(){
+    var box = $("#hoursRows"); box.innerHTML = "";
+    for (var i=0;i<7;i++) (function(i){
+      var h = data.hours[i];
+      var row = document.createElement("div");
+      row.className = "hoursrow" + (h ? "" : " closed");
+      var d = document.createElement("span"); d.className="d"; d.textContent = DAYS[i];
+      var o = document.createElement("input"); o.type="time"; o.value = h ? h[0] : "";
+      o.setAttribute("aria-label", DAYS[i] + " opens");
+      var dash = document.createElement("span"); dash.className="dash"; dash.textContent="–";
+      var c = document.createElement("input"); c.type="time"; c.value = h ? h[1] : "";
+      c.setAttribute("aria-label", DAYS[i] + " closes");
+      function upd(){
+        if (o.value && c.value) data.hours[i] = [o.value, c.value];
+        else if (!o.value && !c.value) data.hours[i] = null;
+        row.className = "hoursrow" + (data.hours[i] ? "" : " closed");
+        save();
+      }
+      o.addEventListener("change", upd); c.addEventListener("change", upd);
+      row.appendChild(d); row.appendChild(o); row.appendChild(dash); row.appendChild(c);
+      box.appendChild(row);
+    })(i);
+  }
+  document.querySelectorAll("[data-preset]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var p = b.dataset.preset;
+      if (p === "weekday") data.hours = [null,["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],["09:00","18:00"],null];
+      if (p === "retail")  data.hours = [null,["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"],["10:00","19:00"]];
+      if (p === "late")    data.hours = [["11:00","21:00"],null,["11:00","21:00"],["11:00","21:00"],["11:00","21:00"],["11:00","22:00"],["11:00","22:00"]];
+      if (p === "clear")   data.hours = [null,null,null,null,null,null,null];
+      drawHours(); save();
+    });
+  });
+  drawHours();
+
+  /* preview */
+  var pvTimer;
+  function paint(){
+    var html = renderSite(data);
+    ["#pvDesk","#pvMobile"].forEach(function(sel){
+      var f = $(sel); if (f) f.srcdoc = html;
+    });
+  }
+  function save(){
+    LS.set("pp.draft", data);
+    clearTimeout(pvTimer); pvTimer = setTimeout(paint, 260);
+  }
+  window.save = save;
+  paint();
+
+  /* mobile preview toggle */
+  if (window.matchMedia("(max-width:859px)").matches){
+    var btn = $("#showMobilePreview"); btn.style.display = "";
+    btn.addEventListener("click", function(){
+      var box = $("#mobilePreview");
+      box.hidden = !box.hidden;
+      btn.textContent = box.hidden ? "Preview on this phone" : "Hide preview";
+      if (!box.hidden){ paint(); box.scrollIntoView({behavior:"smooth", block:"center"}); }
+    });
+  }
+
+  /* deliver */
+  function link(){ return encode(data).then(function(p){ return baseURL() + "#p=" + p; }); }
+
+  $("#copyLink").addEventListener("click", function(){
+    if (!(data.name||"").trim()) return toast("Add the business name first");
+    link().then(function(u){
+      copy(u, u.length > 2000 ? "Copied — it's a long one, paste it whole" : "Link copied — text it to them");
+    });
+  });
+  $("#openLink").addEventListener("click", function(){
+    link().then(function(u){ window.open(u, "_blank"); });
+  });
+  $("#copyHTML").addEventListener("click", function(){
+    copy(renderSite(data), "Page HTML copied");
+  });
+  $("#dlHTML").addEventListener("click", function(){
+    try{
+      var blob = new Blob([renderSite(data)], {type:"text/html"});
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = (data.name || "page").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") + ".html";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+      toast("Saved to your downloads");
+    }catch(e){ toast("Download blocked here — use Copy page HTML"); }
+  });
+  $("#showQR").addEventListener("click", function(){
+    var wrap = $("#qrWrap");
+    if (!wrap.hidden){ wrap.hidden = true; return; }
+    link().then(function(u){
+      wrap.hidden = false;
+      wrap.innerHTML = '<p class="hint">Screenshot this. It opens their page — tape it to the counter or the truck.</p>';
+      var img = document.createElement("img");
+      img.alt = "QR code for " + (data.name || "the page");
+      img.src = "https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=8&data=" + encodeURIComponent(u);
+      img.onerror = function(){
+        wrap.innerHTML = '<p class="hint">QR images can\'t load here. Copy the link, then paste it into any free QR generator.</p>';
+      };
+      wrap.appendChild(img);
+    });
+  });
+
+  /* your own credit line is yours, not the client's — it survives both resets */
+  $("#loadExample").addEventListener("click", function(){
+    var by = data.by; data = example(); data.by = by;
+    refill(); save(); toast("Example loaded");
+  });
+  $("#clearAll").addEventListener("click", function(){
+    var by = data.by; data = blank(); data.by = by;
+    refill(); save(); toast("Cleared — start typing");
+  });
+  function refill(){
+    document.querySelectorAll("[data-k]").forEach(function(el){ el.value = data[el.dataset.k] || ""; });
+    document.querySelectorAll(".sw").forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.style.backgroundColor === hexToRgb(data.color)));
+    });
+    drawSvcs(); drawHours();
+  }
+  function hexToRgb(hex){
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex||""));
+    return m ? "rgb(" + parseInt(m[1],16) + ", " + parseInt(m[2],16) + ", " + parseInt(m[3],16) + ")" : "";
+  }
+
+  moneyTab();
+}
+
+/* ================= money tab ================= */
+function moneyTab(){
+  var STAGES = ["lead","demo","sold","paid"];
+  var LABEL = { lead:"Lead", demo:"Demoed", sold:"Sold", paid:"Paid" };
+  var goal = LS.get("pp.goal", { amt:"", date:"" });
+  var leads = LS.get("pp.leads", []);
+
+  var gAmt = $("#g-amt"), gDate = $("#g-date");
+  gAmt.value = goal.amt || ""; gDate.value = goal.date || "";
+  gAmt.addEventListener("input", function(){ goal.amt = gAmt.value; LS.set("pp.goal", goal); drawGoal(); });
+  gDate.addEventListener("input", function(){ goal.date = gDate.value; LS.set("pp.goal", goal); drawGoal(); });
+
+  function drawGoal(){
+    var target = Number(goal.amt) || 0;
+    var paid = leads.reduce(function(s,l){ return s + (l.stage === "paid" ? (Number(l.amt)||0) : 0); }, 0);
+    $("#paidTotal").textContent = money(paid);
+    $("#goalEcho").textContent = money(target);
+    $("#goalBar").style.width = target ? Math.min(100, paid/target*100) + "%" : "0%";
+    $("#goalTicket").textContent = target ? (paid >= target ? "COVERED" : "SHORT " + money(target - paid)) : "SET A GOAL";
+
+    var pill = $("#daysLeft"), gap = $("#goalGap");
+    var days = null;
+    if (goal.date){
+      var t = Date.parse(goal.date + "T23:59:59");
+      if (!isNaN(t)) days = Math.ceil((t - Date.now()) / 86400000);
+    }
+    if (days === null){ pill.textContent = "NO DUE DATE"; pill.className = "days ok"; }
+    else if (days < 0){ pill.textContent = "PAST DUE"; pill.className = "days"; }
+    else { pill.textContent = days + (days === 1 ? " DAY LEFT" : " DAYS LEFT"); pill.className = "days" + (days > 3 ? " ok" : ""); }
+
+    if (!target){ gap.textContent = "Put your bill amount and due date in and this tracks the rest."; return; }
+    if (paid >= target){ gap.textContent = "Covered. Keep going — next week's bill is already halfway paid."; return; }
+    var short = target - paid;
+    var sales = Math.ceil(short / 59);
+    gap.textContent = money(short) + " to go — that's " + sales + (sales === 1 ? " sale" : " sales") + " at $59" +
+      (days !== null && days > 0 ? ", or " + Math.ceil(sales / days) + " a day for " + days + " days." : ".");
+  }
+
+  function drawLeads(){
+    var box = $("#leadList"); box.innerHTML = "";
+    $("#leadCount").textContent = leads.length + (leads.length === 1 ? " lead" : " leads");
+    if (!leads.length){
+      box.innerHTML = '<p class="empty">Nobody logged yet. Add the first place you walk into.</p>';
+      drawGoal(); return;
+    }
+    leads.forEach(function(l, i){
+      var row = document.createElement("div"); row.className = "lead";
+
+      var who = document.createElement("div"); who.className = "who"; who.textContent = l.name;
+      var amt = document.createElement("div"); amt.className = "amt"; amt.textContent = money(l.amt);
+      amt.style.color = l.stage === "paid" ? "var(--go)" : "var(--ink-3)";
+
+      var meta = document.createElement("div"); meta.className = "meta";
+      var pill = document.createElement("button");
+      pill.className = "pill " + l.stage + "-s"; pill.type = "button";
+      pill.style.cssText = "background:none;cursor:pointer;font-family:inherit";
+      pill.textContent = LABEL[l.stage];
+      pill.addEventListener("click", function(){
+        l.stage = STAGES[(STAGES.indexOf(l.stage) + 1) % STAGES.length];
+        LS.set("pp.leads", leads); drawLeads();
+      });
+      meta.appendChild(pill);
+      if (l.phone){
+        var ph = document.createElement("span");
+        ph.textContent = "  " + l.phone; ph.style.marginLeft = "8px";
+        meta.appendChild(ph);
+      }
+
+      var acts = document.createElement("div"); acts.className = "acts";
+      if (l.phone){
+        var call = document.createElement("a");
+        call.className = "btn btn-icon"; call.href = "tel:" + digits(l.phone);
+        call.textContent = "☎"; call.setAttribute("aria-label","Call " + l.name);
+        var txt = document.createElement("a");
+        txt.className = "btn btn-icon"; txt.href = "sms:" + digits(l.phone);
+        txt.textContent = "✉"; txt.setAttribute("aria-label","Text " + l.name);
+        acts.appendChild(call); acts.appendChild(txt);
+      }
+      var del = document.createElement("button");
+      del.className = "btn btn-icon"; del.type = "button"; del.textContent = "×";
+      del.setAttribute("aria-label","Remove " + l.name);
+      del.addEventListener("click", function(){ leads.splice(i,1); LS.set("pp.leads", leads); drawLeads(); });
+      acts.appendChild(del);
+
+      row.appendChild(who); row.appendChild(amt); row.appendChild(meta); row.appendChild(acts);
+      box.appendChild(row);
+    });
+    drawGoal();
+  }
+
+  $("#addLead").addEventListener("click", function(){
+    var n = $("#l-name").value.trim();
+    if (!n) return toast("Who did you talk to?");
+    leads.unshift({ name:n, phone:$("#l-phone").value.trim(), amt:$("#l-amt").value || 59, stage:"lead" });
+    LS.set("pp.leads", leads);
+    $("#l-name").value = ""; $("#l-phone").value = ""; $("#l-amt").value = "";
+    drawLeads(); toast("Logged");
+  });
+
+  drawLeads();
+}
+</script>
+</body>
+</html>
