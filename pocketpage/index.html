@@ -1071,15 +1071,36 @@ function boot(){
   $("#copyHTML").addEventListener("click", function(){
     copy(renderSite(data), "Page HTML copied");
   });
+  /* Saving a file: some viewers (the Claude artifact frame) block a plain
+     blob link outright and silently, so ask for the hosted save channel when
+     there is one and only fall back to the link when there isn't. */
+  var saver = null;
+  if (window.claude && typeof window.claude.use === "function"){
+    window.claude.use("downloads").then(function(ns){ saver = ns; }, function(){});
+  }
   $("#dlHTML").addEventListener("click", function(){
+    var html = renderSite(data);
+    var fname = (data.name || "page").toLowerCase()
+      .replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") + ".html";
+
+    if (saver && typeof saver.save === "function"){
+      saver.save({ filename: fname, data: html }).then(
+        function(){ toast("Saved"); },
+        function(err){
+          toast(err && err.code === "declined"
+            ? "Save cancelled"
+            : "Couldn't save here — use Copy page HTML");
+        });
+      return;
+    }
     try{
-      var blob = new Blob([renderSite(data)], {type:"text/html"});
+      var blob = new Blob([html], {type:"text/html"});
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = (data.name || "page").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") + ".html";
+      a.download = fname;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
-      toast("Saved to your downloads");
+      toast("Check your downloads — if it's empty, use Copy page HTML");
     }catch(e){ toast("Download blocked here — use Copy page HTML"); }
   });
   $("#showQR").addEventListener("click", function(){
