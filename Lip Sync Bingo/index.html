@@ -54,6 +54,13 @@
         <p><b>Rounds:</b> Round 1 — first to complete 1 line wins (50 pts).
           Round 2 — 2 lines (100 pts). Round 3 — the full card (150 pts).
           Marks carry over between rounds.</p>
+        <p><b>Win shapes:</b> the host can set any shape as a round's target —
+          Line, Two Lines, X, L, T, U, Four Corners, Plus/Cross, Frame, or the
+          Full Card. Your card shades the squares of the shape you're chasing,
+          and a picked shape pays squares × 10 points.</p>
+        <p><b>The music:</b> every called song plays out loud on the caller's
+          phone — tap ▶ Play the song on yours to hear it too. Mic-square
+          performances play the track for a full minute.</p>
         <p><b>🎤 Mic squares:</b> every card has 5 pink mic squares. When a mic song
           gets called, the player can claim the square — but it only counts if they
           perform the song LIVE, camera on every screen in the room, TikTok-style,
@@ -105,10 +112,16 @@
     <h3 class="section-title">Players</h3>
     <ul id="lobby-players" class="player-list"></ul>
 
+    <div id="pattern-picker" class="panel" hidden>
+      <h3>Round 1 target pattern</h3>
+      <p class="hint">The shape that wins the round. Default is Line — tap any shape to change it. A picked shape pays squares × 10 points.</p>
+      <div id="pattern-grid-lobby" class="pattern-grid"></div>
+    </div>
+
     <button id="btn-start-game" class="btn gold big" hidden>▶ Start game</button>
     <p id="lobby-waiting" class="status" hidden>Waiting for the host to start…</p>
     <div class="rounds-note">
-      ROUND 1 = 1 LINE ★ &nbsp;•&nbsp; ROUND 2 = 2 LINES ★★ &nbsp;•&nbsp; ROUND 3 = FULL CARD ★★★
+      ROUND 1 = 1 LINE ★ &nbsp;•&nbsp; ROUND 2 = 2 LINES ★★ &nbsp;•&nbsp; ROUND 3 = FULL CARD ★★★ — or any shape the host picks
     </div>
     <button id="btn-leave-lobby" class="btn ghost danger">Leave room</button>
   </section>
@@ -128,6 +141,11 @@
         <div id="call-secs" class="caller-secs">30s</div>
       </div>
       <div class="caller-meta"><div class="caller-progress"><div id="countdown-fill"></div></div><span id="call-count" class="caller-count">0 CALLED</span></div>
+
+      <div id="call-track-row" class="track-row" hidden>
+        <button id="btn-play-call" class="btn small gold">▶ Play the song</button>
+        <span id="call-track-status" class="hint"></span>
+      </div>
 
       <div id="chips" class="chips"></div>
 
@@ -180,7 +198,7 @@
       <span id="track-status" class="hint"></span>
       <span class="eq" id="track-eq" hidden><i></i><i></i><i></i><i></i><i></i></span>
     </div>
-    <div id="yt-holder" class="yt-holder" aria-hidden="true"></div>
+    <div id="yt-holder" class="yt-holder" aria-hidden="true"><div id="yt-player"></div></div>
 
     <div id="stage-tiles" class="stage-tiles"></div>
 
@@ -231,6 +249,11 @@
     <h2 id="scores-title" class="screen-title">Scoreboard</h2>
     <p id="scores-note" class="status"></p>
     <ul id="scores-list" class="player-list scores"></ul>
+    <div id="pattern-picker-scores" class="panel" hidden>
+      <h3 id="pattern-picker-scores-title">Next round target pattern</h3>
+      <p class="hint">Tap a shape to change what wins the next round. A picked shape pays squares × 10 points.</p>
+      <div id="pattern-grid-scores" class="pattern-grid"></div>
+    </div>
     <div id="scores-host-controls" class="row" hidden>
       <button id="btn-next-round" class="btn gold">Next round ▶</button>
       <button id="btn-new-game" class="btn">New game (fresh cards)</button>
