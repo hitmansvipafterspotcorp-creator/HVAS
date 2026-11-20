@@ -69,6 +69,13 @@
       var peer = new Peer(PEER_PREFIX + code);
       var conns = {}; // peerKey (remote peer id) -> DataConnection
       var mediaCalls = []; // live stage-video calls (in + out)
+      // If the broker never answers (no internet), 'open' never fires
+      // and no error may arrive either — don't leave the promise (and
+      // the "Opening your room…" toast) hanging forever.
+      var openTimer = setTimeout(function () {
+        try { peer.destroy(); } catch (e) {}
+        reject(new Error('Could not reach the game server — check your internet and try again.'));
+      }, 12000);
       function trackCall(c) {
         mediaCalls.push(c);
         c.on('close', function () {
@@ -110,20 +117,28 @@
         },
         close: function () { try { peer.destroy(); } catch (e) {} }
       };
-      peer.on('open', function () { resolve(transport); });
+      peer.on('open', function () { clearTimeout(openTimer); resolve(transport); });
       peer.on('error', function (err) {
+        clearTimeout(openTimer);
         if (err.type === 'unavailable-id') {
           reject(new Error('Room code ' + code + ' is already in use — host again to get a fresh code.'));
         } else { cb.onError(err); reject(err); }
       });
       peer.on('connection', function (conn) {
+        var gone = false; // 'error' and 'close' can BOTH fire for one departure
+        function leave() {
+          if (gone) return;
+          gone = true;
+          delete conns[conn.peer];
+          cb.onLeave(conn.peer);
+        }
         conn.on('open', function () {
           conns[conn.peer] = conn;
           cb.onJoin(conn.peer);
         });
         conn.on('data', function (data) { cb.onMessage(conn.peer, data); });
-        conn.on('close', function () { delete conns[conn.peer]; cb.onLeave(conn.peer); });
-        conn.on('error', function () { delete conns[conn.peer]; cb.onLeave(conn.peer); });
+        conn.on('close', leave);
+        conn.on('error', leave);
       });
     });
   }
@@ -135,6 +150,15 @@
       var peer = new Peer();
       var settled = false;
       var mediaCalls = []; // live stage-video calls (in + out)
+      // Same hang guard as the host: if the broker never opens this
+      // peer (no internet), settle with an error instead of spinning.
+      var openTimer = setTimeout(function () {
+        if (!settled) {
+          settled = true;
+          try { peer.destroy(); } catch (e) {}
+          reject(new Error('Could not reach the game server — check your internet and try again.'));
+        }
+      }, 12000);
       function trackCall(c) {
         mediaCalls.push(c);
         c.on('close', function () {
@@ -148,6 +172,7 @@
         call.on('stream', function (s) { cb.onMedia(call.metadata || {}, s); });
       });
       peer.on('open', function () {
+        clearTimeout(openTimer);
         var conn = peer.connect(PEER_PREFIX + code, { reliable: true });
         var transport = {
           kind: 'online',
@@ -241,6 +266,10 @@
       close: function () {
         Object.keys(channels).forEach(function (k) { try { channels[k].close(); } catch (e) {} });
         Object.keys(pending).forEach(function (k) { try { pending[k].close(); } catch (e) {} });
+        // Paired guests' PCs live ONLY in mediaPc once their answer is
+        // accepted (they leave `pending`) — close them too, or leaving
+        // the room leaks live RTCPeerConnections.
+        Object.keys(mediaPc).forEach(function (k) { try { mediaPc[k].pc.close(); } catch (e) {} });
         channels = {}; pending = {}; mediaPc = {};
       },
 
@@ -347,6 +376,7 @@
       acceptOffer: function (codeText) {
         var sig = decodeSignal(codeText);
         if (sig.type !== 'offer') throw new Error('That is a reply code, not an invite code. Paste the host\u2019s invite code.');
+        if (pc) { try { pc.close(); } catch (e) {} pc = null; dc = null; } // re-pairing: don't leak the old PC
         pc = newLocalPC();
         pc.ontrack = function (ev) {
           var vts = pc.getTransceivers().filter(function (t) {
@@ -410,6 +440,10 @@
     }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
       .then(function (s) {
+        // stop() was pressed while the camera was still starting: the
+        // stream arrives after stop() already ran (it saw stream==null),
+        // so kill the tracks here or the camera stays on forever.
+        if (stopped) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
         stream = s;
         videoEl.srcObject = s;
         videoEl.setAttribute('playsinline', 'true');
