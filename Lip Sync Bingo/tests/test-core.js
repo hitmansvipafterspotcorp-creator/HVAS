@@ -151,12 +151,113 @@ test('verifyClaim REJECTS honest marks that do not form a win', () => {
   assert.deepStrictEqual(res, { ok: false, reason: 'no-win' });
 });
 
+console.log('— Win patterns —');
+
+const PATTERN_CASES = [
+  // [patternId, one exact winning variant]
+  ['x',       [0, 4, 6, 8, 12, 16, 18, 20, 24]],
+  ['t',       [0, 1, 2, 3, 4, 7, 12, 17, 22]],
+  ['u',       [0, 4, 5, 9, 10, 14, 15, 19, 20, 21, 22, 23, 24]],
+  ['corners', [0, 4, 20, 24]],
+  ['plus',    [2, 7, 10, 11, 12, 13, 14, 17, 22]],
+  ['frame',   [0, 1, 2, 3, 4, 5, 9, 10, 14, 15, 19, 20, 21, 22, 23, 24]],
+  ['full',    Array.from({ length: 25 }, (_, i) => i)],
+];
+for (const [pid, cells] of PATTERN_CASES) {
+  test(`pattern ${pid}: exact shape wins, one square short does not`, () => {
+    assert.strictEqual(Core.checkPattern(cells, pid), true, pid + ' exact should win');
+    const missing = cells.find(c => c !== Core.CENTER);
+    const short = cells.filter(c => c !== missing);
+    assert.strictEqual(Core.checkPattern(short, pid), false, pid + ' missing ' + missing + ' should lose');
+    // same result through the round-ladder entry point when a pattern is active
+    assert.strictEqual(Core.checkWin(cells, 1, pid), true);
+    assert.strictEqual(Core.checkWin(short, 1, pid), false);
+  });
+}
+
+test('pattern line: any single line wins, four-in-a-row does not', () => {
+  assert.strictEqual(Core.checkPattern([0, 1, 2, 3, 4], 'line'), true);
+  assert.strictEqual(Core.checkPattern([0, 1, 2, 3], 'line'), false);
+  assert.strictEqual(Core.checkPattern([4, 8, 12, 16, 20], 'line'), true); // diagonal
+});
+
+test('pattern two-lines: needs two complete lines', () => {
+  assert.strictEqual(Core.checkPattern([0, 1, 2, 3, 4], 'two-lines'), false);
+  assert.strictEqual(Core.checkPattern([0, 1, 2, 3, 4, 0, 5, 10, 15, 20], 'two-lines'), true);
+});
+
+test('pattern L: all four corner rotations win, a broken L does not', () => {
+  const rotations = [
+    [0, 5, 10, 15, 20, 21, 22, 23, 24],  // left column + bottom row
+    [0, 1, 2, 3, 4, 5, 10, 15, 20],      // left column + top row
+    [4, 9, 14, 19, 20, 21, 22, 23, 24],  // right column + bottom row
+    [0, 1, 2, 3, 4, 9, 14, 19, 24],      // right column + top row
+  ];
+  rotations.forEach((cells, i) => {
+    assert.strictEqual(Core.checkPattern(cells, 'l'), true, 'rotation ' + i + ' should win');
+    const short = cells.filter(c => c !== cells[1]);
+    assert.strictEqual(Core.checkPattern(short, 'l'), false, 'rotation ' + i + ' one short should lose');
+  });
+  // an L missing its corner join is not an L
+  assert.strictEqual(Core.checkPattern([5, 10, 15, 20, 21, 22, 23, 24], 'l'), false);
+});
+
+test('pattern points: squares x 10 (Line stays 50)', () => {
+  assert.strictEqual(Core.patternPoints('line'), 50);
+  assert.strictEqual(Core.patternPoints('two-lines'), 100);
+  assert.strictEqual(Core.patternPoints('corners'), 40);
+  assert.strictEqual(Core.patternPoints('x'), 90);
+  assert.strictEqual(Core.patternPoints('l'), 90);
+  assert.strictEqual(Core.patternPoints('t'), 90);
+  assert.strictEqual(Core.patternPoints('plus'), 90);
+  assert.strictEqual(Core.patternPoints('u'), 130);
+  assert.strictEqual(Core.patternPoints('frame'), 160);
+  assert.strictEqual(Core.patternPoints('full'), 250);
+  assert.strictEqual(Core.patternPoints('nope'), 0);
+});
+
+test('patternProgress: reports the closest variant for shading', () => {
+  const p = Core.patternProgress([0, 6, 12, 18], 'x');
+  assert.strictEqual(p.need, 9);
+  assert.strictEqual(p.have, 4);
+  assert.strictEqual(Core.patternProgress([0, 6, 18], 'x').have, 4); // free center counts
+  assert.ok(p.cells.includes(24) && p.cells.includes(4));
+  assert.strictEqual(p.complete, false);
+  assert.strictEqual(Core.patternProgress([0, 4, 20, 24], 'corners').complete, true);
+});
+
+test('verifyClaim with a picked pattern: X wins only when the whole X was called', () => {
+  const card = Core.generateCard(starter.songs, 'pat-1');
+  const xCells = [0, 4, 6, 8, 12, 16, 18, 20, 24];
+  const called = xCells.filter(i => i !== Core.CENTER).map(i => card.cells[i]);
+  const ok = Core.verifyClaim({
+    deckSongIds: starter.songs, seed: 'pat-1', cells: card.cells,
+    marks: xCells, calledSongIds: called, round: 1, patternId: 'x'
+  });
+  assert.strictEqual(ok.ok, true);
+  // same marks, but the round pattern is a Frame -> no win
+  const no = Core.verifyClaim({
+    deckSongIds: starter.songs, seed: 'pat-1', cells: card.cells,
+    marks: xCells, calledSongIds: called, round: 1, patternId: 'frame'
+  });
+  assert.deepStrictEqual(no, { ok: false, reason: 'no-win' });
+});
+
 console.log('— Decks —');
 
 test('pool: 110 unique songs, EVERY song has a playable yt id (any song can play)', () => {
   assert.strictEqual(Data.SONGS.length, 110);
   assert.strictEqual(new Set(Data.SONGS.map(s => s.id)).size, 110);
   Data.SONGS.forEach(s => assert.ok(/^[A-Za-z0-9_-]{11}$/.test(s.yt), 'missing/bad yt for ' + s.id));
+});
+
+test('pool: every song carries a verified backup yt2 (except slow-down, which has no second upload)', () => {
+  const NO_BACKUP = ['slow-down']; // audited Nov 20, 2026 — no second legitimate upload exists
+  Data.SONGS.forEach(s => {
+    if (NO_BACKUP.includes(s.id)) return;
+    assert.ok(/^[A-Za-z0-9_-]{11}$/.test(s.yt2 || ''), 'missing/bad yt2 for ' + s.id);
+    assert.notStrictEqual(s.yt2, s.yt, 'yt2 duplicates yt for ' + s.id);
+  });
 });
 
 test('every built-in deck: >= 24 unique songs, all present in the pool', () => {
