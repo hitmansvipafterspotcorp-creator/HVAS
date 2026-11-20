@@ -118,8 +118,20 @@
   var selectedDeckId = localStorage.getItem('lsb_deck') || 'after-spot-starter';
 
   function customDecks() {
-    try { return JSON.parse(localStorage.getItem('lsb_custom_decks') || '[]'); }
+    var list;
+    try { list = JSON.parse(localStorage.getItem('lsb_custom_decks') || '[]'); }
     catch (e) { return []; }
+    if (!Array.isArray(list)) return [];
+    // A saved custom deck can outlive the song pool (songs renamed or
+    // dropped): an unknown id would deal as a broken square whose
+    // track can never play — Korey's rule is a song with no track
+    // never sits on a card. Filter them out, and drop decks that fall
+    // below the 24 songs a card needs.
+    return list.filter(function (d) {
+      if (!d || !Array.isArray(d.songs)) return false;
+      d.songs = d.songs.filter(function (sid) { return !!Data.SONG_MAP[sid]; });
+      return d.songs.length >= 24;
+    });
   }
   function saveCustomDecks(list) {
     localStorage.setItem('lsb_custom_decks', JSON.stringify(list));
@@ -291,7 +303,8 @@
 
   function hostOnJoin(peerKey) { /* player is created on 'hello' */ }
   function hostOnLeave(peerKey) {
-    if (H && H.audience[peerKey]) {
+    if (!H) return; // our own leaveRoom: late close events land after H is gone — playerByPeer would throw on the null host
+    if (H.audience[peerKey]) {
       delete H.audience[peerKey];
       hostBroadcastState();
     }
@@ -309,6 +322,18 @@
   function resyncGuest(p) {
     sendWelcome(p);
     if (H.phase === 'lobby') return;
+    if (H.phase === 'roundEnd' || H.phase === 'over') {
+      // The round is over: land the rejoining guest on the scores
+      // screen like everyone else. The old code sent 'game' here,
+      // dropping them onto a live board while the room saw results.
+      transport.sendTo(p.peerKey, { t: 'marks', playerId: p.id, marks: Array.from(p.marks) });
+      if (H.winner) {
+        transport.sendTo(p.peerKey, { t: 'winner', playerId: H.winner.playerId, name: H.winner.name, round: H.winner.round, points: H.winner.points, patternName: activePatternName() || '' });
+      } else {
+        transport.sendTo(p.peerKey, { t: 'round-end', round: H.round });
+      }
+      return;
+    }
     transport.sendTo(p.peerKey, { t: 'game', round: H.round });
     transport.sendTo(p.peerKey, { t: 'marks', playerId: p.id, marks: Array.from(p.marks) });
     if ((H.phase === 'stage' || H.phase === 'vote') && H.stage) {
@@ -511,6 +536,12 @@
   }
 
   function hostNewGame() {
+    // Kill anything the old game left running: a stage/vote countdown
+    // or the post-vote auto-resume must never fire into the new game.
+    clearInterval(stageInt);
+    clearInterval(countdownInt);
+    clearTimeout(autoResumeTimer);
+    H.stage = null;
     H.roomSeed = 'room-' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
     H.stagedSongs = {};
     H.order.forEach(function (pid) {
@@ -548,8 +579,12 @@
     if (H.stagedSongs[songId]) return;
     var holders = Core.findPerformers(stageCardsById(), H.order, songId);
     if (!holders.length) return;
+    var seedAtCall = H.roomSeed;
     setTimeout(function () {
-      if (H && H.phase === 'playing' && !H.stagedSongs[songId]) openClaimStage(songId, holders);
+      // The roomSeed check ties this timer to the game it was scheduled
+      // in: without it, a claim stage from the PREVIOUS game could pop
+      // open 2.5s into a brand-new one.
+      if (H && H.roomSeed === seedAtCall && H.phase === 'playing' && !H.stagedSongs[songId]) openClaimStage(songId, holders);
     }, 2500);
   }
 
@@ -866,6 +901,7 @@
         if ($('screen-scores').classList.contains('active')) renderScores();
         break;
       case 'game':
+        ensureTrackPlayer(); // guests get no Start tap — build the player on game entry so it is ready before their first Play tap
         G.winner = null;
         G.roundEnded = null;
         show('screen-game');
@@ -1298,7 +1334,8 @@
     var v = myView();
     var winner = role === 'host' ? H.winner : (G ? G.winner : null);
     var round = v.round;
-    var isOver = role === 'host' ? (H.phase === 'over') : (winner && winner.round >= 3);
+    var isOver = role === 'host' ? (H.phase === 'over')
+      : !!((winner && winner.round >= 3) || (G && G.roundEnded >= 3));
     if (winner) {
       $('scores-title').textContent = isOver ? '🏆 Final — ' + winner.name + ' takes it!' : '🎉 ' + winner.name + ' wins Round ' + winner.round + '!';
       $('scores-note').textContent = 'BINGO verified by the host against the call history. +' + winner.points + ' points.';
@@ -1376,6 +1413,7 @@
 
   function showStage(songId, list, mode) {
     sfx('stage');
+    ensureTrackPlayer(); // a stage can be a guest's first track — start the player building now
     show('screen-stage');
     stageNow = list || [];
     var s = Data.SONG_MAP[songId];
@@ -1599,6 +1637,10 @@
     }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
       .then(function (stream) {
+        // The stage ended while the camera was still starting
+        // (stopStageMedia already ran and reset mySlot): keeping this
+        // stream would leak a live camera that nothing ever stops.
+        if (mySlot === -1) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
         myStream = stream;
         var tile = tileFor(myId());
         if (tile) {
@@ -1680,6 +1722,7 @@
   var trackPlayer = null;       // the ONE persistent YT.Player (never destroyed)
   var trackPlayerReady = false;
   var trackPlayerCreating = false;
+  var trackPlayerCreatingAt = 0;
   var trackWant = null;         // {songId, ids:[], idx, purpose, playing}
   var trackWatchdog = null;
 
@@ -1739,34 +1782,49 @@
       document.body.appendChild(holder);
     }
   }
-  /* Create the ONE player, lazily, on the first track request (track
-     requests come from taps — Call, Play, stage — so creation starts
-     inside a user-gesture stack wherever the flow allows). A load asked
-     for before onReady must NOT be fired at the not-yet-ready player:
-     the API drops those calls, and the old ensure-callback design did
-     exactly that for any request that arrived while creation was in
-     flight. Instead the request stays queued in trackWant and onReady
-     drives the latest one. The player is never destroyed afterwards;
+  /* Create the ONE player. Two construction paths:
+       - SYNCHRONOUS, when the API is already on the page (it is
+         preloaded at startup): the player is born inside the caller's
+         own stack — the Start-game tap calls ensureTrackPlayer()
+         directly — so by the first Call the player exists and is READY,
+         and that first load is issued inside the Call tap itself.
+       - ASYNC fallback (API not loaded yet): construct when the API
+         promise resolves; the want stays queued in trackWant and
+         onReady drives it.
+     The old code ONLY had the async path, and it was only entered from
+     the first track request — so the first song's loadVideoById was
+     always issued from the onReady callback, two async hops away from
+     any tap, with no gesture attached; the embed declined to start
+     with sound and sat CUED while the app waited for a PLAYING that
+     could never come. The player is never destroyed afterwards;
      stopTrack only stops the video. */
-  function ensureTrackPlayer() {
-    if (trackPlayer || trackPlayerCreating) return;
-    trackPlayerCreating = true;
-    moveTrackHolderToBody();
-    ytApi().then(function (YT) {
-      if (trackPlayer) return;
-      trackPlayer = new YT.Player('yt-player', {
-        width: 320, height: 180,
-        playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0 },
-        events: {
-          onReady: function () {
-            trackPlayerReady = true;
-            driveTrackPlayer(); // flush the queued track, if any
-          },
-          onStateChange: onTrackState,
-          onError: onTrackError
-        }
-      });
+  function createTrackPlayer(YT) {
+    if (trackPlayer) return;
+    trackPlayer = new YT.Player('yt-player', {
+      width: 320, height: 180,
+      playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0 },
+      events: {
+        onReady: function () {
+          trackPlayerReady = true;
+          driveTrackPlayer(); // flush the queued track, if any
+        },
+        onStateChange: onTrackState,
+        onError: onTrackError
+      }
     });
+  }
+  function ensureTrackPlayer() {
+    if (trackPlayer) return;
+    if (trackPlayerCreating && Date.now() - trackPlayerCreatingAt < 12000) return;
+    // A creation attempt older than 12s with no player is wedged (the
+    // API script blocked or lost) — the old code left the flag set
+    // forever, so no song could ever load again that session. Allow a
+    // fresh attempt instead.
+    trackPlayerCreating = true;
+    trackPlayerCreatingAt = Date.now();
+    moveTrackHolderToBody();
+    if (window.YT && YT.Player) { createTrackPlayer(window.YT); return; }
+    ytApi().then(function (YT) { createTrackPlayer(YT); });
   }
   /* Issue the current trackWant to the persistent player. Safe to call
      at any time: kicks off creation if needed, no-ops while the player
@@ -1775,14 +1833,34 @@
     if (!trackWant) return;
     if (!trackPlayer) { ensureTrackPlayer(); return; }
     if (!trackPlayerReady) return; // onReady will call us again
+    // Load AND explicitly play, in the same stack. loadVideoById alone
+    // only ASKS the embed to autoplay; when the embed declines, the
+    // video sits CUED and the old code never issued a play call to
+    // rescue it — the watchdog just relabelled the stall after 6s.
     try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
+    try { trackPlayer.playVideo(); } catch (e) {}
     armTrackWatchdog();
+    armTrackRetry(trackWant);
+  }
+  /* One nudge for an embed that cued but never started: 3s after a
+     load with no PLAYING, re-issue playVideo() once — before the 6s
+     watchdog gives up and shows the tap prompt. */
+  var trackRetryTimer = null;
+  function armTrackRetry(want) {
+    clearTimeout(trackRetryTimer);
+    trackRetryTimer = setTimeout(function () {
+      if (trackWant === want && !want.playing && !want.retried && trackPlayer && trackPlayerReady) {
+        want.retried = true;
+        try { trackPlayer.playVideo(); } catch (e) {}
+      }
+    }, 3000);
   }
   function onTrackState(e) {
     if (!trackWant) return;
     if (e.data === YT.PlayerState.PLAYING) {
       trackWant.playing = true;
       clearTimeout(trackWatchdog);
+      clearTimeout(trackRetryTimer);
       setTrackStatus(trackWant.purpose, '🎵 Track playing…');
       if (trackWant.purpose === 'stage') setTrackEq(true);
     } else if (e.data === YT.PlayerState.ENDED && trackWant.purpose === 'stage') {
@@ -1794,6 +1872,7 @@
     trackWant.idx++;
     if (trackWant.idx < trackWant.ids.length) {
       trackWant.playing = false;
+      trackWant.retried = false; // the backup upload gets its own 3s nudge
       setTrackStatus(trackWant.purpose, 'That upload won\u2019t play here — trying the backup track…');
       driveTrackPlayer();
     } else {
@@ -1801,6 +1880,7 @@
     }
   }
   function failTrack() {
+    clearTimeout(trackRetryTimer);
     var s = trackWant ? Data.SONG_MAP[trackWant.songId] : null;
     var purpose = trackWant ? trackWant.purpose : trackPurpose;
     var el = trackStatusEl(purpose);
@@ -1833,7 +1913,7 @@
     }
     var ids = [];
     [s.yt, s.yt2].forEach(function (id) { if (id && ids.indexOf(id) === -1) ids.push(id); });
-    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false };
+    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false, retried: false };
     setTrackStatus(purpose, 'Loading the track…');
     var want = trackWant;
     driveTrackPlayer();
@@ -1855,35 +1935,37 @@
     trackTimer = null;
     clearTimeout(trackWatchdog);
     trackWatchdog = null;
+    clearTimeout(trackRetryTimer);
     trackWant = null;
     if (trackPlayer && trackPlayer.stopVideo) {
       try { trackPlayer.stopVideo(); } catch (e) {}
     }
     setTrackEq(false);
   }
-  /** The Play button always drives the CURRENT persistent player: if the
-      wanted track is the video already loaded/cued in it, a real tap's
-      playVideo() beats the autoplay block; if a different (or no) video
-      sits in the player, load the wanted one into it. If the track is
-      already playing, a tap changes nothing. With no live want, the tap
-      (re)starts the current song's track from the top. */
+  /** The Play button spends the tap DIRECTLY on the live player: load
+      the wanted upload AND play it, right here in the tap's own call
+      stack, with no state check in between. (The old handler gated its
+      only playVideo() on getVideoData() already naming the wanted
+      video — in the stalled state that data is exactly what's missing
+      or stale, so the tap fell through to re-issuing the same
+      implicit-autoplay load that had just stalled, and playVideo() was
+      never called at all. The button looked dead because, on that
+      path, it was.) If the track is already playing, a tap changes
+      nothing. With no live want, the tap (re)starts the current
+      song's track from the top. */
   function tapPlayTrack() {
     var songId = (trackWant && trackWant.songId) || currentTrackSong || pendingCallSong;
     if (!songId) return;
+    if (trackWant && trackWant.songId === songId && trackWant.playing) return;
     if (trackPlayer && trackWant && trackWant.songId === songId) {
-      if (trackWant.playing) return;
       if (trackPlayerReady) {
-        var vid = null;
-        try { var d = trackPlayer.getVideoData(); vid = d && d.video_id; } catch (e) {}
-        if (vid && trackWant.ids.indexOf(vid) !== -1) {
-          try { trackPlayer.playVideo(); } catch (e) {}
-          armTrackWatchdog();
-        } else {
-          setTrackStatus(trackWant.purpose, 'Loading the track…');
-          driveTrackPlayer();
-        }
+        setTrackStatus(trackWant.purpose, 'Loading the track…');
+        try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
+        try { trackPlayer.playVideo(); } catch (e) {}
+        armTrackWatchdog();
+        armTrackRetry(trackWant);
       } else {
-        driveTrackPlayer(); // still queued — onReady will load it
+        driveTrackPlayer(); // not ready yet — the want stays queued for onReady
       }
       return;
     }
@@ -1907,8 +1989,14 @@
     clearInterval(countdownInt);
     clearInterval(stageInt);
     clearTimeout(autoResumeTimer);
+    if (hsHelloTimer) { clearInterval(hsHelloTimer); hsHelloTimer = null; }
     stopStageMedia();
-    if (transport) { try { transport.close(); } catch (e) {} }
+    if (transport) {
+      // Detach the close callback first: our own close() otherwise
+      // reports back as "The host closed the room." on a voluntary leave.
+      if (transport.onClose) { try { transport.onClose(function () {}); } catch (e) {} }
+      try { transport.close(); } catch (e) {}
+    }
     transport = null; role = null; mode = null; H = null; G = null; roomCode = '';
     lastCallShown = null;
     show('screen-home');
@@ -2013,6 +2101,7 @@
 
   /* ---- hotspot guest ---- */
   var guestHotspotTransport = null;
+  var hsHelloTimer = null; // hoisted: re-pairing / leaving must be able to kill a pending hello loop
   var stopGuestScan = null;
   $('btn-join-hotspot').addEventListener('click', function () {
     if (!requireName()) return;
@@ -2033,6 +2122,7 @@
   $('btn-guest-make-reply').addEventListener('click', function () {
     var codeText = $('guest-offer-code').value.trim();
     if (!codeText) { $('joinhs-status').textContent = 'Paste or scan the host\u2019s invite code first.'; return; }
+    if (hsHelloTimer) { clearInterval(hsHelloTimer); hsHelloTimer = null; } // a previous pairing attempt's hello loop dies here
     if (guestHotspotTransport) { try { guestHotspotTransport.close(); } catch (e) {} }
     guestHotspotTransport = Net.createHotspotGuest({
       onMessage: function (msg) {
@@ -2058,17 +2148,21 @@
         // The host sends 'welcome' the moment the channel opens; our
         // hello must be ready to go out as soon as it can.
         var tries = 0;
-        var helloTimer = setInterval(function () {
+        hsHelloTimer = setInterval(function () {
           tries++;
           try { guestHotspotTransport.send({ t: 'hello', name: myName }); } catch (e) {}
-          if (role === 'guest' || tries > 40) clearInterval(helloTimer);
+          if (role === 'guest' || tries > 40) { clearInterval(hsHelloTimer); hsHelloTimer = null; }
         }, 500);
       })
       .catch(function (err) { $('joinhs-status').textContent = err.message; });
   });
 
   /* ---- lobby / game controls ---- */
-  $('btn-start-game').addEventListener('click', function () { if (H) hostStartGame(); });
+  // The Start tap is the strongest gesture in the app: create the
+  // track player right here so it exists and is READY before the first
+  // Call — the first song's load then goes out inside the Call tap
+  // itself instead of from an async onReady callback.
+  $('btn-start-game').addEventListener('click', function () { ensureTrackPlayer(); if (H) hostStartGame(); });
   $('btn-leave-lobby').addEventListener('click', function () { leaveRoom(false); });
   $('btn-leave-game').addEventListener('click', function () { leaveRoom(false); });
   $('btn-call-next').addEventListener('click', function () { hostCallNext(); });
@@ -2091,7 +2185,11 @@
       hostHandleClaim(selfPlayer());
     } else if (role === 'guest' && G) {
       var round = G.state ? G.state.round : 1;
-      if (!Core.checkWin(Array.from(G.marks), round)) {
+      // Pre-check against the HOST'S picked pattern for this round,
+      // not just the default ladder: under a picked shape (X, Frame…)
+      // the old ladder-only check told real winners "No BINGO yet"
+      // and never sent the claim the host would have verified.
+      if (!Core.checkWin(Array.from(G.marks), round, activePatternId())) {
         $('bingo-status').textContent = 'No BINGO on your card yet — keep marking!';
         return;
       }
@@ -2272,5 +2370,10 @@
     myName = $('player-name').value.trim();
     localStorage.setItem('lsb_name', myName);
   });
+  // Warm the YouTube API script at startup (script load only — no
+  // player, no video): by the time anyone taps Start or Call, the API
+  // is on the page and the player can be constructed synchronously
+  // inside that tap (see ensureTrackPlayer).
+  ytApi();
   renderDeckGrid();
 })();
