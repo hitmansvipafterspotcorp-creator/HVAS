@@ -1677,7 +1677,9 @@
   var currentTrackSong = null;
   var trackPurpose = 'stage';   // 'stage' | 'call'
   var pendingCallSong = null;   // guest side: latest called song awaiting a tap
-  var trackPlayer = null;
+  var trackPlayer = null;       // the ONE persistent YT.Player (never destroyed)
+  var trackPlayerReady = false;
+  var trackPlayerCreating = false;
   var trackWant = null;         // {songId, ids:[], idx, purpose, playing}
   var trackWatchdog = null;
 
@@ -1718,20 +1720,63 @@
       }
     }, 6000);
   }
-  function ensureTrackPlayer(cb) {
-    if (trackPlayer) { cb(trackPlayer); return; }
+  /* The player element starts inside #screen-stage, and every non-active
+     screen is display:none — an embed inside a display:none subtree has
+     no layout box and silently stalls: loadVideoById/playVideo are
+     accepted by the JS handle but PLAYING never arrives and no error
+     fires (the Nov 20 play-test failure: the first song played while
+     the stage screen was up, every later song went into the stalled
+     hidden embed, and the Play button drove that same dead-feeling
+     player). The holder's own CSS parks it off-screen (-9999px) but
+     still RENDERED — that only works with no display:none ancestor, so
+     the holder is moved to <body> before the player is created. */
+  var trackHolderMoved = false;
+  function moveTrackHolderToBody() {
+    if (trackHolderMoved) return;
+    trackHolderMoved = true;
+    var holder = $('yt-holder');
+    if (holder && holder.parentNode !== document.body) {
+      document.body.appendChild(holder);
+    }
+  }
+  /* Create the ONE player, lazily, on the first track request (track
+     requests come from taps — Call, Play, stage — so creation starts
+     inside a user-gesture stack wherever the flow allows). A load asked
+     for before onReady must NOT be fired at the not-yet-ready player:
+     the API drops those calls, and the old ensure-callback design did
+     exactly that for any request that arrived while creation was in
+     flight. Instead the request stays queued in trackWant and onReady
+     drives the latest one. The player is never destroyed afterwards;
+     stopTrack only stops the video. */
+  function ensureTrackPlayer() {
+    if (trackPlayer || trackPlayerCreating) return;
+    trackPlayerCreating = true;
+    moveTrackHolderToBody();
     ytApi().then(function (YT) {
-      if (trackPlayer) { cb(trackPlayer); return; }
+      if (trackPlayer) return;
       trackPlayer = new YT.Player('yt-player', {
         width: 320, height: 180,
         playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0 },
         events: {
-          onReady: function () { cb(trackPlayer); },
+          onReady: function () {
+            trackPlayerReady = true;
+            driveTrackPlayer(); // flush the queued track, if any
+          },
           onStateChange: onTrackState,
           onError: onTrackError
         }
       });
     });
+  }
+  /* Issue the current trackWant to the persistent player. Safe to call
+     at any time: kicks off creation if needed, no-ops while the player
+     is not ready yet (the want stays queued — never dropped). */
+  function driveTrackPlayer() {
+    if (!trackWant) return;
+    if (!trackPlayer) { ensureTrackPlayer(); return; }
+    if (!trackPlayerReady) return; // onReady will call us again
+    try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
+    armTrackWatchdog();
   }
   function onTrackState(e) {
     if (!trackWant) return;
@@ -1750,8 +1795,7 @@
     if (trackWant.idx < trackWant.ids.length) {
       trackWant.playing = false;
       setTrackStatus(trackWant.purpose, 'That upload won\u2019t play here — trying the backup track…');
-      trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]);
-      armTrackWatchdog();
+      driveTrackPlayer();
     } else {
       failTrack();
     }
@@ -1792,14 +1836,10 @@
     trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false };
     setTrackStatus(purpose, 'Loading the track…');
     var want = trackWant;
-    ensureTrackPlayer(function (p) {
-      if (trackWant !== want) return; // superseded while the API loaded
-      p.loadVideoById(want.ids[0]);
-      armTrackWatchdog();
-    });
+    driveTrackPlayer();
     // If the API itself never arrives (blocked network), fail honestly.
     setTimeout(function () {
-      if (trackWant === want && !want.playing && !trackPlayer) failTrack();
+      if (trackWant === want && !want.playing && !trackPlayerReady) failTrack();
     }, 9000);
   }
 
@@ -1821,13 +1861,30 @@
     }
     setTrackEq(false);
   }
-  /** The Play button: resume a loaded-but-blocked track from a real tap,
-      or (re)start the current song's track from the top. */
+  /** The Play button always drives the CURRENT persistent player: if the
+      wanted track is the video already loaded/cued in it, a real tap's
+      playVideo() beats the autoplay block; if a different (or no) video
+      sits in the player, load the wanted one into it. If the track is
+      already playing, a tap changes nothing. With no live want, the tap
+      (re)starts the current song's track from the top. */
   function tapPlayTrack() {
-    if (!currentTrackSong && !pendingCallSong) return;
-    var songId = currentTrackSong || pendingCallSong;
-    if (trackPlayer && trackWant && trackWant.songId === songId && !trackWant.playing) {
-      try { trackPlayer.playVideo(); } catch (e) {}
+    var songId = (trackWant && trackWant.songId) || currentTrackSong || pendingCallSong;
+    if (!songId) return;
+    if (trackPlayer && trackWant && trackWant.songId === songId) {
+      if (trackWant.playing) return;
+      if (trackPlayerReady) {
+        var vid = null;
+        try { var d = trackPlayer.getVideoData(); vid = d && d.video_id; } catch (e) {}
+        if (vid && trackWant.ids.indexOf(vid) !== -1) {
+          try { trackPlayer.playVideo(); } catch (e) {}
+          armTrackWatchdog();
+        } else {
+          setTrackStatus(trackWant.purpose, 'Loading the track…');
+          driveTrackPlayer();
+        }
+      } else {
+        driveTrackPlayer(); // still queued — onReady will load it
+      }
       return;
     }
     playTrack(songId, trackPurpose);
