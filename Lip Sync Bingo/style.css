@@ -61,11 +61,7 @@ main { max-width: 560px; margin: 0 auto; }
 .bw-top { color: var(--gold); font-size: 10.5px; font-weight: 800; letter-spacing: .3em; }
 .bw-main { font-family: var(--font-d); font-weight: 800; font-size: 27px; letter-spacing: .04em; color: var(--text); line-height: 1.05; }
 .bw-main em { font-style: normal; color: var(--gold); }
-.hero-logo {
-  width: 100%; max-width: 200px; height: auto; display: block; margin: 10px auto 16px;
-  border-radius: 26px; border: 2px solid var(--gold);
-  box-shadow: 0 0 0 5px #000, 0 0 0 7px rgba(212, 175, 55, .45), 0 0 34px rgba(212, 175, 55, .16), 0 18px 40px rgba(0, 0, 0, .7);
-}
+.hero-logo { width: 100%; max-width: 200px; height: auto; display: block; margin: 6px auto 14px; border-radius: 22px; box-shadow: 0 14px 34px rgba(0,0,0,.65); }
 .freeplay {
   margin-left: auto; text-align: center; font-size: 10px; font-weight: 800; letter-spacing: 1px;
   color: #141005; background: var(--gold-grad);
