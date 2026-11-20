@@ -146,12 +146,146 @@
   /**
    * Round win check — Korey's round ladder:
    *  Round 1 = any 1 line, Round 2 = any 2 lines, Round 3 = full card.
+   *  When a patternId is given (host picked a shape for the round),
+   *  the ACTIVE PATTERN decides instead of the ladder.
    */
-  function checkWin(marks, round) {
+  function checkWin(marks, round, patternId) {
+    if (patternId) return checkPattern(marks, patternId);
     var m = markSet(marks);
     m.add(CENTER);
     if (round === 3) return m.size >= 25;
     return countLines(m) >= (round === 2 ? 2 : 1);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Win-PATTERN library (Korey's order, Nov 20 2026: "all the        */
+  /* different ways you could win like Ls, Xs, full card").           */
+  /* Data-driven: every pattern is a list of VARIANTS, each variant a */
+  /* list of cell indices (row-major 0..24, CENTER=12 is the FREE     */
+  /* space and always counts as marked). A card wins a pattern when   */
+  /* ANY variant is fully marked. `size` = squares in the shape;      */
+  /* points = size x 10 when the host picks the pattern.              */
+  /* ---------------------------------------------------------------- */
+  var ROW = function (r) { return [0, 1, 2, 3, 4].map(function (c) { return r * 5 + c; }); };
+  var COL = function (c) { return [0, 1, 2, 3, 4].map(function (r) { return r * 5 + c; }); };
+  function unionCells() {
+    var s = new Set();
+    for (var i = 0; i < arguments.length; i++) {
+      arguments[i].forEach(function (c) { s.add(c); });
+    }
+    return Array.from(s).sort(function (a, b) { return a - b; });
+  }
+
+  var PATTERNS = [
+    { id: 'line', name: 'Line', size: 5,
+      blurb: 'Any full row, column, or diagonal.',
+      variants: LINES, preview: ROW(0) },
+    { id: 'two-lines', name: 'Two Lines', size: 10,
+      blurb: 'Any two full lines.',
+      variants: null, preview: unionCells(ROW(0), ROW(1)) },
+    { id: 'x', name: 'X', size: 9,
+      blurb: 'Both diagonals.',
+      variants: [unionCells([0, 6, 12, 18, 24], [4, 8, 12, 16, 20])],
+      preview: unionCells([0, 6, 12, 18, 24], [4, 8, 12, 16, 20]) },
+    { id: 'l', name: 'L', size: 9,
+      blurb: 'A full outside column plus the full top or bottom row at its corner.',
+      variants: [
+        unionCells(COL(0), ROW(4)), unionCells(COL(0), ROW(0)),
+        unionCells(COL(4), ROW(4)), unionCells(COL(4), ROW(0))
+      ],
+      preview: unionCells(COL(0), ROW(4)) },
+    { id: 't', name: 'T', size: 9,
+      blurb: 'Full top row plus the full center column.',
+      variants: [unionCells(ROW(0), COL(2))], preview: unionCells(ROW(0), COL(2)) },
+    { id: 'u', name: 'U', size: 13,
+      blurb: 'Both outside columns plus the full bottom row.',
+      variants: [unionCells(COL(0), COL(4), ROW(4))],
+      preview: unionCells(COL(0), COL(4), ROW(4)) },
+    { id: 'corners', name: 'Four Corners', size: 4,
+      blurb: 'Just the four corner squares.',
+      variants: [[0, 4, 20, 24]], preview: [0, 4, 20, 24] },
+    { id: 'plus', name: 'Plus / Cross', size: 9,
+      blurb: 'Full center row plus full center column.',
+      variants: [unionCells(ROW(2), COL(2))], preview: unionCells(ROW(2), COL(2)) },
+    { id: 'frame', name: 'Frame', size: 16,
+      blurb: 'Every square around the edge.',
+      variants: [unionCells(ROW(0), ROW(4), COL(0), COL(4))],
+      preview: unionCells(ROW(0), ROW(4), COL(0), COL(4)) },
+    { id: 'full', name: 'Full Card', size: 25,
+      blurb: 'Every square on the card — the blackout.',
+      variants: null,
+      preview: Array.from({ length: 25 }, function (_, i) { return i; }) }
+  ];
+  var PATTERN_MAP = {};
+  PATTERNS.forEach(function (p) { PATTERN_MAP[p.id] = p; });
+
+  /** The ladder defaults when the host doesn't pick a shape. */
+  var ROUND_PATTERNS = { 1: 'line', 2: 'two-lines', 3: 'full' };
+
+  function patternById(id) { return PATTERN_MAP[id] || null; }
+
+  /** Points for a host-picked pattern: squares needed x 10. */
+  function patternPoints(patternId) {
+    var p = patternById(patternId);
+    return p ? p.size * 10 : 0;
+  }
+
+  function variantComplete(m, cells) {
+    for (var i = 0; i < cells.length; i++) if (!m.has(cells[i])) return false;
+    return true;
+  }
+
+  /** Does this mark set satisfy the pattern (any variant)? */
+  function checkPattern(marks, patternId) {
+    var p = patternById(patternId);
+    if (!p) return false;
+    var m = markSet(marks);
+    m.add(CENTER); // free space always counts as marked
+    if (p.id === 'full') return m.size >= 25;
+    if (p.id === 'two-lines') return countLines(m) >= 2;
+    for (var i = 0; i < p.variants.length; i++) {
+      if (variantComplete(m, p.variants[i])) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Progress toward a pattern, for card shading + the goal meter:
+   * the variant the player is CLOSEST to completing.
+   * @returns {{cells:number[], have:number, need:number, complete:boolean}}
+   *   cells = the target squares to shade (best variant; for Two Lines
+   *   the union of the best pair of lines; for Full Card, all cells).
+   */
+  function patternProgress(marks, patternId) {
+    var p = patternById(patternId);
+    var m = markSet(marks);
+    m.add(CENTER);
+    if (!p) return { cells: [], have: 0, need: 0, complete: false };
+    if (p.id === 'full') {
+      return { cells: p.preview, have: m.size, need: 25, complete: m.size >= 25 };
+    }
+    if (p.id === 'two-lines') {
+      // Best pair of distinct lines, by total marked cells in their union.
+      var best = null;
+      for (var i = 0; i < LINES.length; i++) {
+        for (var j = i + 1; j < LINES.length; j++) {
+          var u = unionCells(LINES[i], LINES[j]);
+          var have = 0;
+          u.forEach(function (c) { if (m.has(c)) have++; });
+          if (!best || have > best.have) best = { cells: u, have: have, need: u.length };
+        }
+      }
+      best.complete = countLines(m) >= 2;
+      return best;
+    }
+    var win = null;
+    for (var k = 0; k < p.variants.length; k++) {
+      var cells = p.variants[k], haveK = 0;
+      cells.forEach(function (c) { if (m.has(c)) haveK++; });
+      if (!win || haveK > win.have) win = { cells: cells, have: haveK, need: cells.length };
+    }
+    win.complete = win.have >= win.need;
+    return win;
   }
 
   /* ---------------------------------------------------------------- */
@@ -186,6 +320,7 @@
     var claimedMarks = opts.marks; // array of cell indices the player marked
     var calledSongIds = opts.calledSongIds;
     var round = opts.round;
+    var patternId = opts.patternId || null; // host-picked shape, if any
 
     var card = generateCard(deckSongIds, seed);
     if (JSON.stringify(card.cells) !== JSON.stringify(claimedCells)) {
@@ -201,8 +336,8 @@
       if (!called.has(songId)) return { ok: false, reason: 'uncalled-mark:' + songId };
       verified.push(idx);
     }
-    if (!checkWin(verified, round)) return { ok: false, reason: 'no-win' };
-    return { ok: true, lines: countLines(verified) };
+    if (!checkWin(verified, round, patternId)) return { ok: false, reason: 'no-win' };
+    return { ok: true, lines: countLines(verified), pattern: patternId };
   }
 
   /* ---------------------------------------------------------------- */
@@ -305,6 +440,13 @@
     playerSeed: playerSeed,
     countLines: countLines,
     checkWin: checkWin,
+    PATTERNS: PATTERNS,
+    PATTERN_MAP: PATTERN_MAP,
+    ROUND_PATTERNS: ROUND_PATTERNS,
+    patternById: patternById,
+    patternPoints: patternPoints,
+    checkPattern: checkPattern,
+    patternProgress: patternProgress,
     validateMark: validateMark,
     verifyClaim: verifyClaim,
     tallyVotes: tallyVotes,

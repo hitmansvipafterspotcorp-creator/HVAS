@@ -186,6 +186,9 @@
       players: {}, order: [], nextPid: 1,
       audience: {}, // peerKey -> {name} — vote + react, no card (Jackbox-style)
       phase: 'lobby', round: 1,
+      // Win patterns per round: ladder defaults, host can pick any shape.
+      patterns: { 1: Core.ROUND_PATTERNS[1], 2: Core.ROUND_PATTERNS[2], 3: Core.ROUND_PATTERNS[3] },
+      patternsPicked: { 1: false, 2: false, 3: false },
       callSeq: [], callIdx: 0, called: [],
       auto: false, lastCallAt: 0,
       stage: null, votes: {}, stagedSongs: {},
@@ -242,9 +245,30 @@
     });
   }
   function broadcast(obj) { if (transport) transport.broadcast(obj); }
+
+  /* ---- win patterns: the active shape for the current round ---- */
+  function activePatternId() {
+    if (role === 'host' && H) return H.patterns[H.round] || Core.ROUND_PATTERNS[H.round];
+    if (role === 'guest' && G && G.state && G.state.patternId) return G.state.patternId;
+    return null;
+  }
+  function activePatternName() {
+    var p = Core.patternById(activePatternId());
+    return p ? p.name : null;
+  }
+  /** Points a win pays this round: picked shape = squares x 10;
+      untouched ladder keeps the classic 50 / 100 / 150. */
+  function activeRoundPoints() {
+    if (role === 'host' && H && H.patternsPicked[H.round]) {
+      return Core.patternPoints(H.patterns[H.round]);
+    }
+    return Core.roundWinPoints(H ? H.round : 1);
+  }
+
   function hostBroadcastState() {
     broadcast({
       t: 'state', phase: H.phase, round: H.round,
+      patternId: H.patterns[H.round], patternName: (Core.patternById(H.patterns[H.round]) || {}).name || '',
       called: H.called.slice(),
       current: H.called.length ? H.called[H.called.length - 1] : null,
       deckName: H.deck.name, players: publicPlayers(),
@@ -407,7 +431,8 @@
     if (!H || H.phase !== 'playing') return;
     var res = Core.verifyClaim({
       deckSongIds: H.deck.songs, seed: p.seed, cells: p.card.cells,
-      marks: Array.from(p.marks), calledSongIds: H.called, round: H.round
+      marks: Array.from(p.marks), calledSongIds: H.called, round: H.round,
+      patternId: H.patterns[H.round]
     });
     if (!res.ok) {
       if (p.isSelf) {
@@ -419,12 +444,12 @@
       broadcast({ t: 'claim-rejected', playerId: p.id, name: p.name });
       return;
     }
-    var pts = Core.roundWinPoints(H.round);
+    var pts = activeRoundPoints();
     p.score += pts;
     H.winner = { playerId: p.id, name: p.name, round: H.round, points: pts };
     H.phase = (H.round >= 3) ? 'over' : 'roundEnd';
     sfx('win'); confetti(70);
-    broadcast({ t: 'winner', playerId: p.id, name: p.name, round: H.round, points: pts });
+    broadcast({ t: 'winner', playerId: p.id, name: p.name, round: H.round, points: pts, patternName: activePatternName() || '' });
     hostBroadcastState();
     showScores();
     banner('🎉 ' + p.name + ' — BINGO! Round ' + H.round + ' (+' + pts + ' pts)');
@@ -439,11 +464,11 @@
     H.callIdx = 0;
     H.called = [];
     H.lastCallAt = 0;
-    broadcast({ t: 'game', round: 1, deckName: H.deck.name });
+    broadcast({ t: 'game', round: 1, deckName: H.deck.name, patternId: H.patterns[1], patternName: activePatternName() || '' });
     hostBroadcastState();
     show('screen-game');
     renderGame();
-    toast('Round 1 — 1 line to win. Call the first song!');
+    toast('Round 1 — ' + (activePatternName() || 'Line') + ' to win. Call the first song!');
   }
 
   function hostCallNext() {
@@ -458,6 +483,10 @@
     renderGame();
     startCountdown(H.lastCallAt);
     maybeStage(songId);
+    // The called song plays out loud on the caller's phone (the Call tap
+    // is the gesture browsers require for sound). Hotspot rooms have no
+    // internet — the host plays it in the room instead.
+    if (mode !== 'hotspot') playTrack(songId, 'call');
   }
 
   function hostEndRound() {
@@ -474,11 +503,11 @@
     H.round++;
     H.winner = null;
     H.phase = 'playing';
-    broadcast({ t: 'round', round: H.round });
+    broadcast({ t: 'round', round: H.round, patternId: H.patterns[H.round], patternName: activePatternName() || '' });
     hostBroadcastState();
     show('screen-game');
     renderGame();
-    toast('Round ' + H.round + (H.round === 2 ? ' — 2 lines to win!' : ' — FULL CARD to win!'));
+    toast('Round ' + H.round + ' — ' + (activePatternName() || 'Line') + ' to win!');
   }
 
   function hostNewGame() {
@@ -841,7 +870,7 @@
         G.roundEnded = null;
         show('screen-game');
         renderGame();
-        toast('Game on! Round ' + msg.round + ' — good luck!');
+        toast('Game on! Round ' + msg.round + (msg.patternName ? ' — ' + msg.patternName + ' to win!' : ' — good luck!'));
         break;
       case 'card':
         G.card = msg.card;
@@ -854,6 +883,15 @@
         updateCallerBar(msg.songId, msg.n, msg.total, G.state ? G.state.round : 1);
         startCountdown(msg.at);
         if ($('screen-game').classList.contains('active')) renderGame();
+        // Surface the called song with a Play button — a phone can only
+        // start sound from its own tap, so we don't fake autoplay here.
+        if (mode !== 'hotspot') {
+          var cs = Data.SONG_MAP[msg.songId];
+          pendingCallSong = msg.songId;
+          trackPurpose = 'call';
+          $('call-track-row').hidden = false;
+          setTrackStatus('call', '🎵 ' + (cs ? cs.artist + ' — ' + cs.title : msg.songId) + ' — tap ▶ Play the song to hear it.');
+        }
         break;
       case 'marks':
         if (msg.playerId === G.id) {
@@ -890,7 +928,7 @@
       case 'round':
         show('screen-game');
         renderGame();
-        toast('Round ' + msg.round + (msg.round === 2 ? ' — 2 lines to win!' : ' — FULL CARD to win!'));
+        toast('Round ' + msg.round + ' — ' + (msg.patternName || (msg.round === 2 ? '2 lines' : 'FULL CARD')) + ' to win!');
         break;
       case 'claim-stage':
         G.stageList = msg.holders;
@@ -951,14 +989,15 @@
       var p = selfPlayer();
       return {
         card: p ? p.card : null, marks: p ? p.marks : new Set([Core.CENTER]),
-        called: H.called, round: H.round, players: publicPlayers(), isHost: true
+        called: H.called, round: H.round, players: publicPlayers(), isHost: true,
+        patternId: H.patterns[H.round]
       };
     }
     if (role === 'guest' && G) {
       var s = G.state || { called: [], round: 1, players: [] };
-      return { card: G.card, marks: G.marks, called: s.called || [], round: s.round || 1, players: s.players || [], isHost: false };
+      return { card: G.card, marks: G.marks, called: s.called || [], round: s.round || 1, players: s.players || [], isHost: false, patternId: s.patternId || null };
     }
-    return { card: null, marks: new Set(), called: [], round: 1, players: [], isHost: false };
+    return { card: null, marks: new Set(), called: [], round: 1, players: [], isHost: false, patternId: null };
   }
   function myId() {
     if (role === 'host') { var p = selfPlayer(); return p ? p.id : null; }
@@ -969,6 +1008,48 @@
     for (var i = 0; i < v.players.length; i++) if (v.players[i].id === pid) return v.players[i].name;
     if (role === 'host' && H && H.players[pid]) return H.players[pid].name;
     return 'Player';
+  }
+
+  /* ---- win-pattern picker (host only): name + mini grid + points ---- */
+  var pickerSig = { lobby: '', scores: '' };
+  function buildPatternGrid(el, round) {
+    el.innerHTML = '';
+    Core.PATTERNS.forEach(function (p) {
+      var b = document.createElement('button');
+      b.className = 'pattern-btn' + (H.patterns[round] === p.id ? ' selected' : '');
+      b.title = p.blurb;
+      var grid = '<span class="mini-grid" aria-hidden="true">';
+      for (var i = 0; i < 25; i++) {
+        grid += '<i class="' + (p.preview.indexOf(i) !== -1 ? 'on' : '') + '"></i>';
+      }
+      grid += '</span>';
+      b.innerHTML = grid + '<span class="p-name">' + esc(p.name) + '</span>' +
+        '<span class="p-pts">' + Core.patternPoints(p.id) + ' pts</span>';
+      b.addEventListener('click', function () {
+        H.patterns[round] = p.id;
+        H.patternsPicked[round] = true;
+        pickerSig.lobby = ''; pickerSig.scores = '';
+        renderPatternPickers();
+        hostBroadcastState();
+        toast('Round ' + round + ' target: ' + p.name + ' — ' + Core.patternPoints(p.id) + ' pts to the winner');
+      });
+      el.appendChild(b);
+    });
+  }
+  function renderPatternPickers() {
+    var lp = $('pattern-picker'), sp = $('pattern-picker-scores');
+    if (role !== 'host' || !H) { lp.hidden = true; sp.hidden = true; return; }
+    lp.hidden = false;
+    var sigL = 'r1:' + H.patterns[1];
+    if (pickerSig.lobby !== sigL) { pickerSig.lobby = sigL; buildPatternGrid($('pattern-grid-lobby'), 1); }
+    var next = H.round + 1;
+    var showNext = next <= 3 && H.phase !== 'over' && $('screen-scores').classList.contains('active');
+    sp.hidden = !showNext;
+    if (showNext) {
+      $('pattern-picker-scores-title').textContent = 'Round ' + next + ' target pattern';
+      var sigS = 'r' + next + ':' + H.patterns[next];
+      if (pickerSig.scores !== sigS) { pickerSig.scores = sigS; buildPatternGrid($('pattern-grid-scores'), next); }
+    }
   }
 
   /* ---- lobby ---- */
@@ -1001,6 +1082,7 @@
       }
       if (G && G.state) renderLobbyPlayers(G.state.players);
     }
+    renderPatternPickers();
   }
   function renderLobbyPlayers(players) {
     var ul = $('lobby-players');
@@ -1034,7 +1116,9 @@
     $('call-artist').textContent = s ? s.artist : 'Get ready…';
     $('call-title').textContent = s ? s.title : '';
     $('call-count').textContent = (n || 0) + ' CALLED';
-    $('call-goal').innerHTML = 'R' + round + ' <span class="star">★</span> ' + goalText(round);
+    var pat = Core.patternById(activePatternId());
+    $('call-goal').innerHTML = 'R' + round + ' <span class="star">★</span> ' +
+      (pat ? esc(pat.name.toUpperCase()) : goalText(round));
     lastCallShown = songId;
   }
 
@@ -1053,10 +1137,20 @@
   function renderGoal(v) {
     var mine = null;
     (v.players || []).forEach(function (p) { if (p.id === myId()) mine = p; });
+    var pat = Core.patternById(v.patternId);
+    var isCustom = pat && v.patternId !== Core.ROUND_PATTERNS[v.round];
+    if (isCustom) {
+      // Host picked a shape: progress = closest variant of that shape.
+      var prog = Core.patternProgress(v.marks, v.patternId);
+      $('goal-label').textContent = pat.name.toUpperCase();
+      $('goal-frac').textContent = prog.have + ' / ' + prog.need;
+      $('goal-fill').style.width = (prog.need ? prog.have / prog.need * 100 : 0) + '%';
+      return;
+    }
     var best = 0, marks = 0;
     if (role === 'host' && H) { var sp = selfPlayer(); if (sp) { best = bestLine(sp.marks); marks = sp.marks.size - 1; } }
     else if (mine) { best = mine.best || 0; marks = mine.marks || 0; }
-    var label = goalText(v.round), frac, pct;
+    var label = pat ? pat.name.toUpperCase() : goalText(v.round), frac, pct;
     if (v.round === 1) { frac = best + ' / 5'; pct = best / 5 * 100; }
     else if (v.round === 2) { var ln = mine ? (mine.lines || 0) : 0; frac = ln + ' / 2'; pct = ln / 2 * 100; }
     else { frac = marks + ' / 24'; pct = marks / 24 * 100; }
@@ -1112,6 +1206,12 @@
     el.innerHTML = '';
     if (!v.card) { el.innerHTML = '<p class="hint">Your card is on its way…</p>'; return; }
     var calledSet = new Set(v.called);
+    // Shade the squares of the ACTIVE win shape (the variant this card
+    // is closest to finishing) so players see what they're building.
+    var targetSet = null;
+    if (v.patternId) {
+      targetSet = new Set(Core.patternProgress(v.marks, v.patternId).cells);
+    }
     v.card.cells.forEach(function (songId, idx) {
       var cell = document.createElement('div');
       cell.className = 'cell';
@@ -1123,6 +1223,7 @@
         var s = Data.SONG_MAP[songId];
         var isMic = v.card.mic.indexOf(idx) !== -1;
         if (isMic) cell.classList.add('mic');
+        if (targetSet && targetSet.has(idx) && !v.marks.has(idx)) cell.classList.add('target');
         if (v.marks.has(idx)) cell.classList.add('marked');
         else if (calledSet.has(songId)) cell.classList.add('called');
         cell.innerHTML =
@@ -1217,6 +1318,7 @@
     });
     $('scores-host-controls').hidden = role !== 'host';
     if (role === 'host') $('btn-next-round').hidden = isOver || H.phase === 'over';
+    renderPatternPickers();
   }
 
   /* ---- stage screens (shared host/guest rendering) ---- */
@@ -1356,6 +1458,7 @@
       show('screen-stage');
     }
     stopStageMedia();
+    stopTrack();
     currentTrackSong = null;
     $('track-row').hidden = true;
     $('btn-decline').hidden = true;
@@ -1559,48 +1662,175 @@
     attachStageStream(pf.id, stream);
   }
 
-  /* ---- the track: the called song plays on every phone for the
-     full minute (audio-only embed — the performer is the picture).
-     A "Play the track" button covers browsers that block autoplay. -- */
+  /* ---- the track player (YouTube IFrame API — Nov 20, 2026 repair).
+     Korey's rule: EVERY song has to actually play. So the player now
+     tracks REAL state: "Track playing" shows only after YouTube reports
+     PLAYING. If an upload refuses to embed (errors 101/150 and friends)
+     it auto-falls back to the song's verified backup upload (yt2), and
+     if that fails too it says so honestly and links out to YouTube.
+     Two purposes share the one player:
+       'stage' — the performance track (full minute, on the stage screen)
+       'call'  — the called song, played out loud on the caller's phone;
+                 other phones get a "▶ Play the song" button (their tap
+                 is the gesture browsers require for sound). -- */
   var trackTimer = null;
   var currentTrackSong = null;
-  function startTrack(songId) {
+  var trackPurpose = 'stage';   // 'stage' | 'call'
+  var pendingCallSong = null;   // guest side: latest called song awaiting a tap
+  var trackPlayer = null;
+  var trackWant = null;         // {songId, ids:[], idx, purpose, playing}
+  var trackWatchdog = null;
+
+  var ytApiPromise = null;
+  function ytApi() {
+    if (window.YT && YT.Player) return Promise.resolve(YT);
+    if (!ytApiPromise) {
+      ytApiPromise = new Promise(function (resolve) {
+        var prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = function () {
+          if (prev) try { prev(); } catch (e) {}
+          resolve(window.YT);
+        };
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      });
+    }
+    return ytApiPromise;
+  }
+
+  function trackStatusEl(purpose) {
+    return purpose === 'call' ? $('call-track-status') : $('track-status');
+  }
+  function setTrackStatus(purpose, text) {
+    var el = trackStatusEl(purpose);
+    if (el) el.textContent = text;
+  }
+  function setTrackEq(on) {
+    var eq = $('track-eq');
+    if (eq) eq.hidden = !on;
+  }
+  function armTrackWatchdog() {
+    clearTimeout(trackWatchdog);
+    trackWatchdog = setTimeout(function () {
+      if (trackWant && !trackWant.playing) {
+        setTrackStatus(trackWant.purpose, 'Tap ▶ Play the song to hear it.');
+      }
+    }, 6000);
+  }
+  function ensureTrackPlayer(cb) {
+    if (trackPlayer) { cb(trackPlayer); return; }
+    ytApi().then(function (YT) {
+      if (trackPlayer) { cb(trackPlayer); return; }
+      trackPlayer = new YT.Player('yt-player', {
+        width: 320, height: 180,
+        playerVars: { controls: 0, disablekb: 1, playsinline: 1, rel: 0 },
+        events: {
+          onReady: function () { cb(trackPlayer); },
+          onStateChange: onTrackState,
+          onError: onTrackError
+        }
+      });
+    });
+  }
+  function onTrackState(e) {
+    if (!trackWant) return;
+    if (e.data === YT.PlayerState.PLAYING) {
+      trackWant.playing = true;
+      clearTimeout(trackWatchdog);
+      setTrackStatus(trackWant.purpose, '🎵 Track playing…');
+      if (trackWant.purpose === 'stage') setTrackEq(true);
+    } else if (e.data === YT.PlayerState.ENDED && trackWant.purpose === 'stage') {
+      setTrackEq(false);
+    }
+  }
+  function onTrackError() {
+    if (!trackWant || !trackPlayer) return;
+    trackWant.idx++;
+    if (trackWant.idx < trackWant.ids.length) {
+      trackWant.playing = false;
+      setTrackStatus(trackWant.purpose, 'That upload won\u2019t play here — trying the backup track…');
+      trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]);
+      armTrackWatchdog();
+    } else {
+      failTrack();
+    }
+  }
+  function failTrack() {
+    var s = trackWant ? Data.SONG_MAP[trackWant.songId] : null;
+    var purpose = trackWant ? trackWant.purpose : trackPurpose;
+    var el = trackStatusEl(purpose);
+    setTrackEq(false);
+    if (el && s && s.yt) {
+      el.innerHTML = 'Couldn\u2019t play this track here — ' +
+        '<a href="https://www.youtube.com/watch?v=' + s.yt + '" target="_blank" rel="noopener">tap to open it on YouTube</a>';
+    } else if (el) {
+      el.textContent = 'Couldn\u2019t play this track here.';
+    }
+    trackWant = null;
+  }
+
+  /** Load + play a song's track for the given purpose ('stage'|'call'). */
+  function playTrack(songId, purpose) {
+    var s = Data.SONG_MAP[songId];
     stopTrack();
     currentTrackSong = songId;
-    var s = Data.SONG_MAP[songId];
-    $('track-row').hidden = false;
-    $('track-status').textContent = '';
+    trackPurpose = purpose;
+    if (purpose === 'stage') $('track-row').hidden = false;
+    else $('call-track-row').hidden = false;
+    setTrackStatus(purpose, '');
     if (!s || !s.yt) {
-      $('track-status').textContent = 'No track link for this one — the room sings it!';
+      setTrackStatus(purpose, 'No track link for this one — the room sings it!');
       return;
     }
     if (mode === 'hotspot') {
-      $('track-status').textContent = 'Hotspot has no internet — play the song out loud in the room!';
+      setTrackStatus(purpose, 'Hotspot has no internet — play the song out loud in the room!');
       return;
     }
-    loadTrackIframe(s.yt);
-    trackTimer = setTimeout(stopTrack, (STAGE_SECONDS + 8) * 1000); // never outlives the stage
+    var ids = [];
+    [s.yt, s.yt2].forEach(function (id) { if (id && ids.indexOf(id) === -1) ids.push(id); });
+    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false };
+    setTrackStatus(purpose, 'Loading the track…');
+    var want = trackWant;
+    ensureTrackPlayer(function (p) {
+      if (trackWant !== want) return; // superseded while the API loaded
+      p.loadVideoById(want.ids[0]);
+      armTrackWatchdog();
+    });
+    // If the API itself never arrives (blocked network), fail honestly.
+    setTimeout(function () {
+      if (trackWant === want && !want.playing && !trackPlayer) failTrack();
+    }, 9000);
   }
-  function loadTrackIframe(ytId) {
-    var holder = $('yt-holder');
-    if (!holder) return;
-    holder.innerHTML = '';
-    var f = document.createElement('iframe');
-    f.src = 'https://www.youtube.com/embed/' + ytId + '?autoplay=1&controls=0&disablekb=1&playsinline=1&rel=0';
-    f.setAttribute('allow', 'autoplay; encrypted-media');
-    f.setAttribute('title', 'Song track');
-    holder.appendChild(f);
-    $('track-status').textContent = '🎵 Track playing…';
-    var eq = $('track-eq');
-    if (eq) eq.hidden = false;
+
+  /** Stage performance track: plays for the full minute, then stops. */
+  function startTrack(songId) {
+    playTrack(songId, 'stage');
+    if (mode !== 'hotspot') {
+      trackTimer = setTimeout(stopTrack, (STAGE_SECONDS + 8) * 1000); // never outlives the stage
+    }
   }
   function stopTrack() {
     clearTimeout(trackTimer);
     trackTimer = null;
-    var holder = $('yt-holder');
-    if (holder) holder.innerHTML = '';
-    var eq = $('track-eq');
-    if (eq) eq.hidden = true;
+    clearTimeout(trackWatchdog);
+    trackWatchdog = null;
+    trackWant = null;
+    if (trackPlayer && trackPlayer.stopVideo) {
+      try { trackPlayer.stopVideo(); } catch (e) {}
+    }
+    setTrackEq(false);
+  }
+  /** The Play button: resume a loaded-but-blocked track from a real tap,
+      or (re)start the current song's track from the top. */
+  function tapPlayTrack() {
+    if (!currentTrackSong && !pendingCallSong) return;
+    var songId = currentTrackSong || pendingCallSong;
+    if (trackPlayer && trackWant && trackWant.songId === songId && !trackWant.playing) {
+      try { trackPlayer.playVideo(); } catch (e) {}
+      return;
+    }
+    playTrack(songId, trackPurpose);
   }
 
   /* ================= ROOM SETUP / TEARDOWN ================= */
@@ -1837,9 +2067,11 @@
     if (slot !== -1) startMyPerformance(slot);
   });
   $('btn-play-track').addEventListener('click', function () {
-    if (!currentTrackSong) return;
-    var s = Data.SONG_MAP[currentTrackSong];
-    if (s && s.yt) loadTrackIframe(s.yt); // a real tap always beats autoplay rules
+    tapPlayTrack(); // a real tap always beats autoplay rules
+  });
+  $('btn-play-call').addEventListener('click', function () {
+    trackPurpose = 'call';
+    tapPlayTrack();
   });
   $('btn-claim-mic').addEventListener('click', function () {
     if (role === 'host') hostHandleClaimMic(selfPlayer());
