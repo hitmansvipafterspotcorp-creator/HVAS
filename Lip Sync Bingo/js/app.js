@@ -1806,6 +1806,9 @@
       events: {
         onReady: function () {
           trackPlayerReady = true;
+          // Baseline volume from birth: script-driven embeds can come
+          // up muted (see unmuteTrackPlayer) — start at full volume.
+          try { trackPlayer.setVolume(100); } catch (e) {}
           driveTrackPlayer(); // flush the queued track, if any
         },
         onStateChange: onTrackState,
@@ -1837,10 +1840,51 @@
     // only ASKS the embed to autoplay; when the embed declines, the
     // video sits CUED and the old code never issued a play call to
     // rescue it — the watchdog just relabelled the stall after 6s.
+    clearTimeout(trackSoundTimer); // a new load supersedes any pending sound check
     try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
     try { trackPlayer.playVideo(); } catch (e) {}
+    unmuteTrackPlayer(); // script-driven starts come up MUTED — force sound
     armTrackWatchdog();
     armTrackRetry(trackWant);
+  }
+  /* Force the embed AUDIBLE. A script-driven loadVideoById/playVideo
+     (anything but a direct click on the embed itself) starts MUTED on
+     YouTube: the player state still reports PLAYING, so the app used to
+     announce "🎵 Track playing…" while the room heard nothing — Korey's
+     phone, Nov 20, 2026: status said playing, zero sound, and the code
+     never called unMute()/setVolume() anywhere. Every load path now
+     unmutes, and the PLAYING state is verified for real sound below. */
+  function unmuteTrackPlayer() {
+    if (!trackPlayer) return;
+    try { trackPlayer.unMute(); } catch (e) {}
+    try { trackPlayer.setVolume(100); } catch (e) {}
+  }
+  /* ~800ms after PLAYING (or after a Play-button tap), confirm the
+     embed is REALLY audible. If it is still muted or at volume 0, say
+     so honestly — "playing muted" — instead of claiming "Track
+     playing…" into silence; the ▶ Play tap can still force sound,
+     because a real tap is a full user gesture. */
+  var trackSoundTimer = null;
+  function armTrackSoundVerify(want) {
+    clearTimeout(trackSoundTimer);
+    trackSoundTimer = setTimeout(function () {
+      if (trackWant !== want || !trackPlayer) return;
+      var playing = want.playing;
+      if (!playing) {
+        try { playing = trackPlayer.getPlayerState() === 1; } catch (e) {} // 1 = PLAYING
+        if (playing) want.playing = true;
+      }
+      if (!playing) return; // the 6s watchdog owns the not-playing case
+      var muted = false, vol = 100;
+      try { muted = !!trackPlayer.isMuted(); } catch (e) {}
+      try { vol = trackPlayer.getVolume(); } catch (e) {}
+      if (typeof vol !== 'number') vol = 100;
+      if (muted || vol === 0) {
+        setTrackStatus(want.purpose, 'Track is playing muted — tap ▶ Play the song for sound');
+      } else {
+        setTrackStatus(want.purpose, '🎵 Track playing…');
+      }
+    }, 800);
   }
   /* One nudge for an embed that cued but never started: 3s after a
      load with no PLAYING, re-issue playVideo() once — before the 6s
@@ -1861,7 +1905,11 @@
       trackWant.playing = true;
       clearTimeout(trackWatchdog);
       clearTimeout(trackRetryTimer);
-      setTrackStatus(trackWant.purpose, '🎵 Track playing…');
+      // PLAYING is not the same as AUDIBLE: a script-driven start can
+      // be playing muted. Unmute now, then let the sound verify set
+      // the status — "🎵 Track playing…" only once sound is confirmed.
+      unmuteTrackPlayer();
+      armTrackSoundVerify(trackWant);
       if (trackWant.purpose === 'stage') setTrackEq(true);
     } else if (e.data === YT.PlayerState.ENDED && trackWant.purpose === 'stage') {
       setTrackEq(false);
@@ -1936,6 +1984,7 @@
     clearTimeout(trackWatchdog);
     trackWatchdog = null;
     clearTimeout(trackRetryTimer);
+    clearTimeout(trackSoundTimer);
     trackWant = null;
     if (trackPlayer && trackPlayer.stopVideo) {
       try { trackPlayer.stopVideo(); } catch (e) {}
@@ -1962,6 +2011,10 @@
         setTrackStatus(trackWant.purpose, 'Loading the track…');
         try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
         try { trackPlayer.playVideo(); } catch (e) {}
+        // This tap is a real user gesture — the strongest there is:
+        // spend it on SOUND too, unconditionally, in this same stack.
+        unmuteTrackPlayer();
+        armTrackSoundVerify(trackWant);
         armTrackWatchdog();
         armTrackRetry(trackWant);
       } else {
