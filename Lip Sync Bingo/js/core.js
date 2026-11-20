@@ -120,9 +120,12 @@
     [0, 6, 12, 18, 24], [4, 8, 12, 16, 20]                // diagonals
   ];
 
-  /** marks: Set/array of cell indices (or a {idx:true} map). */
+  /** marks: Set/array of cell indices (or a {idx:true} map).
+      Always returns a FRESH Set: callers (countLines/checkWin/
+      checkPattern/patternProgress) add CENTER to the result, and
+      returning a caller's own Set would silently mutate their state. */
   function markSet(marks) {
-    if (marks instanceof Set) return marks;
+    if (marks instanceof Set) return new Set(marks);
     var s = new Set();
     if (Array.isArray(marks)) marks.forEach(function (m) { s.add(m); });
     else if (marks && typeof marks === 'object') {
