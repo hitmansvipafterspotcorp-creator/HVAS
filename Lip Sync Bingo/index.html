@@ -1,1 +1,306 @@
-<!-- Placeholder - replaced by Lip Sync Bingo v14 upload -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lip Sync Bingo — HITMANS VIP AFTER SPOT</title>
+<meta name="description" content="Lip Sync Bingo — the VIP party game from HITMANS VIP AFTER SPOT CORP. Free play, no prize money. Play online or on a hotspot with no internet.">
+<meta name="theme-color" content="#2a0a4a">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="brand">
+  <div class="brand-word"><span class="bw-top">HITMANS VIP AFTER SPOT</span><span class="bw-main">LIP SYNC <em>BINGO</em></span></div>
+  <span class="freeplay">FREE PLAY<br>NO PRIZE MONEY</span>
+</header>
+
+<main>
+  <!-- ======================= HOME ======================= -->
+  <section id="screen-home" class="screen active">
+    <video class="hero-logo" src="icons/logo-animated.mp4" poster="icons/logo-full.png" autoplay loop muted playsinline aria-label="Lip Sync Bingo animated logo"></video>
+    <label class="field">
+      <span>Your name</span>
+      <input id="player-name" type="text" maxlength="20" placeholder="e.g. Korey" autocomplete="off">
+    </label>
+
+    <h2 class="section-title">Pick a deck</h2>
+    <div id="deck-grid" class="deck-grid"></div>
+    <button id="btn-builder" class="btn ghost">＋ Build your own deck</button>
+
+    <h2 class="section-title">Play</h2>
+    <div class="mode-grid">
+      <button id="btn-host-online" class="btn gold">👑 Host a room (online)</button>
+      <div class="join-row">
+        <input id="join-code" type="text" maxlength="4" placeholder="CODE" autocomplete="off">
+        <button id="btn-join-online" class="btn">Join room</button>
+      </div>
+      <button id="btn-host-hotspot" class="btn">📶 Host on my hotspot (no internet)</button>
+      <button id="btn-join-hotspot" class="btn">📶 Join a hotspot game</button>
+      <button id="btn-join-audience" class="btn ghost">👀 Join as audience — vote only, no card</button>
+      <button id="btn-solo" class="btn ghost">Just me — practice</button>
+    </div>
+
+    <details class="howto">
+      <summary>How to play</summary>
+      <div class="howto-body">
+        <p><b>The game:</b> bingo, but the numbers are songs. The host calls songs from the
+          deck one at a time. When a called song is on your card, tap it to mark it.
+          A square only counts after its song has been called — the host's phone
+          checks every card, so nobody can mark early or fake a win.</p>
+        <p><b>Rounds:</b> Round 1 — first to complete 1 line wins (50 pts).
+          Round 2 — 2 lines (100 pts). Round 3 — the full card (150 pts).
+          Marks carry over between rounds.</p>
+        <p><b>🎤 Mic squares:</b> every card has 5 pink mic squares. When a mic song
+          gets called, the player can claim the square — but it only counts if they
+          perform the song LIVE, camera on every screen in the room, TikTok-style,
+          while the track plays for a full minute. Claim it and perform, or pass —
+          decline, and the square is gone.</p>
+        <p><b>⚔️ Battles:</b> if the same called song is a mic square on two cards
+          and both players claim it, it's a battle — both perform live, side by
+          side, on the same song. The room votes for a winner, and the winner
+          takes the square. The loser doesn't get it.</p>
+        <p><b>Voting:</b> after each performance the room votes — 🔥 FIRE = 3 pts,
+          👏 SOLID = 2 pts, 😐 MID = 1 pt. In a battle the room picks a winner
+          instead: every pick is worth 3 pts and the winner gets a 10 pt bonus.
+          Performance points stack on the scoreboard all night.</p>
+        <p><b>Audience:</b> late to the game? Join as audience with the room code —
+          no card, but you watch the stage and your votes still count.</p>
+        <p><b>Ways to play:</b> online rooms (share the 4-letter code), hotspot rooms
+          (everyone joins the host's phone hotspot — no internet at all), or solo practice.</p>
+        <p><b>Decks:</b> a deck is a night — pick the theme that fits your room, or
+          build your own deck from the song pool.</p>
+      </div>
+    </details>
+    <p class="hint">Online rooms use the free PeerJS broker. Hotspot games pair phone-to-phone
+      with QR codes — no internet, no servers, once everyone is on the host's hotspot.</p>
+  </section>
+
+  <!-- ======================= LOBBY ======================= -->
+  <section id="screen-lobby" class="screen">
+    <h2 id="lobby-title" class="screen-title">Room</h2>
+    <div id="lobby-room-info" class="room-info"></div>
+
+    <div id="hotspot-pair" class="panel" hidden>
+      <h3>Add a player (hotspot pairing)</h3>
+      <p class="hint">For each player: make an invite, let them scan it (or copy the code),
+        then paste their reply code back here. One invite pairs one phone.</p>
+      <button id="btn-make-invite" class="btn gold">Make invite code</button>
+      <div id="invite-qr" class="qr"></div>
+      <label class="field"><span>Invite code (or copy this text to the player)</span>
+        <textarea id="invite-code" rows="4" readonly></textarea></label>
+      <label class="field"><span>Player's reply code</span>
+        <textarea id="answer-code" rows="4" placeholder="Paste the reply code here"></textarea></label>
+      <div class="row">
+        <button id="btn-scan-answer" class="btn">📷 Scan reply QR</button>
+        <button id="btn-apply-answer" class="btn gold">Pair this player</button>
+      </div>
+      <video id="pair-scan-video" class="scan-video" hidden playsinline muted></video>
+      <p id="pair-status" class="status"></p>
+    </div>
+
+    <h3 class="section-title">Players</h3>
+    <ul id="lobby-players" class="player-list"></ul>
+
+    <button id="btn-start-game" class="btn gold big" hidden>▶ Start game</button>
+    <p id="lobby-waiting" class="status" hidden>Waiting for the host to start…</p>
+    <div class="rounds-note">
+      ROUND 1 = 1 LINE ★ &nbsp;•&nbsp; ROUND 2 = 2 LINES ★★ &nbsp;•&nbsp; ROUND 3 = FULL CARD ★★★
+    </div>
+    <button id="btn-leave-lobby" class="btn ghost danger">Leave room</button>
+  </section>
+
+  <!-- ======================= GAME ======================= -->
+  <section id="screen-game" class="screen">
+    <div class="game-topbar">
+      <button id="btn-home-game" class="home-pill">HOME</button>
+      <span class="game-title">Lip Sync Bingo</span>
+      <button id="btn-sound" class="sound-pill" title="Sound on/off">🔊</button>
+    </div>
+
+    <div class="game-panel">
+      <div class="caller-pill">
+        <div class="caller-song"><b id="call-artist">Get ready…</b> <span id="call-title"></span></div>
+        <div id="call-goal" class="caller-goal">R1 ★ 1 LINE</div>
+        <div id="call-secs" class="caller-secs">30s</div>
+      </div>
+      <div class="caller-meta"><div class="caller-progress"><div id="countdown-fill"></div></div><span id="call-count" class="caller-count">0 CALLED</span></div>
+
+      <div id="chips" class="chips"></div>
+
+      <div id="audience-note" class="audience-note" hidden>
+        👀 You're in the <b>audience</b> — no card, all stage. Watch the performances and vote on every one. Your votes count!
+      </div>
+      <div id="card" class="bingo-card"></div>
+
+      <div class="react-row" id="react-row">
+        <button class="react-btn" data-react="🔥">🔥</button>
+        <button class="react-btn" data-react="😂">😂</button>
+        <button class="react-btn" data-react="👏">👏</button>
+        <button class="react-btn" data-react="🎤">🎤</button>
+        <button id="btn-history" class="btn small ghost history-btn">Called songs</button>
+      </div>
+      <div id="history-panel" class="history-panel" hidden>
+        <h3>Called so far</h3>
+        <ol id="history-list" class="history-list"></ol>
+      </div>
+
+      <div class="goal-row"><span id="goal-label">1 LINE</span><span id="goal-frac">0 / 5</span></div>
+      <div class="goal-progress"><div id="goal-fill"></div></div>
+      <p id="bingo-status" class="status"></p>
+
+      <div class="game-actions">
+        <button id="btn-bingo" class="btn gold">🎤 BINGO!</button>
+        <button id="btn-leave-game" class="btn ghost">← Leave round</button>
+      </div>
+
+      <div id="host-controls" class="host-row" hidden>
+        <button id="btn-call-next" class="btn small gold">📣 Call next song</button>
+        <label class="check"><input type="checkbox" id="chk-auto"> Auto 30s</label>
+        <button id="btn-end-round" class="btn small ghost">End round</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= STAGE ======================= -->
+  <section id="screen-stage" class="screen">
+    <div class="stage-lights">✦ ✦ ✦</div>
+    <div class="stage-fx" aria-hidden="true"><i class="beam beam-l"></i><i class="beam beam-r"></i><i class="floor-glow"></i></div>
+    <h2 class="stage-title" id="stage-title">🎤 ON STAGE</h2>
+    <div id="stage-performer" class="stage-performer">—</div>
+    <div id="stage-song" class="stage-song">—</div>
+
+    <p class="stage-note" id="stage-note">Performing LIVE on every screen in the room.</p>
+
+    <div id="track-row" class="track-row" hidden>
+      <button id="btn-play-track" class="btn small gold">🔊 Play the track</button>
+      <span id="track-status" class="hint"></span>
+      <span class="eq" id="track-eq" hidden><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <div id="yt-holder" class="yt-holder" aria-hidden="true"></div>
+
+    <div id="stage-tiles" class="stage-tiles"></div>
+
+    <div id="go-live-row" hidden>
+      <button id="btn-go-live" class="btn gold">🎥 Go live</button>
+      <p class="hint">Your camera streams to this room only — and only while you perform.</p>
+    </div>
+
+    <div class="countdown stage-countdown"><div id="stage-timer-fill"></div></div>
+    <div class="timer-ring" id="timer-ring"><div id="stage-count" class="stage-count">60</div></div>
+
+    <div id="claim-panel" hidden>
+      <p id="claim-text" class="stage-note"></p>
+      <div class="row">
+        <button id="btn-claim-mic" class="btn gold">🎤 Claim it — I'll perform</button>
+        <button id="btn-pass-mic" class="btn ghost">Pass</button>
+      </div>
+      <p id="claim-status" class="status"></p>
+    </div>
+
+    <div id="vote-panel" hidden>
+      <h3 id="vote-heading">How was that performance?</h3>
+      <div id="battle-bar" hidden>
+        <div class="bb-labels"><span id="bb-name-a"></span><span class="bb-mid">VS</span><span id="bb-name-b"></span></div>
+        <div class="bb-track"><div id="bb-fill-a"></div><div id="bb-fill-b"></div></div>
+        <div class="bb-counts"><span id="bb-n-a">0</span><span id="bb-n-b">0</span></div>
+      </div>
+      <div id="vote-solo" class="vote-row">
+        <button class="btn vote-btn" data-vote="fire">🔥 FIRE</button>
+        <button class="btn vote-btn" data-vote="solid">👏 SOLID</button>
+        <button class="btn vote-btn" data-vote="mid">😐 MID</button>
+      </div>
+      <div id="vote-battle" class="vote-row" hidden></div>
+      <p id="vote-status" class="status"></p>
+    </div>
+    <div id="vote-result" class="vote-result" hidden></div>
+
+    <div id="stage-host-controls" class="row" hidden>
+      <button id="btn-end-performance" class="btn">End performance</button>
+      <button id="btn-end-vote" class="btn" hidden>End voting</button>
+      <button id="btn-stage-continue" class="btn gold" hidden>Back to the game</button>
+    </div>
+    <button id="btn-decline" class="btn ghost danger" hidden>Give up the square</button>
+  </section>
+
+  <!-- ======================= SCORES ======================= -->
+  <section id="screen-scores" class="screen">
+    <h2 id="scores-title" class="screen-title">Scoreboard</h2>
+    <p id="scores-note" class="status"></p>
+    <ul id="scores-list" class="player-list scores"></ul>
+    <div id="scores-host-controls" class="row" hidden>
+      <button id="btn-next-round" class="btn gold">Next round ▶</button>
+      <button id="btn-new-game" class="btn">New game (fresh cards)</button>
+    </div>
+    <button id="btn-scores-home" class="btn ghost">Back to home</button>
+  </section>
+
+  <!-- ======================= HOTSPOT JOIN ======================= -->
+  <section id="screen-join-hotspot" class="screen">
+    <h2 class="screen-title">Join a hotspot game</h2>
+    <ol class="steps">
+      <li>Join the host's Wi-Fi hotspot on this phone first.</li>
+      <li>Get the host's invite code — scan it or paste it below.</li>
+      <li>Send your reply code back to the host the same way.</li>
+    </ol>
+    <label class="field"><span>Host's invite code</span>
+      <textarea id="guest-offer-code" rows="4" placeholder="Paste the invite code here"></textarea></label>
+    <div class="row">
+      <button id="btn-guest-scan-offer" class="btn">📷 Scan invite QR</button>
+      <button id="btn-guest-make-reply" class="btn gold">Make my reply code</button>
+    </div>
+    <video id="guest-scan-video" class="scan-video" hidden playsinline muted></video>
+    <div id="guest-answer-wrap" hidden>
+      <h3 class="section-title">Your reply code — show this to the host</h3>
+      <div id="guest-answer-qr" class="qr"></div>
+      <label class="field"><span>Reply code (text)</span>
+        <textarea id="guest-answer-code" rows="4" readonly></textarea></label>
+      <p class="status">Once the host enters your reply, you're in — this screen will switch to the room.</p>
+    </div>
+    <p id="joinhs-status" class="status"></p>
+    <button id="btn-joinhs-back" class="btn ghost">← Back</button>
+  </section>
+
+  <!-- ======================= DECK BUILDER ======================= -->
+  <section id="screen-builder" class="screen">
+    <h2 class="screen-title">Build your own deck</h2>
+    <label class="field"><span>Deck name</span>
+      <input id="builder-name" type="text" maxlength="30" placeholder="e.g. Cookout Classics" autocomplete="off"></label>
+    <label class="field"><span>Search songs</span>
+      <input id="builder-search" type="text" placeholder="Artist or song…" autocomplete="off"></label>
+    <p id="builder-count" class="status">0 songs picked — a deck needs at least 24.</p>
+    <div id="builder-list" class="builder-list"></div>
+    <button id="btn-builder-save" class="btn gold big">Save deck</button>
+    <h3 class="section-title">Your saved decks</h3>
+    <div id="custom-deck-list"></div>
+    <button id="btn-builder-back" class="btn ghost">← Back</button>
+  </section>
+</main>
+
+<div id="fx-layer" aria-hidden="true"></div>
+<div id="banner" hidden></div>
+<div id="toast" hidden></div>
+
+<footer>
+  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="decks.js"></script>
+<script src="js/core.js"></script>
+<script src="js/net.js"></script>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>
