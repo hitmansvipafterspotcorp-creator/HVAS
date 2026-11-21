@@ -1724,8 +1724,107 @@
   var trackPlayerReady = false;
   var trackPlayerCreating = false;
   var trackPlayerCreatingAt = 0;
-  var trackWant = null;         // {songId, ids:[], idx, purpose, playing}
+  var trackWant = null;         // {songId, ids:[], idx, purpose, playing, via}
   var trackWatchdog = null;
+
+  /* ---- ad-free mirror (Invidious) ----
+     Korey 2026-11-21: no ads. The tracks live on YouTube, and YouTube's
+     own player carries the ads with no off switch — so the game first
+     tries an open-source Invidious mirror of the same video: same song,
+     no ads, no Google tracking. Mirrors are community servers and
+     YouTube fights them (only a handful of public ones are left), so
+     this layer is built to fail soft: a short per-server budget, a
+     session memory of the server that answered, and an instant
+     fall-through to the regular YouTube player — the game is never
+     worse off than YouTube alone. Sound cannot be read across origins,
+     so if a mirror loads but the phone keeps it silent under autoplay
+     rules, the status says so and the ▶ Play tap rescues the song onto
+     the YouTube player, whose sound path is proven. */
+  /* The official public-instance list (docs.invidious.io, checked
+     2026-11-21) has exactly four entries. Only two are wired in:
+       - invidious.tiekoetter.com — VERIFIED from here: its /embed/
+         page for a real pool song serves an actual <video> player.
+       - invidious.nerdvpn.de — on the official list; unreachable from
+         the build machine today, but its failure mode is silence (a
+         timeout), which the chain skips safely.
+     Deliberately EXCLUDED: yt.chocolatemoo53.com and inv.nadeko.net.
+     Both sit behind anti-bot CAPTCHA walls (nadeko's is documented;
+     chocolatemoo53's embed URL served a challenge page, verified
+     2026-11-21) — a challenge page still fires the frame's load
+     event, so the game would claim "playing" over a CAPTCHA. Never
+     add a host whose embed answer is a wall. */
+  var MIRROR_HOSTS = ['invidious.tiekoetter.com', 'invidious.nerdvpn.de'];
+  var mirrorHost = null;      // the server that answered this session
+  var mirrorDead = {};        // host -> true (failed this session)
+  var mirrorTimer = null;
+  var mirrorActive = false;
+
+  function stopMirror() {
+    clearTimeout(mirrorTimer);
+    mirrorTimer = null;
+    mirrorActive = false;
+    var f = $('inv-frame');
+    if (f) {
+      f.onload = null;
+      try { f.src = 'about:blank'; } catch (e) {}
+    }
+  }
+  function mirrorCandidates() {
+    var list = [];
+    if (mirrorHost && !mirrorDead[mirrorHost]) list.push(mirrorHost);
+    MIRROR_HOSTS.forEach(function (h) {
+      if (list.indexOf(h) === -1 && !mirrorDead[h]) list.push(h);
+    });
+    return list;
+  }
+  function startMirror(want) {
+    moveTrackHolderToBody();
+    var hosts = mirrorCandidates();
+    if (!hosts.length) { want.via = 'yt'; driveTrackPlayer(); return; }
+    want.via = 'mirror';
+    tryMirror(want, hosts, 0);
+  }
+  function tryMirror(want, hosts, i) {
+    if (trackWant !== want || want.via !== 'mirror') return;
+    if (i >= hosts.length) {
+      // Every mirror failed — YouTube takes the song (ads possible).
+      want.via = 'yt';
+      setTrackStatus(want.purpose, 'Ad-free mirror is down — playing on YouTube (ads possible)');
+      driveTrackPlayer();
+      return;
+    }
+    var host = hosts[i];
+    var f = $('inv-frame');
+    if (!f) { want.via = 'yt'; driveTrackPlayer(); return; }
+    var settled = false;
+    clearTimeout(mirrorTimer);
+    mirrorTimer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      mirrorDead[host] = true;
+      if (mirrorHost === host) mirrorHost = null;
+      f.onload = null;
+      tryMirror(want, hosts, i + 1);
+    }, 4000);
+    f.onload = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(mirrorTimer);
+      // The mirror page loaded. Give its player a beat to start, then
+      // call it playing — with the honest rescue line attached, since
+      // actual sound can't be verified across origins.
+      mirrorTimer = setTimeout(function () {
+        if (trackWant !== want || want.via !== 'mirror') return;
+        mirrorHost = host;
+        mirrorActive = true;
+        want.playing = true;
+        clearTimeout(trackWatchdog);
+        if (want.purpose === 'stage') setTrackEq(true);
+        setTrackStatus(want.purpose, '🎵 Track playing — ad-free mirror. No sound? Tap ▶ Play the song.');
+      }, 900);
+    };
+    try { f.src = 'https://' + host + '/embed/' + want.ids[0] + '?autoplay=1'; } catch (e) {}
+  }
 
   var ytApiPromise = null;
   function ytApi() {
@@ -1781,6 +1880,10 @@
     var holder = $('yt-holder');
     if (holder && holder.parentNode !== document.body) {
       document.body.appendChild(holder);
+    }
+    var inv = $('inv-holder');
+    if (inv && inv.parentNode !== document.body) {
+      document.body.appendChild(inv);
     }
   }
   /* Create the ONE player. Two construction paths:
@@ -1962,14 +2065,16 @@
     }
     var ids = [];
     [s.yt, s.yt2].forEach(function (id) { if (id && ids.indexOf(id) === -1) ids.push(id); });
-    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false, retried: false };
+    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false, retried: false, via: null };
     setTrackStatus(purpose, 'Loading the track…');
     var want = trackWant;
-    driveTrackPlayer();
+    startMirror(want);
     // If the API itself never arrives (blocked network), fail honestly.
+    // The mirror chain gets its own budget first, so this only judges
+    // the YouTube leg once the song has fallen through to it.
     setTimeout(function () {
-      if (trackWant === want && !want.playing && !trackPlayerReady) failTrack();
-    }, 9000);
+      if (trackWant === want && !want.playing && want.via === 'yt' && !trackPlayerReady) failTrack();
+    }, 15000);
   }
 
   /** Stage performance track: plays for the full minute, then stops. */
@@ -1986,6 +2091,7 @@
     trackWatchdog = null;
     clearTimeout(trackRetryTimer);
     clearTimeout(trackSoundTimer);
+    stopMirror();
     trackWant = null;
     if (trackPlayer && trackPlayer.stopVideo) {
       try { trackPlayer.stopVideo(); } catch (e) {}
@@ -2006,6 +2112,18 @@
   function tapPlayTrack() {
     var songId = (trackWant && trackWant.songId) || currentTrackSong || pendingCallSong;
     if (!songId) return;
+    if (trackWant && trackWant.songId === songId && trackWant.via === 'mirror') {
+      // The mirror has this song (or is still fetching it) but the tap
+      // means the room isn't hearing it — autoplay rules can hold a
+      // cross-origin frame silent. Spend the tap on the YouTube
+      // player instead: its sound path is proven.
+      stopMirror();
+      trackWant.via = 'yt';
+      trackWant.playing = false;
+      setTrackStatus(trackWant.purpose, 'Loading the track…');
+      driveTrackPlayer();
+      return;
+    }
     if (trackWant && trackWant.songId === songId && trackWant.playing) return;
     if (trackPlayer && trackWant && trackWant.songId === songId) {
       if (trackPlayerReady) {
