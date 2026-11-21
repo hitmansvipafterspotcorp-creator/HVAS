@@ -561,6 +561,7 @@
      the square. Two claims on the same mic song = a TikTok-style
      BATTLE, and only the winner takes the square. (Korey's rules.) -- */
   var STAGE_SECONDS = 60;   // the track plays for one full minute
+  var CALL_SECONDS = 60;    // a called song plays for one full minute (Korey 2026-11-21: one minute, not 30s)
   var CLAIM_SECONDS = 10;
 
   function stageCardsById() {
@@ -1163,8 +1164,8 @@
     var fill = $('countdown-fill');
     var secs = $('call-secs');
     countdownInt = setInterval(function () {
-      var left = Math.max(0, 30 - (Date.now() - at) / 1000);
-      fill.style.width = ((1 - left / 30) * 100) + '%';
+      var left = Math.max(0, CALL_SECONDS - (Date.now() - at) / 1000);
+      fill.style.width = ((1 - left / CALL_SECONDS) * 100) + '%';
       if (secs) secs.textContent = Math.ceil(left) + 's';
       if (left <= 0) clearInterval(countdownInt);
     }, 200);
@@ -2224,10 +2225,10 @@
     if (!H) return;
     H.auto = e.target.checked;
     if (H.auto && H.phase === 'playing' && H.called.length === 0) hostCallNext();
-    toast(H.auto ? 'Auto-call on — a song every 30 seconds.' : 'Auto-call off — you run the caller.');
+    toast(H.auto ? 'Auto-call on — a song every minute.' : 'Auto-call off — you run the caller.');
   });
   setInterval(function () { // auto-call driver (host only)
-    if (H && H.auto && H.phase === 'playing' && H.lastCallAt && Date.now() - H.lastCallAt >= 30000) {
+    if (H && H.auto && H.phase === 'playing' && H.lastCallAt && Date.now() - H.lastCallAt >= CALL_SECONDS * 1000) {
       hostCallNext();
     }
   }, 500);
