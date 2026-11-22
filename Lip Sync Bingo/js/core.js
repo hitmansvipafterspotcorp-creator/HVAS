@@ -487,6 +487,154 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Playback gate + gated clock (Nov 22, 2026 — Korey: the game      */
+  /* only runs while a SONG is playing, "not the ad").                */
+  /*                                                                  */
+  /* Pure state machines — the app feeds them live player samples;    */
+  /* they hold no DOM and no timers, so the whole rule is testable.   */
+  /*                                                                  */
+  /* THE GATE answers one question: is the actual track audibly       */
+  /* playing right now?                                               */
+  /*  - YouTube legs: the player state must be PLAYING and the        */
+  /*    playhead must be advancing between samples. An ad is          */
+  /*    betrayed by its DURATION: while an ad is on screen the        */
+  /*    player reports the ad's length (seconds), not the song's      */
+  /*    (minutes). The gate latches the song's duration as the        */
+  /*    LONGEST duration observed for the current leg (playback       */
+  /*    metadata reports it before the first frame, and no ad is      */
+  /*    longer than the song), and any PLAYING stretch whose          */
+  /*    duration sits more than AD_DURATION_TOLERANCE below the       */
+  /*    latch is an ad — gate shut. A longer duration re-latches       */
+  /*    upward, so a first sample that caught an ad self-corrects     */
+  /*    the moment the song itself appears.                           */
+  /*  - Mirror legs: the mirror embed is cross-origin, so no media    */
+  /*    state is readable from the app at all. The sample carries     */
+  /*    `mirrorLive` — the app's load+start-beat signal, the same     */
+  /*    one playback itself trusts — and mirror embeds serve no       */
+  /*    ads, so a live mirror is the song by construction.            */
+  /* Reasons: 'song' (open) | 'ad' | 'ended' | 'not-playing' |        */
+  /* 'no-track'. Continuous ad time is accumulated (adMs) so the      */
+  /* app can fail a leg that is stuck behind a marathon ad.           */
+  /* ---------------------------------------------------------------- */
+  var AD_DURATION_TOLERANCE = 3;  // seconds of duration wobble allowed
+  var AD_FREEZE_CAP_MS = 90000;   // continuous ad time before a leg counts as failed
+
+  function createPlaybackGate() {
+    var refDuration = 0;   // latched song duration for the current leg (0 = unknown)
+    var lastDuration = 0;  // most recent nonzero duration sample
+    var lastTime = null;   // most recent currentTime sample
+    var open = false;
+    var reason = 'no-track';
+    var adSince = null;    // when the current continuous ad began
+    var adMs = 0;          // continuous ad time as of the last sample
+
+    function setOpen() {
+      open = true;
+      reason = 'song';
+      adSince = null;
+      adMs = 0;
+    }
+    function setClosed(r, now) {
+      open = false;
+      if (r === 'ad') {
+        if (reason !== 'ad' || adSince === null) adSince = now;
+        adMs = now - adSince;
+      } else {
+        adSince = null;
+        adMs = 0;
+      }
+      reason = r;
+    }
+
+    /**
+     * Feed one player sample. s = {via:'yt'|'mirror', ytState,
+     * duration, currentTime, mirrorLive}; now = ms timestamp.
+     * Returns the gate (chainable). Call reset() on every new track
+     * AND every leg change — the duration latch is per-upload.
+     */
+    function sample(s, now) {
+      if (!s || !s.via) { setClosed('no-track', now); return gate; }
+      if (s.via === 'mirror') {
+        if (s.mirrorLive) setOpen();
+        else setClosed('not-playing', now);
+        return gate;
+      }
+      // YouTube leg.
+      var d = (typeof s.duration === 'number' && s.duration > 0) ? s.duration : 0;
+      if (d) {
+        lastDuration = d;
+        if (d > refDuration) refDuration = d; // the longest content is the song
+      }
+      if (s.ytState === 0) { setClosed('ended', now); return gate; }
+      if (s.ytState !== 1) { setClosed('not-playing', now); return gate; }
+      // PLAYING — the playhead must actually be moving.
+      var t = (typeof s.currentTime === 'number') ? s.currentTime : null;
+      var advancing = false;
+      if (t !== null && lastTime !== null) advancing = (t - lastTime) > 0.03;
+      if (t !== null) lastTime = t;
+      if (!advancing) { setClosed('not-playing', now); return gate; }
+      // PLAYING + advancing — song, or an ad riding the same state?
+      var cur = d || lastDuration;
+      if (refDuration > 0 && cur > 0 && cur < refDuration - AD_DURATION_TOLERANCE) {
+        setClosed('ad', now);
+        return gate;
+      }
+      setOpen();
+      return gate;
+    }
+
+    function reset() {
+      refDuration = 0;
+      lastDuration = 0;
+      lastTime = null;
+      open = false;
+      reason = 'no-track';
+      adSince = null;
+      adMs = 0;
+    }
+
+    var gate = {
+      sample: sample,
+      reset: reset,
+      isOpen: function () { return open; },
+      reason: function () { return reason; },
+      adMs: function () { return adMs; },
+      refDuration: function () { return refDuration; }
+    };
+    return gate;
+  }
+
+  /**
+   * A countdown that accumulates ONLY while the gate is open.
+   * tick(now, isOpen) on every UI beat; left() = seconds remaining.
+   * finish() jumps straight to done (the track ENDED — the song's
+   * window is over however much gated time was left).
+   */
+  function createGatedClock(totalSeconds) {
+    var totalMs = totalSeconds * 1000;
+    var playedMs = 0;
+    var lastNow = null;
+    var finished = false;
+    var clock = {
+      tick: function (now, isOpen) {
+        if (lastNow === null) { lastNow = now; return clock.left(); }
+        var dt = now - lastNow;
+        lastNow = now;
+        if (dt < 0) dt = 0;
+        if (isOpen && !finished) playedMs += dt;
+        if (playedMs >= totalMs) { playedMs = totalMs; finished = true; }
+        return clock.left();
+      },
+      left: function () { return Math.max(0, (totalMs - playedMs) / 1000); },
+      played: function () { return playedMs / 1000; },
+      done: function () { return finished; },
+      finish: function () { playedMs = totalMs; finished = true; },
+      reset: function () { playedMs = 0; lastNow = null; finished = false; }
+    };
+    return clock;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* Room codes: 4 letters from an unambiguous alphabet (no 0/O/1/I).  */
   /* ---------------------------------------------------------------- */
   var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -534,6 +682,10 @@
     sortStandings: sortStandings,
     nightSignature: nightSignature,
     buildNightRecord: buildNightRecord,
+    AD_DURATION_TOLERANCE: AD_DURATION_TOLERANCE,
+    AD_FREEZE_CAP_MS: AD_FREEZE_CAP_MS,
+    createPlaybackGate: createPlaybackGate,
+    createGatedClock: createGatedClock,
     makeRoomCode: makeRoomCode,
     normalizeRoomCode: normalizeRoomCode
   };
