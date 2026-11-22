@@ -464,6 +464,20 @@ body.in-game .brand, body.in-game footer { display: none; }
 
 .scores { }
 
+/* ---------- past nights ---------- */
+#nights-list { display: grid; gap: 10px; margin: 12px 0; }
+.night-row {
+  appearance: none; width: 100%; text-align: left; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 13px 14px; color: var(--text); font-family: inherit;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.night-row:active { transform: scale(.99); }
+.night-row .night-when { color: var(--gold); font-weight: 800; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; font-family: var(--font-d); }
+.night-row .night-deck { font-weight: 800; font-size: 17px; font-family: var(--font-d); }
+.night-row .night-top { color: var(--muted); font-size: 13.5px; }
+#scores-final-controls { margin-top: 2px; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01s !important; animation-iteration-count: 1 !important; transition-duration: .01s !important; }
 }
