@@ -344,7 +344,7 @@
         pickerSig.lobby = ''; pickerSig.scores = '';
       }
     }
-    var hostCbs = { onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onError: function () {}, onMedia: onNetMedia };
+    var hostCbs = { onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onError: surfacePeerError, onStatus: peerStatusChanged, onMedia: onNetMedia };
     if (n.mode === 'hotspot') {
       var ht = Net.createHotspotHost({ onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onRemoteTrack: onHsTrack });
       enterHost('hotspot', ht, '');
@@ -536,6 +536,30 @@
   var mode = null;       // 'online' | 'hotspot' | 'solo'
   var transport = null;
   var roomCode = '';
+  var serverStatus = ''; // online host's broker health: '' | 'open' | 'reconnecting' | 'disconnected'
+  var lastPeerErrAt = 0;
+  /* PeerJS errors used to be swallowed whole (onError: function(){})
+     — a host whose broker socket died looked healthy in the lobby
+     while every guest failed. Surface them (throttled), and track
+     the signaling status so the lobby can show the room's real
+     health while net.js heals the socket. */
+  function surfacePeerError(err) {
+    var now = Date.now();
+    if (now - lastPeerErrAt < 5000) return;
+    lastPeerErrAt = now;
+    toast('⚠ Game server: ' + Core.describePeerError(err));
+  }
+  function peerStatusChanged(s) {
+    serverStatus = s;
+    if (role === 'host' && mode === 'online' && $('screen-lobby').classList.contains('active')) renderLobby();
+  }
+  function joinProgressToast(code) {
+    return function (n, kind) {
+      toast(kind === 'recheck'
+        ? 'Room ' + code + ' is not answering yet — checking again…'
+        : 'Still trying to reach room ' + code + '… (try ' + (n + 1) + ')');
+    };
+  }
   var H = null;          // host state
   var G = null;          // guest state
   var countdownInt = null;
@@ -1499,7 +1523,10 @@
       $('lobby-title').textContent = mode === 'solo' ? 'Practice room' : 'Your room';
       if (mode === 'online') {
         info.innerHTML = 'Share this code with your players:<span class="room-code">' + esc(roomCode) + '</span>' +
-          'Deck: <b>' + esc(H.deck.name) + '</b> • You are the host — you run the caller.';
+          'Deck: <b>' + esc(H.deck.name) + '</b> • You are the host — you run the caller.' +
+          (serverStatus === 'reconnecting' || serverStatus === 'disconnected'
+            ? '<br>⚠ <b>Server connection dropped — reconnecting…</b> New players cannot join until it is back.'
+            : '');
       } else if (mode === 'hotspot') {
         info.innerHTML = 'Hotspot room — no internet needed. Pair each player below.<br>' +
           'Deck: <b>' + esc(H.deck.name) + '</b>';
@@ -3064,7 +3091,7 @@
       if (transport.onClose) { try { transport.onClose(function () {}); } catch (e) {} }
       try { transport.close(); } catch (e) {}
     }
-    transport = null; role = null; mode = null; H = null; G = null; roomCode = '';
+    transport = null; role = null; mode = null; H = null; G = null; roomCode = ''; serverStatus = '';
     nightSaveId = null;
     lastCallShown = null;
     show('screen-home');
@@ -3072,13 +3099,21 @@
   }
 
   /* ---- online ---- */
+  function hostOnline(code, retried) {
+    Net.createPeerHost(code, { onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onError: surfacePeerError, onStatus: peerStatusChanged, onMedia: onNetMedia })
+      .then(function (t) { enterHost('online', t, code); toast('Room ' + code + ' is open — share the code!'); })
+      .catch(function (err) {
+        // A stranger somewhere on Earth can hold our 4-letter code in
+        // the broker's one global namespace. Never show a code whose
+        // registration failed — silently take a fresh one, once.
+        if (!retried && /already in use/i.test((err && err.message) || '')) { hostOnline(Core.makeRoomCode(), true); return; }
+        toast(err.message);
+      });
+  }
   $('btn-host-online').addEventListener('click', function () {
     if (!requireName()) return;
-    var code = Core.makeRoomCode();
     toast('Opening your room…');
-    Net.createPeerHost(code, { onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onError: function () {}, onMedia: onNetMedia })
-      .then(function (t) { enterHost('online', t, code); toast('Room ' + code + ' is open — share the code!'); })
-      .catch(function (err) { toast(err.message); });
+    hostOnline(Core.makeRoomCode(), false);
   });
 
   $('btn-join-online').addEventListener('click', function () {
@@ -3086,7 +3121,7 @@
     var code = Core.normalizeRoomCode($('join-code').value);
     if (code.length !== 4) { toast('Enter the 4-letter room code.'); return; }
     toast('Joining room ' + code + '…');
-    Net.createPeerGuest(code, { onMessage: guestOnMessage, onClose: guestDisconnected, onMedia: onNetMedia })
+    Net.createPeerGuest(code, { onMessage: guestOnMessage, onClose: guestDisconnected, onProgress: joinProgressToast(code), onMedia: onNetMedia })
       .then(function (t) {
         role = 'guest'; mode = 'online'; transport = t; roomCode = code;
         G = { id: null, name: myName, card: null, marks: new Set([Core.CENTER]), state: null, deckName: '', winner: null };
@@ -3094,7 +3129,7 @@
         show('screen-lobby');
         renderLobby();
       })
-      .catch(function (err) { toast(err.message); });
+      .catch(function (err) { toast(err.message + ' Same room as the host? They can start a Hotspot room instead — no internet needed.'); });
   });
 
   /* ---- audience (online): no card — watch the stage, vote, react ---- */
@@ -3103,7 +3138,7 @@
     var code = Core.normalizeRoomCode($('join-code').value);
     if (code.length !== 4) { toast('Enter the 4-letter room code first.'); return; }
     toast('Joining the audience in room ' + code + '…');
-    Net.createPeerGuest(code, { onMessage: guestOnMessage, onClose: guestDisconnected, onMedia: onNetMedia })
+    Net.createPeerGuest(code, { onMessage: guestOnMessage, onClose: guestDisconnected, onProgress: joinProgressToast(code), onMedia: onNetMedia })
       .then(function (t) {
         role = 'guest'; mode = 'online'; transport = t; roomCode = code;
         G = { id: null, name: myName, card: null, marks: new Set([Core.CENTER]), state: null, deckName: '', winner: null, audience: true };
@@ -3111,7 +3146,7 @@
         show('screen-lobby');
         renderLobby();
       })
-      .catch(function (err) { toast(err.message); });
+      .catch(function (err) { toast(err.message + ' Same room as the host? They can start a Hotspot room instead — no internet needed.'); });
   });
 
   /* ---- solo ---- */

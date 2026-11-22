@@ -717,6 +717,76 @@
     return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
   }
 
+  /* ---------------------------------------------------------------- */
+  /* PeerJS host id: the room code IS the address. ONE construction,   */
+  /* used by the host registering AND by every guest dialing, so the   */
+  /* two sides can never drift apart (Nov 22, 2026 join-failure rule:  */
+  /* a prefix/case/whitespace split between register and dial is a     */
+  /* silent 100% join failure — it must be impossible by construction).*/
+  /* ---------------------------------------------------------------- */
+  var PEER_ID_PREFIX = 'lsb-v1-';
+  function peerHostId(code) {
+    return PEER_ID_PREFIX + normalizeRoomCode(code);
+  }
+
+  /* Human text for a PeerJS error. PeerJS errors sometimes arrive
+     with an EMPTY message (seen live Nov 22, 2026: the guest's join
+     failure toasted a blank string) — an empty failure message tells
+     the player nothing, so map by type whenever the message is blank. */
+  function describePeerError(err) {
+    if (!err) return 'Connection failed.';
+    if (err.message) return String(err.message);
+    switch (err.type) {
+      case 'peer-unavailable': return 'No room found with that code.';
+      case 'network': return 'Lost connection to the game server.';
+      case 'server-error': return 'The game server hit an error.';
+      case 'unavailable-id': return 'That room code is already in use.';
+      case 'invalid-id': return 'That room code is not valid.';
+      case 'invalid-key': return 'The game server rejected our key.';
+      case 'browser-incompatible': return 'This browser cannot do online rooms.';
+      case 'webrtc': return 'The call connection failed (WebRTC error).';
+      default: return 'Connection failed (' + (err.type || 'unknown error') + ').';
+    }
+  }
+
+  /* Online-join retry policy (pure data, so tests can pin it). The
+     guest retries a failed join with a FRESH peer every attempt — a
+     wedged peer is never reused. peer-unavailable gets a few quick
+     rechecks first (the broker holds an offer only ~5s, and a host
+     mid-reconnect can blink off the broker for seconds), then it is
+     a real "no room". Timeouts fire only after every attempt is
+     exhausted — never on the first failure. Total worst case stays
+     inside the 30–60s join window working WebRTC games use. */
+  var JOIN_POLICY = {
+    maxAttempts: 4,
+    openTimeoutMs: 8000,
+    connectTimeoutMs: 10000,
+    retryDelayMs: 1200,
+    unavailableRetryDelayMs: 2500,
+    maxUnavailableRetries: 3
+  };
+
+  /* ICE servers for online rooms (single source — net.js hands this
+     to PeerJS as config). PeerJS REPLACES its defaults when a config
+     is passed, so STUN is listed explicitly. Deliberately EXCLUDED:
+     PeerJS 1.5.5's bundled turn:eu-0/us-0.turn.peerjs.com — reported
+     decommissioned (NXDOMAIN, two independent 2026 root-cause
+     write-ups), and dead candidates only slow ICE down. The Metered
+     Open Relay entries are the published no-account public TURN
+     (best-effort, possibly quota-limited — one 2026 report says the
+     static endpoint may no longer allocate, so it is never the only
+     path: same-room/same-Wi-Fi play connects on host candidates and
+     everyone else on srflx via STUN). turns: on 443 is included for
+     networks that block UDP. */
+  var ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+
   return {
     FREE: FREE,
     CENTER: CENTER,
@@ -756,6 +826,11 @@
     callRescueMs: callRescueMs,
     autoCallDue: autoCallDue,
     makeRoomCode: makeRoomCode,
-    normalizeRoomCode: normalizeRoomCode
+    normalizeRoomCode: normalizeRoomCode,
+    PEER_ID_PREFIX: PEER_ID_PREFIX,
+    peerHostId: peerHostId,
+    describePeerError: describePeerError,
+    JOIN_POLICY: JOIN_POLICY,
+    ICE_SERVERS: ICE_SERVERS
   };
 });
