@@ -787,6 +787,264 @@
     { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
   ];
 
+  /* ---------------------------------------------------------------- */
+  /* Owned TURN (Nov 22, 2026, v27): the production relay is OURS —   */
+  /* a Cloudflare TURN credential minter — so the relay path can      */
+  /* never die the way the public endpoints did. At startup the app   */
+  /* fetches fresh ICE servers from ICE_CONFIG_URL (a tiny worker     */
+  /* that returns {"iceServers":[...]} with short-lived credentials). */
+  /*                                                                  */
+  /* !!! ICE_CONFIG_URL below is a PLACEHOLDER — the parent agent     */
+  /* swaps in the real worker URL at publish time. !!!                */
+  /*                                                                  */
+  /* Rules (all pinned by tests):                                     */
+  /*  - The fetch NEVER blocks room creation/joining: it is kicked    */
+  /*    off at load, and peers created before it resolves use the     */
+  /*    built-in ICE_SERVERS unchanged.                               */
+  /*  - The EFFECTIVE config = built-in STUN (always kept) + the      */
+  /*    fetched entries, which REPLACE the built-in Metered TURN.     */
+  /*  - Failure, timeout (~2.5s), or junk JSON: silently keep the     */
+  /*    built-in list. A late success still lands for later peers.    */
+  /* ---------------------------------------------------------------- */
+  var ICE_CONFIG_URL = 'https://lsb-ice.PLACEHOLDER.workers.dev/'; // PLACEHOLDER — swapped for the real worker URL at publish time
+  var ICE_FETCH_TIMEOUT_MS = 2500;
+
+  var iceFetchPromise = null;  // the in-flight (or settled) fetch
+  var iceEffective = null;     // merged config once a fetch validated
+
+  function iceEntryUrls(e) {
+    if (!e) return [];
+    var u = e.urls;
+    if (typeof u === 'string') return [u];
+    if (Array.isArray(u)) {
+      return u.filter(function (x) { return typeof x === 'string'; });
+    }
+    return [];
+  }
+  function isStunEntry(e) {
+    return iceEntryUrls(e).some(function (u) { return u.indexOf('stun:') === 0; });
+  }
+
+  /**
+   * Merge a fetched iceServers list with the built-ins: built-in
+   * STUN always survives; fetched entries (the owned TURN) replace
+   * the built-in TURN entries wholesale. Returns null when the
+   * fetched list is unusable (not an array, empty, no valid urls) —
+   * the caller then keeps the built-in config untouched.
+   */
+  function mergeIceServers(fetched) {
+    if (!Array.isArray(fetched)) return null;
+    var valid = fetched.filter(function (e) { return iceEntryUrls(e).length > 0; });
+    if (!valid.length) return null;
+    var out = [];
+    var seen = {};
+    function push(e) {
+      var key = iceEntryUrls(e).join('|') + '|' + (e.username || '');
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(e);
+    }
+    ICE_SERVERS.forEach(function (e) { if (isStunEntry(e)) push(e); });
+    valid.forEach(push);
+    return out.length ? out : null;
+  }
+
+  /** The ICE config peers should be created with RIGHT NOW. */
+  function effectiveIceServers() {
+    return iceEffective || ICE_SERVERS;
+  }
+
+  /**
+   * Kick off (once) the owned-TURN config fetch. opts.fetch /
+   * opts.url / opts.timeoutMs exist for tests; production uses the
+   * defaults. Resolves with the merged config, or null on any
+   * failure — it never rejects and never throws.
+   */
+  function startIceConfigFetch(opts) {
+    opts = opts || {};
+    if (iceFetchPromise && !opts.force) return iceFetchPromise;
+    var fetchFn = opts.fetch || (typeof fetch === 'function' ? fetch : null);
+    var url = opts.url || ICE_CONFIG_URL;
+    var timeoutMs = opts.timeoutMs || ICE_FETCH_TIMEOUT_MS;
+    if (!fetchFn) {
+      iceFetchPromise = Promise.resolve(null);
+      return iceFetchPromise;
+    }
+    iceFetchPromise = new Promise(function (resolve) {
+      var done = false;
+      function finish(val) { if (!done) { done = true; resolve(val); } }
+      var timer = setTimeout(function () { finish(null); }, timeoutMs);
+      var ctl = null;
+      try { if (typeof AbortController !== 'undefined') ctl = new AbortController(); } catch (e) {}
+      Promise.resolve()
+        .then(function () { return fetchFn(url, ctl ? { signal: ctl.signal } : {}); })
+        .then(function (res) {
+          if (!res || !res.ok) throw new Error('ice config http ' + (res && res.status));
+          return res.json();
+        })
+        .then(function (j) {
+          clearTimeout(timer);
+          var merged = mergeIceServers(j && j.iceServers);
+          if (merged) iceEffective = merged; // a late success still counts
+          finish(merged);
+        })
+        .catch(function () {
+          clearTimeout(timer);
+          if (ctl) { try { ctl.abort(); } catch (e) {} }
+          finish(null);
+        });
+    });
+    return iceFetchPromise;
+  }
+
+  /** Test hook: forget any fetched config and any in-flight fetch. */
+  function resetIceConfig() {
+    iceFetchPromise = null;
+    iceEffective = null;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Lobby connection check (Nov 22, 2026, v27): before the game      */
+  /* starts, every phone proves it can be REACHED from the internet.  */
+  /* The check gathers ICE candidates with the effective config: a    */
+  /* srflx candidate means a STUN server saw the phone's public       */
+  /* address; a relay candidate means a TURN server answered. Either  */
+  /* one = 'ok'. Host-only candidates (or an error) = 'bad': the      */
+  /* phone is behind a wall the game may not be able to cross.        */
+  /* This classifier is the pure half — net.js does the gathering.    */
+  /* ---------------------------------------------------------------- */
+  var CONN_CHECK_TIMEOUT_MS = 6000;
+
+  /**
+   * Classify a set of gathered ICE candidates.
+   * Accepts candidate strings ("candidate:... typ srflx ..."),
+   * RTCIceCandidate-like objects ({candidate} or {type}), or a mix.
+   * Returns 'ok' | 'bad'.
+   */
+  function classifyIceCandidates(cands) {
+    var ok = false;
+    (cands || []).forEach(function (c) {
+      if (ok) return;
+      var type = null;
+      if (typeof c === 'string') {
+        var m = / typ ([a-z]+)/.exec(c);
+        type = m ? m[1] : null;
+      } else if (c && typeof c === 'object') {
+        if (typeof c.type === 'string') type = c.type;
+        else if (typeof c.candidate === 'string') {
+          var m2 = / typ ([a-z]+)/.exec(c.candidate);
+          type = m2 ? m2[1] : null;
+        }
+      }
+      if (type === 'srflx' || type === 'relay') ok = true;
+    });
+    return ok ? 'ok' : 'bad';
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Invidious mirror hosts (v27 — single source; app.js reads this   */
+  /* list). Song playback tries these in order and rotates on any     */
+  /* failure; YouTube is the fallback only after every mirror fails.  */
+  /* The official public-instance list (docs.invidious.io, checked    */
+  /* 2026-11-22) has exactly four clearnet entries, and two of them   */
+  /* (inv.nadeko.net, yt.chocolatemoo53.com) sit behind anti-bot      */
+  /* CAPTCHA walls — a challenge page still fires the frame's load    */
+  /* event, so the game would claim "playing" over a CAPTCHA. They    */
+  /* stay EXCLUDED, permanently. Of the rest:                         */
+  /*  - invidious.tiekoetter.com — VERIFIED from the build machine    */
+  /*    2026-11-22: its /embed/ page for a real pool song returned     */
+  /*    HTTP 200 with an actual <video> player, no challenge.         */
+  /*  - invidious.nerdvpn.de — on the official list; unreachable      */
+  /*    from the build machine (timeout), but its failure mode is     */
+  /*    silence, which rotation skips safely. ASSUMED live.           */
+  /*  - invidious.fdn.fr — long-running vanilla public instance,      */
+  /*    added for rotation depth. NOT verifiable from the build       */
+  /*    sandbox (the egress proxy resets its connections), so it is   */
+  /*    ASSUMED live; if it is down, rotation pays one short          */
+  /*    timeout and moves on.                                         */
+  /* ---------------------------------------------------------------- */
+  var MIRROR_HOSTS = ['invidious.tiekoetter.com', 'invidious.nerdvpn.de', 'invidious.fdn.fr'];
+
+  /* The playback walk and the probe walk are DIFFERENT lists built
+     from different memories (v27 sound-gate patch — the diagnosis of
+     Nov 22, 2026: the pre-call health probes were burning the only
+     working mirror before the first call, because a probe timeout
+     wrote the same "dead" memory playback trusted). Playback walks
+     the FULL list in order — session-proven host first — and skips
+     only hosts PLAYBACK itself proved dead; probe verdicts never
+     enter it. Probes walk the same shape but ALSO skip hosts probes
+     proved dead: probe memory is probe-only, kept so the sweep does
+     not hammer a host that is not answering probes either. */
+  function playbackMirrorCandidates(sessionHost, playbackDead) {
+    var dead = playbackDead || {};
+    var list = [];
+    if (sessionHost && !dead[sessionHost]) list.push(sessionHost);
+    MIRROR_HOSTS.forEach(function (h) {
+      if (list.indexOf(h) === -1 && !dead[h]) list.push(h);
+    });
+    return list;
+  }
+  function probeMirrorCandidates(sessionHost, playbackDead, probeDead) {
+    var pd = playbackDead || {}, qd = probeDead || {};
+    var list = [];
+    if (sessionHost && !pd[sessionHost] && !qd[sessionHost]) list.push(sessionHost);
+    MIRROR_HOSTS.forEach(function (h) {
+      if (list.indexOf(h) === -1 && !pd[h] && !qd[h]) list.push(h);
+    });
+    return list;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* The SOUND GATE (v27 patch, Nov 22, 2026 — ordered after the      */
+  /* reproduced diagnosis in TRACK-AUDIT-2026-11-22-ROUND4's line of  */
+  /* work: the mirror leg claimed "🎵 Track playing" when its frame   */
+  /* merely LOADED — an error page loads too — plus 900ms, while the  */
+  /* media log showed zero play events). A mirror is cross-origin:    */
+  /* its sound can NEVER be verified from here, so a mirror leg is    */
+  /* UNCONFIRMED sound forever, and the gate is the set of rules      */
+  /* that keep the app honest about that:                             */
+  /*  - the status for a started mirror leg is MIRROR_STARTED_STATUS  */
+  /*    — it says the song started, never that it is "playing";       */
+  /*  - the ONE track button wears a big face while sound is          */
+  /*    unconfirmed (soundButtonMode): 'sound' on a mirror leg,       */
+  /*    'play' when a remote call waits for this phone's first tap;   */
+  /*  - the CALLER's device (host / solo — its tap chain is the       */
+  /*    proven audible path) escalates itself to the YouTube leg      */
+  /*    after SOUND_GATE_MS on a mirror leg with no tap               */
+  /*    (shouldAutoEscalate); the YouTube leg then earns the words    */
+  /*    "Track playing" only through the existing sound verify, and   */
+  /*    a failed verify after an auto-escalation says                 */
+  /*    SOUND_FAILED_STATUS instead.                                  */
+  /* ---------------------------------------------------------------- */
+  var SOUND_GATE_MS = 6000;
+  var MIRROR_STARTED_STATUS = '🎵 Song started — ad-free mirror. If there\u2019s no sound, tap the big 🔊 button.';
+  var SOUND_FAILED_STATUS = 'Couldn\u2019t get sound — check your volume, then tap ▶ Play the song.';
+  var SOUND_LABEL_NOSOUND = '🔊 NO SOUND? TAP HERE';
+  var SOUND_LABEL_PLAY = '▶ PLAY THE SONG — tap for sound';
+
+  /* Which face the one track button wears on a given row.
+     state: { rowPurpose: 'call'|'stage',
+              wantPurpose / wantVia / wantSong: the live want (or nulls),
+              pendingSong: a remote call this phone has not started }  */
+  function soundButtonMode(state) {
+    if (!state) return 'default';
+    if (state.wantVia === 'mirror' && state.wantPurpose &&
+        state.wantPurpose === state.rowPurpose) return 'sound';
+    if (state.rowPurpose === 'call' && state.pendingSong &&
+        state.wantSong !== state.pendingSong) return 'play';
+    return 'default';
+  }
+
+  /* The caller's auto-escalation verdict, judged when the gate timer
+     wakes: still on the mirror leg, this device called the song, the
+     full gate window ran, and the user never tapped anything. */
+  function shouldAutoEscalate(state) {
+    if (!state) return false;
+    return state.via === 'mirror' && !!state.caller && !state.userTapped &&
+      typeof state.startedAt === 'number' &&
+      (state.now - state.startedAt) >= SOUND_GATE_MS;
+  }
+
   return {
     FREE: FREE,
     CENTER: CENTER,
@@ -831,6 +1089,24 @@
     peerHostId: peerHostId,
     describePeerError: describePeerError,
     JOIN_POLICY: JOIN_POLICY,
-    ICE_SERVERS: ICE_SERVERS
+    ICE_SERVERS: ICE_SERVERS,
+    ICE_CONFIG_URL: ICE_CONFIG_URL,
+    ICE_FETCH_TIMEOUT_MS: ICE_FETCH_TIMEOUT_MS,
+    mergeIceServers: mergeIceServers,
+    effectiveIceServers: effectiveIceServers,
+    startIceConfigFetch: startIceConfigFetch,
+    resetIceConfig: resetIceConfig,
+    CONN_CHECK_TIMEOUT_MS: CONN_CHECK_TIMEOUT_MS,
+    classifyIceCandidates: classifyIceCandidates,
+    MIRROR_HOSTS: MIRROR_HOSTS,
+    playbackMirrorCandidates: playbackMirrorCandidates,
+    probeMirrorCandidates: probeMirrorCandidates,
+    SOUND_GATE_MS: SOUND_GATE_MS,
+    MIRROR_STARTED_STATUS: MIRROR_STARTED_STATUS,
+    SOUND_FAILED_STATUS: SOUND_FAILED_STATUS,
+    SOUND_LABEL_NOSOUND: SOUND_LABEL_NOSOUND,
+    SOUND_LABEL_PLAY: SOUND_LABEL_PLAY,
+    soundButtonMode: soundButtonMode,
+    shouldAutoEscalate: shouldAutoEscalate
   };
 });
