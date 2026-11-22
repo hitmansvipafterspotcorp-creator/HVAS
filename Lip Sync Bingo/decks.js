@@ -23,6 +23,16 @@
  * All 360 primaries and 359 of 360 `yt2` backups are oEmbed-verified the
  * same way (only Smino's 'Slow Down' has no second upload). A song whose
  * track could not be verified was NOT added — see TRACK-AUDIT-2026-11-20.md.
+ * Nov 22, 2026 round 4 (Korey: "Grow the song pool"): + 40 songs -> 400
+ * total, building two more named versus decks as true 12-vs-12s:
+ * Michael Jackson vs Prince (24 new catalog songs) and Kendrick Lamar
+ * vs J. Cole (J. Cole's catalog built out + 'All the Stars'), plus four
+ * pool staples (Nelly, DMX, The Weeknd, Dua Lipa). All 40 new primaries
+ * AND all 40 `yt2` backups are oEmbed-verified the same way — see
+ * TRACK-AUDIT-2026-11-22-ROUND4.md. Three first-choice songs could not
+ * be verified to the standard and were swapped for verified catalog
+ * songs by the same artists ('Bad' -> 'Black or White'; 'Let's Go
+ * Crazy' -> 'I Wanna Be Your Lover'; 'Diamonds and Pearls' -> 'Gett Off').
  * One primary was REPLACED in the audit: 'slow-down' pointed at the wrong
  * song ('Low Down Derrty Blues'); it now points at Smino's official
  * 'Slow It Down' upload. IDs are never guessed — see TRACK-AUDIT-2026-11-20.md.
@@ -44,6 +54,7 @@
   /* `src:'versus'` / `'country'` / `'afro'` / `'house'` / `'queens'` /    */
   /* `'party'` = the Nov 20, 2026 expansion to 200 songs.                 */
   /* `src:'versus3'` = round 3, the eight named versus matchups (360).    */
+  /* `src:'versus4'` / `'round4'` = round 4, 400 songs (Nov 22, 2026). */
   /* Every song's yt (+ yt2 backup) was oEmbed-verified Nov 20, 2026.    */
   /* ------------------------------------------------------------------ */
   var SONGS = [
@@ -434,6 +445,52 @@
     { id: 'mesmerized', artist: 'Faith Evans', title: 'Mesmerized', yt: 'dTDtEjstff4', yt2: 'fyUUoOqEkVw', src: 'versus3' },
     { id: 'again-faith', artist: 'Faith Evans', title: 'Again', yt: 'pIHPJXvCxvw', yt2: '4XGHh7l3ul8', src: 'versus3' },
     { id: 'ill-be-missing-you', artist: 'Puff Daddy & Faith Evans', title: "I'll Be Missing You", yt: 'NKMtZm2YuBE', yt2: 'W9OjkHJdQJ4', src: 'versus3' },
+
+    /* ---- VERSUS catalogs round 4: Michael Jackson + Prince (added Nov 22, 2026 — yt + yt2 verified) ---- */
+    { id: 'billie-jean', artist: 'Michael Jackson', title: 'Billie Jean', yt: 'Zi_XLOBDo_Y', yt2: 'Kr4EQDVETuA', src: 'versus4' },
+    { id: 'beat-it', artist: 'Michael Jackson', title: 'Beat It', yt: 'oRdxUFDoQe0', yt2: 'n0su-7oBgP8', src: 'versus4' },
+    { id: 'thriller', artist: 'Michael Jackson', title: 'Thriller', yt: '4V90AmXnguw', yt2: 'sO4vI8P88NM', src: 'versus4' },
+    { id: 'smooth-criminal', artist: 'Michael Jackson', title: 'Smooth Criminal', yt: 'h_D3VFfhvs4', yt2: '_mMyPJSx8RU', src: 'versus4' },
+    { id: 'black-or-white', artist: 'Michael Jackson', title: 'Black or White', yt: 'F2AitTPI5U0', yt2: '83CgidmTXMc', src: 'versus4' },
+    { id: 'the-way-you-make-me-feel', artist: 'Michael Jackson', title: 'The Way You Make Me Feel', yt: 'HzZ_urpj4As', yt2: 'VtM-rHPwN7o', src: 'versus4' },
+    { id: 'man-in-the-mirror', artist: 'Michael Jackson', title: 'Man in the Mirror', yt: 'PivWY9wn5ps', yt2: 'Z9NYDgbKsBE', src: 'versus4' },
+    { id: 'dont-stop-til-you-get-enough', artist: 'Michael Jackson', title: 'Don\'t Stop \'Til You Get Enough', yt: 'yURRmWtbTbo', yt2: 'LUDvEcNU2l0', src: 'versus4' },
+    { id: 'rock-with-you', artist: 'Michael Jackson', title: 'Rock with You', yt: '5X-Mrc2l1d0', yt2: 'aCjxP58Ydik', src: 'versus4' },
+    { id: 'wanna-be-startin-somethin', artist: 'Michael Jackson', title: 'Wanna Be Startin\' Somethin\'', yt: '1XMvPTFzgVU', yt2: 'DsJlttdkybk', src: 'versus4' },
+    { id: 'pyt', artist: 'Michael Jackson', title: 'P.Y.T. (Pretty Young Thing)', yt: '1ZZQuj6htF4', yt2: '_GlgOkBR1vU', src: 'versus4' },
+    { id: 'remember-the-time', artist: 'Michael Jackson', title: 'Remember the Time', yt: 'LeiFF0gvqcc', yt2: 'qM19eRgOK1Q', src: 'versus4' },
+    { id: 'purple-rain', artist: 'Prince', title: 'Purple Rain', yt: 'uW1UIDYmYyI', yt2: 'iSBVeZrDfGY', src: 'versus4' },
+    { id: 'when-doves-cry', artist: 'Prince', title: 'When Doves Cry', yt: 'UG3VcCAlUgE', yt2: 'IUc0R8bbWQE', src: 'versus4' },
+    { id: 'kiss-prince', artist: 'Prince', title: 'Kiss', yt: 'H9tEvfIsDyo', yt2: '-a9kOCHYZIw', src: 'versus4' },
+    { id: 'little-red-corvette', artist: 'Prince', title: 'Little Red Corvette', yt: 'v0KpfrJE4zw', yt2: 'D_2a_a2j5jc', src: 'versus4' },
+    { id: '1999-prince', artist: 'Prince', title: '1999', yt: 'rblt2EtFfC4', yt2: 'UWC4X_rTRsA', src: 'versus4' },
+    { id: 'raspberry-beret', artist: 'Prince', title: 'Raspberry Beret', yt: 'l7vRSu_wsNc', yt2: '7rlK4CD60ZY', src: 'versus4' },
+    { id: 'i-wanna-be-your-lover', artist: 'Prince', title: 'I Wanna Be Your Lover', yt: 'Rp8WL621uGM', yt2: 'nzbOY4mGIug', src: 'versus4' },
+    { id: 'i-would-die-4-u', artist: 'Prince', title: 'I Would Die 4 U', yt: 'SVEFRQavTNI', yt2: 'rjspOZHIRE4', src: 'versus4' },
+    { id: 'cream-prince', artist: 'Prince', title: 'Cream', yt: 'rrbFQEcpJ3A', yt2: 'MRLUooLDLgo', src: 'versus4' },
+    { id: 'u-got-the-look', artist: 'Prince', title: 'U Got the Look', yt: '_jCuroTbqBI', yt2: 'iUgMp4JhHXc', src: 'versus4' },
+    { id: 'most-beautiful-girl', artist: 'Prince', title: 'The Most Beautiful Girl in the World', yt: 'FuXbKLiW1UI', yt2: 'QJuTytASlUo', src: 'versus4' },
+    { id: 'gett-off', artist: 'Prince', title: 'Gett Off', yt: '6f4BwQFF-Os', yt2: 'N0xNVmiamak', src: 'versus4' },
+
+    /* ---- VERSUS catalogs round 4: J. Cole + Kendrick Lamar (added Nov 22, 2026 — yt + yt2 verified) ---- */
+    { id: 'work-out', artist: 'J. Cole', title: 'Work Out', yt: 'W5hSdGt2M8w', yt2: 'db-cKHE8dqQ', src: 'versus4' },
+    { id: 'power-trip', artist: 'J. Cole', title: 'Power Trip', yt: '7AjD7nKiUQ4', yt2: 'VMeirNg87AY', src: 'versus4' },
+    { id: 'crooked-smile', artist: 'J. Cole', title: 'Crooked Smile', yt: 'fzzMOMkjm8A', yt2: '2KK_Mxbc91I', src: 'versus4' },
+    { id: 'apparently', artist: 'J. Cole', title: 'Apparently', yt: 'eRaFMlZ1YHA', yt2: '98j39T5mrAk', src: 'versus4' },
+    { id: 'wet-dreamz', artist: 'J. Cole', title: 'Wet Dreamz', yt: 'eCGV26aj-mM', yt2: 'lTgvsJY4aYE', src: 'versus4' },
+    { id: 'middle-child', artist: 'J. Cole', title: 'Middle Child', yt: 'WILNIXZr2oc', yt2: 'e8CLsYzE5wk', src: 'versus4' },
+    { id: 'love-yourz', artist: 'J. Cole', title: 'Love Yourz', yt: '6tjlU4w4fSo', yt2: 'lki42lbKT9s', src: 'versus4' },
+    { id: 'gomd', artist: 'J. Cole', title: 'G.O.M.D.', yt: 'vHU6ZRQJ50Q', yt2: '4d_KpQ6npNA', src: 'versus4' },
+    { id: 'deja-vu', artist: 'J. Cole', title: 'Deja Vu', yt: 'QN8ssSHzGwU', yt2: 'fp7v57ywiWs', src: 'versus4' },
+    { id: 'neighbors', artist: 'J. Cole', title: 'Neighbors', yt: '9nfVWiXY3WY', yt2: '1DhYVci-6ow', src: 'versus4' },
+    { id: 'a-tale-of-2-citiez', artist: 'J. Cole', title: 'A Tale of 2 Citiez', yt: 'bFewu1ATBFs', yt2: '9G50f69eLCg', src: 'versus4' },
+    { id: 'all-the-stars', artist: 'Kendrick Lamar & SZA', title: 'All the Stars', yt: 'JQbjS0_ZfJ0', yt2: 'J8XXsisgH1s', src: 'versus4' },
+
+    /* ---- Round 4 pool staples: party / pop (added Nov 22, 2026 — yt + yt2 verified) ---- */
+    { id: 'hot-in-herre', artist: 'Nelly', title: 'Hot in Herre', yt: 'GeZZr_p6vB8', yt2: 'y8vLMHeO_5s', src: 'round4' },
+    { id: 'party-up', artist: 'DMX', title: 'Party Up (Up in Here)', yt: 'thIVtEOtlWM', yt2: 'XGgV3LsnDWg', src: 'round4' },
+    { id: 'blinding-lights', artist: 'The Weeknd', title: 'Blinding Lights', yt: '4NRXx6U8ABQ', yt2: 'fHI8X4OXluQ', src: 'round4' },
+    { id: 'levitating', artist: 'Dua Lipa', title: 'Levitating', yt: 'TUVcZfQe-Kw', yt2: 'WHuBW3qKm9g', src: 'round4' },
   ];
 
   var SONG_MAP = {};
@@ -784,6 +841,18 @@
       name: 'VERSUS: Mary J. Blige vs Faith Evans',
       tagline: 'VERSUS Night — the Queen of Hip-Hop Soul vs the First Lady of Bad Boy. Twelve a side of pure 90s R&B royalty.',
       songs: ['family-affair', 'real-love', 'you-remind-me', 'im-goin-down', 'not-gon-cry', 'be-without-you', 'just-fine', 'mr-wrong', 'enough-cryin', 'i-can-love-you', 'take-me-as-i-am', 'love-at-1st-sight', 'you-used-to-love-me', 'soon-as-i-get-home', 'aint-nobody-faith', 'love-like-this', 'i-love-you-faith', 'never-gonna-let-you-go', 'burnin-up-faith', 'you-gets-no-love', 'cant-believe-faith', 'mesmerized', 'again-faith', 'ill-be-missing-you']
+    },
+    {
+      id: 'versus-mj-prince',
+      name: 'VERSUS: Michael Jackson vs Prince',
+      tagline: 'VERSUS Night — the King of Pop vs the Purple One. Twelve MJ crowns against twelve Prince essentials: the two most performable catalogs ever pressed, settled on one card.',
+      songs: ['billie-jean', 'beat-it', 'thriller', 'smooth-criminal', 'black-or-white', 'the-way-you-make-me-feel', 'man-in-the-mirror', 'dont-stop-til-you-get-enough', 'rock-with-you', 'wanna-be-startin-somethin', 'pyt', 'remember-the-time', 'purple-rain', 'when-doves-cry', 'kiss-prince', 'little-red-corvette', '1999-prince', 'raspberry-beret', 'i-wanna-be-your-lover', 'i-would-die-4-u', 'cream-prince', 'u-got-the-look', 'most-beautiful-girl', 'gett-off']
+    },
+    {
+      id: 'versus-kendrick-cole',
+      name: 'VERSUS: Kendrick Lamar vs J. Cole',
+      tagline: 'VERSUS Night — Kung Fu Kenny vs Cole World. Twelve a side: the two lyric kings of their generation go bar for bar, and every square is a side picked.',
+      songs: ['humble', 'not-like-us', 'alright', 'dna', 'swimming-pools', 'money-trees', 'king-kunta', 'love-kendrick', 'poetic-justice', 'maad-city', 'bitch-dont-kill-my-vibe', 'all-the-stars', 'no-role-modelz', 'work-out', 'power-trip', 'crooked-smile', 'apparently', 'wet-dreamz', 'middle-child', 'love-yourz', 'gomd', 'deja-vu', 'neighbors', 'a-tale-of-2-citiez']
     }
   ];
 
