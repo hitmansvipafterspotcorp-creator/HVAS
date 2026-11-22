@@ -42,13 +42,19 @@ main { max-width: 560px; margin: 0 auto; }
 
 /* ---------- v27: the moving logo is the whole background ----------
    A fixed full-viewport stack under every screen: poster still,
-   the animated logo video (object-fit: cover), a soft gold glow
+   the animated logo video, a soft gold glow
    that breathes slowly in menus and swells at the game's big
    moments (body.moment-live / -battle / -win, set by app.js), and
    ONE light scrim (bg-scrim) so text that sits directly on the
    video — home labels, lobby lines, stage titles — always stays
    readable. (v28: the scrim is lighter and the panels are
    translucent glass, so the motion reads as THE background.)
+   (v29: the video and the poster fit the WHOLE logo — object-fit:
+   contain, never cropped. The animation is a square crest on
+   black; on a tall phone the old cover fit blew it up until only
+   giant cropped letters showed. Contain on the stack's black
+   backdrop keeps the crest + all its text on screen, and the
+   letterbox bands are the video's own black, so they vanish.)
    Everything here is compositor-cheap (opacity only) and the whole
    stack ignores touches. */
 #bg-stack {
@@ -57,11 +63,14 @@ main { max-width: 560px; margin: 0 auto; }
 }
 #bg-poster {
   position: absolute; inset: 0;
-  background: url('icons/logo-full.png') center / cover no-repeat;
+  /* v29: same contain fit as the video — the poster shows through
+     the video's letterbox bands and IS the background under
+     reduced motion, so it must never crop the logo either. */
+  background: url('icons/logo-full.png') center / contain no-repeat;
 }
 #bg-logo-video {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
+  object-fit: contain; object-position: center;
 }
 #bg-glow {
   position: absolute; inset: 0;
