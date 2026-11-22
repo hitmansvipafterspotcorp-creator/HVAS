@@ -11,8 +11,8 @@
  *  - CDN libraries: stale-while-revalidate into a runtime cache.
  *  - YouTube embeds are never cached (they need internet anyway).
  */
-var SHELL_CACHE = 'lsb-shell-v21';
-var CDN_CACHE = 'lsb-cdn-v21';
+var SHELL_CACHE = 'lsb-shell-v22';
+var CDN_CACHE = 'lsb-cdn-v22';
 var SHELL = [
   './',
   './index.html',
