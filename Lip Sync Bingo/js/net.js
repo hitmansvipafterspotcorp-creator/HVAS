@@ -77,12 +77,16 @@
     if (CoreRef && CoreRef.describePeerError) return CoreRef.describePeerError(err);
     return (err && err.message) ? String(err.message) : 'Connection failed.';
   }
-  /* Explicit ICE config (Core.ICE_SERVERS): PeerJS replaces its
-   * defaults wholesale when a config is passed, and its bundled TURN
-   * hosts are reported decommissioned — so the app always passes its
-   * own list (STUN + best-effort public TURN incl. turns:443). */
+  /* Explicit ICE config (Core.effectiveIceServers): PeerJS replaces
+   * its defaults wholesale when a config is passed, and its bundled
+   * TURN hosts are reported decommissioned — so the app always passes
+   * its own list. The effective list is the built-in Core.ICE_SERVERS
+   * until the owned-TURN fetch (Core.startIceConfigFetch, kicked off
+   * at app load) lands a fresher one; the fallback below mirrors that
+   * when no core is loaded. */
   function peerOptions() {
-    var ice = (CoreRef && CoreRef.ICE_SERVERS) || [{ urls: 'stun:stun.l.google.com:19302' }];
+    var ice = (CoreRef && CoreRef.effectiveIceServers && CoreRef.effectiveIceServers()) ||
+      (CoreRef && CoreRef.ICE_SERVERS) || [{ urls: 'stun:stun.l.google.com:19302' }];
     return { config: { iceServers: ice } };
   }
   function joinPolicy(opts) {
@@ -637,12 +641,76 @@
     return stop;
   }
 
+  /* ==================== Lobby connection check ==================== */
+  /* v27: when a player lands in an online lobby, their phone runs a
+   * quick self-check — gather ICE candidates with the effective
+   * config (no connection to anyone, just gathering) and classify
+   * them with Core.classifyIceCandidates: a srflx or relay candidate
+   * proves a STUN/TURN server answered, so the phone can be reached
+   * from the internet ('ok'); host-only candidates or an error mean
+   * it may not connect in game ('bad'). Resolves with 'ok' | 'bad' —
+   * never rejects. Gathering ends early the moment a qualifying
+   * candidate appears; otherwise it runs to the gathering-complete
+   * event or the Core timeout (~6s). */
+  function checkConnection(opts) {
+    opts = opts || {};
+    var timeoutMs = opts.timeoutMs ||
+      (CoreRef && CoreRef.CONN_CHECK_TIMEOUT_MS) || 6000;
+    return new Promise(function (resolve) {
+      if (typeof RTCPeerConnection === 'undefined') { resolve('bad'); return; }
+      var ice = (CoreRef && CoreRef.effectiveIceServers && CoreRef.effectiveIceServers()) ||
+        (CoreRef && CoreRef.ICE_SERVERS) || [];
+      var pc = null;
+      var done = false;
+      var seen = [];
+      function finish(result) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (pc) { try { pc.close(); } catch (e) {} }
+        resolve(result);
+      }
+      var timer = setTimeout(function () {
+        finish(CoreRef && CoreRef.classifyIceCandidates
+          ? CoreRef.classifyIceCandidates(seen) : 'bad');
+      }, timeoutMs);
+      try {
+        pc = new RTCPeerConnection({ iceServers: ice });
+        pc.onicecandidate = function (ev) {
+          if (done) return;
+          if (!ev.candidate) { // gathering complete
+            finish(CoreRef && CoreRef.classifyIceCandidates
+              ? CoreRef.classifyIceCandidates(seen) : 'bad');
+            return;
+          }
+          seen.push(ev.candidate);
+          // Early exit: one qualifying candidate is proof enough.
+          if (CoreRef && CoreRef.classifyIceCandidates &&
+              CoreRef.classifyIceCandidates(seen) === 'ok') finish('ok');
+        };
+        pc.onicegatheringstatechange = function () {
+          if (pc.iceGatheringState === 'complete') {
+            finish(CoreRef && CoreRef.classifyIceCandidates
+              ? CoreRef.classifyIceCandidates(seen) : 'bad');
+          }
+        };
+        pc.createDataChannel('lsb-conn-check'); // a channel is what makes gathering start
+        pc.createOffer()
+          .then(function (offer) { return pc.setLocalDescription(offer); })
+          .catch(function () { finish('bad'); });
+      } catch (e) {
+        finish('bad');
+      }
+    });
+  }
+
   root.LSB_NET = {
     createLoopbackHost: createLoopbackHost,
     createPeerHost: createPeerHost,
     createPeerGuest: createPeerGuest,
     createHotspotHost: createHotspotHost,
     createHotspotGuest: createHotspotGuest,
+    checkConnection: checkConnection,
     renderQR: renderQR,
     startScanner: startScanner
   };
