@@ -493,17 +493,47 @@
     hostBroadcastState();
     show('screen-game');
     renderGame();
+    // Bulletproof the music: probe every song in the call queue in
+    // the background, starting now (see the track health check).
+    startTrackHealth();
     toast('Round 1 — ' + (activePatternName() || 'Line') + ' to win. Call the first song!');
   }
 
+  var callGatePending = false;
   function hostCallNext() {
-    if (!H || H.phase !== 'playing') return;
+    if (!H || H.phase !== 'playing' || callGatePending) return;
+    // Dead-song law at the gate: a song the health check already
+    // buried is never called — step over it.
+    while (H.callIdx < H.callSeq.length) {
+      var headHealth = trackHealth[H.callSeq[H.callIdx]];
+      if (headHealth && headHealth.state === 'dead') { H.callIdx++; continue; }
+      break;
+    }
     if (H.callIdx >= H.callSeq.length) { toast('Every song in the deck has been called.'); return; }
-    var songId = H.callSeq[H.callIdx++];
+    var songId = H.callSeq[H.callIdx];
+    var hh = trackHealth[songId];
+    if (mode !== 'hotspot' && (!hh || hh.state === 'checking')) {
+      // Pre-call guarantee: this song's track check is still running.
+      // Finish it first (the check jumps the queue) and call only once
+      // a working source is verified — a few seconds of patience beats
+      // a dead call in front of the room. Then re-enter: the gate
+      // either calls it or steps over it, now knowing.
+      callGatePending = true;
+      var gateHost = H;
+      toast('Checking the next song\u2019s track…');
+      checkSong(songId).then(function () {
+        callGatePending = false;
+        if (H && H === gateHost && H.phase === 'playing') hostCallNext();
+      });
+      return;
+    }
+    H.callIdx++;
     H.called.push(songId);
     H.lastCallAt = Date.now();
     sfx('call');
-    broadcast({ t: 'call', songId: songId, n: H.called.length, total: H.callSeq.length, at: H.lastCallAt });
+    // Guests get the verified source with the call, so their Play tap
+    // starts from the source that already answered the host's probe.
+    broadcast({ t: 'call', songId: songId, n: H.called.length, total: H.callSeq.length, at: H.lastCallAt, src: (hh && hh.state === 'ok') ? hh.prefLeg : null });
     hostBroadcastState();
     renderGame();
     startCountdown(H.lastCallAt);
@@ -925,6 +955,7 @@
         if (mode !== 'hotspot') {
           var cs = Data.SONG_MAP[msg.songId];
           pendingCallSong = msg.songId;
+          pendingCallLeg = msg.src || null;
           trackPurpose = 'call';
           $('call-track-row').hidden = false;
           setTrackStatus('call', '🎵 ' + (cs ? cs.artist + ' — ' + cs.title : msg.songId) + ' — tap ▶ Play the song to hear it.');
@@ -1217,6 +1248,7 @@
     renderProgress(v.players);
     renderGoal(v);
     renderHistory(v.called);
+    updateHealthLine();
   }
 
   /* Called-songs master list (most recent first) — the room's record
@@ -1705,6 +1737,245 @@
     attachStageStream(pf.id, stream);
   }
 
+  /* ---- track health check (Nov 22, 2026 — bulletproof the music).
+     Korey's law: NO VERIFIED TRACK, NO CALL. When a game starts, the
+     host's phone quietly probes every song in the call queue in the
+     background — mirror first, then YouTube, then the backup upload —
+     and remembers which source actually answered for each song. A song
+     is only called once it has a verified-working source; if its first
+     source died, the call silently plays from the one that answered.
+     A song with NO working source is pulled from the queue before it
+     can be called, and the host is told its name. The probes are light
+     load tests only: a mirror leg loads the real embed page in a
+     hidden frame (the same answer playback itself trusts), a YouTube
+     leg asks the oEmbed endpoint (200 = the video exists AND may be
+     embedded — the same check the Nov 20, 2026 audit used). Two probe
+     lanes, short timeouts, and the session memory of dead mirror
+     hosts keep the community mirrors from being hammered. Hotspot
+     rooms skip all of this: no internet, no tracks — the room sings
+     it out loud, as before. */
+  var trackHealth = {};      // songId -> {state, prefLeg, failedLegs}
+  var healthPromises = {};   // songId -> Promise (one probe per song per game)
+  var healthStats = { checked: 0, total: 0, swapped: 0, pulled: [] };
+  var healthRunId = 0;       // bumped per game + on leave; stale probes check it
+  var healthSweepDone = false;
+
+  /* The sources a song can play from, in the order playback prefers
+     them: ad-free mirror of the primary upload, YouTube primary,
+     ad-free mirror of the backup upload, YouTube backup. `yt2` is a
+     second verified upload of the SAME song (see decks.js) — moving
+     between legs never changes the song, only where it streams from. */
+  function trackLegs(s) {
+    var legs = [];
+    if (!s) return legs;
+    if (s.yt) { legs.push({ via: 'mirror', id: s.yt }); legs.push({ via: 'yt', id: s.yt }); }
+    if (s.yt2 && s.yt2 !== s.yt) { legs.push({ via: 'mirror', id: s.yt2 }); legs.push({ via: 'yt', id: s.yt2 }); }
+    return legs;
+  }
+  function songLabel(songId) {
+    var s = Data.SONG_MAP[songId];
+    return s ? (s.artist + ' — ' + s.title) : songId;
+  }
+
+  /* -- probe lanes: two hidden frames, handed out one at a time -- */
+  var probeSlots = [{ busy: false }, { busy: false }];
+  var probeWaiters = [];
+  function probeSlotAcquire() {
+    for (var i = 0; i < probeSlots.length; i++) {
+      if (!probeSlots[i].busy) { probeSlots[i].busy = true; return Promise.resolve(i); }
+    }
+    return new Promise(function (res) { probeWaiters.push(res); });
+  }
+  function probeSlotRelease(i) {
+    var f = $('probe-frame-' + i);
+    if (f) { f.onload = null; try { f.src = 'about:blank'; } catch (e) {} }
+    if (probeWaiters.length) probeWaiters.shift()(i); // hand the slot straight over
+    else probeSlots[i].busy = false;
+  }
+  function clearProbeFrames() {
+    probeWaiters = [];
+    probeSlots.forEach(function (slot, i) {
+      slot.busy = false;
+      var f = $('probe-frame-' + i);
+      if (f) { f.onload = null; try { f.src = 'about:blank'; } catch (e) {} }
+    });
+  }
+  /* One mirror leg: load the real embed page in a probe frame. The
+     page answering at all is the same signal playback itself trusts
+     (see tryMirror); a timeout marks the host dead for the session,
+     exactly like a playback timeout does, and the next host is tried. */
+  function probeMirrorLeg(id) {
+    var hosts = mirrorCandidates();
+    if (!hosts.length) return Promise.resolve(false);
+    function attempt(hi) {
+      if (hi >= hosts.length) return Promise.resolve(false);
+      var host = hosts[hi];
+      return probeSlotAcquire().then(function (slot) {
+        return new Promise(function (resolve) {
+          var f = $('probe-frame-' + slot);
+          if (!f) { probeSlotRelease(slot); resolve(false); return; }
+          var settled = false;
+          var timer = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            mirrorDead[host] = true;
+            if (mirrorHost === host) mirrorHost = null;
+            probeSlotRelease(slot);
+            resolve(false);
+          }, 4500);
+          f.onload = function () {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            // Give its player a beat, like tryMirror does, then free the frame.
+            setTimeout(function () { probeSlotRelease(slot); }, 250);
+            resolve(true);
+          };
+          try { f.src = 'https://' + host + '/embed/' + id + '?autoplay=1'; } catch (e) {
+            clearTimeout(timer);
+            settled = true;
+            probeSlotRelease(slot);
+            resolve(false);
+          }
+        }).then(function (ok) { return ok ? true : attempt(hi + 1); });
+      });
+    }
+    return attempt(0);
+  }
+  /* One YouTube leg: oEmbed answers 200 only for a video that exists
+     AND allows embedding; anything else (400/404/network) is a no. */
+  function probeYtLeg(id) {
+    var url = 'https://www.youtube.com/oembed?url=' +
+      encodeURIComponent('https://www.youtube.com/watch?v=' + id) + '&format=json';
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 5000) : null;
+    return fetch(url, ctl ? { signal: ctl.signal } : {})
+      .then(function (res) { if (timer) clearTimeout(timer); return !!res.ok; })
+      .catch(function () { if (timer) clearTimeout(timer); return false; });
+  }
+  function probeLeg(leg) {
+    return leg.via === 'mirror' ? probeMirrorLeg(leg.id) : probeYtLeg(leg.id);
+  }
+  /* Probe a song's legs in preference order until one answers. */
+  function probeSong(songId) {
+    var legs = trackLegs(Data.SONG_MAP[songId]);
+    if (!legs.length) return Promise.resolve({ state: 'dead', pref: -1, failed: {} });
+    var failed = {};
+    function next(i) {
+      if (i >= legs.length) return Promise.resolve({ state: 'dead', pref: -1, failed: failed });
+      return probeLeg(legs[i]).then(function (ok) {
+        if (ok) return { state: 'ok', pref: i, failed: failed };
+        failed[i] = true;
+        return next(i + 1);
+      });
+    }
+    return next(0);
+  }
+  /* Memoized per game: the background sweep, the pre-call gate, and
+     playback itself all share the one probe result for a song. */
+  function checkSong(songId) {
+    var existing = trackHealth[songId];
+    if (existing && existing.state !== 'checking') return Promise.resolve(existing);
+    if (healthPromises[songId]) return healthPromises[songId];
+    var runId = healthRunId;
+    trackHealth[songId] = { state: 'checking' };
+    var p = probeSong(songId).then(function (res) {
+      var legs = trackLegs(Data.SONG_MAP[songId]);
+      var entry = {
+        state: res.state,
+        prefLeg: res.pref >= 0 ? legs[res.pref] : null,
+        failedLegs: res.failed
+      };
+      if (runId !== healthRunId) return entry; // an old game's probe — write nothing
+      trackHealth[songId] = entry;
+      healthStats.checked++;
+      if (res.state === 'dead') pullSong(songId);
+      updateHealthLine();
+      return entry;
+    });
+    healthPromises[songId] = p;
+    return p;
+  }
+  /* Dead-song law: out of the call queue before it can be called, and
+     the host hears its name. Songs already called stay called. */
+  function pullSong(songId) {
+    if (!H) return;
+    var kept = [];
+    var removed = false;
+    for (var i = 0; i < H.callSeq.length; i++) {
+      if (i >= H.callIdx && H.callSeq[i] === songId) { removed = true; continue; }
+      kept.push(H.callSeq[i]);
+    }
+    if (removed) H.callSeq = kept;
+    if (healthStats.pulled.indexOf(songId) === -1) healthStats.pulled.push(songId);
+    if (healthSweepDone) {
+      banner('⚠️ No working track — pulled from the calls: ' + songLabel(songId));
+    }
+    updateHealthLine();
+  }
+  /* The background sweep: two lanes walk the call queue IN CALL ORDER
+     (the next calls resolve first), one probe per song. */
+  function startTrackHealth() {
+    healthRunId++;
+    trackHealth = {};
+    healthPromises = {};
+    healthStats = { checked: 0, total: H ? H.callSeq.length : 0, swapped: 0, pulled: [] };
+    healthSweepDone = false;
+    if (!H || mode === 'hotspot') { healthSweepDone = true; updateHealthLine(); return; }
+    moveTrackHolderToBody(); // the probe frames must be rendered, not display:none
+    updateHealthLine();
+    var runId = healthRunId;
+    var queue = H.callSeq.slice();
+    var qi = 0;
+    function lane() {
+      if (runId !== healthRunId || qi >= queue.length) return Promise.resolve();
+      var songId = queue[qi++];
+      return checkSong(songId).then(lane, lane);
+    }
+    Promise.all([lane(), lane()]).then(function () {
+      if (runId !== healthRunId) return;
+      healthSweepDone = true;
+      if (healthStats.pulled.length) {
+        banner('⚠️ No working track — pulled from tonight\u2019s calls: ' +
+          healthStats.pulled.map(songLabel).join(' • '));
+      }
+      updateHealthLine();
+    });
+  }
+  /* The host's health line (game screen, under the host controls):
+     how many songs are verified, how many sources got switched, how
+     many songs were pulled. Unobtrusive; guests never see it. */
+  function updateHealthLine() {
+    var el = $('track-health');
+    if (!el) return;
+    if (role !== 'host' || mode === 'hotspot' || !healthStats.total) { el.hidden = true; return; }
+    el.hidden = false;
+    var txt = '🎵 Tracks checked ' + healthStats.checked + '/' + healthStats.total;
+    if (healthStats.swapped) txt += ' • sources switched ' + healthStats.swapped;
+    if (healthStats.pulled.length) txt += ' • pulled ' + healthStats.pulled.length + ' (no working track)';
+    el.textContent = txt;
+  }
+  /* Playback order for a song: the verified source first (this phone's
+     own probe result, or the host's hint broadcast to guests), legs the
+     probe proved dead skipped, the rest in preference order behind it.
+     If everything probed dead, the full list is returned anyway —
+     playback makes one last honest attempt before failing out loud. */
+  function orderedLegs(songId, prefHint) {
+    var legs = trackLegs(Data.SONG_MAP[songId]);
+    if (!legs.length) return legs;
+    var h = trackHealth[songId];
+    var first = (h && h.state === 'ok' && h.prefLeg) ? h.prefLeg : (prefHint || null);
+    var failed = (h && h.failedLegs) || {};
+    var out = [];
+    if (first) out.push(first);
+    legs.forEach(function (leg, i) {
+      if (first && leg.via === first.via && leg.id === first.id) return;
+      if (failed[i]) return;
+      out.push(leg);
+    });
+    return out.length ? out : legs;
+  }
+
   /* ---- the track player (YouTube IFrame API — Nov 20, 2026 repair).
      Korey's rule: EVERY song has to actually play. So the player now
      tracks REAL state: "Track playing" shows only after YouTube reports
@@ -1720,11 +1991,12 @@
   var currentTrackSong = null;
   var trackPurpose = 'stage';   // 'stage' | 'call'
   var pendingCallSong = null;   // guest side: latest called song awaiting a tap
+  var pendingCallLeg = null;    // guest side: host's verified source for that call
   var trackPlayer = null;       // the ONE persistent YT.Player (never destroyed)
   var trackPlayerReady = false;
   var trackPlayerCreating = false;
   var trackPlayerCreatingAt = 0;
-  var trackWant = null;         // {songId, ids:[], idx, purpose, playing, via}
+  var trackWant = null;         // {songId, ids:[], legs:[], legIdx, purpose, playing, via}
   var trackWatchdog = null;
 
   /* ---- ad-free mirror (Invidious) ----
@@ -1777,25 +2049,60 @@
     });
     return list;
   }
+  /* Dispatch the want's current leg: a mirror leg goes to the mirror
+     chain, a YouTube leg to the persistent player. */
+  function startLeg(want) {
+    var leg = want.legs[want.legIdx];
+    if (!leg) { failTrack(); return; }
+    if (leg.via === 'mirror') startMirror(want);
+    else { want.via = 'yt'; driveTrackPlayer(); }
+  }
+  /* Move a want to its next source for the SAME song and keep going —
+     no host action, no dead air beyond the switch itself. The swap is
+     counted on the host's health line and the status says plainly
+     what happened. Legs are finite, so this always terminates: the
+     last leg failing lands in failTrack's honest message. */
+  function advanceLeg(want) {
+    if (trackWant !== want) return;
+    var prev = want.legs[want.legIdx];
+    want.legIdx++;
+    if (want.legIdx >= want.legs.length) { failTrack(); return; }
+    want.playing = false;
+    want.retried = false; // the new source gets its own 3s nudge
+    clearTimeout(trackWatchdog);
+    clearTimeout(trackRetryTimer);
+    clearTimeout(trackSoundTimer);
+    stopMirror();
+    healthStats.swapped++;
+    updateHealthLine();
+    var nl = want.legs[want.legIdx];
+    if (prev && nl.id !== prev.id) {
+      setTrackStatus(want.purpose, 'That upload won\u2019t play here — trying the backup track…');
+    } else if (prev && prev.via === 'mirror' && nl.via === 'yt') {
+      setTrackStatus(want.purpose, 'Ad-free mirror is down — playing on YouTube (ads possible)');
+    } else {
+      setTrackStatus(want.purpose, 'That source stalled — switching…');
+    }
+    startLeg(want);
+  }
   function startMirror(want) {
     moveTrackHolderToBody();
     var hosts = mirrorCandidates();
-    if (!hosts.length) { want.via = 'yt'; driveTrackPlayer(); return; }
+    if (!hosts.length) { advanceLeg(want); return; }
     want.via = 'mirror';
     tryMirror(want, hosts, 0);
   }
   function tryMirror(want, hosts, i) {
     if (trackWant !== want || want.via !== 'mirror') return;
     if (i >= hosts.length) {
-      // Every mirror failed — YouTube takes the song (ads possible).
-      want.via = 'yt';
-      setTrackStatus(want.purpose, 'Ad-free mirror is down — playing on YouTube (ads possible)');
-      driveTrackPlayer();
+      // Every mirror failed for this source — move down the leg list
+      // (YouTube for this upload, then the backup upload's sources).
+      advanceLeg(want);
       return;
     }
     var host = hosts[i];
     var f = $('inv-frame');
-    if (!f) { want.via = 'yt'; driveTrackPlayer(); return; }
+    if (!f) { advanceLeg(want); return; }
     var settled = false;
     clearTimeout(mirrorTimer);
     mirrorTimer = setTimeout(function () {
@@ -1823,7 +2130,7 @@
         setTrackStatus(want.purpose, '🎵 Track playing — ad-free mirror. No sound? Tap ▶ Play the song.');
       }, 900);
     };
-    try { f.src = 'https://' + host + '/embed/' + want.ids[0] + '?autoplay=1'; } catch (e) {}
+    try { f.src = 'https://' + host + '/embed/' + want.legs[want.legIdx].id + '?autoplay=1'; } catch (e) {}
   }
 
   var ytApiPromise = null;
@@ -1859,7 +2166,11 @@
     clearTimeout(trackWatchdog);
     trackWatchdog = setTimeout(function () {
       if (trackWant && !trackWant.playing) {
-        setTrackStatus(trackWant.purpose, 'Tap ▶ Play the song to hear it.');
+        // Six seconds with no PLAYING is a stall, not a pause: move to
+        // the next source for the same song instead of giving up. Only
+        // the last source gets the old tap prompt.
+        if (trackWant.legIdx < trackWant.legs.length - 1) advanceLeg(trackWant);
+        else setTrackStatus(trackWant.purpose, 'Tap ▶ Play the song to hear it.');
       }
     }, 6000);
   }
@@ -1884,6 +2195,10 @@
     var inv = $('inv-holder');
     if (inv && inv.parentNode !== document.body) {
       document.body.appendChild(inv);
+    }
+    var probe = $('probe-holder');
+    if (probe && probe.parentNode !== document.body) {
+      document.body.appendChild(probe);
     }
   }
   /* Create the ONE player. Two construction paths:
@@ -1945,7 +2260,7 @@
     // video sits CUED and the old code never issued a play call to
     // rescue it — the watchdog just relabelled the stall after 6s.
     clearTimeout(trackSoundTimer); // a new load supersedes any pending sound check
-    try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
+    try { trackPlayer.loadVideoById(trackWant.legs[trackWant.legIdx].id); } catch (e) {}
     try { trackPlayer.playVideo(); } catch (e) {}
     unmuteTrackPlayer(); // script-driven starts come up MUTED — force sound
     armTrackWatchdog();
@@ -2021,15 +2336,10 @@
   }
   function onTrackError() {
     if (!trackWant || !trackPlayer) return;
-    trackWant.idx++;
-    if (trackWant.idx < trackWant.ids.length) {
-      trackWant.playing = false;
-      trackWant.retried = false; // the backup upload gets its own 3s nudge
-      setTrackStatus(trackWant.purpose, 'That upload won\u2019t play here — trying the backup track…');
-      driveTrackPlayer();
-    } else {
-      failTrack();
-    }
+    // An upload that refuses to embed (errors 101/150 and friends)
+    // moves the song to its next source automatically — the backup
+    // upload included — and only a song out of sources fails out loud.
+    advanceLeg(trackWant);
   }
   function failTrack() {
     clearTimeout(trackRetryTimer);
@@ -2046,8 +2356,13 @@
     trackWant = null;
   }
 
-  /** Load + play a song's track for the given purpose ('stage'|'call'). */
-  function playTrack(songId, purpose) {
+  /** Load + play a song's track for the given purpose ('stage'|'call').
+      Sources are walked as LEGS (see trackLegs): the health check's
+      verified source goes first when there is one, then the rest in
+      preference order; any leg that errors or stalls fails over to
+      the next automatically (advanceLeg). prefHint is the host's
+      verified source, broadcast to guests with the call. */
+  function playTrack(songId, purpose, prefHint) {
     var s = Data.SONG_MAP[songId];
     stopTrack();
     currentTrackSong = songId;
@@ -2063,17 +2378,22 @@
       setTrackStatus(purpose, 'Hotspot has no internet — play the song out loud in the room!');
       return;
     }
+    var legs = orderedLegs(songId, prefHint);
     var ids = [];
-    [s.yt, s.yt2].forEach(function (id) { if (id && ids.indexOf(id) === -1) ids.push(id); });
-    trackWant = { songId: songId, ids: ids, idx: 0, purpose: purpose, playing: false, retried: false, via: null };
+    legs.forEach(function (leg) { if (ids.indexOf(leg.id) === -1) ids.push(leg.id); });
+    trackWant = { songId: songId, ids: ids, legs: legs, legIdx: 0, purpose: purpose, playing: false, retried: false, via: null };
     setTrackStatus(purpose, 'Loading the track…');
     var want = trackWant;
-    startMirror(want);
+    startLeg(want);
     // If the API itself never arrives (blocked network), fail honestly.
     // The mirror chain gets its own budget first, so this only judges
-    // the YouTube leg once the song has fallen through to it.
+    // the YouTube leg once the song has fallen through to it — and any
+    // source still untried gets its turn before the song gives up.
     setTimeout(function () {
-      if (trackWant === want && !want.playing && want.via === 'yt' && !trackPlayerReady) failTrack();
+      if (trackWant === want && !want.playing && want.via === 'yt' && !trackPlayerReady) {
+        if (want.legIdx < want.legs.length - 1) advanceLeg(want);
+        else failTrack();
+      }
     }, 15000);
   }
 
@@ -2117,7 +2437,14 @@
       // means the room isn't hearing it — autoplay rules can hold a
       // cross-origin frame silent. Spend the tap on the YouTube
       // player instead: its sound path is proven.
+      var curLeg = trackWant.legs[trackWant.legIdx];
+      var target = -1;
+      for (var li = 0; li < trackWant.legs.length; li++) {
+        if (trackWant.legs[li].via === 'yt' && trackWant.legs[li].id === curLeg.id) { target = li; break; }
+      }
       stopMirror();
+      if (target === -1) { advanceLeg(trackWant); return; }
+      trackWant.legIdx = target;
       trackWant.via = 'yt';
       trackWant.playing = false;
       setTrackStatus(trackWant.purpose, 'Loading the track…');
@@ -2128,7 +2455,7 @@
     if (trackPlayer && trackWant && trackWant.songId === songId) {
       if (trackPlayerReady) {
         setTrackStatus(trackWant.purpose, 'Loading the track…');
-        try { trackPlayer.loadVideoById(trackWant.ids[trackWant.idx]); } catch (e) {}
+        try { trackPlayer.loadVideoById(trackWant.legs[trackWant.legIdx].id); } catch (e) {}
         try { trackPlayer.playVideo(); } catch (e) {}
         // This tap is a real user gesture — the strongest there is:
         // spend it on SOUND too, unconditionally, in this same stack.
@@ -2141,7 +2468,7 @@
       }
       return;
     }
-    playTrack(songId, trackPurpose);
+    playTrack(songId, trackPurpose, songId === pendingCallSong ? pendingCallLeg : null);
   }
 
   /* ================= ROOM SETUP / TEARDOWN ================= */
@@ -2161,6 +2488,9 @@
     clearInterval(countdownInt);
     clearInterval(stageInt);
     clearTimeout(autoResumeTimer);
+    healthRunId++; // in-flight track probes from this room write nothing now
+    clearProbeFrames();
+    callGatePending = false;
     if (hsHelloTimer) { clearInterval(hsHelloTimer); hsHelloTimer = null; }
     stopStageMedia();
     if (transport) {
