@@ -291,6 +291,14 @@ body.in-game .brand, body.in-game footer { display: none; }
   font-weight: 900; font-size: 18px; padding: 14px 22px; border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0,0,0,.65); text-align: center; max-width: 92vw; font-family: var(--font-d);
 }
+/* Ad gate (v24): shown only while an ad holds the player and the
+   game clock is frozen — same NOIR GOLD tokens as the toast. */
+#ad-banner {
+  position: fixed; left: 50%; top: 78px; transform: translateX(-50%); z-index: 50;
+  background: rgba(16, 16, 19, .96); color: var(--gold); border: 1px solid var(--gold);
+  font-weight: 800; font-size: 15px; padding: 10px 18px; border-radius: 99px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.6); text-align: center; max-width: 92vw; font-family: var(--font-d);
+}
 #toast {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 50;
   background: rgba(16, 16, 19, .96); border: 1px solid var(--line); color: var(--text);
