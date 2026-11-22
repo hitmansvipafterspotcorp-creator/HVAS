@@ -92,7 +92,10 @@
           Full Card. Your card shades the squares of the shape you're chasing,
           and a picked shape pays squares × 10 points.</p>
         <p><b>The music:</b> every called song plays out loud on the caller's
-          phone — tap ▶ Play the song on yours to hear it too. Mic-square
+          phone — and on yours too, once you've tapped anything once (your
+          first tap unlocks sound; after that, called songs start on their
+          own). Tap the song area on the game or stage screen to pause the
+          song and its countdown together; tap again to resume. Mic-square
           performances play the track for a full minute.</p>
         <p><b>🎤 Mic squares:</b> every card has 5 pink mic squares. When a mic song
           gets called, the player can claim the square — but it only counts if they
@@ -180,6 +183,10 @@
         <button id="btn-play-call" class="btn small gold">▶ Play the song</button>
         <span id="call-track-status" class="hint"></span>
       </div>
+      <!-- v31 tap toggle face: wears the round's state (start /
+           playing / paused). Display only — the toggle is the
+           delegated tap on the screen's open area. -->
+      <div id="call-tapface" class="tapface" hidden></div>
 
       <div id="chips" class="chips"></div>
 
@@ -193,10 +200,10 @@
         <button class="react-btn" data-react="😂">😂</button>
         <button class="react-btn" data-react="👏">👏</button>
         <button class="react-btn" data-react="🎤">🎤</button>
-        <button id="btn-history" class="btn small ghost history-btn">Called songs</button>
+        <button id="btn-history" class="btn small ghost history-btn">🎵 Songs played</button>
       </div>
       <div id="history-panel" class="history-panel" hidden>
-        <h3>Called so far</h3>
+        <h3>Songs played</h3>
         <ol id="history-list" class="history-list"></ol>
       </div>
 
@@ -232,6 +239,15 @@
       <button id="btn-play-track" class="btn small gold">🔊 Play the track</button>
       <span id="track-status" class="hint"></span>
       <span class="eq" id="track-eq" hidden><i></i><i></i><i></i><i></i><i></i></span>
+    </div>
+    <!-- v31 tap toggle face (see the game screen's note). -->
+    <div id="stage-tapface" class="tapface" hidden></div>
+    <!-- v31: Songs played, reachable from the stage too — same list
+         as the game screen's panel, filled by the same renderer. -->
+    <button id="btn-history-stage" class="btn small ghost history-btn">🎵 Songs played</button>
+    <div id="stage-history-panel" class="history-panel" hidden>
+      <h3>Songs played</h3>
+      <ol id="stage-history-list" class="history-list"></ol>
     </div>
     <div id="yt-holder" class="yt-holder" aria-hidden="true"><div id="yt-player"></div></div>
     <div id="inv-holder" class="yt-holder" aria-hidden="true"><iframe id="inv-frame" allow="autoplay; encrypted-media" title="Ad-free mirror player"></iframe></div>
@@ -375,7 +391,7 @@
 <div id="toast" hidden></div>
 
 <footer>
-  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v30</span></p>
+  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v31</span></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
