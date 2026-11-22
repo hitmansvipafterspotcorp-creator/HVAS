@@ -414,6 +414,79 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Saved nights: the record of a finished game ("make a night       */
+  /* stick"). Pure data shaping only — storage lives in the app.      */
+  /* ---------------------------------------------------------------- */
+
+  /** Standings sorted best-first. Ties keep their incoming order.
+      Returns fresh {name, score} objects — never mutates the input. */
+  function sortStandings(players) {
+    return (players || []).map(function (p, i) {
+      return {
+        name: String(p && p.name != null ? p.name : 'Player'),
+        score: Number(p && p.score) || 0, _i: i
+      };
+    }).sort(function (a, b) { return (b.score - a.score) || (a._i - b._i); })
+      .map(function (p) { return { name: p.name, score: p.score }; });
+  }
+
+  /**
+   * A content signature for a finished game: same room + deck + call
+   * count + final standings + winner -> same signature, on any device,
+   * at any save time (the timestamp is deliberately NOT an input).
+   * The app uses it to avoid saving one night twice.
+   */
+  function nightSignature(parts) {
+    parts = parts || {};
+    var standings = sortStandings(parts.players).map(function (p) {
+      return p.name + '=' + p.score;
+    }).join(',');
+    return 'n' + hashSeed([
+      parts.roomCode || '', parts.deckId || '', parts.deckName || '',
+      parts.calledCount || 0, standings,
+      parts.winner ? parts.winner.name : ''
+    ].join('|')).toString(36);
+  }
+
+  /**
+   * Normalize a finished game into a saved-night record.
+   * input: {endedAt, roomCode, deckId, deckName, mode,
+   *         players:[{name,score}], winner:{name,score?}|null,
+   *         calledCount, patterns?, patternsPicked?}
+   * Players come out sorted best-first; the winner (if any) gets their
+   * final score attached from the standings when it isn't supplied.
+   */
+  function buildNightRecord(input) {
+    input = input || {};
+    var players = sortStandings(input.players);
+    var winner = null;
+    if (input.winner && input.winner.name) {
+      var wScore = (typeof input.winner.score === 'number') ? input.winner.score : null;
+      if (wScore == null) {
+        for (var i = 0; i < players.length; i++) {
+          if (players[i].name === input.winner.name) { wScore = players[i].score; break; }
+        }
+      }
+      winner = { name: String(input.winner.name), score: wScore };
+    }
+    var rec = {
+      v: 1,
+      endedAt: input.endedAt || 0,
+      roomCode: input.roomCode || '',
+      deckId: input.deckId || null,
+      deckName: input.deckName || '',
+      mode: input.mode || 'online',
+      players: players,
+      winner: winner,
+      calledCount: input.calledCount || 0
+    };
+    if (input.patterns) rec.patterns = input.patterns;
+    if (input.patternsPicked) rec.patternsPicked = input.patternsPicked;
+    rec.sig = nightSignature(rec);
+    return rec;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* Room codes: 4 letters from an unambiguous alphabet (no 0/O/1/I).  */
   /* ---------------------------------------------------------------- */
   var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -458,6 +531,9 @@
     tallyBattle: tallyBattle,
     BATTLE_VOTE_POINTS: BATTLE_VOTE_POINTS,
     BATTLE_WIN_BONUS: BATTLE_WIN_BONUS,
+    sortStandings: sortStandings,
+    nightSignature: nightSignature,
+    buildNightRecord: buildNightRecord,
     makeRoomCode: makeRoomCode,
     normalizeRoomCode: normalizeRoomCode
   };
