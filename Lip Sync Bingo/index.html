@@ -5,13 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Lip Sync Bingo — HITMANS VIP AFTER SPOT</title>
 <meta name="description" content="Lip Sync Bingo — the VIP party game from HITMANS VIP AFTER SPOT CORP. Free play, no prize money. Play online or on a hotspot with no internet.">
-<meta name="theme-color" content="#2a0a4a">
-<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- v28: Korey's retro logo loading screen from the HVAS app opens
+     the game — the crest breaks down into pixels and builds back up
+     over a progress bar (assets/loading_screen.mp4, recovered from
+     the membership app). Full-screen overlay above everything; it
+     dismisses on video end, on any tap, on video error, or on a
+     fallback timer (duration + 1s, hard cap 12s) — it can never
+     trap the user. prefers-reduced-motion skips it entirely (the
+     CSS hides it and the boot script removes it at once). -->
+<div id="boot-overlay">
+  <video id="boot-video" src="assets/loading_screen.mp4" poster="icons/logo-full.png" autoplay muted playsinline preload="auto"></video>
+</div>
 
 <!-- v27: the moving logo IS the background of the whole app — a fixed
      full-viewport layer under every screen, with a soft gold glow
@@ -355,7 +367,7 @@
 <div id="toast" hidden></div>
 
 <footer>
-  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v27</span></p>
+  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v28</span></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
@@ -365,6 +377,74 @@
 <script src="js/core.js"></script>
 <script src="js/net.js"></script>
 <script src="js/app.js"></script>
+<script>
+  /* v28 boot — the retro logo loading screen + the background kick.
+     Two jobs, both defensive (the game must open normally no matter
+     what any video does):
+       1. Boot overlay: dismiss on the loading video's 'ended', on
+          any tap on the overlay, on video 'error', or when the
+          fallback timer fires — duration + 1s once metadata is
+          known, hard-capped at 12s from boot. Under
+          prefers-reduced-motion the overlay is dismissed at once.
+       2. Background kick: the moving logo (bg-logo-video) carries
+          autoplay, but some phones still park it on its poster —
+          call play() explicitly on load, and again on the first
+          pointerdown anywhere (a user gesture always unlocks it). */
+  (function () {
+    var bgVideo = document.getElementById('bg-logo-video');
+    function kickBg() {
+      if (!bgVideo) return;
+      try {
+        if (bgVideo.paused) {
+          var p = bgVideo.play();
+          if (p && p.catch) p.catch(function () {});
+        }
+      } catch (e) {}
+    }
+    if (bgVideo) {
+      if (document.readyState === 'complete') kickBg();
+      else window.addEventListener('load', kickBg);
+      document.addEventListener('pointerdown', function firstTap() {
+        kickBg();
+        document.removeEventListener('pointerdown', firstTap);
+      });
+    }
+
+    var overlay = document.getElementById('boot-overlay');
+    var video = document.getElementById('boot-video');
+    if (!overlay) return;
+    var done = false;
+    var fallback = null;
+    function dismiss() {
+      if (done) return;
+      done = true;
+      if (fallback) clearTimeout(fallback);
+      overlay.classList.add('boot-done');
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, 700);
+    }
+    var reduce = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce || !video) { dismiss(); return; }
+    overlay.addEventListener('pointerdown', dismiss);
+    video.addEventListener('ended', dismiss);
+    video.addEventListener('error', dismiss);
+    fallback = setTimeout(dismiss, 12000);
+    function armFromDuration() {
+      if (isFinite(video.duration) && video.duration > 0) {
+        clearTimeout(fallback);
+        fallback = setTimeout(dismiss, (video.duration + 1) * 1000);
+      }
+    }
+    if (video.readyState >= 1) armFromDuration();
+    else video.addEventListener('loadedmetadata', armFromDuration);
+    try {
+      var bp = video.play();
+      if (bp && bp.catch) bp.catch(function () {});
+    } catch (e) {}
+  })();
+</script>
 <script>
   /* v27 update flow — an installed PWA must never sit stuck on an old
      build (Korey's phone showed the OLD app after v26 shipped):

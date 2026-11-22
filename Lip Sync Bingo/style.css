@@ -6,9 +6,9 @@
    No purple, no aurora, no glass, no foil sweeps. */
 :root {
   --bg: #000000;
-  --bg2: #0a0a0c;
-  --surface: #101013;
-  --surface2: #17171b;
+  --bg2: rgba(10, 10, 12, .66);
+  --surface: rgba(16, 16, 19, .64);
+  --surface2: rgba(23, 23, 27, .70);
   --line: #26262c;
   --line-soft: #1b1b20;
   --gold: #d4af37;
@@ -47,7 +47,8 @@ main { max-width: 560px; margin: 0 auto; }
    moments (body.moment-live / -battle / -win, set by app.js), and
    ONE light scrim (bg-scrim) so text that sits directly on the
    video — home labels, lobby lines, stage titles — always stays
-   readable. Panels keep their own solid NOIR GOLD backgrounds.
+   readable. (v28: the scrim is lighter and the panels are
+   translucent glass, so the motion reads as THE background.)
    Everything here is compositor-cheap (opacity only) and the whole
    stack ignores touches. */
 #bg-stack {
@@ -80,9 +81,38 @@ body.moment-win #bg-glow {
 }
 #bg-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, .44), rgba(0, 0, 0, .27) 34%, rgba(0, 0, 0, .31) 66%, rgba(0, 0, 0, .50));
+  /* v28: lightened — just enough shade for bare text over the
+     video; the sparkles/confetti motion must read clearly through
+     it and through the now-translucent panels. */
+  background: linear-gradient(180deg, rgba(0, 0, 0, .30), rgba(0, 0, 0, .14) 34%, rgba(0, 0, 0, .18) 66%, rgba(0, 0, 0, .36));
 }
 body > header, body > main, body > footer { position: relative; z-index: 1; }
+
+/* ---------- v28: boot loading overlay ----------
+   Korey's retro logo loading screen (from the HVAS app) plays
+   full-screen over the app on open, then fades to home. The boot
+   script in index.html owns dismissal (end / tap / error /
+   fallback timer / reduced motion); these rules are only its
+   face. z-index 200 sits above every other layer. */
+#boot-overlay {
+  position: fixed; inset: 0; z-index: 200; background: #000;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 1; transition: opacity .6s ease;
+}
+#boot-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+#boot-overlay.boot-done { opacity: 0; pointer-events: none; }
+
+/* v28: content floats ON the moving logo — panels, cards and rows
+   are translucent dark glass (the --surface/--bg2 tokens above)
+   with a light blur, so the logo's motion shows around and behind
+   them on every screen. */
+.panel, .deck-card, .player-list li, .chip, .cell, .builder-item,
+.custom-deck-row, .night-row, .history-panel, .caller-pill,
+.pattern-btn, .vote-result, .audience-note, .round-card,
+input[type="text"], input[type="number"], textarea {
+  backdrop-filter: blur(6px) saturate(1.12);
+  -webkit-backdrop-filter: blur(6px) saturate(1.12);
+}
 
 /* ---------- brand header ---------- */
 .brand {
@@ -168,7 +198,7 @@ input::placeholder { color: var(--faint); }
   transition: transform .15s ease, border-color .15s ease;
 }
 .deck-card:active { transform: scale(.98); }
-.deck-card.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); background: #141007; }
+.deck-card.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); background: rgba(20, 16, 7, .78); }
 .deck-cover { display: flex; align-items: center; justify-content: center; height: 86px; border-radius: 12px; margin-bottom: 10px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); }
 .deck-cover span { font-family: var(--font-d); font-weight: 800; font-size: 30px; letter-spacing: .08em; color: rgba(255, 255, 255, .95); text-shadow: 0 2px 8px rgba(0, 0, 0, .4); }
 .deck-card .deck-name, .deck-name { font-weight: 800; font-size: 18px; display: block; color: #fff; font-family: var(--font-d); }
@@ -181,7 +211,7 @@ input::placeholder { color: var(--faint); }
 .join-row .btn { flex: 1; }
 .round-cards { display: flex; gap: 6px; }
 .round-card { flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px; cursor: pointer; color: var(--text); font-family: inherit; text-align: center; }
-.round-card.selected { background: #171106; border-color: var(--gold); }
+.round-card.selected { background: rgba(23, 17, 6, .82); border-color: var(--gold); }
 .howto { margin: 18px 0 4px; border-top: 1px solid var(--line-soft); padding-top: 12px; }
 .howto summary { cursor: pointer; font-family: var(--font-d); font-weight: 700; font-size: 17px; color: var(--text); list-style: none; }
 .howto summary::-webkit-details-marker { display: none; }
@@ -288,7 +318,7 @@ body.in-game .brand, body.in-game footer { display: none; }
 .cell.marked .c-artist { color: #241a04; }
 .cell.marked .c-title { color: #5c430a; }
 @keyframes markpop { 0% { transform: scale(.92); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
-.cell.free { background: #141007; border-color: rgba(212, 175, 55, .45); cursor: default; }
+.cell.free { background: rgba(20, 16, 7, .78); border-color: rgba(212, 175, 55, .45); cursor: default; }
 .cell.free .c-artist { color: var(--gold); font-size: 12.5px; letter-spacing: .5px; }
 .cell.shake { animation: shake .3s ease; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
@@ -499,7 +529,7 @@ body.in-game .brand, body.in-game footer { display: none; }
 }
 .pattern-btn .p-name { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-align: center; line-height: 1.15; }
 .pattern-btn .p-pts { font-size: 11px; color: var(--gold); font-weight: 800; }
-.pattern-btn.selected { border-color: var(--gold); background: #141007; box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(212, 175, 55, .25); }
+.pattern-btn.selected { border-color: var(--gold); background: rgba(20, 16, 7, .78); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(212, 175, 55, .25); }
 .mini-grid { display: grid; grid-template-columns: repeat(5, 9px); grid-template-rows: repeat(5, 9px); gap: 2px; }
 .mini-grid i { background: var(--surface2); border: 1px solid var(--line-soft); border-radius: 2px; }
 .mini-grid i.on { background: var(--gold-grad); border-color: var(--gold-lo); }
@@ -568,6 +598,8 @@ body.in-game .brand, body.in-game footer { display: none; }
      logo and the breathing glow do not run. */
   #bg-logo-video { display: none; }
   #bg-glow { animation: none; opacity: .5; }
+  /* v28: no boot video under reduced motion — straight to home. */
+  #boot-overlay { display: none; }
 }
 
 /* The whole app drives show/hide through the hidden property (~80 call
