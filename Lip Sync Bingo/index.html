@@ -42,6 +42,7 @@
       <button id="btn-join-hotspot" class="btn">📶 Join a hotspot game</button>
       <button id="btn-join-audience" class="btn ghost">👀 Join as audience — vote only, no card</button>
       <button id="btn-solo" class="btn ghost">Just me — practice</button>
+      <button id="btn-past-nights" class="btn ghost">🌙 Past nights</button>
     </div>
 
     <details class="howto">
@@ -261,7 +262,35 @@
       <button id="btn-next-round" class="btn gold">Next round ▶</button>
       <button id="btn-new-game" class="btn">New game (fresh cards)</button>
     </div>
+    <div id="scores-final-controls" class="row" hidden>
+      <button id="btn-rematch" class="btn gold" hidden>🔁 Rematch — same room</button>
+      <button id="btn-share-scores" class="btn">📸 Share the standings</button>
+    </div>
     <button id="btn-scores-home" class="btn ghost">Back to home</button>
+  </section>
+
+  <!-- ======================= PAST NIGHTS ======================= -->
+  <section id="screen-nights" class="screen">
+    <h2 class="screen-title">🌙 Past nights</h2>
+    <p class="hint">Every finished game on this phone is saved here — the final standings,
+      the deck, the room. Open a night to share its standings picture or run it back.</p>
+    <div id="nights-list-wrap">
+      <div id="nights-list"></div>
+    </div>
+    <div id="night-detail" hidden>
+      <h3 id="night-detail-title" class="section-title"></h3>
+      <p id="night-detail-meta" class="status"></p>
+      <ul id="night-detail-list" class="player-list scores"></ul>
+      <div class="row">
+        <button id="btn-night-share" class="btn gold">📸 Share the standings</button>
+        <button id="btn-night-rematch" class="btn">🔁 Rematch this night</button>
+      </div>
+      <div class="row">
+        <button id="btn-night-delete" class="btn ghost danger">Delete this night</button>
+        <button id="btn-night-back" class="btn ghost">← All nights</button>
+      </div>
+    </div>
+    <button id="btn-nights-home" class="btn ghost">Back to home</button>
   </section>
 
   <!-- ======================= HOTSPOT JOIN ======================= -->
