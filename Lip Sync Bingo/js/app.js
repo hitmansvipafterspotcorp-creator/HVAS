@@ -1087,7 +1087,7 @@
     });
     hostBroadcastState();
     showStage(st.songId, st.list, st.mode);
-    startStageCountdown(STAGE_SECONDS, function () { if (H && H.phase === 'stage') endPerformance(); });
+    startStageCountdown(STAGE_SECONDS, function () { if (H && H.phase === 'stage') endPerformance(); }, { gateOnSong: true });
   }
 
   /* Everyone except the performer(s) votes: players AND audience. */
@@ -1379,7 +1379,7 @@
         G.stageList = msg.performers;
         G.stageMedia = msg.media || null;
         showStage(msg.songId, msg.performers, msg.mode);
-        startStageCountdown(msg.seconds || 60, null);
+        startStageCountdown(msg.seconds || 60, null, { gateOnSong: true });
         break;
       case 'stage-end':
         show('screen-game');
@@ -1552,12 +1552,23 @@
     lastCallShown = songId;
   }
 
+  /* The call countdown measures SONG time, not wall time (Nov 22,
+     2026 ad gate): it accumulates only while this phone's gate says
+     the song itself is playing, freezes for the length of any ad,
+     and completes early if the track ends. `at` (the host's call
+     timestamp) is kept for signature compatibility — the host's own
+     bar behaves as before, since its call and its playback start
+     together; a guest's bar now measures the guest's own song time
+     once they tap Play, which is the time they actually hear. */
   function startCountdown(at) {
     clearInterval(countdownInt);
     var fill = $('countdown-fill');
     var secs = $('call-secs');
+    var clock = Core.createGatedClock(CALL_SECONDS);
     countdownInt = setInterval(function () {
-      var left = Math.max(0, CALL_SECONDS - (Date.now() - at) / 1000);
+      var open = gateOpenFor('call');
+      if (gateEndedFor('call')) clock.finish();
+      var left = clock.tick(Date.now(), open);
       fill.style.width = ((1 - left / CALL_SECONDS) * 100) + '%';
       if (secs) secs.textContent = Math.ceil(left) + 's';
       if (left <= 0) clearInterval(countdownInt);
@@ -1877,11 +1888,25 @@
     if (pr && pr.catch) pr.catch(function () {});
   }
 
-  function startStageCountdown(seconds, onDone) {
+  /* opts.gateOnSong (performance countdown only): the seconds are
+     SONG seconds — the clock accumulates only while the ad gate
+     says the track itself is playing, so an ad mid-performance
+     freezes the performer's clock instead of eating it. Claim and
+     vote countdowns are not song-driven and stay wall-clock. */
+  function startStageCountdown(seconds, onDone, opts) {
     clearInterval(stageInt);
+    var gated = !!(opts && opts.gateOnSong);
+    var clock = gated ? Core.createGatedClock(seconds) : null;
     var startedAt = Date.now();
     stageInt = setInterval(function () {
-      var left = Math.max(0, seconds - (Date.now() - startedAt) / 1000);
+      var left;
+      if (gated) {
+        var open = gateOpenFor('stage');
+        if (gateEndedFor('stage')) clock.finish();
+        left = clock.tick(Date.now(), open);
+      } else {
+        left = Math.max(0, seconds - (Date.now() - startedAt) / 1000);
+      }
       $('stage-count').textContent = Math.ceil(left);
       $('stage-timer-fill').style.width = ((1 - left / seconds) * 100) + '%';
       var ring = $('timer-ring');
@@ -2369,6 +2394,78 @@
   var trackWant = null;         // {songId, ids:[], legs:[], legIdx, purpose, playing, via}
   var trackWatchdog = null;
 
+  /* ---- the ad gate (Nov 22, 2026 — Korey: the app should "only
+     play when a song is playing, not the ad"). ONE source of truth
+     for "the SONG is audibly playing right now": the pure gate in
+     core.js decides from live player samples, and every song-driven
+     timer (the 60s call countdown, the stage performance countdown)
+     accumulates only while it says yes — an ad freezes the game
+     clock and raises the "Ad playing — game paused" banner until
+     the song itself is back. YouTube legs: the gate reads the real
+     player (state, duration, playhead) — an ad betrays itself by
+     reporting the AD's duration instead of the song's. Mirror legs:
+     the embed is cross-origin, so no media state is readable from
+     here at all; the verdict rides mirrorActive, the same
+     load+start-beat signal playback itself already trusts, and
+     mirror embeds serve no ads, so a live mirror is the song. ---- */
+  var playbackGate = Core.createPlaybackGate();
+  var gatePoll = null;
+
+  function songActuallyPlaying() {
+    if (!trackWant) { updateAdBanner(false); return false; }
+    var s = { via: trackWant.via, ytState: null, duration: null, currentTime: null, mirrorLive: false };
+    if (trackWant.via === 'mirror') {
+      s.mirrorLive = mirrorActive;
+    } else if (trackWant.via === 'yt' && trackPlayer) {
+      try { s.ytState = trackPlayer.getPlayerState(); } catch (e) {}
+      try { s.duration = trackPlayer.getDuration(); } catch (e) {}
+      try { s.currentTime = trackPlayer.getCurrentTime(); } catch (e) {}
+    }
+    playbackGate.sample(s, Date.now());
+    var adNow = playbackGate.reason() === 'ad';
+    updateAdBanner(adNow);
+    // A marathon ad is not a pause, it is a dead leg: after the cap
+    // of CONTINUOUS ad time, fail over to the next source like any
+    // other dead source. On the last leg there is nowhere to fail
+    // to — the clock simply stays frozen until the song comes back.
+    if (adNow && playbackGate.adMs() >= Core.AD_FREEZE_CAP_MS &&
+        trackWant.legIdx < trackWant.legs.length - 1) {
+      advanceLeg(trackWant); // advanceLeg resets the gate for the new leg
+    }
+    return playbackGate.isOpen();
+  }
+  function updateAdBanner(showAd) {
+    var b = $('ad-banner');
+    if (!b) return;
+    b.hidden = !(showAd && trackWant);
+  }
+  function startGatePoll() {
+    if (gatePoll) return;
+    gatePoll = setInterval(function () {
+      if (!trackWant) { stopGatePoll(); return; }
+      songActuallyPlaying();
+    }, 250);
+  }
+  function stopGatePoll() {
+    clearInterval(gatePoll);
+    gatePoll = null;
+    updateAdBanner(false);
+  }
+  /* Timers ask here. The gate governs a timer only when THIS phone
+     is actually playing that purpose's track: hotspot rooms have no
+     local playback (the room hears the song out loud), and a guest
+     who has not tapped Play yet has no player to judge — in both
+     cases the timer runs as it always did. */
+  function gateOpenFor(purpose) {
+    if (mode === 'hotspot') return true;
+    if (!trackWant || trackWant.purpose !== purpose) return true;
+    return songActuallyPlaying();
+  }
+  function gateEndedFor(purpose) {
+    return !!trackWant && trackWant.purpose === purpose &&
+      playbackGate.reason() === 'ended';
+  }
+
   /* ---- ad-free mirror (Invidious) ----
      Korey 2026-11-21: no ads. The tracks live on YouTube, and YouTube's
      own player carries the ads with no off switch — so the game first
@@ -2434,6 +2531,7 @@
      last leg failing lands in failTrack's honest message. */
   function advanceLeg(want) {
     if (trackWant !== want) return;
+    playbackGate.reset(); // the new leg is a different upload — its duration latch starts fresh
     var prev = want.legs[want.legIdx];
     want.legIdx++;
     if (want.legIdx >= want.legs.length) { failTrack(); return; }
@@ -2713,6 +2811,8 @@
   }
   function failTrack() {
     clearTimeout(trackRetryTimer);
+    stopGatePoll();
+    playbackGate.reset();
     var s = trackWant ? Data.SONG_MAP[trackWant.songId] : null;
     var purpose = trackWant ? trackWant.purpose : trackPurpose;
     var el = trackStatusEl(purpose);
@@ -2752,6 +2852,8 @@
     var ids = [];
     legs.forEach(function (leg) { if (ids.indexOf(leg.id) === -1) ids.push(leg.id); });
     trackWant = { songId: songId, ids: ids, legs: legs, legIdx: 0, purpose: purpose, playing: false, retried: false, via: null };
+    playbackGate.reset();
+    startGatePoll();
     setTrackStatus(purpose, 'Loading the track…');
     var want = trackWant;
     startLeg(want);
@@ -2771,7 +2873,19 @@
   function startTrack(songId) {
     playTrack(songId, 'stage');
     if (mode !== 'hotspot') {
-      trackTimer = setTimeout(stopTrack, (STAGE_SECONDS + 8) * 1000); // never outlives the stage
+      // Wall-clock backstop so the track never outlives the stage.
+      // The stage clock now freezes during ads (ad gate), so a frozen
+      // performance legitimately runs past the old hard stop: re-check
+      // a few times before killing, with a hard cap on the grace.
+      var rearms = 0;
+      var killStageTrack = function () {
+        if (rear++ < 8 && H && H.phase === 'stage' && H.stage && H.stage.sub === 'perform') {
+          trackTimer = setTimeout(killStageTrack, 15000);
+          return;
+        }
+        stopTrack();
+      };
+      trackTimer = setTimeout(killStageTrack, (STAGE_SECONDS + 8) * 1000); // never outlives the stage
     }
   }
   function stopTrack() {
@@ -2781,6 +2895,8 @@
     trackWatchdog = null;
     clearTimeout(trackRetryTimer);
     clearTimeout(trackSoundTimer);
+    stopGatePoll();
+    playbackGate.reset();
     stopMirror();
     trackWant = null;
     if (trackPlayer && trackPlayer.stopVideo) {
@@ -2817,6 +2933,7 @@
       trackWant.legIdx = target;
       trackWant.via = 'yt';
       trackWant.playing = false;
+      playbackGate.reset(); // new source — the gate's duration latch starts fresh
       setTrackStatus(trackWant.purpose, 'Loading the track…');
       driveTrackPlayer();
       return;
@@ -2857,6 +2974,7 @@
   function leaveRoom(silent) {
     clearInterval(countdownInt);
     clearInterval(stageInt);
+    stopGatePoll();
     clearTimeout(autoResumeTimer);
     healthRunId++; // in-flight track probes from this room write nothing now
     clearProbeFrames();
