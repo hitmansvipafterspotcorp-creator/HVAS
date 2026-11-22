@@ -506,7 +506,13 @@
   /*    duration sits more than AD_DURATION_TOLERANCE below the       */
   /*    latch is an ad — gate shut. A longer duration re-latches       */
   /*    upward, so a first sample that caught an ad self-corrects     */
-  /*    the moment the song itself appears.                           */
+  /*    the moment the song itself appears. The app can also hand     */
+  /*    the gate the song's true length from metadata                 */
+  /*    (setExpectedDuration — the Invidious API's lengthSeconds),    */
+  /*    which exists before the first sample: with it, even a leg     */
+  /*    whose very first frame is an ad is judged an ad from the      */
+  /*    start. The latch remains the fallback when metadata is        */
+  /*    unavailable.                                                  */
   /*  - Mirror legs: the mirror embed is cross-origin, so no media    */
   /*    state is readable from the app at all. The sample carries     */
   /*    `mirrorLive` — the app's load+start-beat signal, the same     */
@@ -521,6 +527,11 @@
 
   function createPlaybackGate() {
     var refDuration = 0;   // latched song duration for the current leg (0 = unknown)
+    var expectedDuration = 0; // the song's true length from metadata (Invidious
+                              // API lengthSeconds), when the app could fetch it —
+                              // an independent reference that exists BEFORE the
+                              // first player sample, so even a leg whose very
+                              // first frame is an ad is judged against the song
     var lastDuration = 0;  // most recent nonzero duration sample
     var lastTime = null;   // most recent currentTime sample
     var open = false;
@@ -574,8 +585,13 @@
       if (t !== null) lastTime = t;
       if (!advancing) { setClosed('not-playing', now); return gate; }
       // PLAYING + advancing — song, or an ad riding the same state?
+      // The reference is the BEST knowledge of the song's length: the
+      // latched longest-observed duration, or the metadata length when
+      // that is longer (metadata arrives before any sample, so a leg
+      // that opens ON an ad is caught from its first advancing frame).
       var cur = d || lastDuration;
-      if (refDuration > 0 && cur > 0 && cur < refDuration - AD_DURATION_TOLERANCE) {
+      var ref = Math.max(refDuration, expectedDuration);
+      if (ref > 0 && cur > 0 && cur < ref - AD_DURATION_TOLERANCE) {
         setClosed('ad', now);
         return gate;
       }
@@ -583,8 +599,21 @@
       return gate;
     }
 
+    /**
+     * Tell the gate the song's true length (seconds) from metadata.
+     * Max semantics: the reference only ever grows — a shorter value
+     * never shrinks it, and a longer duration observed from the player
+     * itself still wins. Call it whenever the metadata lands; if it
+     * arrives mid-ad, the very next sample is judged against it.
+     */
+    function setExpectedDuration(sec) {
+      if (typeof sec === 'number' && sec > expectedDuration) expectedDuration = sec;
+      return gate;
+    }
+
     function reset() {
       refDuration = 0;
+      expectedDuration = 0;
       lastDuration = 0;
       lastTime = null;
       open = false;
@@ -595,11 +624,12 @@
 
     var gate = {
       sample: sample,
+      setExpectedDuration: setExpectedDuration,
       reset: reset,
       isOpen: function () { return open; },
       reason: function () { return reason; },
       adMs: function () { return adMs; },
-      refDuration: function () { return refDuration; }
+      refDuration: function () { return Math.max(refDuration, expectedDuration); }
     };
     return gate;
   }
@@ -632,6 +662,43 @@
       reset: function () { playedMs = 0; lastNow = null; finished = false; }
     };
     return clock;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Auto-call driver decision (Nov 22, 2026 perfection pass).        */
+  /*                                                                  */
+  /* The call countdown runs on SONG time (the gated clock above),    */
+  /* so the auto-caller must advance on the CLOCK's completion —      */
+  /* not on wall time. The old driver fired at 60s of wall clock:     */
+  /* after any ad freeze or slow failover the next song was called    */
+  /* while the current one still had gated seconds left, cutting      */
+  /* it short and desyncing the caller from the on-screen bar.        */
+  /* Wall time survives only as a RESCUE: if a call's clock can       */
+  /* never complete (last leg stalled, tap prompt up, gate shut       */
+  /* for good), auto-call still moves on rather than leaving the      */
+  /* room in dead air. The rescue budget is the song window + one     */
+  /* full ad-freeze cap (a marathon ad that fails the leg over) +     */
+  /* slack for failovers and loading — past that, the call is stuck,  */
+  /* not slow.                                                        */
+  /* ---------------------------------------------------------------- */
+  function callRescueMs(songSeconds) {
+    return songSeconds * 1000 + AD_FREEZE_CAP_MS + 90000;
+  }
+
+  /**
+   * Should the auto-caller call the next song right now?
+   * opts: {auto, phase, lastCallAt, now, clockDone, rescueMs}
+   *  - clockDone: the current call's gated clock has completed
+   *    (its full song window was actually heard), or
+   *  - rescue: the call has been live longer than rescueMs of wall
+   *    time without completing.
+   */
+  function autoCallDue(opts) {
+    if (!opts || !opts.auto) return false;
+    if (opts.phase !== 'playing') return false;
+    if (!opts.lastCallAt) return false;
+    if (opts.clockDone) return true;
+    return (opts.now - opts.lastCallAt) >= opts.rescueMs;
   }
 
   /* ---------------------------------------------------------------- */
@@ -686,6 +753,8 @@
     AD_FREEZE_CAP_MS: AD_FREEZE_CAP_MS,
     createPlaybackGate: createPlaybackGate,
     createGatedClock: createGatedClock,
+    callRescueMs: callRescueMs,
+    autoCallDue: autoCallDue,
     makeRoomCode: makeRoomCode,
     normalizeRoomCode: normalizeRoomCode
   };

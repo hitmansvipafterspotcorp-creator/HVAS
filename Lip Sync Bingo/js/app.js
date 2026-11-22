@@ -541,6 +541,13 @@
   var countdownInt = null;
   var stageInt = null;
   var autoResumeTimer = null;
+  /* The current call's gated-clock completion, for the auto-call
+     driver: callClockDone flips true when the call clock that
+     startCountdown started for callClockAt has accumulated its full
+     SONG window. The driver advances on this — never on raw wall
+     time (see Core.autoCallDue). */
+  var callClockDone = false;
+  var callClockAt = 0;
 
   function requireName() {
     myName = $('player-name').value.trim();
@@ -1562,6 +1569,8 @@
      once they tap Play, which is the time they actually hear. */
   function startCountdown(at) {
     clearInterval(countdownInt);
+    callClockAt = at || 0;
+    callClockDone = false;
     var fill = $('countdown-fill');
     var secs = $('call-secs');
     var clock = Core.createGatedClock(CALL_SECONDS);
@@ -1571,7 +1580,7 @@
       var left = clock.tick(Date.now(), open);
       fill.style.width = ((1 - left / CALL_SECONDS) * 100) + '%';
       if (secs) secs.textContent = Math.ceil(left) + 's';
-      if (left <= 0) clearInterval(countdownInt);
+      if (left <= 0) { callClockDone = true; clearInterval(countdownInt); }
     }, 200);
   }
 
@@ -2411,6 +2420,67 @@
   var playbackGate = Core.createPlaybackGate();
   var gatePoll = null;
 
+  /* ---- the song's true length, from metadata (Nov 22, 2026
+     perfection pass — closing the v24 gate's first-ad race). The
+     latch inside the gate learns the song's duration from the
+     player, but a leg whose VERY FIRST frame is an ad has nothing
+     to learn from yet. The mirror instances the app already talks
+     to publish the video's real length (lengthSeconds) through
+     their API — fetched here in parallel, NEVER blocking playback:
+     one light request per upload per session, walked across the
+     candidate hosts like every other mirror call. When it lands,
+     the gate judges durations against the truth; when it never
+     lands (hosts down, no CORS, offline), the latch fallback is
+     exactly the v24 behavior. Fetches happen only for songs that
+     are actually played (playTrack / leg start), never for the
+     whole pool — the community mirrors are not to be hammered. -- */
+  var songDurations = {};   // videoId -> lengthSeconds (this session)
+  var durationAsked = {};   // videoId -> true once a fetch chain ran
+  function fetchSongDuration(id) {
+    if (!id || durationAsked[id]) return;
+    durationAsked[id] = true;
+    var hosts = mirrorCandidates();
+    function attempt(hi) {
+      if (hi >= hosts.length) return;
+      var host = hosts[hi];
+      var ctl = ('AbortController' in window) ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, 4000) : null;
+      fetch('https://' + host + '/api/v1/videos/' + id, ctl ? { signal: ctl.signal } : {})
+        .then(function (res) {
+          if (timer) clearTimeout(timer);
+          if (!res.ok) throw new Error('metadata http ' + res.status);
+          return res.json();
+        })
+        .then(function (j) {
+          var sec = (j && typeof j.lengthSeconds === 'number') ? j.lengthSeconds : 0;
+          if (sec > 0) {
+            songDurations[id] = sec;
+            // If this upload is the leg on screen right now, the gate
+            // gets the truth immediately — even mid-ad.
+            if (trackWant && trackWant.legs[trackWant.legIdx] &&
+                trackWant.legs[trackWant.legIdx].id === id) {
+              playbackGate.setExpectedDuration(sec);
+            }
+          } else {
+            attempt(hi + 1);
+          }
+        })
+        .catch(function () { if (timer) clearTimeout(timer); attempt(hi + 1); });
+    }
+    attempt(0);
+  }
+  /* Hand the gate whatever metadata truth exists for the want's
+     current leg, and make sure the fetch is running for it. Called
+     on every leg start — advanceLeg resets the gate first, so a
+     cached length lands on the fresh gate before its first sample. */
+  function armExpectedDuration(want) {
+    if (!want) return;
+    var leg = want.legs[want.legIdx];
+    if (!leg) return;
+    if (songDurations[leg.id]) playbackGate.setExpectedDuration(songDurations[leg.id]);
+    else fetchSongDuration(leg.id);
+  }
+
   function songActuallyPlaying() {
     if (!trackWant) { updateAdBanner(false); return false; }
     var s = { via: trackWant.via, ytState: null, duration: null, currentTime: null, mirrorLive: false };
@@ -2521,6 +2591,7 @@
   function startLeg(want) {
     var leg = want.legs[want.legIdx];
     if (!leg) { failTrack(); return; }
+    armExpectedDuration(want); // the gate judges this leg against metadata truth when there is any
     if (leg.via === 'mirror') startMirror(want);
     else { want.via = 'yt'; driveTrackPlayer(); }
   }
@@ -2851,6 +2922,11 @@
     var legs = orderedLegs(songId, prefHint);
     var ids = [];
     legs.forEach(function (leg) { if (ids.indexOf(leg.id) === -1) ids.push(leg.id); });
+    // Warm the metadata lengths for every source of this song in
+    // parallel — a failover leg should meet a gate that already
+    // knows the song's true length. Fire-and-forget; playback
+    // starts right now regardless.
+    ids.forEach(function (id) { fetchSongDuration(id); });
     trackWant = { songId: songId, ids: ids, legs: legs, legIdx: 0, purpose: purpose, playing: false, retried: false, via: null };
     playbackGate.reset();
     startGatePoll();
@@ -2934,6 +3010,7 @@
       trackWant.via = 'yt';
       trackWant.playing = false;
       playbackGate.reset(); // new source — the gate's duration latch starts fresh
+      armExpectedDuration(trackWant); // …but a cached metadata length still applies
       setTrackStatus(trackWant.purpose, 'Loading the track…');
       driveTrackPlayer();
       return;
@@ -3165,7 +3242,17 @@
     toast(H.auto ? 'Auto-call on — a song every minute.' : 'Auto-call off — you run the caller.');
   });
   setInterval(function () { // auto-call driver (host only)
-    if (H && H.auto && H.phase === 'playing' && H.lastCallAt && Date.now() - H.lastCallAt >= CALL_SECONDS * 1000) {
+    // Advance on SONG time: the next call fires when the current
+    // call's gated clock has completed its full window (the song was
+    // actually heard for a minute — ads and stalls froze the clock,
+    // so they push the next call later, never cut this song short).
+    // Wall time is only the rescue for a call whose clock can never
+    // complete (Core.autoCallDue / Core.callRescueMs).
+    if (H && Core.autoCallDue({
+      auto: H.auto, phase: H.phase, lastCallAt: H.lastCallAt, now: Date.now(),
+      clockDone: callClockDone && callClockAt === H.lastCallAt,
+      rescueMs: Core.callRescueMs(CALL_SECONDS)
+    })) {
       hostCallNext();
     }
   }, 500);
