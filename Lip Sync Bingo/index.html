@@ -33,7 +33,12 @@
      poster still (logo-full.png) is the calm background instead.
      v29: the video and poster fit the WHOLE logo (contain, centered
      on black) — the crest and all its text stay on screen, never
-     blown up and cropped the way the old cover fit did on phones. -->
+     blown up and cropped the way the old cover fit did on phones.
+     v30: the JUMP fix — the stack's box used to be sized by the
+     phone's dynamic viewport, so the logo rescaled and re-centered
+     every time the browser chrome hid or showed mid-scroll. The
+     boot script below locks the stack's height once at load (see
+     style.css); the anchoring itself is unchanged. -->
 <div id="bg-stack" aria-hidden="true">
   <div id="bg-poster"></div>
   <video id="bg-logo-video" src="icons/logo-animated.mp4" poster="icons/logo-full.png" autoplay loop muted playsinline></video>
@@ -370,7 +375,7 @@
 <div id="toast" hidden></div>
 
 <footer>
-  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v29</span></p>
+  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v30</span></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
@@ -382,7 +387,7 @@
 <script src="js/app.js"></script>
 <script>
   /* v28 boot — the retro logo loading screen + the background kick.
-     Two jobs, both defensive (the game must open normally no matter
+     Three jobs, all defensive (the game must open normally no matter
      what any video does):
        1. Boot overlay: dismiss on the loading video's 'ended', on
           any tap on the overlay, on video 'error', or when the
@@ -392,7 +397,17 @@
        2. Background kick: the moving logo (bg-logo-video) carries
           autoplay, but some phones still park it on its poster —
           call play() explicitly on load, and again on the first
-          pointerdown anywhere (a user gesture always unlocks it). */
+          pointerdown anywhere (a user gesture always unlocks it).
+       3. Background box lock (v30): the bg stack's height is
+          measured ONCE here and set in pixels. Left to itself the
+          stack is sized by the phone's dynamic viewport, so every
+          browser-chrome show/hide mid-scroll resized the box and
+          the contain logo rescaled + re-centered with it — the
+          jolt Korey reported. A resize that changes the WIDTH is
+          a real resize / orientation change and re-locks; a
+          height-only change is chrome showing/hiding and is
+          ignored on purpose. The anchoring never changes — the
+          background rides exactly as it always has, at one size. */
   (function () {
     var bgVideo = document.getElementById('bg-logo-video');
     function kickBg() {
@@ -410,6 +425,23 @@
       document.addEventListener('pointerdown', function firstTap() {
         kickBg();
         document.removeEventListener('pointerdown', firstTap);
+      });
+    }
+
+    var bgStack = document.getElementById('bg-stack');
+    var bgLockedW = 0;
+    function lockBgBox() {
+      if (!bgStack) return;
+      bgLockedW = window.innerWidth;
+      bgStack.style.height = window.innerHeight + 'px';
+    }
+    if (bgStack) {
+      lockBgBox();
+      window.addEventListener('resize', function () {
+        if (window.innerWidth !== bgLockedW) lockBgBox();
+      });
+      window.addEventListener('orientationchange', function () {
+        setTimeout(lockBgBox, 300);
       });
     }
 
