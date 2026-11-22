@@ -34,7 +34,20 @@
     // HOME pill + title over the panel, no brand header, no footer).
     document.body.classList.toggle('in-game', screenId === 'screen-game' || screenId === 'screen-stage');
     if (screenId !== 'screen-stage') stopStageMedia();
+    // The background glow settles back outside the big-moment screens
+    // (stage keeps its moment; scores keeps the winner's glow).
+    if (screenId !== 'screen-stage' && screenId !== 'screen-scores') setBgMoment('');
     window.scrollTo(0, 0);
+  }
+  /* v27 lovable touch: the gold glow behind the moving logo breathes
+     gently in menus and swells at the game's big moments — a
+     performer on stage ('live'), a battle ('battle'), a winner
+     ('win'). Pure CSS does the swelling; this only names the moment. */
+  function setBgMoment(m) {
+    var b = document.body;
+    if (!b || !b.classList) return;
+    b.classList.remove('moment-live', 'moment-battle', 'moment-win');
+    if (m) b.classList.add('moment-' + m);
   }
   var toastTimer = null;
   function toast(msg, ms) {
@@ -606,7 +619,8 @@
       id: pid, peerKey: peerKey, name: name || 'Player', seed: seed,
       card: Core.generateCard(H.deck.songs, seed),
       marks: new Set([Core.CENTER]), score: 0,
-      connected: true, isSelf: !!isSelf
+      connected: true, isSelf: !!isSelf,
+      conn: null // v27 lobby connection check: null (not run) | 'checking' | 'ok' | 'bad'
     };
     H.players[pid] = p;
     H.order.push(pid);
@@ -643,7 +657,7 @@
         id: p.id, name: p.name, marks: p.marks.size - 1,
         lines: Core.countLines(Array.from(p.marks)),
         best: bestLine(p.marks),
-        score: p.score, connected: p.connected
+        score: p.score, connected: p.connected, conn: p.conn || null
       };
     });
   }
@@ -689,6 +703,38 @@
       deckId: H.deck.id, deckName: H.deck.name,
       card: { cells: p.card.cells, mic: p.card.mic },
       round: H.round, phase: H.phase
+    });
+  }
+
+  /* ---- v27 lobby connection check (host side): the host checks
+     its own phone the same way guests do, so its dot in the lobby
+     list means the same thing as everyone else's. Guests report
+     their results with a 'conn' message (see hostOnMessage). ---- */
+  function runHostConnCheck() {
+    if (mode !== 'online' || !Net.checkConnection) return;
+    var me = selfPlayer();
+    if (!me) return;
+    me.conn = 'checking';
+    hostBroadcastState();
+    Net.checkConnection().then(function (res) {
+      if (!H) return;
+      var p = selfPlayer();
+      if (!p) return;
+      p.conn = res;
+      hostBroadcastState();
+      if ($('screen-lobby').classList.contains('active')) renderLobby();
+    });
+  }
+  /* Guest side of the same check: run it, remember the result for
+     our own lobby row, and report it to the host for everyone else's
+     list. Re-run on every (re)join and every welcome/resync. */
+  function runGuestConnCheck() {
+    if (mode !== 'online' || !Net.checkConnection || !transport) return;
+    var t = transport;
+    Net.checkConnection().then(function (res) {
+      if (G) G.myConn = res;
+      if (transport === t) { try { t.send({ t: 'conn', conn: res }); } catch (e) {} }
+      if ($('screen-lobby').classList.contains('active')) renderLobby();
     });
   }
 
@@ -778,6 +824,7 @@
       if (rejoin) {
         rejoin.peerKey = peerKey;
         rejoin.connected = true;
+        if (mode === 'online') rejoin.conn = 'checking'; // re-checked on resync (v27)
         resyncGuest(rejoin);
         hostBroadcastState();
         renderLobby();
@@ -793,6 +840,18 @@
       return;
     }
     if (msg.t === 'react') { hostRelayReact(peerKey, msg.emoji); return; }
+    if (msg.t === 'conn') {
+      // v27: a guest's lobby connection-check result. Stored on the
+      // player record and rebroadcast, so every lobby list in the
+      // room shows the same dot.
+      var cp = playerByPeer(peerKey);
+      if (cp) {
+        cp.conn = msg.conn === 'ok' ? 'ok' : 'bad';
+        hostBroadcastState();
+        if ($('screen-lobby').classList.contains('active')) renderLobby();
+      }
+      return;
+    }
     var player = playerByPeer(peerKey);
     if (!player) {
       if (msg.t === 'vote' && H.audience[peerKey]) hostHandleVoteAud(peerKey, msg.vote);
@@ -864,7 +923,7 @@
     p.score += pts;
     H.winner = { playerId: p.id, name: p.name, round: H.round, points: pts };
     H.phase = (H.round >= 3) ? 'over' : 'roundEnd';
-    sfx('win'); confetti(70);
+    sfx('win'); confetti(70); setBgMoment('win');
     broadcast({ t: 'winner', playerId: p.id, name: p.name, round: H.round, points: pts, patternName: activePatternName() || '' });
     hostBroadcastState();
     showScores();
@@ -1305,6 +1364,7 @@
         G.card = msg.card;
         G.marks = new Set([Core.CENTER]);
         G.deckName = msg.deckName;
+        runGuestConnCheck(); // v27: (re)joining/resyncing guests re-run the lobby check
         renderLobby();
         break;
       case 'welcome-aud':
@@ -1377,7 +1437,7 @@
         break;
       case 'winner':
         G.winner = { playerId: msg.playerId, name: msg.name, round: msg.round, points: msg.points };
-        sfx('win'); confetti(70);
+        sfx('win'); confetti(70); setBgMoment('win');
         showScores();
         banner('🎉 ' + msg.name + ' — BINGO! Round ' + msg.round + ' (+' + msg.points + ' pts)');
         break;
@@ -1551,10 +1611,22 @@
   function renderLobbyPlayers(players) {
     var ul = $('lobby-players');
     ul.innerHTML = '';
+    var anyBad = false;
     (players || []).forEach(function (p) {
       var li = document.createElement('li');
       if (!p.connected) li.className = 'offline';
-      li.innerHTML = '<span class="p-name">' + esc(p.name) + '</span>' +
+      // v27 connection dot: my own freshest result wins over the
+      // host's copy of it (which lags one broadcast behind).
+      var conn = (role === 'guest' && G && p.id === myId() && G.myConn) ? G.myConn : p.conn;
+      var dot = '';
+      if (conn === 'ok' || conn === 'bad' || conn === 'checking') {
+        if (conn === 'bad') anyBad = true;
+        dot = '<span class="conn-dot ' + conn + '" title="' +
+          (conn === 'ok' ? 'Connection check passed — this phone can be reached'
+            : conn === 'bad' ? 'Connection check failed — this phone may not connect in game'
+            : 'Checking this phone\u2019s connection…') + '"></span>';
+      }
+      li.innerHTML = dot + '<span class="p-name">' + esc(p.name) + '</span>' +
         (p.id === myId() ? ' <span class="p-meta">(you)</span>' : '') +
         '<span class="p-meta">' + (p.connected ? 'in the room' : 'left') + '</span>';
       ul.appendChild(li);
@@ -1568,6 +1640,8 @@
       ul.appendChild(li2);
     }
     if ((!players || !players.length) && !audN) ul.innerHTML = '<li>No players yet…</li>';
+    var connHint = $('lobby-conn-hint');
+    if (connHint) connHint.hidden = !anyBad;
   }
 
   /* ---- game ---- */
@@ -1813,6 +1887,7 @@
 
   function showClaimStage(songId, holders) {
     sfx('stage');
+    setBgMoment('live');
     stopTrack();
     currentTrackSong = null;
     show('screen-stage');
@@ -1863,6 +1938,7 @@
 
   function showStage(songId, list, mode) {
     sfx('stage');
+    setBgMoment(mode === 'battle' ? 'battle' : 'live');
     ensureTrackPlayer(); // a stage can be a guest's first track — start the player building now
     show('screen-stage');
     stageNow = list || [];
@@ -2020,6 +2096,7 @@
   }
   function showVoteResult(performerId, tally, total, squareEarned) {
     confetti(24);
+    setBgMoment('win');
     $('vote-panel').hidden = true;
     var el = $('vote-result');
     el.hidden = false;
@@ -2038,6 +2115,7 @@
 
   function showBattleResult(results, winnerId) {
     confetti(36);
+    setBgMoment('win');
     $('vote-panel').hidden = true;
     var el = $('vote-result');
     el.hidden = false;
@@ -2068,6 +2146,7 @@
 
   function showBattleForfeit(winnerName, loserName) {
     if (!$('screen-stage').classList.contains('active')) show('screen-stage');
+    setBgMoment('win');
     stopStageMedia();
     $('claim-panel').hidden = true;
     $('vote-panel').hidden = true;
@@ -2219,7 +2298,7 @@
   }
   function probeSlotRelease(i) {
     var f = $('probe-frame-' + i);
-    if (f) { f.onload = null; try { f.src = 'about:blank'; } catch (e) {} }
+    if (f) { f.onload = null; f.onerror = null; try { f.src = 'about:blank'; } catch (e) {} }
     if (probeWaiters.length) probeWaiters.shift()(i); // hand the slot straight over
     else probeSlots[i].busy = false;
   }
@@ -2228,15 +2307,20 @@
     probeSlots.forEach(function (slot, i) {
       slot.busy = false;
       var f = $('probe-frame-' + i);
-      if (f) { f.onload = null; try { f.src = 'about:blank'; } catch (e) {} }
+      if (f) { f.onload = null; f.onerror = null; try { f.src = 'about:blank'; } catch (e) {} }
     });
   }
   /* One mirror leg: load the real embed page in a probe frame. The
      page answering at all is the same signal playback itself trusts
-     (see tryMirror); a timeout marks the host dead for the session,
-     exactly like a playback timeout does, and the next host is tried. */
+     (see tryMirror). A probe timeout marks the host PROBE-dead only
+     (probeDead — the probes stop asking it, playback never sees the
+     verdict): the Nov 22, 2026 diagnosis caught probes burning the
+     only working mirror before the first call, because a probe
+     timeout used to write the same mirrorDead memory playback
+     trusted. Playback keeps its own memory and always walks the
+     full host list itself (see mirrorCandidates). */
   function probeMirrorLeg(id) {
-    var hosts = mirrorCandidates();
+    var hosts = Core.probeMirrorCandidates(mirrorHost, mirrorDead, probeDead);
     if (!hosts.length) return Promise.resolve(false);
     function attempt(hi) {
       if (hi >= hosts.length) return Promise.resolve(false);
@@ -2249,8 +2333,7 @@
           var timer = setTimeout(function () {
             if (settled) return;
             settled = true;
-            mirrorDead[host] = true;
-            if (mirrorHost === host) mirrorHost = null;
+            probeDead[host] = true; // probe memory only — NEVER mirrorDead
             probeSlotRelease(slot);
             resolve(false);
           }, 4500);
@@ -2261,6 +2344,13 @@
             // Give its player a beat, like tryMirror does, then free the frame.
             setTimeout(function () { probeSlotRelease(slot); }, 250);
             resolve(true);
+          };
+          f.onerror = function () {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            probeSlotRelease(slot);
+            resolve(false);
           };
           try { f.src = 'https://' + host + '/embed/' + id + '?autoplay=1'; } catch (e) {
             clearTimeout(timer);
@@ -2390,7 +2480,12 @@
      own probe result, or the host's hint broadcast to guests), legs the
      probe proved dead skipped, the rest in preference order behind it.
      If everything probed dead, the full list is returned anyway —
-     playback makes one last honest attempt before failing out loud. */
+     playback makes one last honest attempt before failing out loud.
+     SOUND GATE exception (Nov 22, 2026): a MIRROR leg is never dropped
+     for a probe failure. A mirror probe verdict is about a HOST (it
+     timed out, possibly while the network was busy), and playback
+     walks the hosts live for itself — the probe may deprioritize the
+     mirror behind a verified source, never blacklist it. */
   function orderedLegs(songId, prefHint) {
     var legs = trackLegs(Data.SONG_MAP[songId]);
     if (!legs.length) return legs;
@@ -2401,7 +2496,7 @@
     if (first) out.push(first);
     legs.forEach(function (leg, i) {
       if (first && leg.via === first.via && leg.id === first.id) return;
-      if (failed[i]) return;
+      if (failed[i] && leg.via !== 'mirror') return;
       out.push(leg);
     });
     return out.length ? out : legs;
@@ -2573,27 +2668,25 @@
      session memory of the server that answered, and an instant
      fall-through to the regular YouTube player — the game is never
      worse off than YouTube alone. Sound cannot be read across origins,
-     so if a mirror loads but the phone keeps it silent under autoplay
-     rules, the status says so and the ▶ Play tap rescues the song onto
-     the YouTube player, whose sound path is proven. */
-  /* The official public-instance list (docs.invidious.io, checked
-     2026-11-21) has exactly four entries. Only two are wired in:
-       - invidious.tiekoetter.com — VERIFIED from here: its /embed/
-         page for a real pool song serves an actual <video> player.
-       - invidious.nerdvpn.de — on the official list; unreachable from
-         the build machine today, but its failure mode is silence (a
-         timeout), which the chain skips safely.
-     Deliberately EXCLUDED: yt.chocolatemoo53.com and inv.nadeko.net.
-     Both sit behind anti-bot CAPTCHA walls (nadeko's is documented;
-     chocolatemoo53's embed URL served a challenge page, verified
-     2026-11-21) — a challenge page still fires the frame's load
-     event, so the game would claim "playing" over a CAPTCHA. Never
-     add a host whose embed answer is a wall. */
-  var MIRROR_HOSTS = ['invidious.tiekoetter.com', 'invidious.nerdvpn.de'];
+     so a loaded mirror is only ever a song STARTED, never a song
+     "playing" — the SOUND GATE (below, Core's sound-gate section)
+     owns what happens next: honest status, the big rescue button on
+     every phone, and the caller's own phone escalating itself onto
+     the YouTube player, whose sound path is proven and verified. */
+  /* The mirror host list is single-sourced in core.js (Core.
+     MIRROR_HOSTS, v27) — three hosts: one verified live from the
+     build machine, two assumed (see core.js for the audit note and
+     why the CAPTCHA-walled official instances stay excluded).
+     Playback rotates through every candidate in order and only
+     falls back to YouTube after all of them fail. */
+  var MIRROR_HOSTS = Core.MIRROR_HOSTS;
   var mirrorHost = null;      // the server that answered this session
-  var mirrorDead = {};        // host -> true (failed this session)
+  var mirrorDead = {};        // host -> true (PLAYBACK proved it dead this session)
+  var probeDead = {};         // host -> true (PROBES timed out on it — probe memory only;
+                              // playback never reads this, see probeMirrorLeg)
   var mirrorTimer = null;
   var mirrorActive = false;
+  var soundGateTimer = null;  // the caller's ~6s mirror -> YouTube auto-escalation wake-up
 
   function stopMirror() {
     clearTimeout(mirrorTimer);
@@ -2602,16 +2695,17 @@
     var f = $('inv-frame');
     if (f) {
       f.onload = null;
+      f.onerror = null;
       try { f.src = 'about:blank'; } catch (e) {}
     }
   }
+  /* The PLAYBACK walk: the full host list in order (session-proven
+     host first), skipping only hosts playback itself proved dead.
+     Probe verdicts (probeDead) never enter here — a host the probes
+     burned still gets its real playback attempt. Pure list logic
+     lives in core.js (Core.playbackMirrorCandidates). */
   function mirrorCandidates() {
-    var list = [];
-    if (mirrorHost && !mirrorDead[mirrorHost]) list.push(mirrorHost);
-    MIRROR_HOSTS.forEach(function (h) {
-      if (list.indexOf(h) === -1 && !mirrorDead[h]) list.push(h);
-    });
-    return list;
+    return Core.playbackMirrorCandidates(mirrorHost, mirrorDead);
   }
   /* Dispatch the want's current leg: a mirror leg goes to the mirror
      chain, a YouTube leg to the persistent player. */
@@ -2638,6 +2732,8 @@
     clearTimeout(trackWatchdog);
     clearTimeout(trackRetryTimer);
     clearTimeout(trackSoundTimer);
+    clearTimeout(soundGateTimer); // the new leg re-arms the sound gate when IT starts
+    soundGateTimer = null;
     stopMirror();
     healthStats.swapped++;
     updateHealthLine();
@@ -2677,26 +2773,140 @@
       mirrorDead[host] = true;
       if (mirrorHost === host) mirrorHost = null;
       f.onload = null;
+      f.onerror = null;
       tryMirror(want, hosts, i + 1);
     }, 4000);
+    // A frame-level error (DNS, refused connection) is a dead host
+    // for this session too — rotate immediately instead of spending
+    // the whole load budget on it.
+    f.onerror = function () {
+      if (settled) return;
+      settled = true;
+      clearTimeout(mirrorTimer);
+      mirrorDead[host] = true;
+      if (mirrorHost === host) mirrorHost = null;
+      f.onload = null;
+      f.onerror = null;
+      tryMirror(want, hosts, i + 1);
+    };
     f.onload = function () {
       if (settled) return;
       settled = true;
       clearTimeout(mirrorTimer);
       // The mirror page loaded. Give its player a beat to start, then
-      // call it playing — with the honest rescue line attached, since
-      // actual sound can't be verified across origins.
+      // call the song STARTED — never "playing": the frame loading is
+      // all that was proven (an error page fires load too, and the
+      // Nov 22, 2026 diagnosis reproduced zero media events under the
+      // old "🎵 Track playing" claim), and actual sound can never be
+      // verified across origins. The sound gate takes it from here:
+      // the big button offers a one-tap rescue on every phone, and
+      // the caller's own phone escalates itself (armSoundGate).
       mirrorTimer = setTimeout(function () {
         if (trackWant !== want || want.via !== 'mirror') return;
         mirrorHost = host;
         mirrorActive = true;
         want.playing = true;
+        want.mirrorStartedAt = Date.now();
         clearTimeout(trackWatchdog);
         if (want.purpose === 'stage') setTrackEq(true);
-        setTrackStatus(want.purpose, '🎵 Track playing — ad-free mirror. No sound? Tap ▶ Play the song.');
+        setTrackStatus(want.purpose, Core.MIRROR_STARTED_STATUS);
+        armSoundGate(want);
       }, 900);
     };
     try { f.src = 'https://' + host + '/embed/' + want.legs[want.legIdx].id + '?autoplay=1'; } catch (e) {}
+  }
+
+  /* ---- the SOUND GATE (Nov 22, 2026 — see Core's sound-gate note).
+     A mirror leg's sound is unconfirmed forever. Three mechanisms
+     keep that honest without stranding the song:
+       1. the status never claims "playing" for a mirror leg
+          (Core.MIRROR_STARTED_STATUS, set in tryMirror);
+       2. the ONE track button wears a big pulsing face while sound
+          is unconfirmed — 'sound' on a mirror leg, 'play' when a
+          remote call waits for this phone's first tap — and a tap
+          on it escalates THIS phone to the YouTube leg;
+       3. the CALLER's phone (host / solo: the device that called
+          the song — its tap chain is the proven v18/v19 audible
+          path) escalates ITSELF ~6s into a mirror leg if the user
+          hasn't tapped anything, and the YouTube leg then has to
+          pass the existing sound verify before "playing" is claimed;
+          a failed verify says so (Core.SOUND_FAILED_STATUS). */
+  function armSoundGate(want) {
+    clearTimeout(soundGateTimer);
+    soundGateTimer = null;
+    if (!want.caller) return; // guests/audience rescue by tap — browsers require it of them
+    soundGateTimer = setTimeout(function () {
+      soundGateTimer = null;
+      if (trackWant !== want) return;
+      if (!Core.shouldAutoEscalate({
+        via: want.via, caller: want.caller, startedAt: want.mirrorStartedAt,
+        now: Date.now(), userTapped: !!want.userTapped
+      })) return;
+      want.autoEscalated = true;
+      escalateWantToYouTube(want);
+    }, Core.SOUND_GATE_MS);
+  }
+  /* Any tap anywhere is the user taking charge: the pending
+     auto-escalation for the current song stands down (the big button
+     remains for a deliberate rescue). Registered in the capture
+     phase, so it lands before the tap's own handler — a Call tap
+     marks the OUTGOING want, never the song it is about to start. */
+  document.addEventListener('pointerdown', function () {
+    if (trackWant) trackWant.userTapped = true;
+    clearTimeout(soundGateTimer);
+    soundGateTimer = null;
+  }, true);
+  /* Move a want from its mirror leg to the YouTube leg of the SAME
+     upload (or down the leg list when the upload has no YouTube leg
+     left). Shared by the big button's tap (tapPlayTrack) and the
+     caller's auto-escalation — one escalation path, two triggers. */
+  function escalateWantToYouTube(want) {
+    if (trackWant !== want || want.via !== 'mirror') return false;
+    var curLeg = want.legs[want.legIdx];
+    var target = -1;
+    for (var li = 0; li < want.legs.length; li++) {
+      if (want.legs[li].via === 'yt' && want.legs[li].id === curLeg.id) { target = li; break; }
+    }
+    clearTimeout(soundGateTimer);
+    soundGateTimer = null;
+    stopMirror();
+    if (target === -1) { advanceLeg(want); return true; }
+    want.legIdx = target;
+    want.via = 'yt';
+    want.playing = false;
+    playbackGate.reset(); // new source — the gate's duration latch starts fresh
+    armExpectedDuration(want); // …but a cached metadata length still applies
+    setTrackStatus(want.purpose, 'Loading the track…');
+    driveTrackPlayer();
+    return true;
+  }
+  /* The ONE track button per row, wearing the face the sound gate
+     dictates (Core.soundButtonMode): big + pulsing on 'sound'/'play',
+     the plain small button otherwise. Called on every status change
+     (setTrackStatus is the choke point) and on stop/fail, so the face
+     always matches the live state. */
+  function renderSoundButtons() {
+    [['call', $('btn-play-call')], ['stage', $('btn-play-track')]].forEach(function (pair) {
+      var btn = pair[1];
+      if (!btn) return;
+      var face = Core.soundButtonMode({
+        rowPurpose: pair[0],
+        wantPurpose: trackWant ? trackWant.purpose : null,
+        wantVia: trackWant ? trackWant.via : null,
+        wantSong: trackWant ? trackWant.songId : null,
+        pendingSong: pendingCallSong
+      });
+      if (face === 'sound') {
+        btn.classList.add('sound-big');
+        btn.textContent = Core.SOUND_LABEL_NOSOUND;
+      } else if (face === 'play') {
+        btn.classList.add('sound-big');
+        btn.textContent = Core.SOUND_LABEL_PLAY;
+      } else {
+        btn.classList.remove('sound-big');
+        btn.textContent = pair[0] === 'call' ? '▶ Play the song' : '🔊 Play the track';
+      }
+    });
   }
 
   var ytApiPromise = null;
@@ -2723,6 +2933,7 @@
   function setTrackStatus(purpose, text) {
     var el = trackStatusEl(purpose);
     if (el) el.textContent = text;
+    renderSoundButtons(); // the button's face follows the same state changes
   }
   function setTrackEq(on) {
     var eq = $('track-eq');
@@ -2865,7 +3076,13 @@
       try { vol = trackPlayer.getVolume(); } catch (e) {}
       if (typeof vol !== 'number') vol = 100;
       if (muted || vol === 0) {
-        setTrackStatus(want.purpose, 'Track is playing muted — tap ▶ Play the song for sound');
+        // After a sound-gate AUTO-escalation the app already spent
+        // its one automatic rescue — a still-muted player is a failed
+        // verify, and the status says exactly that instead of the
+        // softer "playing muted" line a manual state gets.
+        setTrackStatus(want.purpose, want.autoEscalated
+          ? Core.SOUND_FAILED_STATUS
+          : 'Track is playing muted — tap ▶ Play the song for sound');
       } else {
         setTrackStatus(want.purpose, '🎵 Track playing…');
       }
@@ -2909,6 +3126,8 @@
   }
   function failTrack() {
     clearTimeout(trackRetryTimer);
+    clearTimeout(soundGateTimer);
+    soundGateTimer = null;
     stopGatePoll();
     playbackGate.reset();
     var s = trackWant ? Data.SONG_MAP[trackWant.songId] : null;
@@ -2922,6 +3141,7 @@
       el.textContent = 'Couldn\u2019t play this track here.';
     }
     trackWant = null;
+    renderSoundButtons();
   }
 
   /** Load + play a song's track for the given purpose ('stage'|'call').
@@ -2954,7 +3174,12 @@
     // knows the song's true length. Fire-and-forget; playback
     // starts right now regardless.
     ids.forEach(function (id) { fetchSongDuration(id); });
-    trackWant = { songId: songId, ids: ids, legs: legs, legIdx: 0, purpose: purpose, playing: false, retried: false, via: null };
+    trackWant = { songId: songId, ids: ids, legs: legs, legIdx: 0, purpose: purpose, playing: false, retried: false, via: null,
+      // Sound gate state: `caller` = THIS device called the song (host
+      // / solo — only its device auto-escalates off a mirror leg);
+      // userTapped / autoEscalated / mirrorStartedAt drive Core's
+      // shouldAutoEscalate verdict and the honest failed-verify line.
+      caller: role === 'host', userTapped: false, autoEscalated: false, mirrorStartedAt: null };
     playbackGate.reset();
     startGatePoll();
     setTrackStatus(purpose, 'Loading the track…');
@@ -2998,6 +3223,8 @@
     trackWatchdog = null;
     clearTimeout(trackRetryTimer);
     clearTimeout(trackSoundTimer);
+    clearTimeout(soundGateTimer);
+    soundGateTimer = null;
     stopGatePoll();
     playbackGate.reset();
     stopMirror();
@@ -3006,6 +3233,7 @@
       try { trackPlayer.stopVideo(); } catch (e) {}
     }
     setTrackEq(false);
+    renderSoundButtons();
   }
   /** The Play button spends the tap DIRECTLY on the live player: load
       the wanted upload AND play it, right here in the tap's own call
@@ -3025,21 +3253,10 @@
       // The mirror has this song (or is still fetching it) but the tap
       // means the room isn't hearing it — autoplay rules can hold a
       // cross-origin frame silent. Spend the tap on the YouTube
-      // player instead: its sound path is proven.
-      var curLeg = trackWant.legs[trackWant.legIdx];
-      var target = -1;
-      for (var li = 0; li < trackWant.legs.length; li++) {
-        if (trackWant.legs[li].via === 'yt' && trackWant.legs[li].id === curLeg.id) { target = li; break; }
-      }
-      stopMirror();
-      if (target === -1) { advanceLeg(trackWant); return; }
-      trackWant.legIdx = target;
-      trackWant.via = 'yt';
-      trackWant.playing = false;
-      playbackGate.reset(); // new source — the gate's duration latch starts fresh
-      armExpectedDuration(trackWant); // …but a cached metadata length still applies
-      setTrackStatus(trackWant.purpose, 'Loading the track…');
-      driveTrackPlayer();
+      // player instead: its sound path is proven. (The escalation
+      // itself is escalateWantToYouTube — the caller's sound-gate
+      // auto-escalation runs the very same path.)
+      escalateWantToYouTube(trackWant);
       return;
     }
     if (trackWant && trackWant.songId === songId && trackWant.playing) return;
@@ -3073,6 +3290,7 @@
     hostAddPlayer('self', myName, true);
     show('screen-lobby');
     renderLobby();
+    runHostConnCheck(); // v27: online hosts check their own connection for the lobby dot
   }
 
   function leaveRoom(silent) {
@@ -3495,6 +3713,21 @@
 
   /* ================= INIT ================= */
   $('player-name').value = myName;
+  // v27: kick off the owned-TURN ICE config fetch at load. It never
+  // blocks anything — peers created before it lands use the built-in
+  // Core.ICE_SERVERS, and a failure leaves them untouched.
+  if (Core.startIceConfigFetch) { try { Core.startIceConfigFetch(); } catch (e) {} }
+  // v27: reduced motion — the background logo stays a calm still
+  // poster (CSS hides the video; make sure it never starts).
+  try {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var bgVideo = $('bg-logo-video');
+      if (bgVideo) {
+        bgVideo.removeAttribute('autoplay');
+        if (bgVideo.pause) bgVideo.pause();
+      }
+    }
+  } catch (e) {}
   $('player-name').addEventListener('change', function () {
     myName = $('player-name').value.trim();
     localStorage.setItem('lsb_name', myName);
