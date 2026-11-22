@@ -1,270 +1,49 @@
-'use strict';
-// Relative paths so the SW works whether hosted at domain root or a /subpath/
-// (e.g. GitHub Pages project sites) and inside packaged TWA / Xbox PWA shells.
-const CACHE_NAME = 'hitgear-os-v45';
-const CORE_ASSETS = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './css/hitgear.css',
-  './css/game.css',
-  './icons/icon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-512-maskable.png',
-  './data/characters.json',
-  './data/venues.json',
-  './data/enemies.json',
-  // ── Runtime scripts ──────────────────────────────────────────────────────
-  './runtime/save_system.js',
-  './runtime/vip_status.js',
-  './runtime/input_manager.js',
-  './runtime/asset_loader.js',
-  './runtime/ui_elements.js',
-  './runtime/digit_font.js',
-  './runtime/prop_renderer.js',
-  './runtime/sprite_system.js',
-  './runtime/combat_engine.js',
-  './runtime/fighter_engine.js',
-  './runtime/scene_manager.js',
-  './runtime/stage1_scene.js',
-  './runtime/npc_engine.js',
-  './runtime/mission_engine.js',
-  './runtime/quest_engine.js',
-  './runtime/story_mode.js',
-  './runtime/char_renderer.js',
-  './runtime/loading_screen.js',
-  './runtime/versus_engine.js',
-  './runtime/dance_minigame.js',
-  './runtime/hitgear_os.js',
-  // ── Venue backgrounds ────────────────────────────────────────────────────
-  // All 13 venues now have real backdrop art. Prop cutouts + _manifest.json are
-  // fetched lazily and runtime-cached (see fetch handler) so they aren't listed
-  // here individually.
-  './assets/venues/cafe8fifty_exterior.png',
-  './assets/venues/hvas_interior.png',
-  './assets/venues/social_gaines.png',
-  './assets/venues/success.png',
-  './assets/venues/kingdom_come_saloon.png',
-  './assets/venues/kingdom_come_exterior.png',
-  './assets/venues/outta_interior.png',
-  './assets/venues/outta_exterior.png',
-  './assets/venues/tally_exterior.png',
-  './assets/venues/tally_den.png',
-  './assets/venues/tally_itus.png',
-  './assets/venues/tally_sammys.png',
-  './assets/venues/tally_public_hall.png',
-  './assets/venues/tally_13rave.png',
-  './assets/venues/dukes_interior.png',
-  './assets/venues/dukes_exterior.png',
-  './assets/venues/qhf_exterior.png',
-  './assets/venues/qhf_pack_07_exterior_bg.png',
-  './assets/venues/dukes_pack_07_exterior_bg.png',
-  './assets/venues/dukes_pack_08_interior_bg.png',
-  './assets/venues/tally_pack_02_exterior_stage.png',
-  './assets/venues/kcs_pack_08_interior_bg.png',
-  // ── UI shell ─────────────────────────────────────────────────────────────
-  './assets/ui/hitgear_shell.png',
-  './assets/ui/hvas_logo.png',
-  // ── E3 UI elements ───────────────────────────────────────────────────────
-  './assets/ui/elements/frames_emblems/frames_emblems_002.png',
-  './assets/ui/elements/frames_emblems/frames_emblems_003.png',
-  './assets/ui/elements/frames_emblems/frames_emblems_011.png',
-  './assets/ui/elements/frames_emblems/frames_emblems_014.png',
-  './assets/ui/elements/frames_emblems/frames_emblems_013.png',
-  './assets/ui/elements/frames_emblems/frames_emblems_005.png',
-  './assets/ui/elements/pause_menu/pause_menu_007.png',
-  './assets/ui/elements/pause_menu/pause_menu_021.png',
-  './assets/ui/elements/pause_menu/pause_menu_026.png',
-  './assets/ui/elements/pause_menu/pause_menu_000.png',
-  './assets/ui/elements/hud/digit_0.png',
-  './assets/ui/elements/hud/digit_1.png',
-  './assets/ui/elements/hud/digit_2.png',
-  './assets/ui/elements/hud/digit_3.png',
-  './assets/ui/elements/hud/digit_4.png',
-  './assets/ui/elements/hud/digit_5.png',
-  './assets/ui/elements/hud/digit_6.png',
-  './assets/ui/elements/hud/digit_7.png',
-  './assets/ui/elements/hud/digit_8.png',
-  './assets/ui/elements/hud/digit_9.png',
-  './assets/ui/elements/hud/hud_001.png',
-  './assets/ui/elements/hud/hud_002.png',
-  './assets/ui/elements/hud/hud_003.png',
-  './assets/ui/elements/hud/hud_009.png',
-  './assets/ui/elements/hud/hud_combo_label.png',
-  './assets/ui/elements/hud/hud_pip_star.png',
-  './assets/ui/elements/hud/hud_020.png',
-  './assets/ui/elements/hud/hud_019.png',
-  './assets/ui/elements/hud/hud_012.png',
-  './assets/ui/elements/hud/hud_011.png',
-  './assets/ui/elements/hud/hud_health_bar.png',
-  './assets/ui/elements/hud/hud_021.png',
-  './assets/ui/elements/hud/hud_022.png',
-  './assets/ui/elements/hud/hud_017.png',
-  './assets/ui/elements/hud/hud_018.png',
-  './assets/ui/elements/dialogue_mission/dialogue_mission_003.png',
-  './assets/ui/elements/character_select/character_select_027.png',
-  './assets/ui/elements/character_select/character_select_040.png',
-  './assets/ui/elements/character_select/character_select_028.png',
-  './assets/ui/elements/title_menu/title_menu_000.png',
-  './assets/ui/elements/venue_map/venue_map_001.png',
-  // ── Character sheets — playable fighters ─────────────────────────────────
-  './assets/characters/kendrick_sheet01_loco.png',
-  './assets/characters/kendrick_sheet02_combat.png',
-  './assets/characters/kendrick_sheet03_damage.png',
-  './assets/characters/kendrick_sheet04_supers.png',
-  './assets/characters/kendrick_sheet05_topdown.png',
-  './assets/characters/kendrick_sheet06_vfx.png',
-  './assets/characters/creator_sheet01_loco.png',
-  './assets/characters/creator_sheet02_combat.png',
-  './assets/characters/creator_sheet03_damage.png',
-  './assets/characters/creator_sheet04_supers.png',
-  './assets/characters/creator_sheet05_topdown.png',
-  './assets/characters/creator_sheet06_vfx.png',
-  './assets/characters/famu_female_sheet01_loco.png',
-  './assets/characters/famu_female_sheet02_combat.png',
-  './assets/characters/famu_female_sheet03_damage.png',
-  './assets/characters/famu_female_sheet04_supers.png',
-  './assets/characters/famu_female_sheet05_topdown.png',
-  './assets/characters/famu_female_sheet06_vfx.png',
-  './assets/characters/famu_male_sheet01_loco.png',
-  './assets/characters/famu_male_sheet02_combat.png',
-  './assets/characters/famu_male_sheet03_damage.png',
-  './assets/characters/famu_male_sheet04_supers.png',
-  './assets/characters/famu_male_sheet05_topdown.png',
-  './assets/characters/famu_male_sheet06_vfx.png',
-  './assets/characters/fsu_female_sheet01_loco.png',
-  './assets/characters/fsu_female_sheet02_combat.png',
-  './assets/characters/fsu_female_sheet03_damage.png',
-  './assets/characters/fsu_female_sheet04_supers.png',
-  './assets/characters/fsu_female_sheet05_topdown.png',
-  './assets/characters/fsu_female_sheet06_vfx.png',
-  './assets/characters/fsu_male_sheet01_loco.png',
-  './assets/characters/fsu_male_sheet02_combat.png',
-  './assets/characters/fsu_male_sheet03_damage.png',
-  './assets/characters/fsu_male_sheet04_supers.png',
-  './assets/characters/fsu_male_sheet05_topdown.png',
-  './assets/characters/fsu_male_sheet06_vfx.png',
-  // ── Bosses & Ops ─────────────────────────────────────────────────────────
-  './assets/characters/kt_sheet01_loco.png',
-  './assets/characters/kt_sheet02_combat.png',
-  './assets/characters/kt_sheet03_damage.png',
-  './assets/characters/kt_sheet04_supers.png',
-  './assets/characters/kt_sheet05_topdown.png',
-  './assets/characters/kt_sheet06_vfx.png',
-  './assets/characters/bigsoulja_sheet01_loco.png',
-  './assets/characters/bigsoulja_sheet02_combat.png',
-  './assets/characters/bigsoulja_sheet03_damage.png',
-  './assets/characters/bigsoulja_sheet04_supers.png',
-  './assets/characters/bigsoulja_sheet05_topdown.png',
-  './assets/characters/bigsoulja_sheet06_vfx.png',
-  './assets/characters/pete_sheet01_loco.png',
-  './assets/characters/pete_sheet02_combat.png',
-  './assets/characters/pete_sheet03_damage.png',
-  './assets/characters/pete_sheet04_supers.png',
-  './assets/characters/pete_sheet05_vfx.png',
-  './assets/characters/snow_sheet01_loco.png',
-  './assets/characters/snow_sheet02_combat.png',
-  './assets/characters/snow_sheet03_damage.png',
-  './assets/characters/snow_sheet04_supers.png',
-  './assets/characters/snow_sheet05_vfx.png',
-  './assets/characters/eld_sheet01_loco.png',
-  './assets/characters/eld_sheet02_combat.png',
-  './assets/characters/eld_sheet03_damage.png',
-  './assets/characters/eld_sheet04_supers.png',
-  './assets/characters/eld_sheet05_topdown.png',
-  './assets/characters/eld_sheet06_vfx.png',
-  // ── NPC venue sheets ─────────────────────────────────────────────────────
-  './assets/characters/dj_sheet01_loco.png',
-  './assets/characters/dj_sheet02_combat.png',
-  './assets/characters/dj_sheet03_damage.png',
-  './assets/characters/dj_sheet04_supers.png',
-  './assets/characters/dj_sheet05_topdown.png',
-  './assets/characters/dj_sheet06_vfx.png',
-  './assets/characters/vendor_sheet01_loco.png',
-  './assets/characters/vendor_sheet02_combat.png',
-  './assets/characters/vendor_sheet03_damage.png',
-  './assets/characters/vendor_sheet04_supers.png',
-  './assets/characters/vendor_sheet05_topdown.png',
-  './assets/characters/vendor_sheet06_vfx.png',
-  './assets/characters/security_sheet01_loco.png',
-  './assets/characters/security_sheet02_combat.png',
-  './assets/characters/security_sheet03_damage.png',
-  './assets/characters/security_sheet04_supers.png',
-  './assets/characters/security_sheet05_topdown.png',
-  './assets/characters/security_sheet06_vfx.png',
-  './assets/characters/hvas_npcs_a.png',
-  './assets/characters/hvas_npcs_b.png',
-  './assets/characters/hvas_npcs_c.png',
-  './assets/characters/cafe8fifty_npcs_a.png',
-  './assets/characters/cafe8fifty_npcs_b.png',
-  './assets/characters/cafe8fifty_npcs_c.png',
-  './assets/characters/bigsoulja_venue_npcs_a.png',
-  './assets/characters/bigsoulja_venue_npcs_b.png',
-  './assets/characters/bigsoulja_venue_npcs_c.png',
-  './assets/characters/host_sheet01_loco.png',
-  './assets/characters/influencer_sheet01_loco.png',
-  './assets/characters/photographer_sheet01_loco.png',
-  './assets/characters/promoter_sheet01_loco.png',
-  './assets/characters/dancer_sheet01_loco.png',
-  './assets/characters/influencer_sheet02_combat.png',
-  './assets/characters/influencer_sheet03_damage.png',
-  './assets/characters/influencer_sheet04_supers.png',
-  './assets/characters/influencer_sheet05_topdown.png',
-  './assets/characters/influencer_sheet06_vfx.png',
-  './assets/characters/photographer_sheet02_combat.png',
-  './assets/characters/photographer_sheet03_damage.png',
-  './assets/characters/photographer_sheet04_supers.png',
-  './assets/characters/photographer_sheet05_topdown.png',
-  './assets/characters/photographer_sheet06_vfx.png',
-  './assets/characters/promoter_sheet02_combat.png',
-  './assets/characters/promoter_sheet03_damage.png',
-  './assets/characters/promoter_sheet04_supers.png',
-  './assets/characters/promoter_sheet05_topdown.png',
-  './assets/characters/promoter_sheet06_vfx.png',
-  './assets/characters/dancer_sheet02_combat.png',
-  './assets/characters/dancer_sheet03_damage.png',
-  './assets/characters/dancer_sheet04_supers.png',
-  './assets/characters/dancer_sheet05_topdown.png',
-  './assets/characters/dancer_sheet06_vfx.png',
-  './assets/characters/host_sheet02_combat.png',
-  './assets/characters/host_sheet03_damage.png',
-  './assets/characters/host_sheet04_supers.png',
-  './assets/characters/host_sheet05_topdown.png',
-  './assets/characters/host_sheet06_vfx.png',
-  './assets/characters/pete_sheet06_topdown.png',
-  './assets/characters/snow_sheet06_topdown.png',
-];
+// KILL-SWITCH service worker — temporary, deployed 2026-11-22.
+//
+// Why this exists: on 2026-11-22 a publish placed a service worker at this
+// path (cache "hitgear-os-v45") that the AFTER SPOT app never had before.
+// Phones that picked it up may keep serving the broken shell that came with
+// it from cache. The app's real service worker lives at sw.js and is not
+// touched by this file.
+//
+// What this does: installs immediately, deletes ALL caches on this origin,
+// unregisters ITSELF, and reloads any open app windows so they fetch the
+// restored app fresh from the network. Once it has run, this registration
+// is gone and nothing of it remains. This file can be deleted from the
+// repo afterwards (or left — with no registration pointing at it, it is
+// never fetched again).
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME)
-      // addAll is atomic — one 404 rejects the whole batch, so cache individually
-      .then(cache => Promise.all(CORE_ASSETS.map(u =>
-        cache.add(u).catch(() => { /* tolerate a missing optional asset */ })
-      )))
-      .then(() => self.skipWaiting())
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      // Delete every cache on this origin, including this worker's own
+      // hitgear-os-v45 cache and any older app caches.
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+
+      // Remove this registration entirely.
+      await self.registration.unregister();
+
+      // Reload open windows so they load the restored app from the network.
+      const clients = await self.clients.matchAll({ type: 'window' });
+      await Promise.all(
+        clients.map((client) => {
+          try {
+            return client.navigate(client.url);
+          } catch (e) {
+            return Promise.resolve();
+          }
+        })
+      );
+    })()
   );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-// Cache-first, then network with runtime caching (covers all the lazy-loaded art).
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request).then(resp => {
-      if (resp && resp.status === 200 && resp.type === 'basic') {
-        const clone = resp.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
-      return resp;
-    }).catch(() => caches.match('./index.html')))
-  );
-});
+// Never serve anything from cache while this worker is alive: pass every
+// fetch straight to the network so no stale shell can be served in the
+// window between install and activation completing.
+self.addEventListener('fetch', () => {});
