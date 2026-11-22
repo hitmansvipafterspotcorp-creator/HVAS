@@ -13,6 +13,19 @@
 </head>
 <body>
 
+<!-- v27: the moving logo IS the background of the whole app — a fixed
+     full-viewport layer under every screen, with a soft gold glow
+     (breathes in menus, swells at big moments) and one light scrim so
+     text that sits directly on the video always stays readable.
+     Under prefers-reduced-motion the video never shows: the layer's
+     poster still (logo-full.png) is the calm background instead. -->
+<div id="bg-stack" aria-hidden="true">
+  <div id="bg-poster"></div>
+  <video id="bg-logo-video" src="icons/logo-animated.mp4" poster="icons/logo-full.png" autoplay loop muted playsinline></video>
+  <div id="bg-glow"></div>
+  <div id="bg-scrim"></div>
+</div>
+
 <header class="brand">
   <div class="brand-word"><span class="bw-top">HITMANS VIP AFTER SPOT</span><span class="bw-main">LIP SYNC <em>BINGO</em></span></div>
   <span class="freeplay">FREE PLAY<br>NO PRIZE MONEY</span>
@@ -21,7 +34,6 @@
 <main>
   <!-- ======================= HOME ======================= -->
   <section id="screen-home" class="screen active">
-    <video class="hero-logo" src="icons/logo-animated.mp4" poster="icons/logo-full.png" autoplay loop muted playsinline aria-label="Lip Sync Bingo animated logo"></video>
     <label class="field">
       <span>Your name</span>
       <input id="player-name" type="text" maxlength="20" placeholder="e.g. Korey" autocomplete="off">
@@ -112,6 +124,7 @@
 
     <h3 class="section-title">Players</h3>
     <ul id="lobby-players" class="player-list"></ul>
+    <p id="lobby-conn-hint" class="hint" hidden>Red dot = this phone may not connect in game — try switching Wi-Fi/data.</p>
 
     <div id="pattern-picker" class="panel" hidden>
       <h3>Round 1 target pattern</h3>
@@ -336,12 +349,13 @@
 </main>
 
 <div id="fx-layer" aria-hidden="true"></div>
+<button id="update-banner" hidden>✨ New version ready — tap to refresh</button>
 <div id="banner" hidden></div>
 <div id="ad-banner" hidden>Ad playing — game paused</div>
 <div id="toast" hidden></div>
 
 <footer>
-  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY</p>
+  <p>LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP • FREE PLAY — NO PRIZE MONEY • <span id="app-version">v27</span></p>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
@@ -352,9 +366,59 @@
 <script src="js/net.js"></script>
 <script src="js/app.js"></script>
 <script>
+  /* v27 update flow — an installed PWA must never sit stuck on an old
+     build (Korey's phone showed the OLD app after v26 shipped):
+       1. updateViaCache:'none' — the browser never serves a stale
+          service-worker.js from HTTP cache when checking.
+       2. registration.update() on every app open AND whenever the
+          app returns to the foreground.
+       3. When a new version has activated and taken control of this
+          page's worker (controllerchange), or one is already waiting
+          at load, show the gold banner — one tap reloads into the
+          new build. The reload is guarded so it can only fire once,
+          and the banner never interrupts a first-ever install (no
+          controller yet = nothing to update FROM). */
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+      var reloading = false;
+      // Was this page already controlled when it loaded? Only then is
+      // a later controllerchange an UPDATE taking over — on a first
+      // install it is just the first worker arriving, and no banner
+      // should appear.
+      var hadController = !!navigator.serviceWorker.controller;
+      var banner = document.getElementById('update-banner');
+      function showUpdateBanner() { if (banner) banner.hidden = false; }
+      if (banner) {
+        banner.addEventListener('click', function () {
+          if (reloading) return;
+          reloading = true;
+          window.location.reload();
+        });
+      }
+      navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' })
+        .then(function (reg) {
+          // An update already installed and waiting when we opened.
+          if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
+          reg.addEventListener('updatefound', function () {
+            var nw = reg.installing;
+            if (!nw) return;
+            nw.addEventListener('statechange', function () {
+              // Installed alongside an existing controller = an update
+              // is ready (the SW skipWaiting()s, so activation and
+              // controllerchange follow immediately).
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner();
+            });
+          });
+          document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) reg.update().catch(function () {});
+          });
+          reg.update().catch(function () {});
+        })
+        .catch(function () {});
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        // A new version just took over — offer the one-tap refresh.
+        if (hadController) showUpdateBanner();
+      });
     });
   }
 </script>
