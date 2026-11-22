@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LSB Connection Probe — PeerJS vs Trystero</title>
+<!--
+  probe.html — STANDALONE diagnostic. Not part of the Lip Sync Bingo app.
+  No app files are loaded, no service worker is registered here.
+
+  Purpose: settle whether THIS browser/environment can pass WebRTC
+  connections at all, and via which transport — separating an app
+  defect from a test-environment wall.
+
+  Usage (open the SAME room code in two tabs):
+    ?mode=host&room=XXXX      host tab (PeerJS registers the room id)
+    ?mode=guest&room=XXXX     guest tab (PeerJS dials the host)
+    ?mode=hostauto            host + generates a code, shown HUGE
+    &transport=peerjs|nostr|torrent   (optional; default = run all three)
+
+  PeerJS leg mirrors the app exactly:
+    - peerjs@1.5.5 from the same jsdelivr URL index.html uses
+    - host id = Core.peerHostId: 'lsb-v1-' + code uppercased,
+      non-alphanumerics stripped, max 8 chars (js/core.js)
+    - ICE servers copied verbatim from Core.ICE_SERVERS (js/core.js)
+    - guest: fresh Peer (no id), dial on 'open' with {reliable:true}
+
+  Trystero legs use the scoped 0.25.4 packages via jsdelivr +esm:
+    - @trystero-p2p/nostr@0.25.4   (Nostr strategy)
+    - @trystero-p2p/torrent@0.25.4 (BitTorrent-tracker strategy)
+  NOTE: 'trystero@0.25.4/torrent' is a deprecated stub that THROWS on
+  import, and 'trystero@0.25.4/nostr' merely re-exports the scoped
+  package — so the scoped packages are imported directly.
+  Trystero API per the 0.25.4 README: joinRoom({appId}, roomId),
+  room.onPeerJoin / room.onPeerLeave are assignable properties,
+  room.makeAction(name) -> {send(data, {target}), onMessage}.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: #0b0b10; color: #f2ead8;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 20px; line-height: 1.4;
+  }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 24px; margin: 0 0 6px; }
+  .meta { color: #bdb49b; font-size: 17px; word-break: break-all; }
+  #bigcode {
+    display: none; text-align: center; font-weight: 800;
+    font-size: 110px; letter-spacing: 10px; margin: 10px 0;
+    color: #ffd75e; text-shadow: 0 2px 18px rgba(255,215,94,.35);
+  }
+  section {
+    border: 2px solid #3a3626; border-radius: 12px;
+    padding: 12px 14px; margin: 14px 0; background: #12121a;
+  }
+  .verdict { font-size: 26px; font-weight: 800; padding: 8px 10px; border-radius: 8px; background: #23232e; margin: 8px 0; }
+  .verdict.ok   { background: #0f3d1e; color: #7dff9a; }
+  .verdict.fail { background: #471418; color: #ff9a9a; }
+  .verdict.wait { background: #23232e; color: #cfc7ab; }
+  pre.log {
+    margin: 0; white-space: pre-wrap; word-break: break-word;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 16px; line-height: 1.45; color: #d8f3dc;
+    max-height: 46vh; overflow-y: auto;
+  }
+  #summary { border-color: #ffd75e; }
+  #summary .verdict { font-size: 24px; }
+</style>
+<script>
+  // Buffer errors that happen before the logger exists (module load
+  // failures, CDN failures) so nothing fails silently.
+  window.__earlyErrors = [];
+  window.addEventListener('error', function (e) {
+    var msg = (e.message || 'unknown error') + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '');
+    if (window.__probeLogGlobal) { window.__probeLogGlobal('window.onerror: ' + msg); }
+    else { window.__earlyErrors.push('window.onerror: ' + msg); }
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason || {};
+    var msg = 'unhandledrejection: ' + (r.message || String(r));
+    if (window.__probeLogGlobal) { window.__probeLogGlobal(msg); }
+    else { window.__earlyErrors.push(msg); }
+  });
+</script>
+</head>
+<body>
+  <h1>🔎 Lip Sync Bingo — Connection Probe</h1>
+  <div class="meta" id="meta">starting…</div>
+  <div id="bigcode"></div>
+
+  <section id="summary">
+    <h2>Summary</h2>
+    <div class="verdict wait" id="sum-peerjs">PEERJS: …waiting…</div>
+    <div class="verdict wait" id="sum-nostr">TRYSTERO-NOSTR: …waiting…</div>
+    <div class="verdict wait" id="sum-torrent">TRYSTERO-TORRENT: …waiting…</div>
+  </section>
+
+  <section id="sec-peerjs">
+    <h2>Transport A — PeerJS (same build &amp; settings as the app)</h2>
+    <div class="verdict wait" id="verdict-peerjs">PEERJS: …waiting…</div>
+    <pre class="log" id="log-peerjs"></pre>
+  </section>
+
+  <section id="sec-nostr">
+    <h2>Transport B1 — Trystero / Nostr</h2>
+    <div class="verdict wait" id="verdict-nostr">TRYSTERO-NOSTR: …waiting…</div>
+    <pre class="log" id="log-nostr"></pre>
+  </section>
+
+  <section id="sec-torrent">
+    <h2>Transport B2 — Trystero / Torrent trackers</h2>
+    <div class="verdict wait" id="verdict-torrent">TRYSTERO-TORRENT: …waiting…</div>
+    <pre class="log" id="log-torrent"></pre>
+  </section>
+
+  <section id="sec-global">
+    <h2>Global / page errors</h2>
+    <pre class="log" id="log-global"></pre>
+  </section>
+
+  <!-- EXACT same PeerJS build the app loads (index.html line 347). -->
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------------- params ---------------- */
+  var qs = new URLSearchParams(location.search);
+  var MODE = (qs.get('mode') || 'host').toLowerCase();
+  var TRANSPORT = (qs.get('transport') || 'all').toLowerCase();
+  var IS_HOST = (MODE === 'host' || MODE === 'hostauto');
+
+  // Room codes: app alphabet (Core.CODE_ALPHABET / makeRoomCode).
+  var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  function makeRoomCode() {
+    var c = '';
+    for (var i = 0; i < 4; i++) c += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return c;
+  }
+  function normalizeRoomCode(raw) {
+    return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  }
+  var ROOM = normalizeRoomCode(qs.get('room'));
+  if (!ROOM && IS_HOST) {
+    ROOM = makeRoomCode();
+    try {
+      var u = new URL(location.href);
+      u.searchParams.set('room', ROOM);
+      history.replaceState(null, '', u.toString());
+    } catch (e) { /* display still shows it */ }
+  }
+
+  /* ---------------- logging ---------------- */
+  var T0 = performance.now();
+  function stamp() {
+    var ms = Math.floor(performance.now() - T0);
+    var s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+    var frac = ('00' + (ms % 1000)).slice(-3);
+    return '[' + m + ':' + ('0' + (s % 60)).slice(-2) + '.' + frac + '] ';
+  }
+  function makeLogger(elId) {
+    var el = document.getElementById(elId);
+    return function (line) {
+      var text = stamp() + line;
+      if (el) { el.textContent += text + '\n'; el.scrollTop = el.scrollHeight; }
+      try { console.log('[probe] ' + text); } catch (e) {}
+    };
+  }
+  var logGlobal = makeLogger('log-global');
+  window.__probeLogGlobal = logGlobal;
+  window.__earlyErrors.forEach(function (m) { logGlobal(m); });
+  window.__earlyErrors = [];
+
+  function setVerdict(key, ok, text) {
+    var v = document.getElementById('verdict-' + key);
+    var s = document.getElementById('sum-' + key);
+    [v, s].forEach(function (el) {
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'verdict ' + (ok === true ? 'ok' : ok === false ? 'fail' : 'wait');
+    });
+  }
+
+  /* ---------------- header ---------------- */
+  var meta = document.getElementById('meta');
+  meta.textContent =
+    'mode=' + MODE + '  room=' + (ROOM || '(none!)') +
+    '  transport=' + TRANSPORT +
+    '  serviceWorker.controller=' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'YES (app SW may intercept this page!)' : 'no') +
+    '  url=' + location.href;
+  if (MODE === 'hostauto' && ROOM) {
+    var big = document.getElementById('bigcode');
+    big.style.display = 'block';
+    big.textContent = ROOM;
+  }
+  logGlobal('page loaded. mode=' + MODE + ' room=' + ROOM + ' ua=' + navigator.userAgent);
+  if (!ROOM) {
+    logGlobal('NO ROOM CODE — guest mode needs ?room=XXXX. Nothing will be tested.');
+    ['peerjs', 'nostr', 'torrent'].forEach(function (k) {
+      setVerdict(k, false, k.toUpperCase() + ': FAILED at setup — no room code in URL');
+    });
+    return;
+  }
+  if (typeof RTCPeerConnection === 'undefined') {
+    logGlobal('RTCPeerConnection is UNDEFINED in this browser — WebRTC cannot pass here at all.');
+  }
+
+  var DEADLINE_MS = 60000;
+
+  /* ================================================================= */
+  /* TRANSPORT A — PeerJS (mirrors js/net.js + js/core.js exactly)      */
+  /* ================================================================= */
+
+  // Core.ICE_SERVERS, copied verbatim from js/core.js.
+  var ICE_SERVERS = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+  // Core.peerHostId, replicated exactly.
+  function peerHostId(code) { return 'lsb-v1-' + normalizeRoomCode(code); }
+
+  function errText(err) {
+    if (!err) return '(no error object)';
+    var t = err.type || '(no type)';
+    var m = err.message ? String(err.message) : '(empty message)';
+    return 'type=' + t + ' message=' + m;
+  }
+
+  function runPeerJS() {
+    var log = makeLogger('log-peerjs');
+    var step = 'init';
+    var done = false;
+    var lastErr = '';
+    function fail(atStep, why) {
+      if (done) return;
+      done = true;
+      setVerdict('peerjs', false, 'PEERJS: FAILED at ' + atStep + ' — ' + why);
+      log('VERDICT: FAILED at ' + atStep + ' — ' + why);
+    }
+    function succeed() {
+      if (done) return;
+      done = true;
+      setVerdict('peerjs', true, 'PEERJS: CONNECTED + PING OK');
+      log('VERDICT: CONNECTED + PING OK');
+    }
+    setTimeout(function () {
+      fail(step, 'timeout after ' + (DEADLINE_MS / 1000) + 's' + (lastErr ? ' (last error: ' + lastErr + ')' : ' (no error ever reported)'));
+    }, DEADLINE_MS);
+
+    try {
+      if (typeof Peer === 'undefined') {
+        fail('library-load', 'Peer global is undefined — peerjs@1.5.5 CDN script did not load/execute');
+        return;
+      }
+      log('PeerJS library present (app build: peerjs@1.5.5 via jsdelivr).');
+      var hostId = peerHostId(ROOM);
+      var opts = { config: { iceServers: ICE_SERVERS } };
+      var peer;
+
+      function wireConn(conn, who) {
+        var pcStates = { ice: '', conn: '' };
+        var poll = setInterval(function () {
+          try {
+            var pc = conn.peerConnection;
+            if (!pc) return;
+            if (pc.iceConnectionState !== pcStates.ice) {
+              pcStates.ice = pc.iceConnectionState;
+              log(who + ' pc.iceConnectionState -> ' + pcStates.ice);
+            }
+            if (pc.connectionState !== pcStates.conn) {
+              pcStates.conn = pc.connectionState;
+              log(who + ' pc.connectionState -> ' + pcStates.conn);
+            }
+          } catch (e) { clearInterval(poll); }
+        }, 500);
+        conn.on('open', function () {
+          step = 'connection-open';
+          log(who + ' connection OPEN (remote=' + conn.peer + ')');
+          if (!IS_HOST) log('guest: waiting for host ping…');
+          if (IS_HOST) {
+            step = 'ping-sent';
+            try { conn.send({ t: 'ping', n: 1, from: 'host' }); log('host: sent ping'); }
+            catch (e) { log('host: ping send threw: ' + (e.message || e)); }
+          }
+        });
+        conn.on('data', function (data) {
+          log(who + ' data received: ' + JSON.stringify(data));
+          if (!data || typeof data !== 'object') return;
+          if (IS_HOST && data.t === 'pong') {
+            step = 'pong-received';
+            try { conn.send({ t: 'ack', n: data.n }); log('host: sent ack'); } catch (e) {}
+            succeed();
+          } else if (!IS_HOST && data.t === 'ping') {
+            step = 'ping-received';
+            try { conn.send({ t: 'pong', n: data.n, from: 'guest' }); step = 'pong-sent'; log('guest: sent pong'); }
+            catch (e) { log('guest: pong send threw: ' + (e.message || e)); }
+          } else if (!IS_HOST && data.t === 'ack') {
+            succeed();
+          }
+        });
+        conn.on('iceStateChanged', function (state) {
+          log(who + ' conn iceStateChanged -> ' + state);
+        });
+        conn.on('error', function (err) {
+          lastErr = errText(err);
+          log(who + ' connection ERROR: ' + lastErr);
+        });
+        conn.on('close', function () { log(who + ' connection closed'); });
+      }
+
+      if (IS_HOST) {
+        step = 'peer-create';
+        log('host: creating Peer with id "' + hostId + '" (app scheme lsb-v1-<CODE>)');
+        peer = new Peer(hostId, opts);
+        peer.on('open', function (id) {
+          step = 'peer-open';
+          log('host: peer OPEN, broker assigned/confirmed id=' + id);
+        });
+        peer.on('connection', function (conn) {
+          step = 'incoming-connection';
+          log('host: incoming connection from ' + conn.peer);
+          wireConn(conn, 'host');
+        });
+      } else {
+        step = 'peer-create';
+        log('guest: creating Peer (no id, broker assigns one), will dial "' + hostId + '"');
+        peer = new Peer(opts);
+        peer.on('open', function (id) {
+          step = 'peer-open';
+          log('guest: peer OPEN, my id=' + id);
+          step = 'dial';
+          log('guest: dialing host id "' + hostId + '" with {reliable:true} (as the app does)');
+          var conn = peer.connect(hostId, { reliable: true });
+          wireConn(conn, 'guest');
+        });
+      }
+      peer.on('error', function (err) {
+        lastErr = errText(err);
+        log('peer ERROR: ' + lastErr + '  (step was: ' + step + ')');
+        if (err && err.type === 'peer-unavailable') fail('dial', 'broker reports peer-unavailable: ' + lastErr);
+      });
+      peer.on('disconnected', function () { log('peer DISCONNECTED from broker'); });
+      peer.on('close', function () { log('peer CLOSED (destroyed)'); });
+    } catch (e) {
+      fail(step, 'exception: ' + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  /* ================================================================= */
+  /* TRANSPORT B — Trystero (nostr + torrent strategies)                */
+  /* ================================================================= */
+
+  var TRYSTERO_URLS = {
+    nostr: 'https://cdn.jsdelivr.net/npm/@trystero-p2p/nostr@0.25.4/+esm',
+    torrent: 'https://cdn.jsdelivr.net/npm/@trystero-p2p/torrent@0.25.4/+esm'
+  };
+
+  function runTrystero(kind) {
+    var label = kind === 'nostr' ? 'TRYSTERO-NOSTR' : 'TRYSTERO-TORRENT';
+    var log = makeLogger('log-' + kind);
+    var step = 'module-import';
+    var done = false;
+    var lastErr = '';
+    function fail(atStep, why) {
+      if (done) return;
+      done = true;
+      setVerdict(kind, false, label + ': FAILED at ' + atStep + ' — ' + why);
+      log('VERDICT: FAILED at ' + atStep + ' — ' + why);
+    }
+    function succeed() {
+      if (done) return;
+      done = true;
+      setVerdict(kind, true, label + ': CONNECTED + PING OK');
+      log('VERDICT: CONNECTED + PING OK');
+    }
+    setTimeout(function () {
+      fail(step, 'timeout after ' + (DEADLINE_MS / 1000) + 's' + (lastErr ? ' (last error: ' + lastErr + ')' : ' (no error ever reported)'));
+    }, DEADLINE_MS);
+
+    log('importing ' + TRYSTERO_URLS[kind]);
+    import(TRYSTERO_URLS[kind]).then(function (mod) {
+      try {
+        step = 'join-room';
+        var joinRoom = mod.joinRoom;
+        if (typeof joinRoom !== 'function') { fail('module-import', 'joinRoom export missing from module'); return; }
+        log('module loaded. selfId=' + mod.selfId);
+        if (mod.defaultRelayUrls) {
+          log('default relays/trackers (' + mod.defaultRelayUrls.length + '): ' + mod.defaultRelayUrls.slice(0, 6).join(', ') + (mod.defaultRelayUrls.length > 6 ? ', …' : ''));
+        }
+        var room = joinRoom({ appId: 'lsb-probe' }, ROOM);
+        log('joinRoom({appId:"lsb-probe"}, "' + ROOM + '") called as ' + (IS_HOST ? 'HOST' : 'GUEST') + ' — trystero is symmetric, both sides join the same room');
+        step = 'waiting-for-peer';
+
+        var ping = room.makeAction('lsbping');
+        ping.onMessage = function (data, meta) {
+          var from = (meta && meta.peerId) || '(unknown peer)';
+          log('action message from ' + from + ': ' + JSON.stringify(data));
+          if (!data || typeof data !== 'object') return;
+          if (data.kind === 'ping') {
+            step = 'ping-received';
+            try {
+              ping.send({ kind: 'pong', n: data.n }, { target: from });
+              step = 'pong-sent';
+              log('sent pong to ' + from);
+            } catch (e) { log('pong send threw: ' + (e.message || e)); }
+          } else if (data.kind === 'pong') {
+            step = 'pong-received';
+            try { ping.send({ kind: 'ack', n: data.n }, { target: from }); log('sent ack to ' + from); } catch (e) {}
+            succeed();
+          } else if (data.kind === 'ack') {
+            succeed();
+          }
+        };
+
+        room.onPeerJoin = function (peerId) {
+          step = 'peer-join';
+          log('onPeerJoin: ' + peerId);
+          try {
+            ping.send({ kind: 'ping', n: 1 }, { target: peerId });
+            step = 'ping-sent';
+            log('sent ping to ' + peerId);
+          } catch (e) { log('ping send threw: ' + (e.message || e)); }
+        };
+        room.onPeerLeave = function (peerId) { log('onPeerLeave: ' + peerId); };
+        if ('onPeerStream' in room) {
+          room.onPeerStream = function (stream, peerId) { log('onPeerStream from ' + peerId + ' (not part of this probe)'); };
+        }
+
+        // Relay/tracker socket health snapshot — separates "signaling
+        // unreachable" from "WebRTC itself blocked".
+        setTimeout(function () {
+          try {
+            if (typeof mod.getRelaySockets === 'function') {
+              var socks = mod.getRelaySockets();
+              var keys = Object.keys(socks || {});
+              if (!keys.length) { log('relay sockets at +6s: NONE open'); return; }
+              keys.forEach(function (k) {
+                var s = socks[k];
+                log('relay socket +6s: ' + k + ' readyState=' + (s && s.readyState) + ' (0=connecting 1=open 2=closing 3=closed)');
+              });
+            }
+          } catch (e) { log('getRelaySockets threw: ' + (e.message || e)); }
+        }, 6000);
+      } catch (e) {
+        lastErr = (e && e.message) ? e.message : String(e);
+        fail(step, 'exception: ' + lastErr);
+      }
+    }).catch(function (e) {
+      lastErr = (e && e.message) ? e.message : String(e);
+      fail('module-import', 'dynamic import failed: ' + lastErr);
+    });
+  }
+
+  /* ---------------- run ---------------- */
+  var wanted = {
+    peerjs: TRANSPORT === 'all' || TRANSPORT === 'peerjs',
+    nostr: TRANSPORT === 'all' || TRANSPORT === 'nostr' || TRANSPORT === 'trystero-nostr',
+    torrent: TRANSPORT === 'all' || TRANSPORT === 'torrent' || TRANSPORT === 'trystero-torrent'
+  };
+  ['peerjs', 'nostr', 'torrent'].forEach(function (k) {
+    if (!wanted[k]) {
+      var sec = document.getElementById('sec-' + k);
+      if (sec) sec.style.display = 'none';
+      var sum = document.getElementById('sum-' + k);
+      if (sum) sum.style.display = 'none';
+    }
+  });
+  if (wanted.peerjs) runPeerJS();
+  if (wanted.nostr) runTrystero('nostr');
+  if (wanted.torrent) runTrystero('torrent');
+})();
+</script>
+</body>
+</html>
