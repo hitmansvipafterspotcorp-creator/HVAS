@@ -1403,15 +1403,23 @@
         updateCallerBar(msg.songId, msg.n, msg.total, G.state ? G.state.round : 1);
         startCountdown(msg.at);
         if ($('screen-game').classList.contains('active')) renderGame();
-        // Surface the called song with a Play button — a phone can only
-        // start sound from its own tap, so we don't fake autoplay here.
+        // Surface the called song. A phone that has never been tapped
+        // can only start sound from its own tap, so the call waits
+        // behind the big Play button — no fake autoplay. Once this
+        // phone HAS tapped anything (v31), the browser's unlock is
+        // spent and the called song starts on its own, exactly like
+        // the host's own calls.
         if (mode !== 'hotspot') {
           var cs = Data.SONG_MAP[msg.songId];
           pendingCallSong = msg.songId;
           pendingCallLeg = msg.src || null;
           trackPurpose = 'call';
           $('call-track-row').hidden = false;
-          setTrackStatus('call', '🎵 ' + (cs ? cs.artist + ' — ' + cs.title : msg.songId) + ' — tap ▶ Play the song to hear it.');
+          if (hasInteracted) {
+            playTrack(msg.songId, 'call', msg.src || null);
+          } else {
+            setTrackStatus('call', '🎵 ' + (cs ? cs.artist + ' — ' + cs.title : msg.songId) + ' — tap ▶ Play the song to hear it.');
+          }
         }
         break;
       case 'marks':
@@ -1736,20 +1744,33 @@
 
   /* Called-songs master list (most recent first) — the room's record
      of what has actually been called, like the pro music-bingo boards. */
+  /* Songs played this game (v31 — Korey: "to see what was playing
+     already"): every called song, most recent at the top wearing
+     the ▶ LAST PLAYED marker. One renderer fills BOTH lists — the
+     game screen's panel and the stage screen's — from the same
+     called list every client already holds (host: H.called; guests
+     and audience: the host's state sync, which carries the full
+     called array, so a late joiner sees the whole night, not just
+     the calls since they arrived). Opening a panel re-renders from
+     that list; nothing here touches the round or any timer. */
   function renderHistory(called) {
-    var list = $('history-list');
-    if (!list) return;
-    list.innerHTML = '';
-    var songs = (called || []).slice().reverse();
-    if (!songs.length) {
-      list.innerHTML = '<li class="hist-empty">No songs called yet.</li>';
-      return;
-    }
-    songs.forEach(function (sid, i) {
-      var s = Data.SONG_MAP[sid];
-      var li = document.createElement('li');
-      li.innerHTML = '<span class="hist-n">' + (called.length - i) + '</span><span><b>' + esc(s ? s.artist : sid) + '</b> — ' + esc(s ? s.title : '') + '</span>';
-      list.appendChild(li);
+    [['history-list'], ['stage-history-list']].forEach(function (pair) {
+      var list = $(pair[0]);
+      if (!list) return;
+      list.innerHTML = '';
+      var songs = (called || []).slice().reverse();
+      if (!songs.length) {
+        list.innerHTML = '<li class="hist-empty">No songs played yet.</li>';
+        return;
+      }
+      songs.forEach(function (sid, i) {
+        var s = Data.SONG_MAP[sid];
+        var li = document.createElement('li');
+        if (i === 0) li.className = 'hist-last';
+        li.innerHTML = '<span class="hist-n">' + (called.length - i) + '</span><span><b>' + esc(s ? s.artist : sid) + '</b> — ' + esc(s ? s.title : '') + '</span>' +
+          (i === 0 ? '<span class="hist-tag">▶ LAST PLAYED</span>' : '');
+        list.appendChild(li);
+      });
     });
   }
 
@@ -2518,6 +2539,10 @@
   var trackPurpose = 'stage';   // 'stage' | 'call'
   var pendingCallSong = null;   // guest side: latest called song awaiting a tap
   var pendingCallLeg = null;    // guest side: host's verified source for that call
+  var hasInteracted = false;    // v31: this phone has tapped at least once — the
+                                // browser's sound-autoplay unlock. Before it, a
+                                // remote call waits for the big Play tap; after
+                                // it, remote calls autoplay on arrival.
   var trackPlayer = null;       // the ONE persistent YT.Player (never destroyed)
   var trackPlayerReady = false;
   var trackPlayerCreating = false;
@@ -2538,9 +2563,19 @@
      the embed is cross-origin, so no media state is readable from
      here at all; the verdict rides mirrorActive, the same
      load+start-beat signal playback itself already trusts, and
-     mirror embeds serve no ads, so a live mirror is the song. ---- */
+     mirror embeds serve no ads, so a live mirror is the song.
+     v31 tightening (Korey: "don't start the count down til the song
+     plays not the ad"): the timers now run on the gate's stricter
+     songConfirmed() verdict — a duration MATCH against the song's
+     metadata length, not merely "not shorter than the longest seen"
+     — because an ad has sound and a PLAYING state, and a leg whose
+     first frames are an ad otherwise latched the ad's own length
+     and opened on it. While an ad runs, the track status reads
+     Core.AD_WAITING_STATUS. See core.js's confirmation note. ---- */
   var playbackGate = Core.createPlaybackGate();
   var gatePoll = null;
+  var wasAd = false;   // v31: previous sample's ad verdict — the
+                       // ad->song transition re-earns the status claim
 
   /* ---- the song's true length, from metadata (Nov 22, 2026
      perfection pass — closing the v24 gate's first-ad race). The
@@ -2607,15 +2642,39 @@
     if (!trackWant) { updateAdBanner(false); return false; }
     var s = { via: trackWant.via, ytState: null, duration: null, currentTime: null, mirrorLive: false };
     if (trackWant.via === 'mirror') {
-      s.mirrorLive = mirrorActive;
+      // A tap-paused mirror is suspended (frame blanked): not live.
+      s.mirrorLive = mirrorActive && !trackWant.mirrorSuspended;
+      // The frame is cross-origin — its playhead is unreadable — but
+      // the instance API's lengthSeconds IS this video's duration:
+      // feed it so the gate's confirmation can check the mirror leg
+      // against the expected length like any other leg (v31).
+      var mLeg = trackWant.legs[trackWant.legIdx];
+      if (mLeg && songDurations[mLeg.id]) s.duration = songDurations[mLeg.id];
     } else if (trackWant.via === 'yt' && trackPlayer) {
       try { s.ytState = trackPlayer.getPlayerState(); } catch (e) {}
       try { s.duration = trackPlayer.getDuration(); } catch (e) {}
       try { s.currentTime = trackPlayer.getCurrentTime(); } catch (e) {}
+      // The live sound read for the gate's confirmation (v31): an ad
+      // has sound too, so this alone never starts a countdown — it
+      // only ever VETOES a confirmation when the player is muted.
+      try {
+        var vol = trackPlayer.getVolume();
+        if (typeof vol === 'number') s.soundOk = !trackPlayer.isMuted() && vol > 0;
+      } catch (e) {}
     }
     playbackGate.sample(s, Date.now());
     var adNow = playbackGate.reason() === 'ad';
     updateAdBanner(adNow);
+    if (adNow) {
+      // While the ad runs, the status says exactly what is true —
+      // the countdown starts when the SONG starts (v31).
+      setTrackStatus(trackWant.purpose, Core.AD_WAITING_STATUS);
+    } else if (wasAd) {
+      // The ad just ended: re-run the sound verify so the "playing"
+      // claim is re-earned against the song itself, not the ad.
+      armTrackSoundVerify(trackWant);
+    }
+    wasAd = adNow;
     // A marathon ad is not a pause, it is a dead leg: after the cap
     // of CONTINUOUS ad time, fail over to the next source like any
     // other dead source. On the last leg there is nowhere to fail
@@ -2647,11 +2706,16 @@
      is actually playing that purpose's track: hotspot rooms have no
      local playback (the room hears the song out loud), and a guest
      who has not tapped Play yet has no player to judge — in both
-     cases the timer runs as it always did. */
+     cases the timer runs as it always did. v31: timers run on the
+     gate's CONFIRMED verdict (Core's songConfirmed), not the base
+     verdict — the countdown starts when the SONG is confirmed
+     playing (duration matched to the song's true length, sound not
+     contradicted, playhead advancing), never on an ad. */
   function gateOpenFor(purpose) {
     if (mode === 'hotspot') return true;
     if (!trackWant || trackWant.purpose !== purpose) return true;
-    return songActuallyPlaying();
+    songActuallyPlaying();
+    return playbackGate.songConfirmed();
   }
   function gateEndedFor(purpose) {
     return !!trackWant && trackWant.purpose === purpose &&
@@ -2850,8 +2914,11 @@
      auto-escalation for the current song stands down (the big button
      remains for a deliberate rescue). Registered in the capture
      phase, so it lands before the tap's own handler — a Call tap
-     marks the OUTGOING want, never the song it is about to start. */
+     marks the OUTGOING want, never the song it is about to start.
+     The same first tap is the browser's autoplay unlock (v31): from
+     here on, remote-called songs may start on their own. */
   document.addEventListener('pointerdown', function () {
+    hasInteracted = true;
     if (trackWant) trackWant.userTapped = true;
     clearTimeout(soundGateTimer);
     soundGateTimer = null;
@@ -2934,6 +3001,7 @@
     var el = trackStatusEl(purpose);
     if (el) el.textContent = text;
     renderSoundButtons(); // the button's face follows the same state changes
+    renderTapFaces();     // …and so does the tap toggle's face (v31)
   }
   function setTrackEq(on) {
     var eq = $('track-eq');
@@ -3084,7 +3152,16 @@
           ? Core.SOUND_FAILED_STATUS
           : 'Track is playing muted — tap ▶ Play the song for sound');
       } else {
-        setTrackStatus(want.purpose, '🎵 Track playing…');
+        // Sound is real — but so is an ad's. Take a fresh gate
+        // sample: if its duration verdict says an ad is on screen
+        // right now (v31), the status waits for the song instead
+        // of claiming it.
+        songActuallyPlaying();
+        if (playbackGate.reason() === 'ad') {
+          setTrackStatus(want.purpose, Core.AD_WAITING_STATUS);
+        } else {
+          setTrackStatus(want.purpose, '🎵 Track playing…');
+        }
       }
     }, 800);
   }
@@ -3142,6 +3219,7 @@
     }
     trackWant = null;
     renderSoundButtons();
+    renderTapFaces();
   }
 
   /** Load + play a song's track for the given purpose ('stage'|'call').
@@ -3227,6 +3305,8 @@
     soundGateTimer = null;
     stopGatePoll();
     playbackGate.reset();
+    wasAd = false;
+    roundPaused = false; // a stopped track ends any tap-pause (v31)
     stopMirror();
     trackWant = null;
     if (trackPlayer && trackPlayer.stopVideo) {
@@ -3234,6 +3314,7 @@
     }
     setTrackEq(false);
     renderSoundButtons();
+    renderTapFaces();
   }
   /** The Play button spends the tap DIRECTLY on the live player: load
       the wanted upload AND play it, right here in the tap's own call
@@ -3277,6 +3358,101 @@
       return;
     }
     playTrack(songId, trackPurpose, songId === pendingCallSong ? pendingCallLeg : null);
+  }
+
+  /* ---- the TAP TOGGLE (v31 — Korey: "Tap should be to start the
+     game and pause the game"). One tap on the stage/track area is
+     this phone's master start/pause for the round. The decision is
+     Core.roundTapAction; this shell carries it out through the REAL
+     player, so the gated clocks freeze from the actual playback
+     state — there is no separate fake pause:
+       - YouTube leg: pause calls pauseVideo() (the player's PAUSED
+         state closes the gate; resume calls playVideo() and the
+         song continues from the same spot);
+       - mirror leg: a cross-origin frame exposes no pause or seek,
+         so pause SUSPENDS it (frame blanked, gate fed not-live) and
+         resume RESTARTS that leg's song from the top — the only
+         honest mirror pause. The countdown stays in sync either
+         way: it only ever runs while the gate confirms the song.
+     Buttons and controls never toggle (see bindTapToggle): a tap
+     on a button does only the button's job. ---- */
+  var roundPaused = false;
+  function pauseRound() {
+    if (!trackWant || roundPaused) return;
+    roundPaused = true;
+    if (trackWant.via === 'mirror') {
+      trackWant.mirrorSuspended = true;
+      mirrorActive = false;
+      clearTimeout(mirrorTimer);
+      mirrorTimer = null;
+      var f = $('inv-frame');
+      if (f) { f.onload = null; f.onerror = null; try { f.src = 'about:blank'; } catch (e) {} }
+    } else if (trackPlayer) {
+      try { trackPlayer.pauseVideo(); } catch (e) {}
+    }
+    setTrackStatus(trackWant.purpose, '⏸ Paused — tap the song area to resume');
+    renderTapFaces();
+  }
+  function resumeRound() {
+    if (!roundPaused) return;
+    roundPaused = false;
+    if (!trackWant) { renderTapFaces(); return; }
+    if (trackWant.mirrorSuspended) {
+      trackWant.mirrorSuspended = false;
+      startLeg(trackWant); // a suspended mirror leg restarts its song
+    } else if (trackWant.via === 'yt' && trackPlayer) {
+      try { trackPlayer.playVideo(); } catch (e) {}
+      unmuteTrackPlayer();
+      armTrackSoundVerify(trackWant);
+      armTrackWatchdog();
+    }
+    renderTapFaces();
+  }
+  function startRoundFromTap() {
+    if (trackWant || pendingCallSong) { tapPlayTrack(); return; }
+    // No live want: the stage screen's song is the startable round.
+    if (currentTrackSong && $('screen-stage').classList.contains('active')) {
+      playTrack(currentTrackSong, 'stage');
+    }
+  }
+  function toggleRoundTap() {
+    var action = Core.roundTapAction({
+      paused: roundPaused,
+      want: !!trackWant,
+      wantPlaying: !!(trackWant && trackWant.playing),
+      pending: !!pendingCallSong,
+      startable: !!currentTrackSong
+    });
+    if (action === 'pause') pauseRound();
+    else if (action === 'resume') resumeRound();
+    else if (action === 'start') startRoundFromTap();
+  }
+  /* The tap faces — one under each track row, wearing the round's
+     state so the room sees it at a glance: ▶ TAP TO START before
+     the song is going, 🎵 PLAYING (tap to pause) while it runs,
+     ⏸ PAUSED while paused. Pure display: the toggle itself is the
+     delegated screen tap (bindTapToggle), and this face is not a
+     button, so a tap on it toggles exactly once. */
+  function renderTapFaces() {
+    [['call', $('call-tapface')], ['stage', $('stage-tapface')]].forEach(function (pair) {
+      var el = pair[1];
+      if (!el) return;
+      var row = pair[0];
+      var active = !!trackWant && trackWant.purpose === row;
+      if (row === 'call' && pendingCallSong && !active) active = true;
+      if (!active) { el.hidden = true; return; }
+      el.hidden = false;
+      if (roundPaused) {
+        el.className = 'tapface paused';
+        el.textContent = '⏸ PAUSED — tap to resume';
+      } else if (trackWant && trackWant.playing) {
+        el.className = 'tapface playing';
+        el.textContent = '🎵 PLAYING — tap here to pause';
+      } else {
+        el.className = 'tapface';
+        el.textContent = '▶ TAP TO START';
+      }
+    });
   }
 
   /* ================= ROOM SETUP / TEARDOWN ================= */
@@ -3601,6 +3777,28 @@
     p.hidden = !p.hidden;
     if (!p.hidden) renderHistory(myView().called);
   });
+  $('btn-history-stage').addEventListener('click', function () {
+    var p = $('stage-history-panel');
+    p.hidden = !p.hidden;
+    if (!p.hidden) renderHistory(myView().called);
+  });
+  /* ---- the tap toggle (v31): a tap on the game/stage screens'
+     open area is the round's start/pause (toggleRoundTap). Any tap
+     that lands on an interactive element — a button, a link, an
+     input, the bingo card (marking), or an open Songs-played panel
+     — does only that element's job and never toggles. ---- */
+  function bindTapToggle(screenId) {
+    var scr = $(screenId);
+    if (!scr) return;
+    scr.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (t.closest('button, a, input, textarea, select, label, summary, #card, #history-panel, #stage-history-panel')) return;
+      toggleRoundTap();
+    });
+  }
+  bindTapToggle('screen-game');
+  bindTapToggle('screen-stage');
   var soundBtn = $('btn-sound');
   function paintSoundBtn() { if (soundBtn) soundBtn.textContent = sfxOn ? '🔊' : '🔇'; }
   paintSoundBtn();

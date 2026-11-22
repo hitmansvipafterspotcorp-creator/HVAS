@@ -521,9 +521,38 @@
   /* Reasons: 'song' (open) | 'ad' | 'ended' | 'not-playing' |        */
   /* 'no-track'. Continuous ad time is accumulated (adMs) so the      */
   /* app can fail a leg that is stuck behind a marathon ad.           */
+  /*                                                                  */
+  /* v31 (Korey: "don't start the count down til the song plays not   */
+  /* the ad") adds a STRICTER verdict on top of the gate:             */
+  /* songConfirmed(). The gate above can still be fooled at a leg's   */
+  /* first frames — an ad has sound and a PLAYING state, and before   */
+  /* any metadata lands the duration latch IS the ad's own length,    */
+  /* so the base verdict opens on the ad. Confirmation therefore      */
+  /* requires, while the expected length is known and the player's    */
+  /* duration is readable, a MATCH: |duration - expected| within      */
+  /* tolerance (max(3s, 2% of the song)) — plus, on YouTube legs,     */
+  /* sound not contradicted (the sample's soundOk: not muted,         */
+  /* volume > 0), and on mirror legs an advancing playhead (the       */
+  /* sample's currentTime when it carries one; sustained-live         */
+  /* otherwise, since a cross-origin frame exposes no playhead).      */
+  /* Timers run on songConfirmed(), never on the base verdict.        */
+  /* ANTI-TRAP: if confirmation cannot be established within          */
+  /* CONFIRM_FALLBACK_MS of the leg's first sample (metadata never    */
+  /* landed, duration never readable, sound never verifiable),        */
+  /* confirmation falls back to the base (pre-v31) verdict rather     */
+  /* than freezing the round forever — confirmViaFallback() says      */
+  /* when that is how confirmation was reached.                       */
   /* ---------------------------------------------------------------- */
   var AD_DURATION_TOLERANCE = 3;  // seconds of duration wobble allowed
   var AD_FREEZE_CAP_MS = 90000;   // continuous ad time before a leg counts as failed
+  var CONFIRM_FALLBACK_MS = 8000; // strict-confirm window before the anti-trap fallback
+  var AD_WAITING_STATUS = '⏳ Ad playing — countdown starts when the song starts';
+
+  /* Match tolerance for the confirmation check: ±3s or ±2% of the
+     song's length, whichever is larger (the v31 rule). */
+  function confirmTolerance(expected) {
+    return Math.max(AD_DURATION_TOLERANCE, (expected || 0) * 0.02);
+  }
 
   function createPlaybackGate() {
     var refDuration = 0;   // latched song duration for the current leg (0 = unknown)
@@ -538,6 +567,21 @@
     var reason = 'no-track';
     var adSince = null;    // when the current continuous ad began
     var adMs = 0;          // continuous ad time as of the last sample
+    // v31 confirmation state (see the note above): the strict
+    // verdict the timers actually run on.
+    var firstSampleAt = null; // when this leg's first sample arrived
+    var confirmed = false;    // the song itself is confirmed playing
+    var viaFallback = false;  // confirmation came from the anti-trap fallback
+    var mirrorLiveSince = null; // mirror: when the current live stretch began
+    var mirrorLastTime = null;  // mirror: last currentTime the sample carried
+
+    function durationMatches(d) {
+      return expectedDuration > 0 && d > 0 &&
+        Math.abs(d - expectedDuration) <= confirmTolerance(expectedDuration);
+    }
+    function fallbackReached(now) {
+      return firstSampleAt !== null && (now - firstSampleAt) >= CONFIRM_FALLBACK_MS;
+    }
 
     function setOpen() {
       open = true;
@@ -559,15 +603,47 @@
 
     /**
      * Feed one player sample. s = {via:'yt'|'mirror', ytState,
-     * duration, currentTime, mirrorLive}; now = ms timestamp.
-     * Returns the gate (chainable). Call reset() on every new track
-     * AND every leg change — the duration latch is per-upload.
+     * duration, currentTime, mirrorLive, soundOk}; now = ms
+     * timestamp. Returns the gate (chainable). Call reset() on every
+     * new track AND every leg change — the duration latch is
+     * per-upload. `soundOk` (YouTube legs) is the app's live sound
+     * read — false means the player is muted or at volume 0; the
+     * confirmation layer treats an unreported soundOk as not
+     * contradicted (the app always reports it). Mirror samples may
+     * carry duration/currentTime when a player exposes them; the
+     * real cross-origin frame exposes neither, so the app feeds the
+     * duration from the instance API's metadata and sustained-live
+     * stands in for the advancing playhead.
      */
     function sample(s, now) {
-      if (!s || !s.via) { setClosed('no-track', now); return gate; }
+      if (!s || !s.via) { setClosed('no-track', now); confirmed = false; viaFallback = false; return gate; }
+      if (firstSampleAt === null) firstSampleAt = now;
       if (s.via === 'mirror') {
-        if (s.mirrorLive) setOpen();
+        var live = !!s.mirrorLive;
+        if (live && mirrorLiveSince === null) mirrorLiveSince = now;
+        if (!live) { mirrorLiveSince = null; mirrorLastTime = null; }
+        // Advancing proof: a carried playhead must move; without one
+        // (the real cross-origin case) the live signal must SUSTAIN —
+        // a single load beat is a start, not a progression.
+        var mAdv = false;
+        if (live && typeof s.currentTime === 'number') {
+          mAdv = mirrorLastTime !== null && (s.currentTime - mirrorLastTime) > 0.03;
+          mirrorLastTime = s.currentTime;
+        } else if (live) {
+          mAdv = mirrorLiveSince !== null && (now - mirrorLiveSince) >= 500;
+        }
+        if (live) setOpen();
         else setClosed('not-playing', now);
+        // v31 confirmation, mirror discipline: the video's duration
+        // must match the expected length and the playhead must be
+        // advancing — a wrong or stalled mirror never starts the
+        // countdown. The anti-trap fallback covers a leg whose
+        // duration can never be read at all.
+        var mDur = (typeof s.duration === 'number' && s.duration > 0) ? s.duration : 0;
+        if (!live) { confirmed = false; viaFallback = false; }
+        else if (mDur > 0 && durationMatches(mDur) && mAdv) { confirmed = true; viaFallback = false; }
+        else if (fallbackReached(now) && mAdv) { confirmed = true; viaFallback = true; }
+        else { confirmed = false; viaFallback = false; }
         return gate;
       }
       // YouTube leg.
@@ -576,14 +652,14 @@
         lastDuration = d;
         if (d > refDuration) refDuration = d; // the longest content is the song
       }
-      if (s.ytState === 0) { setClosed('ended', now); return gate; }
-      if (s.ytState !== 1) { setClosed('not-playing', now); return gate; }
+      if (s.ytState === 0) { setClosed('ended', now); return finishConfirm(s, now); }
+      if (s.ytState !== 1) { setClosed('not-playing', now); return finishConfirm(s, now); }
       // PLAYING — the playhead must actually be moving.
       var t = (typeof s.currentTime === 'number') ? s.currentTime : null;
       var advancing = false;
       if (t !== null && lastTime !== null) advancing = (t - lastTime) > 0.03;
       if (t !== null) lastTime = t;
-      if (!advancing) { setClosed('not-playing', now); return gate; }
+      if (!advancing) { setClosed('not-playing', now); return finishConfirm(s, now); }
       // PLAYING + advancing — song, or an ad riding the same state?
       // The reference is the BEST knowledge of the song's length: the
       // latched longest-observed duration, or the metadata length when
@@ -593,9 +669,33 @@
       var ref = Math.max(refDuration, expectedDuration);
       if (ref > 0 && cur > 0 && cur < ref - AD_DURATION_TOLERANCE) {
         setClosed('ad', now);
-        return gate;
+        return finishConfirm(s, now);
       }
       setOpen();
+      return finishConfirm(s, now);
+    }
+
+    /* v31: derive the confirmation verdict from the base verdict
+       this sample just produced. Closed is closed. Open still has
+       to prove it is the SONG: while the expected length is known
+       and a duration is readable, only a match confirms (an ad's
+       duration betrays it even though its sound is real); sound
+       contradicted by the player (muted / volume 0) also blocks.
+       When strict proof is impossible — no metadata yet, duration
+       unreadable, sound unverifiable — the anti-trap fallback
+       confirms on the base verdict once the window has run, so a
+       round can never be frozen forever by missing data. */
+    function finishConfirm(s, now) {
+      if (!open) { confirmed = false; viaFallback = false; return gate; }
+      if (expectedDuration > 0 && lastDuration > 0) {
+        if (durationMatches(lastDuration) && s.soundOk !== false) {
+          confirmed = true; viaFallback = false;
+        } else if (fallbackReached(now)) {
+          confirmed = true; viaFallback = true;
+        } else { confirmed = false; viaFallback = false; }
+      } else if (fallbackReached(now)) {
+        confirmed = true; viaFallback = true;
+      } else { confirmed = false; viaFallback = false; }
       return gate;
     }
 
@@ -620,6 +720,11 @@
       reason = 'no-track';
       adSince = null;
       adMs = 0;
+      firstSampleAt = null;
+      confirmed = false;
+      viaFallback = false;
+      mirrorLiveSince = null;
+      mirrorLastTime = null;
     }
 
     var gate = {
@@ -627,6 +732,8 @@
       setExpectedDuration: setExpectedDuration,
       reset: reset,
       isOpen: function () { return open; },
+      songConfirmed: function () { return confirmed; },
+      confirmViaFallback: function () { return viaFallback; },
       reason: function () { return reason; },
       adMs: function () { return adMs; },
       refDuration: function () { return Math.max(refDuration, expectedDuration); }
@@ -1045,6 +1152,29 @@
       (state.now - state.startedAt) >= SOUND_GATE_MS;
   }
 
+  /* ---------------------------------------------------------------- */
+  /* The TAP TOGGLE (v31 — Korey: "Tap should be to start the game    */
+  /* and pause the game"). One tap on the stage/track area is the     */
+  /* round's master start/pause on this phone. The DECISION is this   */
+  /* pure function; app.js is a thin shell that carries it out        */
+  /* through the real player (YouTube pauseVideo/playVideo, mirror    */
+  /* suspend/restart), so the gated clock freezes from the actual     */
+  /* playback state — there is no separate fake pause.                */
+  /* state: { paused, want, wantPlaying, pending, startable }         */
+  /*  - paused (this phone paused the round)      -> 'resume'         */
+  /*  - a track live and playing                  -> 'pause'          */
+  /*  - a want cued, a call pending, or a stage   -> 'start'          */
+  /*    song startable                                            */
+  /*  - nothing live                              -> 'none'           */
+  /* ---------------------------------------------------------------- */
+  function roundTapAction(state) {
+    if (!state) return 'none';
+    if (state.paused) return state.want ? 'resume' : 'none';
+    if (state.want && state.wantPlaying) return 'pause';
+    if (state.want || state.pending || state.startable) return 'start';
+    return 'none';
+  }
+
   return {
     FREE: FREE,
     CENTER: CENTER,
@@ -1079,6 +1209,8 @@
     buildNightRecord: buildNightRecord,
     AD_DURATION_TOLERANCE: AD_DURATION_TOLERANCE,
     AD_FREEZE_CAP_MS: AD_FREEZE_CAP_MS,
+    CONFIRM_FALLBACK_MS: CONFIRM_FALLBACK_MS,
+    AD_WAITING_STATUS: AD_WAITING_STATUS,
     createPlaybackGate: createPlaybackGate,
     createGatedClock: createGatedClock,
     callRescueMs: callRescueMs,
@@ -1107,6 +1239,7 @@
     SOUND_LABEL_NOSOUND: SOUND_LABEL_NOSOUND,
     SOUND_LABEL_PLAY: SOUND_LABEL_PLAY,
     soundButtonMode: soundButtonMode,
-    shouldAutoEscalate: shouldAutoEscalate
+    shouldAutoEscalate: shouldAutoEscalate,
+    roundTapAction: roundTapAction
   };
 });
