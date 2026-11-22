@@ -143,6 +143,366 @@
     return Data.DECKS[0];
   }
 
+  /* ================= SAVED NIGHTS =================
+     "Make a night stick": when a game reaches its final standings,
+     the night is saved on THIS device (whoever is looking at the
+     standings — host or guest): date/time, deck, room code, every
+     player's final score, the winner. From there: a Past nights
+     list, a one-tap rematch, and a shareable standings picture.
+     All storage is fail-soft — a blocked or full localStorage must
+     never break a game in progress. */
+  var NIGHTS_KEY = 'lsb_nights';
+  var NIGHTS_MAX = 30;
+  // Storage id of the record saved for the game that just ended on
+  // this screen. Re-renders of the same final standings UPDATE that
+  // record (the host's state broadcast lands after the winner
+  // message, with the final scores) instead of stacking duplicates.
+  var nightSaveId = null;
+
+  function loadNights() {
+    try {
+      var list = JSON.parse(localStorage.getItem(NIGHTS_KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (e) { return []; }
+  }
+  function storeNights(list) {
+    try { localStorage.setItem(NIGHTS_KEY, JSON.stringify(list)); return true; }
+    catch (e) { return false; }
+  }
+  function paintPastNightsBtn() {
+    var b = $('btn-past-nights');
+    if (!b) return;
+    var n = loadNights().length;
+    b.textContent = '🌙 Past nights' + (n ? ' (' + n + ')' : '');
+  }
+  function nightById(id) {
+    var list = loadNights();
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+  function nightWhen(ts) {
+    var d = new Date(ts || 0);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' • ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /** The finished game on THIS screen, as a saved-night record —
+      or null when this device has no finished game to record. */
+  function currentNightRecord() {
+    if (role === 'host' && H) {
+      var w = null;
+      if (H.winner) {
+        var wp = playerById(H.winner.playerId);
+        w = { name: H.winner.name, score: wp ? wp.score : null };
+      }
+      return Core.buildNightRecord({
+        endedAt: Date.now(), roomCode: roomCode, deckId: H.deck.id, deckName: H.deck.name,
+        mode: mode, players: publicPlayers(), winner: w, calledCount: H.called.length,
+        patterns: H.patterns, patternsPicked: H.patternsPicked
+      });
+    }
+    if (role === 'guest' && G && G.state) {
+      var gw = null;
+      if (G.winner) {
+        gw = { name: G.winner.name, score: null };
+        (G.state.players || []).forEach(function (p) {
+          if (p.id === G.winner.playerId) gw.score = p.score;
+        });
+      }
+      var deck = null;
+      var wantName = G.state.deckName || G.deckName || '';
+      allDecks().forEach(function (d) { if (d.name === wantName) deck = d; });
+      return Core.buildNightRecord({
+        endedAt: Date.now(), roomCode: roomCode, deckId: deck ? deck.id : null,
+        deckName: wantName, mode: mode,
+        players: G.state.players || [], winner: gw, calledCount: (G.state.called || []).length
+      });
+    }
+    return null;
+  }
+
+  /** Save the finished game — once. Later re-renders of the same
+      standings update the record named by nightSaveId (see above);
+      a genuinely new finished game always gets a fresh record. (No
+      signature dedupe: a rematch can legitimately end with identical
+      standings, and a reloaded page holds no finished game in memory
+      to re-save.) */
+  function maybeSaveNight() {
+    var rec = currentNightRecord();
+    if (!rec || !rec.players.length) return;
+    var list = loadNights();
+    if (nightSaveId) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].id === nightSaveId) {
+          rec.id = nightSaveId;
+          rec.endedAt = list[i].endedAt; // keep the moment the game ended
+          list[i] = rec;
+          storeNights(list);
+          return;
+        }
+      }
+      nightSaveId = null; // the record was deleted from under this screen
+    }
+    rec.id = 'night-' + Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e6).toString(36);
+    list.unshift(rec);
+    if (list.length > NIGHTS_MAX) list = list.slice(0, NIGHTS_MAX);
+    if (storeNights(list)) { nightSaveId = rec.id; paintPastNightsBtn(); }
+  }
+
+  /* ---- one-tap rematch (in the room): same room code, same deck,
+     same round/shape settings, scores reset, connected players stay
+     in. That is exactly a fresh game in this room — hostNewGame does
+     all of it without touching the transport. ---- */
+  function hostRematch() {
+    if (!H || H.phase !== 'over') return;
+    hostNewGame();
+    toast('🔁 Rematch! Same room, same deck — fresh cards, scores reset.');
+  }
+
+  /* ---- past nights UI ---- */
+  var openNightId = null;
+  function renderNights() {
+    var wrap = $('nights-list');
+    var list = loadNights();
+    openNightId = null;
+    $('night-detail').hidden = true;
+    $('nights-list-wrap').hidden = false;
+    wrap.innerHTML = '';
+    if (!list.length) {
+      wrap.innerHTML = '<p class="hint">No finished games saved yet — finish a game and its final standings land here automatically.</p>';
+      return;
+    }
+    list.forEach(function (n) {
+      var top = (n.players || [])[0];
+      var row = document.createElement('button');
+      row.className = 'night-row';
+      row.innerHTML = '<span class="night-when">' + esc(nightWhen(n.endedAt)) + '</span>' +
+        '<span class="night-deck">' + esc(n.deckName || 'Lip Sync Bingo') +
+        (n.roomCode ? ' • Room ' + esc(n.roomCode) : '') + '</span>' +
+        '<span class="night-top">' +
+        (n.winner ? '🏆 ' + esc(n.winner.name) + ' took the night'
+          : (top ? 'Top score: ' + esc(top.name) + ' — ' + top.score + ' pts' : '')) +
+        ' • ' + (n.players || []).length + ((n.players || []).length === 1 ? ' player' : ' players') + '</span>';
+      row.addEventListener('click', function () { openNight(n.id); });
+      wrap.appendChild(row);
+    });
+  }
+  function openNight(id) {
+    var n = nightById(id);
+    if (!n) { renderNights(); return; }
+    openNightId = id;
+    $('nights-list-wrap').hidden = true;
+    $('night-detail').hidden = false;
+    $('night-detail-title').textContent = n.deckName || 'Lip Sync Bingo';
+    $('night-detail-meta').textContent = nightWhen(n.endedAt) +
+      (n.roomCode ? ' • Room ' + n.roomCode : '') +
+      (n.mode === 'solo' ? ' • Practice game' : n.mode === 'hotspot' ? ' • Hotspot game' : '');
+    var ul = $('night-detail-list');
+    ul.innerHTML = '';
+    (n.players || []).forEach(function (p, i) {
+      var li = document.createElement('li');
+      if (n.winner && p.name === n.winner.name && p.score === n.winner.score) li.className = 'winner-row';
+      li.innerHTML = '<span class="p-name">' + (i + 1) + '. ' + esc(p.name) + '</span>' +
+        '<span class="p-meta"><span class="p-score">' + p.score + ' pts</span></span>';
+      ul.appendChild(li);
+    });
+    if (!(n.players || []).length) ul.innerHTML = '<li>No players recorded.</li>';
+  }
+  function deleteOpenNight() {
+    if (!openNightId) return;
+    storeNights(loadNights().filter(function (n) { return n.id !== openNightId; }));
+    if (nightSaveId === openNightId) nightSaveId = null;
+    openNightId = null;
+    paintPastNightsBtn();
+    renderNights();
+    toast('Night deleted.');
+  }
+
+  /* ---- rematch from a saved night: host the room again under the
+     same code, same deck, same shapes. If the code is somehow taken
+     (another live room owns it), say so plainly and run the rematch
+     under a fresh code instead. ---- */
+  function rematchNight() {
+    var n = openNightId ? nightById(openNightId) : null;
+    if (!n) return;
+    if (!myName) { toast('Put your name in on the home screen first!'); show('screen-home'); return; }
+    if (n.deckId) {
+      var found = null;
+      allDecks().forEach(function (x) { if (x.id === n.deckId) found = x; });
+      if (found) {
+        selectedDeckId = found.id;
+        try { localStorage.setItem('lsb_deck', selectedDeckId); } catch (e) {}
+        renderDeckGrid();
+      }
+    }
+    function applySettings() {
+      if (n.patterns) {
+        H.patterns = { 1: n.patterns[1], 2: n.patterns[2], 3: n.patterns[3] };
+        if (n.patternsPicked) {
+          H.patternsPicked = { 1: !!n.patternsPicked[1], 2: !!n.patternsPicked[2], 3: !!n.patternsPicked[3] };
+        }
+        pickerSig.lobby = ''; pickerSig.scores = '';
+      }
+    }
+    var hostCbs = { onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onError: function () {}, onMedia: onNetMedia };
+    if (n.mode === 'hotspot') {
+      var ht = Net.createHotspotHost({ onMessage: hostOnMessage, onJoin: hostOnJoin, onLeave: hostOnLeave, onRemoteTrack: onHsTrack });
+      enterHost('hotspot', ht, '');
+      applySettings();
+      toast('Hotspot rematch room open — pair each player below.');
+      return;
+    }
+    if (n.mode === 'solo' || !n.roomCode) {
+      enterHost('solo', Net.createLoopbackHost(), '');
+      applySettings();
+      toast('Practice rematch — same deck as that night.');
+      return;
+    }
+    var wanted = n.roomCode;
+    toast('Reopening room ' + wanted + '…');
+    Net.createPeerHost(wanted, hostCbs)
+      .then(function (t) {
+        enterHost('online', t, wanted);
+        applySettings();
+        toast('🔁 Room ' + wanted + ' is back — same code, same deck. Your players can rejoin with the code!');
+      })
+      .catch(function (err) {
+        if (!/already in use/i.test((err && err.message) || '')) { toast(err.message); return; }
+        var fresh = Core.makeRoomCode();
+        Net.createPeerHost(fresh, hostCbs)
+          .then(function (t) {
+            enterHost('online', t, fresh);
+            applySettings();
+            toast('Room ' + wanted + ' was taken — the rematch is room ' + fresh + ' instead. Share the new code!');
+          })
+          .catch(function (err2) { toast(err2.message); });
+      });
+  }
+
+  /* ---- the shareable standings picture: native canvas only, no
+     libraries, so it works on a hotspot with no internet. Portrait
+     1080x1350 in the NOIR GOLD look. ---- */
+  function drawStandingsImage(n) {
+    var W = 1080, Hh = 1350;
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = Hh;
+    var ctx = cv.getContext('2d');
+    var GOLD = '#d4af37', GOLD_HI = '#f6e27a', GOLD_LO = '#a87f1f',
+      TEXT = '#f5f2ea', MUTED = '#a09c90', FAINT = '#6e6a60',
+      SURFACE = '#101013', LINE = '#26262c';
+    var DISPLAY = '"Bricolage Grotesque","Manrope",sans-serif';
+    var BODY = '"Manrope",sans-serif';
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, W, Hh);
+    var glow = ctx.createRadialGradient(W / 2, -160, 60, W / 2, -160, 780);
+    glow.addColorStop(0, 'rgba(212,175,55,0.20)');
+    glow.addColorStop(1, 'rgba(212,175,55,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, 640);
+    var grad = ctx.createLinearGradient(0, 0, 0, Hh);
+    grad.addColorStop(0, GOLD_HI); grad.addColorStop(0.55, GOLD); grad.addColorStop(1, GOLD_LO);
+    ctx.strokeStyle = grad; ctx.lineWidth = 6; ctx.strokeRect(26, 26, W - 52, Hh - 52);
+    ctx.strokeStyle = 'rgba(212,175,55,0.40)'; ctx.lineWidth = 2; ctx.strokeRect(46, 46, W - 92, Hh - 92);
+    function spaced(text, y, font, color, spacing) {
+      ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      try { ctx.letterSpacing = spacing || '0px'; } catch (e) {}
+      ctx.fillText(text, W / 2, y);
+      try { ctx.letterSpacing = '0px'; } catch (e) {}
+    }
+    function fit(text, maxWidth, font) {
+      ctx.font = font;
+      var t = String(text == null ? '' : text);
+      if (ctx.measureText(t).width <= maxWidth) return t;
+      while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+      return t + '…';
+    }
+    // Brand header — "LIP SYNC" in white, "BINGO" in gold, like the app.
+    spaced('HITMANS VIP AFTER SPOT', 116, '800 29px ' + BODY, GOLD, '10px');
+    var titleFont = '800 86px ' + DISPLAY;
+    ctx.font = titleFont;
+    var wA = ctx.measureText('LIP SYNC ').width, wB = ctx.measureText('BINGO').width;
+    var tx = (W - (wA + wB)) / 2;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = TEXT; ctx.fillText('LIP SYNC ', tx, 182);
+    ctx.fillStyle = GOLD; ctx.fillText('BINGO', tx + wA, 182);
+    var rule = ctx.createLinearGradient(W / 2 - 190, 0, W / 2 + 190, 0);
+    rule.addColorStop(0, GOLD_LO); rule.addColorStop(0.5, GOLD_HI); rule.addColorStop(1, GOLD_LO);
+    ctx.fillStyle = rule; ctx.fillRect(W / 2 - 190, 234, 380, 4);
+    spaced('FINAL STANDINGS', 282, '800 38px ' + DISPLAY, GOLD, '8px');
+    var when = new Date(n.endedAt || 0);
+    spaced(when.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) +
+      ' • ' + when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+      336, '600 29px ' + BODY, MUTED);
+    spaced(fit('Deck: ' + (n.deckName || 'Lip Sync Bingo') + (n.roomCode ? '  •  Room ' + n.roomCode : ''), 900, '600 29px ' + BODY),
+      378, '600 29px ' + BODY, MUTED);
+    var y = 428;
+    if (n.winner) {
+      spaced('👑 WINNER', y + 8, '800 27px ' + BODY, GOLD, '6px');
+      spaced(fit(n.winner.name, 880, '800 66px ' + DISPLAY), y + 62, '800 66px ' + DISPLAY, TEXT);
+      if (typeof n.winner.score === 'number') {
+        spaced(n.winner.score + ' PTS', y + 118, '800 33px ' + DISPLAY, GOLD, '3px');
+      }
+      y += 168;
+    }
+    // Ranked standings — as many rows as fit, then a "+N more" line.
+    var players = n.players || [];
+    var footTop = Hh - 148;
+    var maxRows = Math.max(1, Math.floor((footTop - y) / 78));
+    var shown = Math.min(players.length, maxRows);
+    var rowH = Math.min(76, (footTop - y) / Math.max(1, shown));
+    for (var i = 0; i < shown; i++) {
+      var p = players[i];
+      var ry = y + i * rowH;
+      var isWin = !!(n.winner && p.name === n.winner.name && p.score === n.winner.score);
+      ctx.fillStyle = SURFACE;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(90, ry, W - 180, rowH - 10, 14); else ctx.rect(90, ry, W - 180, rowH - 10);
+      ctx.fill();
+      if (isWin) { ctx.strokeStyle = grad; ctx.lineWidth = 2.5; ctx.stroke(); }
+      ctx.textBaseline = 'middle';
+      ctx.font = '800 32px ' + DISPLAY; ctx.fillStyle = GOLD; ctx.textAlign = 'left';
+      ctx.fillText(String(i + 1), 122, ry + (rowH - 10) / 2);
+      ctx.font = '700 34px ' + BODY; ctx.fillStyle = TEXT;
+      ctx.fillText(fit(p.name, 560, '700 34px ' + BODY), 178, ry + (rowH - 10) / 2);
+      ctx.font = '800 32px ' + DISPLAY; ctx.fillStyle = GOLD; ctx.textAlign = 'right';
+      ctx.fillText(p.score + ' PTS', W - 122, ry + (rowH - 10) / 2);
+    }
+    if (players.length > shown) {
+      spaced('+' + (players.length - shown) + ' more players', y + shown * rowH + 22, '600 26px ' + BODY, FAINT);
+    }
+    spaced('LIP SYNC BINGO • HITMANS VIP AFTER SPOT CORP', Hh - 96, '700 23px ' + BODY, MUTED, '3px');
+    spaced('FREE PLAY — NO PRIZE MONEY', Hh - 62, '700 21px ' + BODY, FAINT, '3px');
+    return cv;
+  }
+  function shareStandingsImage(n) {
+    if (!n) return;
+    var cv;
+    try { cv = drawStandingsImage(n); } catch (e) { toast('Could not make the picture on this phone.'); return; }
+    function download() {
+      try {
+        var a = document.createElement('a');
+        a.download = 'lip-sync-bingo-standings.png';
+        a.href = cv.toDataURL('image/png');
+        document.body.appendChild(a);
+        a.click();
+        if (a.remove) a.remove();
+        toast('Standings picture downloaded — post it anywhere!');
+      } catch (e) { toast('Sharing is not available on this phone.'); }
+    }
+    if (cv.toBlob && typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+      cv.toBlob(function (blob) {
+        if (!blob) { download(); return; }
+        var file = null;
+        try { file = new File([blob], 'lip-sync-bingo-standings.png', { type: 'image/png' }); } catch (e) { download(); return; }
+        var data = { files: [file], title: 'Lip Sync Bingo — Final Standings' };
+        var ok = false;
+        try { ok = navigator.canShare(data); } catch (e) { ok = false; }
+        if (ok) navigator.share(data).catch(function () { /* the host closed the share sheet — fine */ });
+        else download();
+      }, 'image/png');
+    } else {
+      download();
+    }
+  }
+
   function renderDeckGrid() {
     var grid = $('deck-grid');
     grid.innerHTML = '';
@@ -482,6 +842,7 @@
 
   /* ---- the caller ---- */
   function hostStartGame() {
+    nightSaveId = null; // a new game gets its own saved-night record
     H.phase = 'playing';
     H.round = 1;
     H.winner = null;
@@ -933,6 +1294,7 @@
         break;
       case 'game':
         ensureTrackPlayer(); // guests get no Start tap — build the player on game entry so it is ready before their first Play tap
+        nightSaveId = null; // a new game gets its own saved-night record
         G.winner = null;
         G.roundEnded = null;
         show('screen-game');
@@ -1388,6 +1750,14 @@
     });
     $('scores-host-controls').hidden = role !== 'host';
     if (role === 'host') $('btn-next-round').hidden = isOver || H.phase === 'over';
+    // Final standings: save the night on this device, and offer the
+    // rematch (host) + the standings picture (everyone).
+    var fin = $('scores-final-controls');
+    if (fin) {
+      fin.hidden = !isOver;
+      $('btn-rematch').hidden = role !== 'host';
+    }
+    if (isOver) maybeSaveNight();
     renderPatternPickers();
   }
 
@@ -2500,6 +2870,7 @@
       try { transport.close(); } catch (e) {}
     }
     transport = null; role = null; mode = null; H = null; G = null; roomCode = '';
+    nightSaveId = null;
     lastCallShown = null;
     show('screen-home');
     if (!silent) toast('You left the room.');
@@ -2786,7 +3157,23 @@
   /* ---- scores controls ---- */
   $('btn-next-round').addEventListener('click', function () { hostNextRound(); });
   $('btn-new-game').addEventListener('click', function () { hostNewGame(); });
+  $('btn-rematch').addEventListener('click', function () { hostRematch(); });
+  $('btn-share-scores').addEventListener('click', function () {
+    var rec = currentNightRecord();
+    if (rec) shareStandingsImage(rec);
+  });
   $('btn-scores-home').addEventListener('click', function () { leaveRoom(false); });
+
+  /* ---- past nights ---- */
+  $('btn-past-nights').addEventListener('click', function () { show('screen-nights'); renderNights(); });
+  $('btn-nights-home').addEventListener('click', function () { show('screen-home'); });
+  $('btn-night-back').addEventListener('click', function () { renderNights(); });
+  $('btn-night-delete').addEventListener('click', function () { deleteOpenNight(); });
+  $('btn-night-share').addEventListener('click', function () {
+    var n = nightById(openNightId);
+    if (n) shareStandingsImage(n);
+  });
+  $('btn-night-rematch').addEventListener('click', function () { rematchNight(); });
 
   /* ================= DECK BUILDER ================= */
   var builderPicked = new Set();
@@ -2878,4 +3265,5 @@
   // inside that tap (see ensureTrackPlayer).
   ytApi();
   renderDeckGrid();
+  paintPastNightsBtn();
 })();
